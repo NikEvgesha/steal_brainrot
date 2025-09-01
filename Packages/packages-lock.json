@@ -1,5 +1,28 @@
 {
   "dependencies": {
+    "com.romanlee17.mirrasdk": {
+      "version": "git@github.com:MirraSDK/SDK.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.addressables": "1.0.0"
+      },
+      "hash": "bd1dfec4fd9f4a250dfef1c255c7ab2c28ff49e0"
+    },
+    "com.unity.addressables": {
+      "version": "1.22.3",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.assetbundle": "1.0.0",
+        "com.unity.modules.jsonserialize": "1.0.0",
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.modules.unitywebrequest": "1.0.0",
+        "com.unity.scriptablebuildpipeline": "1.21.25",
+        "com.unity.modules.unitywebrequestassetbundle": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.collab-proxy": {
       "version": "2.9.2",
       "depth": 0,
@@ -63,6 +86,13 @@
     "com.unity.performance.profile-analyzer": {
       "version": "1.2.3",
       "depth": 1,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.scriptablebuildpipeline": {
+      "version": "1.21.25",
+      "depth": 2,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
