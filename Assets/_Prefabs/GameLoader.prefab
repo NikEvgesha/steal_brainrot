@@ -179,7 +179,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1585407460803921474}
-  - component: {fileID: 6598329015578064376}
+  - component: {fileID: 4167235093117916985}
   m_Layer: 0
   m_Name: GameLoader
   m_TagString: Untagged
@@ -203,7 +203,7 @@ Transform:
   - {fileID: 2750009670590189547}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6598329015578064376
+--- !u!114 &4167235093117916985
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -212,7 +212,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1166656756220559793}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 45a0443b8bf6f734eb6fdd9f54b4efba, type: 3}
+  m_Script: {fileID: 11500000, guid: 65311025fb7116349a166d4981f1f387, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _loadingImage: {fileID: 1176121247863319989}
@@ -679,119 +679,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 6843992401974593432}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d8430e81f33b564fa86edd61c396d6c, type: 3}
+  m_Script: {fileID: 11500000, guid: 1a7ebae9ef99aa2419572359d376db2f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _image: {fileID: 2467525428991380947}
+  _image: {fileID: 6879758176479500175}
   _visuals:
   - serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
       value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
       weightedMode: 0
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
       time: 1
       value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  - serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 0.16384545
-      value: 0.4091521
-      inSlope: 1.179522
-      outSlope: 1.179522
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 0.71879596
-      value: 0.6154635
-      inSlope: 0.9289929
-      outSlope: 0.9289929
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  - serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 0.13393785
-      value: 0.19108152
-      inSlope: 0.11826123
-      outSlope: 0.11826123
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.91254574
-    - serializedVersion: 3
-      time: 0.42434964
-      value: 0.4091521
-      inSlope: 0.5286132
-      outSlope: 0.5286132
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.45511413
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 0.7692161
-      value: 0.8230107
-      inSlope: 0.34867507
-      outSlope: 0.34867507
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.62645614
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 34
       weightedMode: 0
       inWeight: 0
       outWeight: 0
