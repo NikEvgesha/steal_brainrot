@@ -179,7 +179,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1585407460803921474}
-  - component: {fileID: 4167235093117916985}
+  - component: {fileID: 3636252216441058601}
   m_Layer: 0
   m_Name: GameLoader
   m_TagString: Untagged
@@ -203,7 +203,7 @@ Transform:
   - {fileID: 2750009670590189547}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &4167235093117916985
+--- !u!114 &3636252216441058601
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -212,7 +212,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1166656756220559793}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 65311025fb7116349a166d4981f1f387, type: 3}
+  m_Script: {fileID: 11500000, guid: a363bab0387457f42b73caf1b5ead986, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _loadingImage: {fileID: 1176121247863319989}
@@ -603,7 +603,7 @@ GameObject:
   - component: {fileID: 7582113640502614679}
   - component: {fileID: 7450333230741061599}
   - component: {fileID: 7857850417848156787}
-  - component: {fileID: 2084394322250424347}
+  - component: {fileID: 5544373105185920013}
   m_Layer: 5
   m_Name: LoadingProgressBarUI
   m_TagString: Untagged
@@ -670,7 +670,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &2084394322250424347
+--- !u!114 &5544373105185920013
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -679,7 +679,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6843992401974593432}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1a7ebae9ef99aa2419572359d376db2f, type: 3}
+  m_Script: {fileID: 11500000, guid: 79e7e3ff6ec571a4bb9407424f554c24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _image: {fileID: 6879758176479500175}
@@ -707,6 +707,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  _text: {fileID: 3308289105531111861}
+  _text: {fileID: 0}
   _progress: 0
   _firstPartProgress: 0.8
