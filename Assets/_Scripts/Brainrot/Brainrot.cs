@@ -4,7 +4,7 @@ using UnityEngine;
 public class Brainrot : MonoBehaviour
 {
     [SerializeField] private float _speed;
-
+    [SerializeField] Transform _modelPoint;
     private BrainrotData _data;
     private Rarity _rarity;
     private BrainrotStatus _status;
@@ -12,6 +12,8 @@ public class Brainrot : MonoBehaviour
 
     private bool _isMoving;
     private Transform _destinationPoint;
+    private GameObject _model;
+    private Animator _animatorModel;
 
     private void Awake()
     {
@@ -24,7 +26,8 @@ public class Brainrot : MonoBehaviour
         _rarity = rarity;
         _status = BrainrotStatus.Conveyer;
         _canvas.SetInfo(data, rarity);
-
+        _model = Instantiate(_data.Model,_modelPoint);
+        _animatorModel = _model.GetComponent<Animator>();
         //Set model from _data;
         //Set rarity material;
     }
@@ -42,10 +45,13 @@ public class Brainrot : MonoBehaviour
         switch (status)
         {
             case BrainrotStatus.Conveyer:
+                _animatorModel.SetBool("Move", true);
                 break;
             case BrainrotStatus.MovingToBase:
+                _animatorModel.SetBool("Move", true);
                 break;
             case BrainrotStatus.Base:
+                _animatorModel.SetBool("Move", false);
                 break;
         }
     }
