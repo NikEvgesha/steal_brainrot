@@ -1,0 +1,78 @@
+using System.Collections;
+using UnityEngine;
+
+public class BrainrotPlatform : MonoBehaviour
+{
+    [SerializeField] private Transform _brainrotPoint;
+    [SerializeField] private PushPlatform _incomePlatform;
+
+    private bool _empty = true;
+    private bool _brainrotOnPoint = false;
+    private Brainrot _brainrot;
+    private PlayerBase _playerBase;
+    private ulong _currentIncome; 
+
+    public bool Empty { get { return _empty; } }
+    public Brainrot Brainrot { get { return _brainrot; } }
+    public Transform BrainrotPoint { get { return _brainrotPoint; } }
+
+    private void OnEnable()
+    {
+        _incomePlatform.PlayerOnPlatform += GetIncome;
+    }
+
+    private void OnDisable()
+    {
+        _incomePlatform.PlayerOnPlatform -= GetIncome;
+    }
+
+    public void SetPlayerBase(PlayerBase playerBase)
+    {
+        _playerBase = playerBase;
+    }
+
+    public void SetBrainrot(Brainrot brainrot)
+    {
+        _brainrot = brainrot;
+        _brainrotOnPoint = _brainrot != null;
+        _empty = _brainrot == null;
+    } 
+
+    public void OnBrainrotArrival()
+    {
+        _brainrot.SetStatus(BrainrotStatus.Base);
+        _brainrotOnPoint = true;
+        _brainrot.transform.position = _brainrotPoint.position;
+        _brainrot.transform.localEulerAngles = transform.localEulerAngles;
+        _currentIncome = 0;
+        _incomePlatform.SetVisible(true);
+        StartCoroutine(ProduceIncome());
+        _brainrot.Selled += OnSell;
+    }
+
+    private IEnumerator ProduceIncome()
+    {
+        while (_brainrotOnPoint)
+        {
+            yield return new WaitForSecondsRealtime(1);
+            _currentIncome += (ulong)(_brainrot.Data.Income * _brainrot.Rarity.IncomeMultiplier);
+            _incomePlatform.SetText(_currentIncome);
+        }
+    }
+
+    private void GetIncome()
+    {
+        CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _currentIncome);
+        _currentIncome = 0;
+        _incomePlatform.SetText(_currentIncome);
+    }
+
+    private void OnSell()
+    {
+        _empty = true;
+        StopAllCoroutines();
+        GetIncome();
+        CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _brainrot.Data.SellPrice);
+        Destroy(_brainrot.gameObject);
+    }
+}

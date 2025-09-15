@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,7 +13,7 @@ public class BrainrotInfoUI : MonoBehaviour
     {
         _name.text = data.Name;
         _rarity.text = rarity.Name;
-        _income.text = string.Format("{0}/s", data.Income);
-        _price.text = data.Price.ToString();
+        _income.text = string.Format("{0}/s", data.Income * rarity.IncomeMultiplier);
+        _price.text = data.BuyPrice.ToString();
     }
 }

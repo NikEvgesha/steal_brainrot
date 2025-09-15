@@ -5,9 +5,10 @@ public class BrainrotData : ScriptableObject
 {
     [SerializeField] private string _name;
     [SerializeField] private GameObject _model;
-    [SerializeField] private int _price; // big int ? decimal ?
-    [SerializeField] private int _income; // in second
+    [SerializeField] private uint _buyPrice; // big int ? decimal ?
+    [SerializeField] private uint _income; // in second
     [SerializeField] private float _weight;
+    [SerializeField] private uint _sellPrice;
 
     public string Name
     {
@@ -19,7 +20,8 @@ public class BrainrotData : ScriptableObject
     }
 
     public GameObject Model => _model;
-    public int Price => _price;
-    public int Income => _income;
+    public uint BuyPrice => _buyPrice;
+    public uint SellPrice => _sellPrice;
+    public uint Income => _income;
     public float Weight => _weight;
 }

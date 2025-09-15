@@ -3,7 +3,7 @@ public enum BrainrotStatus
 {
     Init,
     Conveyer,
-    MovingToBase,
+    Moving,
     Base,
-    Stolen
+    //Stolen
 }

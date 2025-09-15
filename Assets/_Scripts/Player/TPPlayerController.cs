@@ -34,9 +34,12 @@ public class TPPlayerController : MonoBehaviour
     private void Update()
     {
         // 1) Считываем ввод
-        float h = Input.GetAxisRaw("Horizontal");
-        float v = Input.GetAxisRaw("Vertical");
-        bool running = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        //float h = Input.GetAxisRaw("Horizontal");
+        //float v = Input.GetAxisRaw("Vertical");
+
+        Vector3 movement = PlayerInput.Instance.Movement;
+
+        //bool running = PlayerInput.Instance.Sprint; //Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 
         // 2) Направление в плоскости XZ относительно камеры
         Vector3 camForward = cameraTransform != null ? cameraTransform.forward : Vector3.forward;
@@ -44,11 +47,11 @@ public class TPPlayerController : MonoBehaviour
         camForward.y = 0f; camRight.y = 0f;
         camForward.Normalize(); camRight.Normalize();
 
-        Vector3 moveDir = camForward * v + camRight * h;
+        Vector3 moveDir = camForward * movement.z + camRight * movement.x;
         if (moveDir.sqrMagnitude > 1f) moveDir.Normalize();
 
         // 3) Плавное изменение целевой горизонтальной скорости
-        float targetSpeed = (running ? runSpeed : walkSpeed) * moveDir.magnitude;
+        float targetSpeed = /*(running ? runSpeed : walkSpeed) **/ walkSpeed * moveDir.magnitude;
         _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, acceleration * Time.deltaTime);
 
         Vector3 velocity = moveDir * _currentSpeed;
