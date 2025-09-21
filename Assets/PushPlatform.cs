@@ -7,7 +7,7 @@ public class PushPlatform : MonoBehaviour
     [SerializeField] private GameObject _incomeCanvas;
     [SerializeField] private Text _incomeText;
 
-    public Action PlayerOnPlatform;
+    public Action<bool> PlayerOnPlatform;
 
     public void SetText(ulong income)
     {
@@ -22,10 +22,17 @@ public class PushPlatform : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        Debug.Log("Trigger");
         if (other.CompareTag("Player"))
         {
-            PlayerOnPlatform?.Invoke();
+            PlayerOnPlatform?.Invoke(true);
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            PlayerOnPlatform?.Invoke(false);
         }
     }
 

@@ -6,6 +6,7 @@ public class BrainrotPlatform : MonoBehaviour
     [SerializeField] private Transform _brainrotPoint;
     [SerializeField] private PushPlatform _incomePlatform;
 
+    private AudioSource _audio;
     private bool _empty = true;
     private bool _brainrotOnPoint = false;
     private Brainrot _brainrot;
@@ -16,14 +17,19 @@ public class BrainrotPlatform : MonoBehaviour
     public Brainrot Brainrot { get { return _brainrot; } }
     public Transform BrainrotPoint { get { return _brainrotPoint; } }
 
+    private void Awake()
+    {
+        _audio = GetComponent<AudioSource>();
+    }
+
     private void OnEnable()
     {
-        _incomePlatform.PlayerOnPlatform += GetIncome;
+        _incomePlatform.PlayerOnPlatform += onPlayerEnter;
     }
 
     private void OnDisable()
     {
-        _incomePlatform.PlayerOnPlatform -= GetIncome;
+        _incomePlatform.PlayerOnPlatform -= onPlayerEnter;
     }
 
     public void SetPlayerBase(PlayerBase playerBase)
@@ -60,11 +66,22 @@ public class BrainrotPlatform : MonoBehaviour
         }
     }
 
+    private void onPlayerEnter(bool onPlatform)
+    {
+        if (_brainrot == null) return;
+        if (onPlatform)
+        {
+            GetIncome();
+        }   
+        _brainrot.ShowSellHint(onPlatform);
+    }
+
     private void GetIncome()
     {
         CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _currentIncome);
         _currentIncome = 0;
         _incomePlatform.SetText(_currentIncome);
+        _audio.Play();
     }
 
     private void OnSell()
@@ -74,5 +91,6 @@ public class BrainrotPlatform : MonoBehaviour
         GetIncome();
         CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _brainrot.Data.SellPrice);
         Destroy(_brainrot.gameObject);
+        _audio.Play();
     }
 }

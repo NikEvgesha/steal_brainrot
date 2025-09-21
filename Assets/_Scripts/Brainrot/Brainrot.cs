@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-using static UnityEditor.Experimental.GraphView.GraphView;
 
 public class Brainrot : MonoBehaviour
 {
@@ -11,6 +10,7 @@ public class Brainrot : MonoBehaviour
     [SerializeField] private BuyTouchHandler _touchHandler;
     [SerializeField] private Text _interactionText;
     [SerializeField] private Image _buyProgress;
+    [SerializeField] private Collider _collider;
 
     private BrainrotData _data;
     private Rarity _rarity;
@@ -20,12 +20,14 @@ public class Brainrot : MonoBehaviour
     private Transform _destinationPoint;
     private GameObject _model;
     private Animator _animatorModel;
+
     private bool _playerInTrigger;
     private float _progress;
-    private bool _buyInProgress;
-    private IEnumerator _buyCoroutine;
+    private bool _interactionInProgress;
+    private IEnumerator _interactionCoroutine;
     private BaseOwner _currentBuyer;
     private BaseOwner _owner;
+    private bool _playerOwn;
 
     public BrainrotStatus Status => _status;
     public BrainrotData Data => _data;
@@ -48,8 +50,6 @@ public class Brainrot : MonoBehaviour
         _canvas.SetInfo(data, rarity);
         _model = Instantiate(_data.Model,_modelPoint);
         _animatorModel = _model.GetComponent<Animator>();
-        //Set model from _data;
-        //Set rarity material;
     }
 
     public void SetDestination(Transform destination)
@@ -68,16 +68,18 @@ public class Brainrot : MonoBehaviour
         switch (status)
         {
             case BrainrotStatus.Conveyer:
+                _collider.enabled = true;
                 _animatorModel.SetBool("Move", true);
-                _interactionText.text = "Buy";
                 break;
             case BrainrotStatus.Moving:
+                _collider.enabled = true;
                 _animatorModel.SetBool("Move", true);
-                _interactionText.text = "Steal";
                 break;
             case BrainrotStatus.Base:
+                _touchHandler.transform.parent.gameObject.SetActive(false);
+                _collider.enabled = false;
+                _playerInTrigger = false;
                 _animatorModel.SetBool("Move", false);
-                _interactionText.text = "Sell";
                 break;
         }
     }
@@ -110,8 +112,8 @@ public class Brainrot : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            _currentBuyer = other.GetComponent<BaseOwner>();
-            _touchHandler.transform.parent.gameObject.SetActive(true);
+            SetInteractionHint();
+            //_currentBuyer = other.GetComponent<BaseOwner>();
             _playerInTrigger = true;
         }
     }
@@ -120,48 +122,71 @@ public class Brainrot : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            _currentBuyer = null;
+            //_currentBuyer = null;
             _touchHandler.transform.parent.gameObject.SetActive(false);
             _playerInTrigger = false;
-            if (_buyCoroutine != null)
+            if (_interactionCoroutine != null)
             {
-                StopCoroutine(_buyCoroutine);
+                StopCoroutine(_interactionCoroutine);
                 _progress = 0;
                 _buyProgress.fillAmount = _progress;
-                _buyInProgress = false;
+                _interactionInProgress = false;
             }
-                
-
         }
     }
 
     private void Update()
     {
-        if (!_playerInTrigger || _buyInProgress) return;
+        if (!_playerInTrigger || _interactionInProgress) return;
 
         if (PlayerInput.Instance.Interaction)
         {
-            switch (_status)
-            {
-                case BrainrotStatus.Conveyer:
+            InteractionStart();   
+        }
+    }
+
+    private void InteractionStart()
+    {
+        switch (_status)
+        {
+            case BrainrotStatus.Conveyer:
+                if (_playerInTrigger)
                     TryBuy();
-                    break;
-                case BrainrotStatus.Base:
-                    TrySell();
-                    break;
-                case BrainrotStatus.Moving:
-                    break;
-            }
-            
+                break;
+            case BrainrotStatus.Base:
+                TrySell();
+                break;
+            case BrainrotStatus.Moving:
+                break;
+        }
+    }
+
+    private void SetInteractionHint()
+    {
+        //TODO: get text from localization
+        switch (_status)
+        {
+            case BrainrotStatus.Conveyer:
+                _touchHandler.transform.parent.gameObject.SetActive(true);
+                _interactionText.text = "Buy";
+                break;
+            case BrainrotStatus.Base:
+                _touchHandler.transform.parent.gameObject.SetActive(true);
+                _interactionText.text = _playerOwn ? "Sell" : "Steal";
+                break;
+            case BrainrotStatus.Moving:
+                _touchHandler.transform.parent.gameObject.SetActive(!_playerOwn);
+                _interactionText.text = "Steal";
+                break;
         }
     }
 
     private void TrySell()
     {
-        _buyInProgress = true;
+        _interactionInProgress = true;
         _progress = 0;
-        _buyCoroutine = InteractionProcess(true);
-        StartCoroutine(_buyCoroutine);
+        _interactionCoroutine = InteractionProcess(true);
+        StartCoroutine(_interactionCoroutine);
     }
 
     private void TryBuy(BaseOwner buyer = null)
@@ -173,6 +198,7 @@ public class Brainrot : MonoBehaviour
         } else
         {
             /* Покупка игроком */
+            _currentBuyer = PlayerManager.Instance.BaseOwner;
             bool enoughMoney = CurrencyManager.Instance.CheckEnoughCurrency(CurrencyType.Coins, _data.BuyPrice);
             if (!enoughMoney)
                 // Показать подсказку что нет денег;
@@ -181,10 +207,10 @@ public class Brainrot : MonoBehaviour
         
         if (_currentBuyer.Base.GetEmptyPlatform() != null)
         {
-            _buyInProgress = true;
+            _interactionInProgress = true;
             _progress = 0;
-            _buyCoroutine = InteractionProcess(buyer == null);
-            StartCoroutine(_buyCoroutine);
+            _interactionCoroutine = InteractionProcess(buyer == null);
+            StartCoroutine(_interactionCoroutine);
         }
 
         
@@ -210,8 +236,14 @@ public class Brainrot : MonoBehaviour
             {
                 case BrainrotStatus.Conveyer:
                     if (isPlayerBuying)
+                    {
                         CurrencyManager.Instance.RemoveCurrency(CurrencyType.Coins, _data.BuyPrice);
-                    OnBuySuccess(_currentBuyer);
+                        _playerOwn = true;
+                    } else
+                    {
+                        _playerOwn = false;
+                    }
+                        OnBuySuccess(_currentBuyer);
                     break;
                 case BrainrotStatus.Base:
                     OnSellSuccess();
@@ -223,7 +255,8 @@ public class Brainrot : MonoBehaviour
         }
         _progress = 0;
         _buyProgress.fillAmount = _progress;
-        _buyInProgress = false;
+        _interactionInProgress = false;
+        _touchHandler.transform.parent.gameObject.SetActive(false);
 
     }
 
@@ -238,6 +271,21 @@ public class Brainrot : MonoBehaviour
     private void OnSellSuccess()
     {
         Selled?.Invoke();
+    }
+
+    private void OnStealSuccess(BaseOwner owner)
+    {
+        _owner = owner;
+        SetStatus(BrainrotStatus.Moving);
+        owner.Base.GetEmptyPlatform().SetBrainrot(this);
+        SetDestination(owner.Base.EntryPoint);
+    }
+
+    public void ShowSellHint(bool visible)
+    {
+        SetInteractionHint();
+        _touchHandler.transform.parent.gameObject.SetActive(visible);
+        _playerInTrigger = visible;
     }
 
 }
