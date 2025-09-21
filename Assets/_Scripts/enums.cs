@@ -7,3 +7,12 @@ public enum BrainrotStatus
     Base,
     //Stolen
 }
+
+
+public enum EggStatus
+{
+    Conveyer,
+    Purchased,
+    Maturing,
+    Hatching
+}

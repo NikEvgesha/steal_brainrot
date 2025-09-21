@@ -12,6 +12,7 @@ public class TPPlayerController : MonoBehaviour
     [SerializeField] private float runSpeed = 6.0f;
     [SerializeField] private float acceleration = 12f;       // Насколько быстро набираем/сбрасываем скорость
     [SerializeField] private float rotationLerp = 12f;       // Скорость разворота к направлению бега
+    [SerializeField] private float jumpForce = 5f;       // Скорость разворота к направлению бега
 
     [Header("Physics")]
     [SerializeField] private float gravity = -20f;
@@ -60,7 +61,11 @@ public class TPPlayerController : MonoBehaviour
         if (_cc.isGrounded)
         {
             if (_verticalVel < 0f) _verticalVel = groundedStick;
-        }
+            if (PlayerInput.Instance.JumpTriggered)
+            {
+                _verticalVel = jumpForce; // Применяем силу прыжка
+            }
+         }
         else
         {
             _verticalVel += gravity * Time.deltaTime;
