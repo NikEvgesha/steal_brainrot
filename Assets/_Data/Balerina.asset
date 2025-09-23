@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd95a7b0c6fead442b3b50267e219cac, type: 3}
   m_Name: Balerina
   m_EditorClassIdentifier: 
-  _name: balerina
+  _nameKey: Balerina
+  _rareType: 1
   _model: {fileID: 6577960996788430254, guid: 60b52fe8eed414b4597b2ec2fe6734e0, type: 3}
-  _buyPrice: 10
-  _income: 5
-  _weight: 50
-  _sellPrice: 10
+  _startIncome: 10
+  _minWeight: 10
+  _maxWeightMult: 3
+  _startSellPrice: 20

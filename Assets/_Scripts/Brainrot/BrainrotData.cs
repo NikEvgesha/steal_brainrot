@@ -3,25 +3,27 @@ using UnityEngine;
 [CreateAssetMenu(menuName ="Scriptable/BrainrotData")]
 public class BrainrotData : ScriptableObject
 {
-    [SerializeField] private string _name;
+    [SerializeField] private string _nameKey;
+    [SerializeField] private RareType _rareType;
     [SerializeField] private GameObject _model;
-    [SerializeField] private uint _buyPrice; // big int ? decimal ?
-    [SerializeField] private uint _income; // in second
-    [SerializeField] private float _weight;
-    [SerializeField] private uint _sellPrice;
+
+    [SerializeField] private float _startIncome; // in second
+    [SerializeField] private float _minWeight;
+    [SerializeField] private float _maxWeightMult = 3F;
+
+    [SerializeField] private float _startSellPrice;
 
     public string Name
     {
         get
         {
             // localized name ? 
-            return _name;
+            return _nameKey;
         }
     }
 
     public GameObject Model => _model;
-    public uint BuyPrice => _buyPrice;
-    public uint SellPrice => _sellPrice;
-    public uint Income => _income;
-    public float Weight => _weight;
+    public float StartSellPrice => _startSellPrice;
+    public float Income => _startIncome;
+    public float MinWeight => _minWeight;
 }

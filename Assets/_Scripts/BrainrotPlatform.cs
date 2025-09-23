@@ -46,7 +46,6 @@ public class BrainrotPlatform : MonoBehaviour
 
     public void OnBrainrotArrival()
     {
-        _brainrot.SetStatus(BrainrotStatus.Base);
         _brainrotOnPoint = true;
         _brainrot.transform.position = _brainrotPoint.position;
         _brainrot.transform.localEulerAngles = transform.localEulerAngles;
@@ -73,7 +72,7 @@ public class BrainrotPlatform : MonoBehaviour
         {
             GetIncome();
         }   
-        _brainrot.ShowSellHint(onPlatform);
+        //_brainrot.ShowSellHint(onPlatform);
     }
 
     private void GetIncome()
@@ -89,7 +88,7 @@ public class BrainrotPlatform : MonoBehaviour
         _empty = true;
         StopAllCoroutines();
         GetIncome();
-        CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _brainrot.Data.SellPrice);
+        //CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _brainrot.Data.SellPrice);
         Destroy(_brainrot.gameObject);
         _audio.Play();
     }

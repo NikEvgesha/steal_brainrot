@@ -7,9 +7,9 @@ using UnityEngine;
 [Serializable]
 public struct Rarity
 {
-    public string Name;
+    public ElementType Type;
     public float IncomeMultiplier;
-    public float Weight;
+    public float WeightMultiplier;
 }
 
 public class BrainrotSpawner : MonoBehaviour
@@ -40,8 +40,8 @@ public class BrainrotSpawner : MonoBehaviour
 
     private void Start()
     {
-        _totalBrainrotWeight = _brainrots.Sum(item => item.Weight);
-        _totalRarityWeight = _rarityList.Sum(item => item.Weight);
+        _totalBrainrotWeight = _brainrots.Sum(item => item.MinWeight);
+        //_totalRarityWeight = _rarityList.Sum(item => item.Weight);
         StartCoroutine(SpawnBrainrots());
     }
 
@@ -56,8 +56,8 @@ public class BrainrotSpawner : MonoBehaviour
         {
 
             Brainrot brainrot = Instantiate(_brainrotPrefab, _spawnPoint.position, Quaternion.identity, transform);
-            brainrot.Init(GetNextBrainrot(), GetNextRarity());
-            brainrot.SetDestination(_destroyArea.transform);
+            //brainrot.Init(GetNextBrainrot(), GetNextRarity());
+            //brainrot.SetDestination(_destroyArea.transform);
             yield return new WaitForSeconds(_spawnInterval);
         }
     }
@@ -71,7 +71,7 @@ public class BrainrotSpawner : MonoBehaviour
 
         foreach (BrainrotData data in _brainrots)
         {
-            current += data.Weight;
+            current += data.MinWeight;
 
             if (current >= rand)
             {
@@ -98,7 +98,7 @@ public class BrainrotSpawner : MonoBehaviour
                 break;
             }
 
-            current += rarity.Weight;
+            //current += rarity.Weight;
         }
 
         return res;
