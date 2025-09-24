@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd95a7b0c6fead442b3b50267e219cac, type: 3}
   m_Name: TungTungSahur
   m_EditorClassIdentifier: 
-  _name: sahur
+  _nameKey: TungTungSahur
+  _rareType: 3
   _model: {fileID: 8750298700831505457, guid: b0c855388ef655e4bbdfdd6d3a3b233c, type: 3}
-  _buyPrice: 500
-  _income: 50
-  _weight: 50
-  _sellPrice: 500
+  _startIncome: 30
+  _minWeight: 30
+  _maxWeightMult: 3
+  _startSellPrice: 30

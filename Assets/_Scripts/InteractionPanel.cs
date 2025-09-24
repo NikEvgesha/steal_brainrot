@@ -28,6 +28,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void OnDisable()
     {
+        ResetProgress();
+        _interactionHold = false;
         StopAllCoroutines();
     }
 
@@ -73,12 +75,14 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         {
             InteractionComplete.Invoke();
         }
-
+        ResetProgress();
+    }
+    private void ResetProgress()
+    {
         _progress = 0;
         _fillImg.fillAmount = 0;
         _interactionInProgress = false;
     }
-
 
     public void SetInfo(string actionText, string price = null)
     {

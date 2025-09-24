@@ -11,7 +11,7 @@ public class BrainrotPlatform : MonoBehaviour
     private bool _brainrotOnPoint = false;
     private Brainrot _brainrot;
     private PlayerBase _playerBase;
-    private ulong _currentIncome; 
+    private float _currentIncome; 
 
     public bool Empty { get { return _empty; } }
     public Brainrot Brainrot { get { return _brainrot; } }
@@ -60,7 +60,7 @@ public class BrainrotPlatform : MonoBehaviour
         while (_brainrotOnPoint)
         {
             yield return new WaitForSecondsRealtime(1);
-            _currentIncome += (ulong)(_brainrot.Data.Income * _brainrot.Rarity.IncomeMultiplier);
+            _currentIncome += (float)(_brainrot.Data.Income * ElementTypeMultiplaer.Init.GetMultiplaer(_brainrot.DinamicData.Type));
             _incomePlatform.SetText(_currentIncome);
         }
     }

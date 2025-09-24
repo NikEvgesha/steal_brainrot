@@ -8,11 +8,11 @@ public class BrainrotInfoUI : MonoBehaviour
     [SerializeField] private Text _offlineIncome;
 
 
-    public void SetInfo(BrainrotData data, Rarity rarity)
+    public void SetInfo(BrainrotData data, BrainrotDinamicData dinamicData)
     {
         //_name.text = data.Name;
         _accumulationIncome.text = "$0";
-        _income.text = string.Format("${0}/s", data.Income * rarity.IncomeMultiplier);
+        _income.text = string.Format("${0}/s", data.Income * ElementTypeMultiplaer.Init.GetMultiplaer(dinamicData.Type));
     }
     public void UpdateIncome(float income)
     {

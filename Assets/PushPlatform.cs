@@ -9,7 +9,7 @@ public class PushPlatform : MonoBehaviour
 
     public Action<bool> PlayerOnPlatform;
 
-    public void SetText(ulong income)
+    public void SetText(float income)
     {
         // TODO: format string (1K, 2.2M ...)
         _incomeText.text = income.ToString(); 

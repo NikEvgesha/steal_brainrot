@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd95a7b0c6fead442b3b50267e219cac, type: 3}
   m_Name: GlorboFruttodrillo
   m_EditorClassIdentifier: 
-  _name: fruttidrillo
+  _nameKey: GlorboFruttodrillo
+  _rareType: 2
   _model: {fileID: 397041699210266239, guid: 0f354061cad1e954ba2b666ff07cf626, type: 3}
-  _buyPrice: 100
-  _income: 20
-  _weight: 50
-  _sellPrice: 100
+  _startIncome: 20
+  _minWeight: 20
+  _maxWeightMult: 3
+  _startSellPrice: 20

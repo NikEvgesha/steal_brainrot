@@ -26,4 +26,5 @@ public class BrainrotData : ScriptableObject
     public float StartSellPrice => _startSellPrice;
     public float Income => _startIncome;
     public float MinWeight => _minWeight;
+    public float MaxWeightMult => _maxWeightMult;
 }
