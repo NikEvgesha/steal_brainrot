@@ -1,86 +1,150 @@
 using UnityEngine;
 
 /// <summary>
-/// Простой и шустрый TPS контроллер под CharacterController.
-/// Движение от камеры, плавное ускорение, гравитация. Без GC-аллокаций в апдейте.
+/// TPS контроллер с анимациями через Animator:
+/// - BlendTree по Speed (Idle/Run или IdleEgg/IdleRun при IsHolding)
+/// - Переключение "держать" по булю и, опционально, по триггеру для красивого входного перехода.
+/// Оптимизировано под WebGL: без лишних аллокаций, Animator-хеши кэшируются.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class TPPlayerController : MonoBehaviour
 {
+    // === Movement ===
     [Header("Movement")]
     [SerializeField] private float walkSpeed = 3.5f;
     [SerializeField] private float runSpeed = 6.0f;
-    [SerializeField] private float acceleration = 12f;       // Насколько быстро набираем/сбрасываем скорость
-    [SerializeField] private float rotationLerp = 12f;       // Скорость разворота к направлению бега
-    [SerializeField] private float jumpForce = 5f;       // Скорость разворота к направлению бега
+    [SerializeField] private float acceleration = 12f;
+    [SerializeField] private float rotationLerp = 12f;
+    [SerializeField] private float jumpForce = 5f;
 
     [Header("Physics")]
     [SerializeField] private float gravity = -20f;
-    [SerializeField] private float groundedStick = -2f;      // Лёгкая «прилипчивость» к земле
+    [SerializeField] private float groundedStick = -2f;
 
     [Header("References")]
-    [SerializeField] private Transform cameraTransform;      // Перетащи сюда главную камеру
+    [SerializeField] private Transform cameraTransform; // Камера для направления движения
+
+    // === Animation ===
+    public enum AnimParamName
+    {
+        Speed,       // float
+        IsHolding,   // bool
+        HoldTrigger  // trigger (опц.)
+    }
+
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
+    [SerializeField] private float speedDampTime = 0.08f;  // сглаживание параметра Speed
+    [SerializeField] private bool useHoldTriggerOnToggle = true; // жать триггер при смене hold
+    [SerializeField] private bool debugToggleHoldWithKey = false;
+    [SerializeField] private KeyCode debugHoldKey = KeyCode.E;
 
     private CharacterController _cc;
     private float _verticalVel;
     private float _currentSpeed;
+    private bool _isHolding; // текущее логическое состояние "держать"
 
     private void Awake()
     {
         _cc = GetComponent<CharacterController>();
+
         if (cameraTransform == null && Camera.main != null)
             cameraTransform = Camera.main.transform;
+
+        // На всякий случай выключим root motion (контроль у CharacterController)
+        if (animator != null) animator.applyRootMotion = false;
     }
 
     private void Update()
     {
-        // 1) Считываем ввод
-        //float h = Input.GetAxisRaw("Horizontal");
-        //float v = Input.GetAxisRaw("Vertical");
+        Vector3 movement;
+        float h;
+        float v;
+        bool running;
+        // ===== Ввод =====
+        if (PlayerInput.Instance == null)
+        {
+            h = Input.GetAxisRaw("Horizontal");
+            v = Input.GetAxisRaw("Vertical");
+            running = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        }
+        else
+        {
+            movement = PlayerInput.Instance.Movement;
+            h = movement.x;
+            v = movement.z;
+            running = PlayerInput.Instance.Sprint;
+        }
 
-        Vector3 movement = PlayerInput.Instance.Movement;
-
-        //bool running = PlayerInput.Instance.Sprint; //Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-
-        // 2) Направление в плоскости XZ относительно камеры
-        Vector3 camForward = cameraTransform != null ? cameraTransform.forward : Vector3.forward;
-        Vector3 camRight = cameraTransform != null ? cameraTransform.right : Vector3.right;
+        // ===== Направление по камере =====
+        Vector3 camForward = cameraTransform ? cameraTransform.forward : Vector3.forward;
+        Vector3 camRight = cameraTransform ? cameraTransform.right : Vector3.right;
         camForward.y = 0f; camRight.y = 0f;
         camForward.Normalize(); camRight.Normalize();
-
-        Vector3 moveDir = camForward * movement.z + camRight * movement.x;
+    
+        Vector3 moveDir = camForward * v + camRight * h;
+        
         if (moveDir.sqrMagnitude > 1f) moveDir.Normalize();
 
-        // 3) Плавное изменение целевой горизонтальной скорости
-        float targetSpeed = /*(running ? runSpeed : walkSpeed) **/ walkSpeed * moveDir.magnitude;
+        // ===== Скорость (плавно) =====
+        float targetSpeed = (running ? runSpeed : walkSpeed) * moveDir.magnitude;
         _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, acceleration * Time.deltaTime);
 
         Vector3 velocity = moveDir * _currentSpeed;
 
-        // 4) Гравитация
+        // ===== Гравитация =====
         if (_cc.isGrounded)
         {
             if (_verticalVel < 0f) _verticalVel = groundedStick;
-            if (PlayerInput.Instance.JumpTriggered)
+            if (PlayerInput.Instance && PlayerInput.Instance.JumpTriggered)
             {
                 _verticalVel = jumpForce; // Применяем силу прыжка
             }
-         }
+        }
         else
         {
             _verticalVel += gravity * Time.deltaTime;
         }
-
         velocity.y = _verticalVel;
 
-        // 5) Поворот персонажа в сторону движения
+        // ===== Поворот к движению =====
         if (moveDir.sqrMagnitude > 0.0001f)
         {
             Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationLerp * Time.deltaTime);
         }
 
-        // 6) Движение контроллером
+        // ===== Движение =====
         _cc.Move(velocity * Time.deltaTime);
+
+        // ===== Анимация =====
+        if (animator != null)
+        {
+            // Нормализуем скорость в [0..1] относительно runSpeed (один и тот же BlendTree param для обычного/hold набора)
+            float normalized = runSpeed > 0.0001f ? (_currentSpeed / runSpeed) : 0f;
+            animator.SetFloat(AnimParamName.Speed.ToString(), normalized, speedDampTime, Time.deltaTime);
+            animator.SetBool(AnimParamName.IsHolding.ToString(), _isHolding);
+        }
     }
+
+    /// <summary>
+    /// Установить состояние "держать". Поддерживает триггер для входного/выходного перехода.
+    /// </summary>
+    public void SetHolding(bool holding)
+    {
+        if (_isHolding == holding) return;
+        _isHolding = holding;
+
+        if (animator != null)
+        {
+            animator.SetBool(AnimParamName.IsHolding.ToString(), _isHolding);
+
+            // Если нужен отдельный переходный клип (взять/убрать предмет) — дёрнем триггер
+            if (useHoldTriggerOnToggle)
+                animator.SetTrigger(AnimParamName.HoldTrigger.ToString());
+        }
+    }
+
+    /// <summary>Удобный вызов из других скриптов (или через UnityEvent).</summary>
+    public void ToggleHolding() => SetHolding(!_isHolding);
 }

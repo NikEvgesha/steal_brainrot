@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using static UnityEditor.Progress;
 
 public class TestBackpackBrainrot : MonoBehaviour
 {
@@ -45,15 +46,17 @@ public class TestBackpackBrainrot : MonoBehaviour
     {
         _currentEgg= egg;
         _inHand = Item.Egg;
-        egg.transform.SetParent(PlayerManager.Instance.transform);
-        egg.transform.localPosition = Vector3.up;
+        PlayerManager.Instance.SetItem(egg.transform);
+        //egg.transform.SetParent(PlayerManager.Instance.transform);
+        //egg.transform.localPosition = Vector3.up;
     }
     public void TakeBrainrot(Brainrot brainrot)
     {
         _currentBrainrot = brainrot;
         _inHand = Item.Brainrot;
-        brainrot.transform.SetParent(PlayerManager.Instance.transform);
-        brainrot.transform.localPosition = Vector3.up;
+        PlayerManager.Instance.SetItem(brainrot.transform);
+        //brainrot.transform.SetParent(PlayerManager.Instance.transform);
+        //brainrot.transform.localPosition = Vector3.up;
     }
     public void Drop(FieldCell field)
     {
@@ -62,16 +65,20 @@ public class TestBackpackBrainrot : MonoBehaviour
         switch (_inHand)
         {
             case Item.Egg:
+                PlayerManager.Instance.RemoveItem();
                 _currentEgg.transform.SetParent(_floorListener.transform);
                 _currentEgg.transform.localPosition = Vector3.zero;
+                _currentEgg.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
                 _currentEgg.InitTimer(_floorListener);
                 _currentEgg = null;
                 _inHand = Item.Hamer;
                 SwichItem?.Invoke();
                 break;
             case Item.Brainrot:
+                PlayerManager.Instance.RemoveItem();
                 _currentBrainrot.transform.SetParent(_floorListener.transform);
                 _currentBrainrot.transform.localPosition = Vector3.zero;
+                _currentBrainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
                 _currentBrainrot.NewPlace(_floorListener);
                 _currentBrainrot = null;
                 _inHand = Item.Hamer;

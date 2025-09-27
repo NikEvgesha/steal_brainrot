@@ -128,6 +128,7 @@ public class Egg : MonoBehaviour
         BrainrotData brainrotData = GetRandomBrainrot();
         _data.DinamicData.WeightMultiplier = Random.Range(1, brainrotData.MaxWeightMult);
         Brainrot brainrot = Instantiate(TestBackpackBrainrot.Instance.BrainrotObj, _currentCell.transform);
+        brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         brainrot.Init(brainrotData, _data.DinamicData, _currentCell);
         _currentCell.UpdateFieldItem(Item.Brainrot);
         Destroy(gameObject);

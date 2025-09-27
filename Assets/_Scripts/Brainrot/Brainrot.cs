@@ -82,7 +82,9 @@ public class Brainrot : MonoBehaviour
     }
     private void SetSize()
     {
-        _model.transform.localScale = Vector3.one * (1 + ((1-_dinamicData.WeightMultiplier)/4));
+        var m = Mathf.Max(1f, _dinamicData.WeightMultiplier); // на всякий случай не меньше 1
+        float scale = 1f + (m - 1f) * 0.25f;
+        _model.transform.localScale = Vector3.one * scale;
     }
 
     private void PlayerInPlace()
