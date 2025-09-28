@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -26,6 +28,12 @@ public class Egg : MonoBehaviour
     private EggStatus _status;
     private FieldCell _currentCell;
     private int _currentHatchingTime;
+
+    private int _totalDurationSec;      // Полная длительность вылупления
+    private DateTime _endUtc;           // Момент окончания (UTC)
+    private Coroutine _ticker;
+    private string SaveKey => $"egg_endUtc_{_currentCell.Id}";//если таймеров несколько — добавьте id клетки/яйца)
+
     public EggData Data { get { return _data; } }
     [HideInInspector] public UnityEvent<Egg> EggPurchased;
 
@@ -37,6 +45,7 @@ public class Egg : MonoBehaviour
         _buyPanel.gameObject.SetActive(false);
         _infoUI.SetInfo(Data);
         _status = EggStatus.Conveyer;
+        _infoUI.SetStatus(_status);
         SetTypeVisual();
     }
     private void SetTypeVisual()
@@ -90,7 +99,8 @@ public class Egg : MonoBehaviour
             TestBackpackBrainrot.Instance.TakeEgg(this);
             EggPurchased.Invoke(this);
             _status = EggStatus.Purchased;
-            Destroy(_infoUI.gameObject);
+            _infoUI.SetStatus(_status);
+            //Destroy(_infoUI.gameObject);
             Destroy(_buyPanel.gameObject);
         }
         else
@@ -100,43 +110,118 @@ public class Egg : MonoBehaviour
     }
     public void InitTimer(FieldCell field)
     {
+        _status = EggStatus.Maturing;
+        _infoUI.SetStatus(_status);
         _currentCell = field;
-        _currentHatchingTime = _data.SecondsToHatching;
-        _currentCell.SpeedBoost.AddListener(SpeedBoost);
-        StartCoroutine(HatchingTimer());
+        _totalDurationSec = Mathf.RoundToInt(
+            _data.SecondsToHatching * ElementTypeMultiplaer.Init.GetMultiplaer(_data.DinamicData.Type)
+        );
+
+        // Подписка на бусты скорости
+
+        _currentCell.SpeedBoost.AddListener(SpeedBoostInstant);
+        //_currentCell.SpeedBoost.AddListener(SpeedBoostAd);     // пример: -30 мин
+        //_currentCell.InstantHatch.AddListener(SpeedBoostInstant); // пример: мгновенно
+
+        /* Тут нужно будет в зависимости от сохранения запускать таймер
+        if (PlayerPrefs.HasKey(SaveKey))
+        {
+            long ticks = long.Parse(PlayerPrefs.GetString(SaveKey));
+            _endUtc = new DateTime(ticks, DateTimeKind.Utc);
+        }
+        else
+        {
+            _endUtc = DateTime.UtcNow.AddSeconds(_totalDurationSec);
+            PlayerPrefs.SetString(SaveKey, _endUtc.Ticks.ToString());
+            PlayerPrefs.Save();
+        }
+       */
+        _endUtc = DateTime.UtcNow.AddSeconds(_totalDurationSec); // временно без сохранения
+
+        if (_ticker != null) StopCoroutine(_ticker);
+        _ticker = StartCoroutine(Ticker());
+
+    }
+    /// <summary>
+    /// Рекламный буст: минус 30 минут от оставшегося времени.
+    /// </summary>
+    public void SpeedBoostAd()
+    {
+        const int minusSeconds = 30 * 60;
+        _endUtc = _endUtc.AddSeconds(-minusSeconds);
+
+        // Не даём уйти «в прошлое» дальше текущего момента
+        if (_endUtc < DateTime.UtcNow) _endUtc = DateTime.UtcNow;
+
+        //SaveDeadline();
+    }
+    /// <summary>
+    /// Платный буст: мгновенное вылупление.
+    /// </summary>
+    public void SpeedBoostInstant()
+    {
+        _endUtc = DateTime.UtcNow;
+        //SaveDeadline();
     }
     public void SpeedBoost()
     {
         _currentHatchingTime = 0; //переделать на реальное время, добавить ветвление - за рекламу - 30 минут, за плату сразу
     }
-    private IEnumerator HatchingTimer()
+
+    private IEnumerator Ticker()
     {
-        while (_currentHatchingTime > 0)
+        // Можно тиковаться раз в 0.2–0.5с для плавности прогресса
+        var wait = new WaitForSeconds(0.25f);
+
+        while (true)
         {
-            yield return new WaitForSecondsRealtime(1);
-            _currentHatchingTime--; //переделать на реальное время
+            double remainingSec = (_endUtc - DateTime.UtcNow).TotalSeconds;
+
+            if (remainingSec <= 0)
+            {
+                _infoUI.ShowTimeUI(0, 1f); // 100% прогресса
+                Hatching();
+                yield break;
+            }
+            float progress01 = 1f - Mathf.Clamp01((float)(remainingSec / _totalDurationSec));
+            _infoUI.ShowTimeUI((int)Math.Ceiling(remainingSec), progress01);
+
+            yield return wait;
         }
-        Hatching();
     }
+    private void SaveDeadline()
+    {
+        PlayerPrefs.SetString(SaveKey, _endUtc.Ticks.ToString());
+        PlayerPrefs.Save();
+    }
+
+    // Сохраняем при паузе/выходе (на случай, если endUtc изменили)
+    private void OnApplicationPause(bool pause)
+    {
+        if (pause) SaveDeadline();
+    }
+    private void OnApplicationQuit()
+    {
+        SaveDeadline();
+    }
+
     private void Hatching()
     {
+        _status = EggStatus.Hatching;
+        _infoUI.SetStatus(_status);
+
+        /*
+        PlayerPrefs.DeleteKey(SaveKey);
+        PlayerPrefs.Save();
+        */
+
         _currentCell.SpeedBoost.RemoveListener(SpeedBoost);
+        //_currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);     // пример: -30 мин
+        //_currentCell.InstantHatch.RemoveListener(SpeedBoostInstant); // пример: мгновенно
+
+
+
         StartCoroutine(ShowAnimation());
-    }
-    private void SpawnBrainrot()
-    {
-        BrainrotData brainrotData = GetRandomBrainrot();
-        _data.DinamicData.WeightMultiplier = Random.Range(1, brainrotData.MaxWeightMult);
-        Brainrot brainrot = Instantiate(TestBackpackBrainrot.Instance.BrainrotObj, _currentCell.transform);
-        brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        brainrot.Init(brainrotData, _data.DinamicData, _currentCell);
-        _currentCell.UpdateFieldItem(Item.Brainrot);
-        Destroy(gameObject);
-    }
-    private BrainrotData GetRandomBrainrot()
-    {
-        int rand = Random.Range(0, _data.Brainrots.Count);
-        return _data.Brainrots[rand];
     }
     private IEnumerator ShowAnimation()
     {
@@ -150,5 +235,20 @@ public class Egg : MonoBehaviour
             yield return null;
         }
         SpawnBrainrot();
+    }
+    private void SpawnBrainrot()
+    {
+        BrainrotData brainrotData = GetRandomBrainrot();
+        _data.DinamicData.WeightMultiplier = UnityEngine.Random.Range(1, brainrotData.MaxWeightMult);
+        Brainrot brainrot = Instantiate(TestBackpackBrainrot.Instance.BrainrotObj, _currentCell.transform);
+        brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        brainrot.Init(brainrotData, _data.DinamicData, _currentCell);
+        _currentCell.UpdateFieldItem(Item.Brainrot);
+        Destroy(gameObject);
+    }
+    private BrainrotData GetRandomBrainrot()
+    {
+        int rand = UnityEngine.Random.Range(0, _data.Brainrots.Count);
+        return _data.Brainrots[rand];
     }
 }

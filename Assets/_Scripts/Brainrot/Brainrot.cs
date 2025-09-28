@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 
@@ -40,7 +41,11 @@ public class Brainrot : MonoBehaviour
         _dinamicData = rarity;
         _canvas.SetInfo(data, rarity);
         _model = Instantiate(_data.Model,_modelPoint);
+        Vector3 scale = _canvas.transform.localScale;
+        _canvas.transform.parent = _model.transform;
         SetSize();
+        _canvas.transform.parent = transform;
+        _canvas.transform.localScale = scale;
         _currentIncome = 0;
         NewPlace(floor);
         SetTypeVisual();

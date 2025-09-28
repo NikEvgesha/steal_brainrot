@@ -6,7 +6,10 @@ public class BrainrotInfoUI : MonoBehaviour
     [SerializeField] private Text _income;
     [SerializeField] private Text _accumulationIncome;
     [SerializeField] private Text _offlineIncome;
-
+    private void Start()
+    {
+        _offlineIncome.gameObject.SetActive(false);
+    }
 
     public void SetInfo(BrainrotData data, BrainrotDinamicData dinamicData)
     {
@@ -20,6 +23,7 @@ public class BrainrotInfoUI : MonoBehaviour
     }
     public void UpdateOfflineIncome(float income)
     {
+        _offlineIncome.gameObject.SetActive(true);
         _offlineIncome.text = "ќфлайн инком = $" + income;
     }
 }

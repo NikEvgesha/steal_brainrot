@@ -3,6 +3,8 @@ using UnityEngine.Events;
 
 public class FieldCell : MonoBehaviour
 {
+
+    [SerializeField] private string _id;
     [SerializeField] private GameObject _triggerIndicator;
     [SerializeField] private GameObject _takeButton;
     [SerializeField] private GameObject _dropButton;
@@ -12,9 +14,19 @@ public class FieldCell : MonoBehaviour
     [HideInInspector] public UnityEvent PlayerExit;
     [HideInInspector] public UnityEvent TakeBrainrot;
     [HideInInspector] public UnityEvent SpeedBoost;
+
     private Item _inField;
 
     private bool _playerOnCell;
+    public string Id { get { return _id; } }
+    private void Awake()
+    {
+        // Если id ещё не назначен — генерируем новый
+        if (string.IsNullOrEmpty(_id))
+        {
+            _id = System.Guid.NewGuid().ToString();
+        }
+    }
 
     public void _OnPlayerEnter()
     {
