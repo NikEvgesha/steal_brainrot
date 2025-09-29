@@ -15,11 +15,11 @@ public class EggInfoUI : MonoBehaviour
 
     private EggStatus _status;
 
-    public void SetInfo(EggData data)
+    public void SetInfo(Egg egg)
     {
-        _name.text = data.Name;
-        _luck.text = data.Luck+"X"+ " Удача" ;
-        _price.text = "$"+ (data.Price * ElementTypeMultiplaer.Init.GetMultiplaer(data.DinamicData.Type)).ToString();
+        _name.text = egg.Name;
+        _luck.text = egg.Data.Luck+"X"+ " пїЅпїЅпїЅпїЅпїЅ" ;
+        _price.text = "$"+ (egg.Data.Price * ElementTypeMultiplaer.Init.GetMultiplaer(egg.Data.DinamicData.ElementType)).ToString();
     }
     public void SetStatus(EggStatus status)
     {
@@ -42,21 +42,21 @@ public class EggInfoUI : MonoBehaviour
     }
     public void ShowTimeUI(int remainingSec, float progress01)
     {
-        // Текст: «Яйцо вылупится через X мин Y с»
+        // пїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ X пїЅпїЅпїЅ Y пїЅ
         TimeSpan t = TimeSpan.FromSeconds(Mathf.Max(remainingSec, 0));
-        _time.text = $"Яйцо вылупится через {FormatRus(t)}";
+        _time.text = $"пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ {FormatRus(t)}";
 
-        // Прогресс: 0..1
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: 0..1
         _progress.value = progress01;
 
-        // Проценты с запятой: 34,1%
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ: 34,1%
         float percent = progress01 * 100f;
         _percent.text = percent.ToString("0.0") + "%";
 
     }
     private string FormatRus(TimeSpan t)
     {
-        // Упрощённо: показываем мин + сек (можно расширить до часов/дней)
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ + пїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅ)
         int m = (int)t.TotalMinutes;
         int s = t.Seconds;
 
@@ -64,17 +64,17 @@ public class EggInfoUI : MonoBehaviour
         {
             int h = (int)t.TotalHours;
             m = t.Minutes;
-            return $"{h} {Plural(h, "час", "часа", "часов")} {m} {Plural(m, "минуту", "минуты", "минут")}";
+            return $"{h} {Plural(h, "пїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅ")} {m} {Plural(m, "пїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅ")}";
         }
 
         if (m > 0)
-            return $"{m} {Plural(m, "минуту", "минуты", "минут")} {s} {Plural(s, "секунду", "секунды", "секунд")}";
+            return $"{m} {Plural(m, "пїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅ")} {s} {Plural(s, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅпїЅ")}";
 
-        return $"{s} {Plural(s, "секунду", "секунды", "секунд")}";
+        return $"{s} {Plural(s, "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ", "пїЅпїЅпїЅпїЅпїЅпїЅ")}";
     }
     private string Plural(int n, string form1, string form2, string form5)
     {
-        // Русское склонение 1,2-4,5-0
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 1,2-4,5-0
         n = Mathf.Abs(n) % 100;
         int n1 = n % 10;
         if (n > 10 && n < 20) return form5;

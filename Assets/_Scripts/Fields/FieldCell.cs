@@ -30,13 +30,15 @@ public class FieldCell : MonoBehaviour
 
     public void _OnPlayerEnter()
     {
-        TestBackpackBrainrot.Instance.SwichItem.AddListener(CheckPlayer);
-        TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
+        //TestBackpackBrainrot.Instance.SwichItem.AddListener(CheckPlayer);
+        QuickAccessManager.Instance.SwitchActiveItem.AddListener(CheckPlayer);
+        //TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
+        QuickAccessManager.Instance.PlaceItem.AddListener(UpdateFieldItem);
         CheckPlayer();
         _playerOnCell = true;
         PlayerEnter?.Invoke();
     }
-    public void CheckPlayer()
+    public void CheckPlayer(InventoryItem item=null)
     {
         _dropButton.SetActive(false);
         _addSpeedButton.SetActive(false);
@@ -50,7 +52,7 @@ public class FieldCell : MonoBehaviour
                 _addSpeedButton.SetActive(true);
                 break;
             case Item.Brainrot:
-                if (TestBackpackBrainrot.Instance.CheckHand() == Item.Hamer)
+                if (QuickAccessManager.Instance.CheckHand() == Item.Hamer)
                 {
                     _takeButton.SetActive(true);
                 }
@@ -61,7 +63,7 @@ public class FieldCell : MonoBehaviour
     }
     private void FieldFree()
     {
-        switch (TestBackpackBrainrot.Instance.CheckHand())
+        switch (QuickAccessManager.Instance.CheckHand())
         {
             case Item.Egg:
                 _triggerIndicator.SetActive(true);
@@ -81,8 +83,8 @@ public class FieldCell : MonoBehaviour
     }
     public void _OnPlayerExit()
     {
-        TestBackpackBrainrot.Instance.PlaceItem.RemoveListener(UpdateFieldItem);
-        TestBackpackBrainrot.Instance.SwichItem.RemoveListener(CheckPlayer);
+        QuickAccessManager.Instance.PlaceItem.RemoveListener(UpdateFieldItem);
+        QuickAccessManager.Instance.SwitchActiveItem.RemoveListener(CheckPlayer);
         _dropButton.SetActive(false);
         _addSpeedButton.SetActive(false);
         _takeButton.SetActive(false);
@@ -96,7 +98,8 @@ public class FieldCell : MonoBehaviour
     }
     public void _Drop()
     {
-        TestBackpackBrainrot.Instance.Drop(this);
+        QuickAccessManager.Instance.DropCurrent(this);
+        //TestBackpackBrainrot.Instance.Drop(this);
     }
     public void _AddSpeed()
     {

@@ -60,7 +60,7 @@ public class BrainrotPlatform : MonoBehaviour
         while (_brainrotOnPoint)
         {
             yield return new WaitForSecondsRealtime(1);
-            _currentIncome += (float)(_brainrot.Data.Income * ElementTypeMultiplaer.Init.GetMultiplaer(_brainrot.DinamicData.Type));
+            _currentIncome += (float)(_brainrot.Data.StartIncome * ElementTypeMultiplaer.Init.GetMultiplaer(_brainrot.DinamicData.ElementType));
             _incomePlatform.SetText(_currentIncome);
         }
     }

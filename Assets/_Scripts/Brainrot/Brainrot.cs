@@ -1,23 +1,37 @@
-using System;
+п»їusing System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
 
+[Serializable]
+public struct BrainrotTypeData
+{
+    public RareType RareType;
+    //public GameObject Model;
+
+    public float StartIncome;
+    public float MinWeight;
+    public float MaxWeightMult;
+
+    public float StartSellPrice;
+}
+
 
 [Serializable]
 public struct BrainrotDinamicData
 {
-    public ElementType Type;
+    public ElementType ElementType;
     public float WeightMultiplier;
+    public float ResultIncome;
 }
-public class Brainrot : MonoBehaviour
+public class Brainrot : InventoryItem
 {
     [SerializeField] private Transform _modelPoint;
     [SerializeField] private AudioSource _audio;
 
-    private BrainrotData _data;
-    public BrainrotData Data => _data;
+    [SerializeField] private BrainrotTypeData _data;
+    public BrainrotTypeData Data => _data;
 
     private BrainrotDinamicData _dinamicData;
     public BrainrotDinamicData DinamicData => _dinamicData;
@@ -29,24 +43,26 @@ public class Brainrot : MonoBehaviour
 
     private FieldCell _floorListener;
 
+    private BrainrotItem _item;
+
     public Action Selled;
     public Action Stealed;
     private Coroutine _incomeCorutine;
 
-    public void Init(BrainrotData data, BrainrotDinamicData rarity, FieldCell floor) //передавать плейс из яйца
+    public void Init(BrainrotDinamicData rarity, FieldCell floor) //РїРµСЂРµРґР°РІР°С‚СЊ РїР»РµР№СЃ РёР· СЏР№С†Р°
     {
-        // rarity считается в яйце? 
+        // rarity СЃС‡РёС‚Р°РµС‚СЃСЏ РІ СЏР№С†Рµ? 
         _canvas = GetComponentInChildren<BrainrotInfoUI>();
-        _data = data;
         _dinamicData = rarity;
-        _canvas.SetInfo(data, rarity);
-        _model = Instantiate(_data.Model,_modelPoint);
+        _canvas.SetInfo(_data, rarity);
+        //_model = Instantiate(_data.,_modelPoint);
         Vector3 scale = _canvas.transform.localScale;
-        _canvas.transform.parent = _model.transform;
+        _canvas.transform.parent = _modelPoint.transform;
         SetSize();
         _canvas.transform.parent = transform;
         _canvas.transform.localScale = scale;
         _currentIncome = 0;
+        _dinamicData.ResultIncome = Mathf.RoundToInt(_data.StartIncome * ElementTypeMultiplaer.Init.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
         NewPlace(floor);
         SetTypeVisual();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
@@ -54,10 +70,10 @@ public class Brainrot : MonoBehaviour
 
     private void SetTypeVisual()
     {
-        Renderer[] renderer = _model.GetComponentsInChildren<Renderer>();
+        Renderer[] renderer = _modelPoint.GetComponentsInChildren<Renderer>();
         foreach (Renderer item in renderer)
         {
-            switch (_dinamicData.Type)
+            switch (_dinamicData.ElementType)
             {
                 case ElementType.Gold:
                     item.material.color = Color.yellow;
@@ -87,9 +103,9 @@ public class Brainrot : MonoBehaviour
     }
     private void SetSize()
     {
-        var m = Mathf.Max(1f, _dinamicData.WeightMultiplier); // на всякий случай не меньше 1
+        var m = Mathf.Max(1f, _dinamicData.WeightMultiplier); // пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ 1
         float scale = 1f + (m - 1f) * 0.25f;
-        _model.transform.localScale = Vector3.one * scale;
+        _modelPoint.transform.localScale = Vector3.one * scale;
     }
 
     private void PlayerInPlace()
@@ -103,7 +119,8 @@ public class Brainrot : MonoBehaviour
         _floorListener.UpdateFieldItem(Item.Free);
         StopCoroutine(_incomeCorutine);
         _incomeCorutine = null;
-        TestBackpackBrainrot.Instance.TakeBrainrot(this);
+        Inventory.Instance.Add(this);
+        //TestBackpackBrainrot.Instance.TakeBrainrot(this);
     }
     private void GetIncome()
     {
@@ -119,7 +136,7 @@ public class Brainrot : MonoBehaviour
         while (true)
         {
             yield return new WaitForSecondsRealtime(1);
-            _currentIncome += _data.Income * ElementTypeMultiplaer.Init.GetMultiplaer(_dinamicData.Type) * (_dinamicData.WeightMultiplier/2); //2 is the magic number
+            _currentIncome += _dinamicData.ResultIncome; //2 is the magic number
             _currentIncome = Mathf.RoundToInt(_currentIncome);
             _canvas.UpdateIncome(_currentIncome);
         }

@@ -11,11 +11,11 @@ public class BrainrotInfoUI : MonoBehaviour
         _offlineIncome.gameObject.SetActive(false);
     }
 
-    public void SetInfo(BrainrotData data, BrainrotDinamicData dinamicData)
+    public void SetInfo(BrainrotTypeData data, BrainrotDinamicData dinamicData)
     {
         //_name.text = data.Name;
         _accumulationIncome.text = "$0";
-        _income.text = string.Format("${0}/s", data.Income * ElementTypeMultiplaer.Init.GetMultiplaer(dinamicData.Type));
+        _income.text = string.Format("${0}/s", dinamicData.ResultIncome);
     }
     public void UpdateIncome(float income)
     {

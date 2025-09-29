@@ -7,7 +7,7 @@ public class TestBackpackBrainrot : MonoBehaviour
     public static TestBackpackBrainrot Instance;
     public Brainrot BrainrotObj;
 
-    private BrainrotData _data; 
+    private BrainrotTypeData _data; 
     private EggData _eggData;
     private BrainrotDinamicData _brainrotDinamicData;
     private FieldCell _floorListener;
@@ -46,7 +46,7 @@ public class TestBackpackBrainrot : MonoBehaviour
     {
         _currentEgg= egg;
         _inHand = Item.Egg;
-        PlayerManager.Instance.SetItem(egg.transform);
+        //PlayerManager.Instance.SetItem(egg.transform);
         //egg.transform.SetParent(PlayerManager.Instance.transform);
         //egg.transform.localPosition = Vector3.up;
     }
@@ -54,7 +54,7 @@ public class TestBackpackBrainrot : MonoBehaviour
     {
         _currentBrainrot = brainrot;
         _inHand = Item.Brainrot;
-        PlayerManager.Instance.SetItem(brainrot.transform);
+        //PlayerManager.Instance.SetItem(brainrot.transform);
         //brainrot.transform.SetParent(PlayerManager.Instance.transform);
         //brainrot.transform.localPosition = Vector3.up;
     }
@@ -65,7 +65,7 @@ public class TestBackpackBrainrot : MonoBehaviour
         switch (_inHand)
         {
             case Item.Egg:
-                PlayerManager.Instance.RemoveItem();
+                //PlayerManager.Instance.RemoveItem();
                 _currentEgg.transform.SetParent(_floorListener.transform);
                 _currentEgg.transform.localPosition = Vector3.zero;
                 _currentEgg.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
@@ -75,7 +75,7 @@ public class TestBackpackBrainrot : MonoBehaviour
                 SwichItem?.Invoke();
                 break;
             case Item.Brainrot:
-                PlayerManager.Instance.RemoveItem();
+                //PlayerManager.Instance.RemoveItem();
                 _currentBrainrot.transform.SetParent(_floorListener.transform);
                 _currentBrainrot.transform.localPosition = Vector3.zero;
                 _currentBrainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
