@@ -127,6 +127,7 @@ public class QuickAccessManager : MonoBehaviour
         } else
         {
             _inHand = Item.Free;
+            PlayerManager.Instance.RemoveItem();
         }
 
         SwitchActiveItem?.Invoke(_currentActive);

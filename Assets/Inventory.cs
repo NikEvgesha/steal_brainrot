@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 public class Inventory : MonoBehaviour
 {
@@ -52,10 +53,9 @@ public class Inventory : MonoBehaviour
                 break;
         }
         item.transform.SetParent(PlayerManager.Instance.transform);
-        item.transform.localPosition = Vector3.up;
         item.gameObject.SetActive(false);
+        item.SellAllowed = true;
         QuickAccessManager.Instance.Add(item);
-
     }
 
     public void Remove(InventoryItem item)

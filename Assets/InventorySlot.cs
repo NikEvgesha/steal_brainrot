@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class InventorySlot : MonoBehaviour
@@ -7,6 +8,9 @@ public class InventorySlot : MonoBehaviour
     [SerializeField] private Text _name;
     [SerializeField] private GameObject _quickSlotIndicator;
     [SerializeField] private Image _background;
+    [SerializeField] private GameObject _sellButtonLockIcon;
+    [SerializeField] private GameObject _sellButtonUnlockIcon;
+    [SerializeField] private GameObject _lockSellIndicator;
 
     private InventoryItem _item;
     public InventoryItem Item => _item;
@@ -52,6 +56,9 @@ public class InventorySlot : MonoBehaviour
             default:
                 break;
         }
+        _sellButtonLockIcon.SetActive(_item.SellAllowed);
+        _sellButtonUnlockIcon.SetActive(!_item.SellAllowed);
+        _lockSellIndicator.SetActive(!_item.SellAllowed);
     }
 
     public void _OnClick() {
@@ -67,5 +74,14 @@ public class InventorySlot : MonoBehaviour
             
     }
 
+    public void _OnSellLockButtonClick()
+    {
+        _item.SellAllowed = !_item.SellAllowed;
+
+        _sellButtonLockIcon.SetActive(_item.SellAllowed);
+        _sellButtonUnlockIcon.SetActive(!_item.SellAllowed);
+        _lockSellIndicator.SetActive(!_item.SellAllowed);
+
+    }
 
 }

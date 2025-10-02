@@ -132,7 +132,7 @@ public class TPPlayerController : MonoBehaviour
     /// </summary>
     public void SetHolding(bool holding)
     {
-        if (_isHolding == holding) return;
+        //if (_isHolding == holding) return;
         _isHolding = holding;
 
         if (animator != null)
@@ -140,8 +140,8 @@ public class TPPlayerController : MonoBehaviour
             animator.SetBool(AnimParamName.IsHolding.ToString(), _isHolding);
 
             // Если нужен отдельный переходный клип (взять/убрать предмет) — дёрнем триггер
-            if (useHoldTriggerOnToggle)
-                animator.SetTrigger(AnimParamName.HoldTrigger.ToString());
+            //if (useHoldTriggerOnToggle)
+            //    animator.SetTrigger(AnimParamName.HoldTrigger.ToString());
         }
     }
 
