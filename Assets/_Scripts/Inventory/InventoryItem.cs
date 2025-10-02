@@ -5,6 +5,7 @@ public abstract class InventoryItem : MonoBehaviour
     [SerializeField] private string _name;
     [SerializeField] protected Item _type;
     [SerializeField] protected Sprite _icon;
+    [SerializeField] protected RareType _rareType;
 
     private protected bool _inQuickAccess;
 
@@ -12,4 +13,6 @@ public abstract class InventoryItem : MonoBehaviour
     public Sprite Icon => _icon;
     public string Name => _name;
     public bool InQuickAccess { get; set; }
+
+    public RareType RareType => _rareType;
 }

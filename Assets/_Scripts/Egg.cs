@@ -10,7 +10,6 @@ using UnityEngine.Events;
 public struct EggData
 {
     public int Luck;
-    public RareType RareType;
     public float Price;
     public int SecondsToHatching;
     public List<Brainrot> Brainrots;

@@ -126,8 +126,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2be7e8b884d9204ba2c952715c5fdb3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _baseOwner: {fileID: 0}
-  _getPoint: {fileID: 3460207412433771546}
+  _getPoint: {fileID: 7173060581840784051}
+  _handPoint: {fileID: 1429787132952567314}
 --- !u!114 &3110733507595287357
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -200,7 +200,7 @@ Transform:
   m_GameObject: {fileID: 3460207412433771546}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.38, z: 0.64}
+  m_LocalPosition: {x: 0, y: 2.09, z: 0.01}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -294,6 +294,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a2df525fa14baa64c8d94e7782f8b31e, type: 3}
+--- !u!4 &1429787132952567314 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5572493356328602447, guid: a2df525fa14baa64c8d94e7782f8b31e, type: 3}
+  m_PrefabInstance: {fileID: 6810259559181915485}
+  m_PrefabAsset: {fileID: 0}
 --- !u!95 &2890640654912758897 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 8547683250059850028, guid: a2df525fa14baa64c8d94e7782f8b31e, type: 3}

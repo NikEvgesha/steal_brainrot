@@ -7,7 +7,6 @@ using UnityEngine;
 [Serializable]
 public struct BrainrotTypeData
 {
-    public RareType RareType;
     //public GameObject Model;
 
     public float StartIncome;

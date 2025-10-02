@@ -15,6 +15,10 @@ public class QuickAccessManager : MonoBehaviour
     private InventoryItem _currentActive;
     private FieldCell _floorListener;
     private Item _inHand;
+    private bool _dropping;
+
+    public List<InventoryItem> Items => _items;
+    public InventoryItem CurrentActive => _currentActive;
 
 
     [HideInInspector] public UnityEvent<List<InventoryItem>> ItemsUpdated;
@@ -40,12 +44,12 @@ public class QuickAccessManager : MonoBehaviour
     private void Start()
     {
         _inHand = Item.Free;
-        foreach (InventoryItem item in _startItems)
+        foreach (InventoryItem it in _startItems)
         {
-            if (_items.Count < _capacity)
-                _items.Add(item);
+            InventoryItem item = Instantiate(it, PlayerManager.Instance.transform);
+            Add(item);
         }
-        ItemsUpdated.Invoke(_items);
+        SwitchActive(null);
     }
 
 
@@ -56,10 +60,6 @@ public class QuickAccessManager : MonoBehaviour
             return false;
         }
 
-        if (_currentActive != null)
-        {
-            _currentActive.gameObject.SetActive(false);
-        }
         _items.Add(item);
         item.InQuickAccess = true;
         ItemsUpdated.Invoke(_items);
@@ -74,14 +74,14 @@ public class QuickAccessManager : MonoBehaviour
         item.InQuickAccess = false;
         if (_currentActive == item)
         {
-            _currentActive = null;
-            SwitchActive(null);
+            SwitchActive(null);           
         }
         ItemsUpdated.Invoke(_items);
     }
 
     public void DropCurrent(FieldCell field)
     {
+        _dropping = true;
         PlaceItem?.Invoke(_currentActive.Type);
         _floorListener = field;
         _currentActive.transform.SetParent(_floorListener.transform);
@@ -100,32 +100,41 @@ public class QuickAccessManager : MonoBehaviour
                 break;
         }
         Inventory.Instance.Remove(_currentActive);
+        _dropping = false;
     }
 
 
     public Item CheckHand()
     {
-        return _inHand;// _currentActive != null ? _currentActive.Type : Item.Free;
+        return _inHand;
     }
 
 
     public void SwitchActive(InventoryItem item)
     {
-        if (_currentActive != null)
+        if (_currentActive != null && !_dropping)
         {
             _currentActive.gameObject.SetActive(false);
         }
-
-
+       
         _currentActive = item;
-        SwitchActiveItem?.Invoke(_currentActive);
-
+        
         if (_currentActive != null)
         {
             _currentActive.gameObject.SetActive(true);
             _inHand = _currentActive.Type;
+            PlayerManager.Instance.SetItem(item);
+        } else
+        {
+            _inHand = Item.Free;
         }
 
-       
+        SwitchActiveItem?.Invoke(_currentActive);
+    }
+
+
+    public void OnUIInitialized()
+    {
+        ItemsUpdated.Invoke(_items);
     }
 }

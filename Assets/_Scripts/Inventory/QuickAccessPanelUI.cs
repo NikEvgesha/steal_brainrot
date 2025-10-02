@@ -21,6 +21,7 @@ public class QuickAccessPanelUI : MonoBehaviour
             slot.SetIndex(i + 1);
         }
 
+        QuickAccessManager.Instance.OnUIInitialized();
     }
 
     private void UpdateUI(List<InventoryItem> items)

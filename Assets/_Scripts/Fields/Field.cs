@@ -15,6 +15,7 @@ public class Field : MonoBehaviour
     private BuyTouchHandler _touchHandler;
     private void Start()
     {
+        QuickAccessManager.Instance.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
         _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
         _buyPanel.SetInfo("Разблокировать", _price.ToString());
@@ -36,9 +37,9 @@ public class Field : MonoBehaviour
     {
         if (_unblocked) return;
 
-        // TODO: check if hammer active
-        _buyPanel.gameObject.SetActive(true);
         _playerOnField = true;
+        CheckBuy(QuickAccessManager.Instance.CurrentActive);
+        
 
     }
 
@@ -50,6 +51,12 @@ public class Field : MonoBehaviour
         _playerOnField = false;
     }
 
+
+    private void CheckBuy(InventoryItem currentActive)
+    {
+        if (!_playerOnField) return;
+        _buyPanel.gameObject.SetActive(currentActive != null && currentActive.Type == Item.Hamer);
+    }
 
     public void _TryBuy()
     {

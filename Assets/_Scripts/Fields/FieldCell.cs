@@ -80,6 +80,7 @@ public class FieldCell : MonoBehaviour
     public void UpdateFieldItem(Item item)
     {
         _inField = item;
+        CheckPlayer();
     }
     public void _OnPlayerExit()
     {
