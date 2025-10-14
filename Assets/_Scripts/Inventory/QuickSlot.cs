@@ -27,14 +27,14 @@ public class QuickSlot : MonoBehaviour
         }
         
         _img.sprite = item.Icon;
-        QuickAccessManager.Instance.SwitchActiveItem.AddListener(OnActiveItemSwitch);
+        G.QuickAccess.SwitchActiveItem.AddListener(OnActiveItemSwitch);
     }
 
     private void Update()
     {
         if (Input.GetKeyDown((KeyCode)(48 + _idx)))
         {
-            QuickAccessManager.Instance.SwitchActive(_item);
+            G.QuickAccess.SwitchActive(_item);
         }
     }
 

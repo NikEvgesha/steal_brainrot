@@ -15,7 +15,7 @@ public class Field : MonoBehaviour
     private BuyTouchHandler _touchHandler;
     private void Start()
     {
-        QuickAccessManager.Instance.SwitchActiveItem.AddListener(CheckBuy);
+        G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
         _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
         _buyPanel.SetInfo("Разблокировать", _price.ToString());
@@ -38,7 +38,7 @@ public class Field : MonoBehaviour
         if (_unblocked) return;
 
         _playerOnField = true;
-        CheckBuy(QuickAccessManager.Instance.CurrentActive);
+        CheckBuy(G.QuickAccess.CurrentActive);
         
 
     }
@@ -60,9 +60,9 @@ public class Field : MonoBehaviour
 
     public void _TryBuy()
     {
-        if (CurrencyManager.Instance.CheckEnoughCurrency(CurrencyType.Coins, _price))
+        if (G.Currency.CheckEnoughCurrency(CurrencyType.Coins, _price))
         {
-            CurrencyManager.Instance.RemoveCurrency(CurrencyType.Coins, _price);
+            G.Currency.RemoveCurrency(CurrencyType.Coins, _price);
             Destroy(_grassObj);
             Destroy(_buyPanel.gameObject);
             foreach (FieldCell cell in _cells)

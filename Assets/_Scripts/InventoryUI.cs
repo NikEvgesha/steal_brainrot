@@ -43,16 +43,16 @@ public class InventoryUI : MonoBehaviour
     {
         _isOpen = !_isOpen;
         _uiPanel.SetActive(_isOpen);
-        UpdateItems(Inventory.Instance.GetItems(Item.Brainrot));
+        UpdateItems(G.Inventory.GetItems(Item.Brainrot));
     }
 
     public void _ShowBrainrots()
     {
-        UpdateItems(Inventory.Instance.GetItems(Item.Brainrot));
+        UpdateItems(G.Inventory.GetItems(Item.Brainrot));
     }
     public void _ShowEggs()
     {
-        UpdateItems(Inventory.Instance.GetItems(Item.Egg));
+        UpdateItems(G.Inventory.GetItems(Item.Egg));
     }
 
 

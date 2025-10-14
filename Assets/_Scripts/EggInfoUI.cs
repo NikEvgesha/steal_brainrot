@@ -19,7 +19,7 @@ public class EggInfoUI : MonoBehaviour
     {
         _name.text = egg.Name;
         _luck.text = egg.Data.Luck+"X"+ " �����" ;
-        _price.text = "$"+ (egg.Data.Price * ElementTypeMultiplaer.Init.GetMultiplaer(egg.Data.DinamicData.ElementType)).ToString();
+        _price.text = "$"+ (egg.Data.Price * G.Elements.GetMultiplaer(egg.Data.DinamicData.ElementType)).ToString();
     }
     public void SetStatus(EggStatus status)
     {

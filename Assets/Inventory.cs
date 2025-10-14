@@ -2,13 +2,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.EventSystems;
 
 public class Inventory : MonoBehaviour
 {
-    private static Inventory _instance;
-    public static Inventory Instance { get { return _instance; } }
-
     private List<InventoryItem> _brainrots;
     private List<InventoryItem> _eggs;
     private InventoryUI _ui;
@@ -17,9 +13,10 @@ public class Inventory : MonoBehaviour
 
     private void Awake()
     {
-        if (_instance == null)
+        if (G.Inventory == null)
         {
-            _instance = this;
+            G.Inventory = this;
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -29,13 +26,15 @@ public class Inventory : MonoBehaviour
         _eggs = new();
     }
 
-    private void Start()
+    public void Init()
     {
         _brainrots = new();
         _eggs = new();
-        _ui = FindAnyObjectByType<InventoryUI>();
-        _ui.QuickAccessSwitched.AddListener(TrySwitchQuickAccessStatus);
+        //_ui = FindAnyObjectByType<InventoryUI>();
+        //_ui.QuickAccessSwitched.AddListener(TrySwitchQuickAccessStatus);
     }
+
+
 
 
 
@@ -55,7 +54,7 @@ public class Inventory : MonoBehaviour
         item.transform.SetParent(PlayerManager.Instance.transform);
         item.gameObject.SetActive(false);
         item.SellAllowed = true;
-        QuickAccessManager.Instance.Add(item);
+        G.QuickAccess.Add(item);
     }
 
     public void Remove(InventoryItem item)
@@ -71,10 +70,10 @@ public class Inventory : MonoBehaviour
             default:
                 break;
         }
-        QuickAccessManager.Instance.Remove(item);
+        G.QuickAccess.Remove(item);
     }
 
-    private void TrySwitchQuickAccessStatus(InventoryItem item)
+    public void TrySwitchQuickAccessStatus(InventoryItem item)
     {
 
     }

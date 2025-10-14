@@ -22,8 +22,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void Start()
     {
-        _hintTouch.SetActive(ControlManager.Instance.UseTouchControl);
-        _hintDesctop.SetActive(!ControlManager.Instance.UseTouchControl);
+        _hintTouch.SetActive(G.Control.UseTouchControl);
+        _hintDesctop.SetActive(!G.Control.UseTouchControl);
     }
 
     private void OnDisable()
@@ -47,10 +47,10 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void Update()
     {
-        _interactionHold = PlayerInput.Instance.InteractionHold;
+        _interactionHold = G.Input.InteractionHold;
         if (_interactionInProgress) return;
 
-        if (PlayerInput.Instance.Interaction)
+        if (G.Input.Interaction)
         {
             StartInteraction();
         }

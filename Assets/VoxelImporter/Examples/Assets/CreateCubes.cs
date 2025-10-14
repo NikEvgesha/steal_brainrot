@@ -19,8 +19,8 @@ namespace VoxelImporter
             {
                 Shader shader = null;
 #if UNITY_2019_1_OR_NEWER
-                if (GraphicsSettings.renderPipelineAsset != null)
-                    shader = GraphicsSettings.renderPipelineAsset.defaultShader;
+                if (GraphicsSettings.defaultRenderPipeline != null)
+                    shader = GraphicsSettings.defaultRenderPipeline.defaultShader;
 #elif UNITY_2018_1_OR_NEWER
                 if (GraphicsSettings.renderPipelineAsset != null)
                     shader = GraphicsSettings.renderPipelineAsset.GetDefaultShader();

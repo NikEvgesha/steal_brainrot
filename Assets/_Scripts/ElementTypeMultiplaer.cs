@@ -11,7 +11,6 @@ public struct ElementMultiplier
 }
 public class ElementTypeMultiplaer : MonoBehaviour
 { 
-    public static ElementTypeMultiplaer Init;
     [SerializeField]private List<ElementMultiplier> _elementMultipliers = new List<ElementMultiplier>();
 
     // кэши
@@ -21,9 +20,9 @@ public class ElementTypeMultiplaer : MonoBehaviour
 
     private void Awake()
     {
-        if (Init == null)
+        if (G.Elements == null)
         {
-            Init = this;
+            G.Elements = this;
             BuildCaches();
         }
         else

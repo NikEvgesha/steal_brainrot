@@ -37,7 +37,7 @@ public class Egg : InventoryItem
 
     private void Awake()
     {
-        _data.DinamicData.ElementType = ElementTypeMultiplaer.Init.GetRandomWeighted();
+        _data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
         _infoUI = GetComponentInChildren<EggInfoUI>();
         _buyPanel = GetComponentInChildren<InteractionPanel>();
         _buyPanel.gameObject.SetActive(false);
@@ -88,14 +88,14 @@ public class Egg : InventoryItem
 
     public void TryBuy()
     {
-        if (CurrencyManager.Instance.CheckEnoughCurrency(CurrencyType.Coins, _data.Price * ElementTypeMultiplaer.Init.GetMultiplaer(_data.DinamicData.ElementType)))
+        if (G.Currency.CheckEnoughCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)))
         {
-            CurrencyManager.Instance.RemoveCurrency(CurrencyType.Coins, _data.Price * ElementTypeMultiplaer.Init.GetMultiplaer(_data.DinamicData.ElementType)); // ��������� � CheckEnoughCurrency
+            G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)); // ��������� � CheckEnoughCurrency
 
             // �������� � ���������, ��������� ��������
 
-            Inventory.Instance.Add(this);
-            //QuickAccessManager.Instance.Add(this);
+            G.Inventory.Add(this);
+            //G.QuickAccess.Add(this);
 
             //TestBackpackBrainrot.Instance.TakeEgg(this);
             EggPurchased.Invoke(this);
@@ -115,7 +115,7 @@ public class Egg : InventoryItem
         _infoUI.SetStatus(_status);
         _currentCell = field;
         _totalDurationSec = Mathf.RoundToInt(
-            _data.SecondsToHatching * ElementTypeMultiplaer.Init.GetMultiplaer(_data.DinamicData.ElementType)
+            _data.SecondsToHatching * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)
         );
 
         // �������� �� ����� ��������

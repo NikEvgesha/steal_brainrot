@@ -10,18 +10,18 @@ public class QuickAccessPanelUI : MonoBehaviour
 
     void Start()
     {
-        QuickAccessManager.Instance.ItemsUpdated.AddListener(UpdateUI);
+        G.QuickAccess.ItemsUpdated.AddListener(UpdateUI);
 
         _slots = new List<QuickSlot>();
 
-        for (int i = 0; i < QuickAccessManager.Instance.Capacity; i++)
+        for (int i = 0; i < G.QuickAccess.Capacity; i++)
         {
             QuickSlot slot = Instantiate(_slotPrefab, _slotParent);
             _slots.Add(slot);
             slot.SetIndex(i + 1);
         }
 
-        QuickAccessManager.Instance.OnUIInitialized();
+        G.QuickAccess.OnUIInitialized();
     }
 
     private void UpdateUI(List<InventoryItem> items)

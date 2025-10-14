@@ -64,11 +64,11 @@ public class InventorySlot : MonoBehaviour
     public void _OnClick() {
         if (!_item.InQuickAccess)
         {
-            bool added = QuickAccessManager.Instance.Add(_item);
+            bool added = G.QuickAccess.Add(_item);
             _quickSlotIndicator.SetActive(added);
         } else
         {
-            QuickAccessManager.Instance.Remove(_item);
+            G.QuickAccess.Remove(_item);
             _quickSlotIndicator.SetActive(false);
         }
             

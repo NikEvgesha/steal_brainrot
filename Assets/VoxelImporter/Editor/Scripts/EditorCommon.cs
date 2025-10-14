@@ -94,10 +94,10 @@ namespace VoxelImporter
         public static bool IsUniversalRenderPipeline()
         {
 #if UNITY_2018_1_OR_NEWER
-            if (GraphicsSettings.renderPipelineAsset == null)
+            if (GraphicsSettings.defaultRenderPipeline == null)
                 return false;
 #if UNITY_2019_1_OR_NEWER
-            var shader = GraphicsSettings.renderPipelineAsset.defaultShader;
+            var shader = GraphicsSettings.defaultRenderPipeline.defaultShader;
 #else
             var shader = GraphicsSettings.renderPipelineAsset.GetDefaultShader();
 #endif
@@ -111,10 +111,10 @@ namespace VoxelImporter
         public static bool IsHighDefinitionRenderPipeline()
         {
 #if UNITY_2018_1_OR_NEWER
-            if (GraphicsSettings.renderPipelineAsset == null)
+            if (GraphicsSettings.defaultRenderPipeline == null)
                 return false;
 #if UNITY_2019_1_OR_NEWER
-            var shader = GraphicsSettings.renderPipelineAsset.defaultShader;
+            var shader = GraphicsSettings.defaultRenderPipeline.defaultShader;
 #else
             var shader = GraphicsSettings.renderPipelineAsset.GetDefaultShader();
 #endif
@@ -127,10 +127,10 @@ namespace VoxelImporter
         public static Shader GetStandardShader()
         {
 #if UNITY_2018_1_OR_NEWER
-            if (GraphicsSettings.renderPipelineAsset != null)
+            if (GraphicsSettings.defaultRenderPipeline != null)
             {
 #if UNITY_2019_1_OR_NEWER
-                var shader = GraphicsSettings.renderPipelineAsset.defaultShader;
+                var shader = GraphicsSettings.defaultRenderPipeline.defaultShader;
 #else
                 var shader = GraphicsSettings.renderPipelineAsset.GetDefaultShader();
 #endif

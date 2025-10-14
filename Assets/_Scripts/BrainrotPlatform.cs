@@ -60,7 +60,7 @@ public class BrainrotPlatform : MonoBehaviour
         while (_brainrotOnPoint)
         {
             yield return new WaitForSecondsRealtime(1);
-            _currentIncome += (float)(_brainrot.Data.StartIncome * ElementTypeMultiplaer.Init.GetMultiplaer(_brainrot.DinamicData.ElementType));
+            _currentIncome += (float)(_brainrot.Data.StartIncome * G.Elements.GetMultiplaer(_brainrot.DinamicData.ElementType));
             _incomePlatform.SetText(_currentIncome);
         }
     }
@@ -77,7 +77,7 @@ public class BrainrotPlatform : MonoBehaviour
 
     private void GetIncome()
     {
-        CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _currentIncome);
+        G.Currency.AddCurrency(CurrencyType.Coins, _currentIncome);
         _currentIncome = 0;
         _incomePlatform.SetText(_currentIncome);
         _audio.Play();
@@ -88,7 +88,7 @@ public class BrainrotPlatform : MonoBehaviour
         _empty = true;
         StopAllCoroutines();
         GetIncome();
-        //CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _brainrot.Data.SellPrice);
+        //G.Currency.AddCurrency(CurrencyType.Coins, _brainrot.Data.SellPrice);
         Destroy(_brainrot.gameObject);
         _audio.Play();
     }

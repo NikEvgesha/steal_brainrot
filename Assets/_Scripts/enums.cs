@@ -16,3 +16,10 @@ public enum EggStatus
     Maturing,
     Hatching
 }
+
+public enum GameScene
+{
+    Melomaner,
+    Evgesha,
+    Terabitia
+}

@@ -31,9 +31,9 @@ public class FieldCell : MonoBehaviour
     public void _OnPlayerEnter()
     {
         //TestBackpackBrainrot.Instance.SwichItem.AddListener(CheckPlayer);
-        QuickAccessManager.Instance.SwitchActiveItem.AddListener(CheckPlayer);
+        G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
         //TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
-        QuickAccessManager.Instance.PlaceItem.AddListener(UpdateFieldItem);
+        G.QuickAccess.PlaceItem.AddListener(UpdateFieldItem);
         CheckPlayer();
         _playerOnCell = true;
         PlayerEnter?.Invoke();
@@ -52,7 +52,7 @@ public class FieldCell : MonoBehaviour
                 _addSpeedButton.SetActive(true);
                 break;
             case Item.Brainrot:
-                if (QuickAccessManager.Instance.CheckHand() == Item.Hamer)
+                if (G.QuickAccess.CheckHand() == Item.Hamer)
                 {
                     _takeButton.SetActive(true);
                 }
@@ -63,7 +63,7 @@ public class FieldCell : MonoBehaviour
     }
     private void FieldFree()
     {
-        switch (QuickAccessManager.Instance.CheckHand())
+        switch (G.QuickAccess.CheckHand())
         {
             case Item.Egg:
                 _triggerIndicator.SetActive(true);
@@ -84,8 +84,8 @@ public class FieldCell : MonoBehaviour
     }
     public void _OnPlayerExit()
     {
-        QuickAccessManager.Instance.PlaceItem.RemoveListener(UpdateFieldItem);
-        QuickAccessManager.Instance.SwitchActiveItem.RemoveListener(CheckPlayer);
+        G.QuickAccess.PlaceItem.RemoveListener(UpdateFieldItem);
+        G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
         _dropButton.SetActive(false);
         _addSpeedButton.SetActive(false);
         _takeButton.SetActive(false);
@@ -99,7 +99,7 @@ public class FieldCell : MonoBehaviour
     }
     public void _Drop()
     {
-        QuickAccessManager.Instance.DropCurrent(this);
+        G.QuickAccess.DropCurrent(this);
         //TestBackpackBrainrot.Instance.Drop(this);
     }
     public void _AddSpeed()

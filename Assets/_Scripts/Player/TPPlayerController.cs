@@ -62,7 +62,7 @@ public class TPPlayerController : MonoBehaviour
         float v;
         bool running;
         // ===== Ввод =====
-        if (PlayerInput.Instance == null)
+        if (G.Input == null)
         {
             h = Input.GetAxisRaw("Horizontal");
             v = Input.GetAxisRaw("Vertical");
@@ -70,10 +70,10 @@ public class TPPlayerController : MonoBehaviour
         }
         else
         {
-            movement = PlayerInput.Instance.Movement;
+            movement = G.Input.Movement;
             h = movement.x;
             v = movement.z;
-            running = PlayerInput.Instance.Sprint;
+            running = G.Input.Sprint;
         }
 
         // ===== Направление по камере =====
@@ -96,7 +96,7 @@ public class TPPlayerController : MonoBehaviour
         if (_cc.isGrounded)
         {
             if (_verticalVel < 0f) _verticalVel = groundedStick;
-            if (PlayerInput.Instance && PlayerInput.Instance.JumpTriggered)
+            if (G.Input && G.Input.JumpTriggered)
             {
                 _verticalVel = jumpForce; // Применяем силу прыжка
             }

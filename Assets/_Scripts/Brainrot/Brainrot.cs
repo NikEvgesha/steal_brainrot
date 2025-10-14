@@ -61,7 +61,7 @@ public class Brainrot : InventoryItem
         _canvas.transform.parent = transform;
         _canvas.transform.localScale = scale;
         _currentIncome = 0;
-        _dinamicData.ResultIncome = Mathf.RoundToInt(_data.StartIncome * ElementTypeMultiplaer.Init.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
+        _dinamicData.ResultIncome = Mathf.RoundToInt(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
         NewPlace(floor);
         SetTypeVisual();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
@@ -118,12 +118,12 @@ public class Brainrot : InventoryItem
         _floorListener.UpdateFieldItem(Item.Free);
         StopCoroutine(_incomeCorutine);
         _incomeCorutine = null;
-        Inventory.Instance.Add(this);
+        G.Inventory.Add(this);
         //TestBackpackBrainrot.Instance.TakeBrainrot(this);
     }
     private void GetIncome()
     {
-        CurrencyManager.Instance.AddCurrency(CurrencyType.Coins, _currentIncome);
+        G.Currency.AddCurrency(CurrencyType.Coins, _currentIncome);
         _currentIncome = 0;
         _canvas.UpdateIncome(_currentIncome);
         if (_audio)

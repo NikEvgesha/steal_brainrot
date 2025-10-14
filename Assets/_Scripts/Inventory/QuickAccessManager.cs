@@ -4,10 +4,6 @@ using UnityEngine.Events;
 
 public class QuickAccessManager : MonoBehaviour
 {
-    private static QuickAccessManager _instance;
-    public static QuickAccessManager Instance { get { return _instance; } }
-
-
     [SerializeField] private int _capacity = 8;
     [SerializeField] private List<InventoryItem> _startItems;
 
@@ -30,9 +26,9 @@ public class QuickAccessManager : MonoBehaviour
 
     private void Awake()
     {
-        if (_instance == null)
+        if (G.QuickAccess == null)
         {
-            _instance = this;
+            G.QuickAccess = this;
         }
         else
         {
@@ -41,7 +37,7 @@ public class QuickAccessManager : MonoBehaviour
         _items = new List<InventoryItem>(_capacity);
     }
 
-    private void Start()
+    public void Init()
     {
         _inHand = Item.Free;
         foreach (InventoryItem it in _startItems)
@@ -99,7 +95,7 @@ public class QuickAccessManager : MonoBehaviour
             default:
                 break;
         }
-        Inventory.Instance.Remove(_currentActive);
+        G.Inventory.Remove(_currentActive);
         _dropping = false;
     }
 
