@@ -192,6 +192,7 @@ public class Egg : InventoryItem
     }
     private void SaveDeadline()
     {
+        if (_currentCell == null) return;
         PlayerPrefs.SetString(SaveKey, _endUtc.Ticks.ToString());
         PlayerPrefs.Save();
     }

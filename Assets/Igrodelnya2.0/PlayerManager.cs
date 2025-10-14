@@ -2,19 +2,18 @@ using UnityEngine;
 
 public class PlayerManager : MonoBehaviour
 {
-    private static PlayerManager _instance;
-    public static PlayerManager Instance { get { return _instance; } private set { } }
-
     [SerializeField] private Transform _getPoint;
     [SerializeField] private Transform _handPoint;
+    [SerializeField] private TPCameraController _camera;
+    [SerializeField] private Transform _cameraPivot;
 
     private TPPlayerController _tPPlayer;
 
     private void Awake()
     {
-        if (_instance == null)
+        if (G.Player == null)
         {
-            _instance = this;
+            G.Player = this;
             _tPPlayer = GetComponent<TPPlayerController>();
         }
         else
@@ -22,6 +21,15 @@ public class PlayerManager : MonoBehaviour
             Destroy(gameObject);
         }
     }
+
+    public void Init(Transform spawnPos)
+    {
+        transform.position = spawnPos.position;
+        TPCameraController camera = Instantiate(_camera);
+        camera.SetTarget(_cameraPivot);
+        _tPPlayer.SetCamera(camera.transform);
+    }
+
     public void SetItem(InventoryItem item)
     {
         if (item.Type == Item.Hamer)
@@ -30,11 +38,12 @@ public class PlayerManager : MonoBehaviour
         } else
         {
             item.transform.SetParent(_getPoint.transform);
+            _tPPlayer.SetHolding(true);
         }
             
         item.transform.localPosition = Vector3.zero;
         //item.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
-        _tPPlayer.SetHolding(true);
+       
     }
     public void RemoveItem()
     {

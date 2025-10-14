@@ -38,14 +38,25 @@ public class TPCameraController : MonoBehaviour
     private void Awake()
     {
         _cam = GetComponent<Camera>();
-        if (target == null)
-        {
-            Debug.LogWarning("[TPCameraController] Target not set. Disabling.");
-            enabled = false;
-            return;
-        }
+        //if (target == null)
+        //{
+        //    Debug.LogWarning("[TPCameraController] Target not set. Disabling.");
+        //    enabled = false;
+        //    return;
+        //}
 
         // Инициализация дистанции от текущего положения камеры
+        //_desiredDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), minDistance, maxDistance);
+        //_currentDistance = _desiredDistance;
+
+        //// Начальный yaw берём из поворота таргета
+        //yaw = target.eulerAngles.y;
+    }
+
+
+    public void SetTarget(Transform t)
+    {
+        target = t;
         _desiredDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), minDistance, maxDistance);
         _currentDistance = _desiredDistance;
 

@@ -9,14 +9,18 @@ public class GameEntryPoint : MonoBehaviour
     [SerializeField] private GameObject _scene;
     [SerializeField] private ElementTypeMultiplaer _elements;
 
+
+    [SerializeField] private Transform _playerSpawnPoint;
+
     private void Start()
     {
-        //Instantiate(_playerManager);
+        Instantiate(_playerManager).Init(_playerSpawnPoint);
         Instantiate(_inventory).Init();
         Instantiate(_quickAccess).Init();
         Instantiate(_elements);
         Instantiate(_ui);
-        _scene.SetActive(true);
+        G.Initialized?.Invoke();
+        //_scene.SetActive(true);
         G.GameLoader.ShowLoadingScreen(false);
     }
 }

@@ -1,3 +1,5 @@
+using UnityEngine.Events;
+
 public static class G
 {
     public static SoundManager SoundManager;
@@ -12,7 +14,9 @@ public static class G
     public static CurrencyManager Currency;
     public static QuickAccessManager QuickAccess;
     public static ElementTypeMultiplaer Elements;
+    public static PlayerManager Player;
 
     public static bool IsPaused;
+    public static UnityEvent Initialized = new();
 }
 

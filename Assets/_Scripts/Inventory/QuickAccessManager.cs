@@ -42,7 +42,7 @@ public class QuickAccessManager : MonoBehaviour
         _inHand = Item.Free;
         foreach (InventoryItem it in _startItems)
         {
-            InventoryItem item = Instantiate(it, PlayerManager.Instance.transform);
+            InventoryItem item = Instantiate(it, G.Player.transform);
             Add(item);
         }
         SwitchActive(null);
@@ -119,11 +119,11 @@ public class QuickAccessManager : MonoBehaviour
         {
             _currentActive.gameObject.SetActive(true);
             _inHand = _currentActive.Type;
-            PlayerManager.Instance.SetItem(item);
+            G.Player.SetItem(item);
         } else
         {
             _inHand = Item.Free;
-            PlayerManager.Instance.RemoveItem();
+            G.Player.RemoveItem();
         }
 
         SwitchActiveItem?.Invoke(_currentActive);

@@ -46,16 +46,16 @@ public class TestBackpackBrainrot : MonoBehaviour
     {
         _currentEgg= egg;
         _inHand = Item.Egg;
-        //PlayerManager.Instance.SetItem(egg.transform);
-        //egg.transform.SetParent(PlayerManager.Instance.transform);
+        //G.Player.SetItem(egg.transform);
+        //egg.transform.SetParent(G.Player.transform);
         //egg.transform.localPosition = Vector3.up;
     }
     public void TakeBrainrot(Brainrot brainrot)
     {
         _currentBrainrot = brainrot;
         _inHand = Item.Brainrot;
-        //PlayerManager.Instance.SetItem(brainrot.transform);
-        //brainrot.transform.SetParent(PlayerManager.Instance.transform);
+        //G.Player.SetItem(brainrot.transform);
+        //brainrot.transform.SetParent(G.Player.transform);
         //brainrot.transform.localPosition = Vector3.up;
     }
     public void Drop(FieldCell field)
@@ -65,7 +65,7 @@ public class TestBackpackBrainrot : MonoBehaviour
         switch (_inHand)
         {
             case Item.Egg:
-                //PlayerManager.Instance.RemoveItem();
+                //G.Player.RemoveItem();
                 _currentEgg.transform.SetParent(_floorListener.transform);
                 _currentEgg.transform.localPosition = Vector3.zero;
                 _currentEgg.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
@@ -75,7 +75,7 @@ public class TestBackpackBrainrot : MonoBehaviour
                 SwichItem?.Invoke();
                 break;
             case Item.Brainrot:
-                //PlayerManager.Instance.RemoveItem();
+                //G.Player.RemoveItem();
                 _currentBrainrot.transform.SetParent(_floorListener.transform);
                 _currentBrainrot.transform.localPosition = Vector3.zero;
                 _currentBrainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);

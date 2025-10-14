@@ -51,7 +51,7 @@ public class Inventory : MonoBehaviour
             default:
                 break;
         }
-        item.transform.SetParent(PlayerManager.Instance.transform);
+        item.transform.SetParent(G.Player.transform);
         item.gameObject.SetActive(false);
         item.SellAllowed = true;
         G.QuickAccess.Add(item);

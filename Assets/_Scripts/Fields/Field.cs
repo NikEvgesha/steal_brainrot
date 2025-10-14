@@ -13,7 +13,16 @@ public class Field : MonoBehaviour
     private List<FieldCell> _cells;
     private bool _playerOnField;
     private BuyTouchHandler _touchHandler;
-    private void Start()
+    
+    
+    
+    private void Awake()
+    {
+        G.Initialized.AddListener(Init);     
+    }
+
+
+    private void Init()
     {
         G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
@@ -23,7 +32,8 @@ public class Field : MonoBehaviour
         if (_unblocked)
         {
             Destroy(_grassObj);
-        } else
+        }
+        else
         {
             foreach (FieldCell cell in _cells)
             {
@@ -31,7 +41,6 @@ public class Field : MonoBehaviour
             }
         }
     }
-
 
     public void _OnPlayerEnter()
     {

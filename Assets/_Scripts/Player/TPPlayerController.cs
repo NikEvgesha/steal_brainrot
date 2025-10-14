@@ -48,11 +48,18 @@ public class TPPlayerController : MonoBehaviour
     {
         _cc = GetComponent<CharacterController>();
 
-        if (cameraTransform == null && Camera.main != null)
-            cameraTransform = Camera.main.transform;
+        //if (cameraTransform == null && Camera.main != null)
+        //    cameraTransform = Camera.main.transform;
 
         // На всякий случай выключим root motion (контроль у CharacterController)
         if (animator != null) animator.applyRootMotion = false;
+    }
+
+    public void SetCamera(Transform camera)
+    {
+        if (camera == null && Camera.main != null)
+            cameraTransform = Camera.main.transform;
+        else cameraTransform = camera;
     }
 
     private void Update()
