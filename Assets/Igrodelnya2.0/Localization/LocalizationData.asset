@@ -1,0 +1,1100 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 398c862069006f743b35f10815d240bb, type: 3}
+  m_Name: LocalizationData
+  m_EditorClassIdentifier: 
+  languages:
+  - Ru
+  - En
+  entries:
+  - Key: Settings
+    Translations:
+    - Settings/
+    - Settings/
+  - Key: Settings/MusicVolume
+    Translations:
+    - "\u0413\u0440\u043E\u043C\u043A\u043E\u0441\u0442\u044C \u043C\u0443\u0437\u044B\u043A\u0438"
+    - Music volume
+  - Key: Settings/SoundVolume
+    Translations:
+    - "\u0413\u0440\u043E\u043C\u043A\u043E\u0441\u0442\u044C \u0437\u0432\u0443\u043A\u043E\u0432"
+    - Sound volume
+  - Key: Settings/SelectLanguage
+    Translations:
+    - "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u044F\u0437\u044B\u043A"
+    - Select a language
+  - Key: PlayerBestTime
+    Translations:
+    - "\u0422\u0432\u043E\u0439 \u0440\u0435\u043A\u043E\u0440\u0434:"
+    - 'Your record:'
+  - Key: Play
+    Translations:
+    - "\u041D\u0430\u0447\u0430\u0442\u044C \u0438\u0433\u0440\u0443"
+    - Start game
+  - Key: Cancel
+    Translations:
+    - "\u041E\u0442\u043C\u0435\u043D\u0430"
+    - Cancel
+  - Key: Buy
+    Translations:
+    - "\u041A\u0443\u043F\u0438\u0442\u044C"
+    - Buy
+  - Key: BuyFor
+    Translations:
+    - "\u041A\u0443\u043F\u0438\u0442\u044C \u0437\u0430"
+    - Buy for
+  - Key: Yes
+    Translations:
+    - "\u0414\u0430"
+    - Yes
+  - Key: No
+    Translations:
+    - "\u041D\u0435\u0442"
+    - No
+  - Key: Exit
+    Translations:
+    - "\u0412\u044B\u0439\u0442\u0438"
+    - Exit
+  - Key: ExitLevel
+    Translations:
+    - "\u0423\u0432\u0435\u0440\u0435\u043D\u044B?\n\u0422\u0435\u043A\u0443\u0449\u0438\u0439
+      \u043F\u0440\u043E\u0433\u0440\u0435\u0441\u0441 \u0431\u0443\u0434\u0435\u0442
+      \u043F\u043E\u0442\u0435\u0440\u044F\u043D"
+    - 'Are you sure?
+
+      Current progress will be lost'
+  - Key: Menu
+    Translations:
+    - "\u041C\u0435\u043D\u044E"
+    - Menu
+  - Key: SensivitySettings
+    Translations:
+    - "\u0421\u043A\u043E\u0440\u043E\u0441\u0442\u044C \u043A\u0430\u043C\u0435\u0440\u044B"
+    - Camera speed
+  - Key: ExitButton
+    Translations:
+    - "\u0412\u044B\u0445\u043E\u0434"
+    - Exit
+  - Key: ControlHint
+    Translations:
+    - "WASD - \u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u0438\u0435\n\u041F\u0440\u043E\u0431\u0435\u043B
+      - \u041F\u0440\u044B\u0436\u043E\u043A\nLShift - \u0423\u0441\u043A\u043E\u0440\u0435\u043D\u0438\u0435\nTab
+      - \u0418\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C"
+    - 'WASD - Move
+
+      Space - Jump
+
+      LShift - Accelerate
+
+      Tab - Inventory'
+  - Key: ControlHint/PickUp
+    Translations:
+    - "\u041F\u041A\u041C - \u043F\u043E\u0434\u043D\u044F\u0442\u044C/\u0431\u0440\u043E\u0441\u0438\u0442\u044C"
+    - RMB - pick up/drop
+  - Key: ControlHint/PutToInventory
+    Translations:
+    - "E - \u043F\u043E\u043B\u043E\u0436\u0438\u0442\u044C \u0432 \u0441\u0443\u043C\u043A\u0443"
+    - E - put in bag
+  - Key: ControlHint/Attach
+    Translations:
+    - "Z - \u043F\u0440\u0438\u043A\u0440\u0435\u043F\u0438\u0442\u044C/\u043E\u0442\u043A\u0440\u0435\u043F\u0438\u0442\u044C"
+    - Z - attach/unattach
+  - Key: ControlHint/Rotate
+    Translations:
+    - "Q/E - \u0432\u0440\u0430\u0449\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043C\u0435\u0442"
+    - Q/E - rotate
+  - Key: ControlHint/Heal
+    Translations:
+    - "\u0414\u0435\u0440\u0436\u0430\u0442\u044C \u041B\u041A\u041C - \u043B\u0435\u0447\u0435\u043D\u0438\u0435"
+    - Hold LBM - heal
+  - Key: ControlHint/Hold
+    Translations:
+    - "\u0414\u0435\u0440\u0436\u0430\u0442\u044C"
+    - Hold
+  - Key: ShopReal
+    Translations:
+    - "\u041C\u0430\u0433\u0430\u0437\u0438\u043D"
+    - Shop
+  - Key: Inventory
+    Translations:
+    - "\u0418\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C"
+    - Inventory
+  - Key: ToLobby
+    Translations:
+    - "\u0412 \u043B\u043E\u0431\u0431\u0438"
+    - To lobby
+  - Key: Restart
+    Translations:
+    - "\u041D\u0430\u0447\u0430\u0442\u044C \u0441\u043D\u0430\u0447\u0430\u043B\u0430"
+    - Restart
+  - Key: Spawn
+    Translations:
+    - "\u0421\u043F\u0430\u0432\u043D"
+    - Spawn
+  - Key: GetReward
+    Translations:
+    - "\u041F\u043E\u043B\u0443\u0447\u0438\u0442\u044C"
+    - Receive
+  - Key: AdTimer
+    Translations:
+    - "\u041F\u043E\u043A\u0430\u0437 \u0440\u0435\u043A\u043B\u0430\u043C\u044B
+      \u0447\u0435\u0440\u0435\u0437:"
+    - 'Ad display in:'
+  - Key: GemsAdReward
+    Translations:
+    - "\u041F\u043E\u0441\u043C\u043E\u0442\u0440\u0438 \u0440\u0435\u043A\u043B\u0430\u043C\u0443,
+      \u0447\u0442\u043E\u0431\u044B \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C"
+    - Watch ad to earn
+  - Key: CallHelp
+    Translations:
+    - "\u0412\u044B\u0437\u0432\u0430\u0442\u044C \u043F\u043E\u043C\u043E\u0449\u044C"
+    - Call for help
+  - Key: AddFuel
+    Translations:
+    - "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0442\u043E\u043F\u043B\u0438\u0432\u043E"
+    - Add fuel
+  - Key: Item
+    Translations:
+    - Item/
+    - Item/
+  - Key: Item/Gems5
+    Translations:
+    - "5 \u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - 5 Gems
+  - Key: Item/Gems20
+    Translations:
+    - "20 \u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - 20 Gems
+  - Key: Item/Gems200
+    Translations:
+    - "200 \u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - 200 Gems
+  - Key: Item/Gems1500
+    Translations:
+    - "1500 \u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - 1500 Gems
+  - Key: Item/Coal
+    Translations:
+    - "\u0423\u0433\u043E\u043B\u044C"
+    - Coal
+  - Key: Item/Axe
+    Translations:
+    - "\u0422\u043E\u043F\u043E\u0440"
+    - Axe
+  - Key: Item/Potion
+    Translations:
+    - "\u0417\u0435\u043B\u044C\u0435 \u043B\u0435\u0447\u0435\u043D\u0438\u044F"
+    - Heal potion
+  - Key: Item/Ammo
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B"
+    - Ammo
+  - Key: Item/AmmoPistol
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u043F\u0438\u0441\u0442\u043E\u043B\u0435\u0442\u0430"
+    - Pistol ammo
+  - Key: Item/AmmoRifle
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u0432\u0438\u043D\u0442\u043E\u0432\u043A\u0438"
+    - Rifle ammo
+  - Key: Item/AmmoShotgun
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u0434\u0440\u043E\u0431\u043E\u0432\u0438\u043A\u0430"
+    - Shotgun ammo
+  - Key: Item/Amphora
+    Translations:
+    - "\u041A\u0443\u0432\u0448\u0438\u043D"
+    - Amphora
+  - Key: Item/Barrel
+    Translations:
+    - "\u0411\u043E\u0447\u043A\u0430"
+    - Barrel
+  - Key: Item/Bandage
+    Translations:
+    - "\u0411\u0438\u043D\u0442"
+    - Bandage
+  - Key: Item/Bone
+    Translations:
+    - "\u041A\u043E\u0441\u0442\u044C"
+    - Bone
+  - Key: Item/Bowl
+    Translations:
+    - "\u041C\u0438\u0441\u043A\u0430"
+    - Bowl
+  - Key: Item/BronzeKey
+    Translations:
+    - "\u0411\u0440\u043E\u043D\u0437\u043E\u0432\u044B\u0439 \u043A\u043B\u044E\u0447"
+    - Bronze key
+  - Key: Item/Bucket
+    Translations:
+    - "\u0412\u0435\u0434\u0440\u043E"
+    - Bucket
+  - Key: Item/Cage
+    Translations:
+    - "\u041A\u043B\u0435\u0442\u043A\u0430"
+    - Cage
+  - Key: Item/Coin
+    Translations:
+    - "\u041C\u043E\u043D\u0435\u0442\u0430"
+    - Coin
+  - Key: Item/Crown
+    Translations:
+    - "\u041A\u043E\u0440\u043E\u043D\u0430"
+    - Crown
+  - Key: Item/Crystal
+    Translations:
+    - "\u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B"
+    - Crystal
+  - Key: Item/Cup
+    Translations:
+    - "\u041A\u0440\u0443\u0436\u043A\u0430"
+    - Cup
+  - Key: Item/Dragon
+    Translations:
+    - "\u0414\u0440\u0430\u043A\u043E\u043D"
+    - Dragon
+  - Key: Item/Emerald
+    Translations:
+    - "\u0418\u0437\u0443\u043C\u0440\u0443\u0434"
+    - Emerald
+  - Key: Item/Fence
+    Translations:
+    - "\u041E\u0433\u0440\u0430\u0434\u0430"
+    - Fence
+  - Key: Item/Goblet
+    Translations:
+    - "\u041A\u0443\u0431\u043E\u043A"
+    - Goblet
+  - Key: Item/GoldBar
+    Translations:
+    - "\u0417\u043E\u043B\u043E\u0442\u043E\u0439 \u0441\u043B\u0438\u0442\u043E\u043A"
+    - Gold bar
+  - Key: Item/GoldCup
+    Translations:
+    - "\u0417\u043E\u043B\u043E\u0442\u043E\u0439 \u043A\u0443\u0431\u043E\u043A"
+    - Gold cup
+  - Key: Item/GoldKey
+    Translations:
+    - "\u0417\u043E\u043B\u043E\u0442\u043E\u0439 \u043A\u043B\u044E\u0447"
+    - Gold key
+  - Key: Item/Gun
+    Translations:
+    - "\u0420\u0443\u0436\u044C\u0435"
+    - Gun
+  - Key: Item/Jug
+    Translations:
+    - "\u041A\u0443\u0432\u0448\u0438\u043D"
+    - Jug
+  - Key: Item/Key
+    Translations:
+    - "\u041A\u043B\u044E\u0447"
+    - Key
+  - Key: Item/Lantern
+    Translations:
+    - "\u0424\u043E\u043D\u0430\u0440\u044C"
+    - Lantern
+  - Key: Item/Musket
+    Translations:
+    - "\u041F\u0438\u0441\u0442\u043E\u043B\u0435\u0442"
+    - Pistol
+  - Key: Item/Plate
+    Translations:
+    - "\u0422\u0430\u0440\u0435\u043B\u043A\u0430"
+    - Plate
+  - Key: Item/Potion
+    Translations:
+    - "\u0417\u0435\u043B\u044C\u0435 \u043B\u0435\u0447\u0435\u043D\u0438\u044F"
+    - Heal potion
+  - Key: Item/Ruby
+    Translations:
+    - "\u0420\u0443\u0431\u0438\u043D"
+    - Ruby
+  - Key: Item/Saber
+    Translations:
+    - "\u0421\u0430\u0431\u043B\u044F"
+    - Saber
+  - Key: Item/SilverBar
+    Translations:
+    - "\u0421\u0435\u0440\u0435\u0431\u0440\u044F\u043D\u043D\u044B\u0439 \u0441\u043B\u0438\u0442\u043E\u043A"
+    - Silver bar
+  - Key: Item/SilverCup
+    Translations:
+    - "\u0421\u0435\u0440\u0435\u0431\u0440\u044F\u043D\u043D\u044B\u0439 \u043A\u0443\u0431\u043E\u043A"
+    - Silver cup
+  - Key: Item/Skull
+    Translations:
+    - "\u0427\u0435\u0440\u0435\u043F"
+    - Skull
+  - Key: Item/Baricade
+    Translations:
+    - "\u0411\u0430\u0440\u0438\u043A\u0430\u0434\u0430"
+    - Baricade
+  - Key: Item/Statue
+    Translations:
+    - "\u0421\u0442\u0430\u0442\u0443\u044F"
+    - Statue
+  - Key: Item/Stool
+    Translations:
+    - "\u0422\u0430\u0431\u0443\u0440\u0435\u0442"
+    - Stool
+  - Key: Item/Straw
+    Translations:
+    - "\u0421\u0435\u043D\u043E"
+    - Straw
+  - Key: Item/TableLong
+    Translations:
+    - "\u0414\u043B\u0438\u043D\u043D\u044B\u0439 \u0441\u0442\u043E\u043B"
+    - Long table
+  - Key: Item/TableMedium
+    Translations:
+    - "\u0421\u0442\u043E\u043B"
+    - Table
+  - Key: Item/Pirate
+    Translations:
+    - "\u041F\u0438\u0440\u0430\u0442"
+    - Pirate
+  - Key: Item/Dragon
+    Translations:
+    - "\u0414\u0440\u0430\u043A\u043E\u043D"
+    - Dragon
+  - Key: Item/Zombie
+    Translations:
+    - "\u0417\u043E\u043C\u0431\u0438"
+    - Zombie
+  - Key: Item/Rifle
+    Translations:
+    - "\u0412\u0438\u043D\u0442\u043E\u0432\u043A\u0430"
+    - Rifle
+  - Key: Item/Shotgun
+    Translations:
+    - "\u0414\u0440\u043E\u0431\u043E\u0432\u0438\u043A"
+    - Shotgun
+  - Key: Tag
+    Translations:
+    - Tag/
+    - Tag/
+  - Key: Tag/Fuel
+    Translations:
+    - "\u0422\u043E\u043F\u043B\u0438\u0432\u043E"
+    - Fuel
+  - Key: Tag/Trash
+    Translations:
+    - "\u041C\u0443\u0441\u043E\u0440"
+    - Trash
+  - Key: Tag/Valuable
+    Translations:
+    - "\u0426\u0435\u043D\u043D\u043E\u0441\u0442\u044C"
+    - Valuable
+  - Key: Tag/Weapon
+    Translations:
+    - "\u041E\u0440\u0443\u0436\u0438\u0435"
+    - Weapon
+  - Key: Tag/Medicine
+    Translations:
+    - "\u041B\u0435\u043A\u0430\u0440\u0441\u0442\u0432\u043E"
+    - Medicine
+  - Key: Tag/Dead
+    Translations:
+    - "\u0422\u0440\u0443\u043F"
+    - Dead
+  - Key: Tag/Reward
+    Translations:
+    - "\u041D\u0430\u0433\u0440\u0430\u0434\u0430"
+    - Reward
+  - Key: Tag/Ammo
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B"
+    - Ammo
+  - Key: Game/Lobby
+    Translations:
+    - "\u041B\u043E\u0431\u0431\u0438"
+    - Lobby
+  - Key: Game/Loose
+    Translations:
+    - "\u0412\u044B \u043F\u043E\u0433\u0438\u0431\u043B\u0438..."
+    - You Died
+  - Key: Game/Traveled
+    Translations:
+    - "\u041F\u0440\u043E\u0439\u0434\u0435\u043D\u044B\u0439 \u043F\u0443\u0442\u044C:
+      {0}\u043C"
+    - 'Distance traveled: {0}m'
+  - Key: Game/SecLeft
+    Translations:
+    - "\u041E\u0441\u0442\u0430\u043B\u043E\u0441\u044C {0} \u0441\u0435\u043A\u0443\u043D\u0434 "
+    - '{0} seconds left'
+  - Key: Game/AutoLeft
+    Translations:
+    - "\u0412\u043E\u0437\u0432\u0440\u0430\u0449\u0430\u0435\u043C\u0441\u044F \u0432
+      \u043B\u043E\u0431\u0431\u0438 \u0447\u0435\u0440\u0435\u0437 {0} \u0441\u0435\u043A\u0443\u043D\u0434"
+    - Back to the lobby in {0} seconds
+  - Key: Game/PlayAgane
+    Translations:
+    - "\u0421\u044B\u0433\u0440\u0430\u0442\u044C \u0441\u043D\u043E\u0432\u0430"
+    - Play again
+  - Key: Game/Revive
+    Translations:
+    - "\u0412\u043E\u0437\u0440\u043E\u0434\u0438\u0442\u044C\u0441\u044F"
+    - Revive
+  - Key: Game/Win
+    Translations:
+    - "\u0412\u044B \u0432\u044B\u0438\u0433\u0440\u0430\u043B\u0438!"
+    - You Win!
+  - Key: Ammo/Gun
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u043F\u0438\u0441\u0442\u043E\u043B\u0435\u0442\u0430"
+    - Pistol ammunition
+  - Key: Ammo/Shotgun
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u0434\u0440\u043E\u0431\u043E\u0432\u0438\u043A\u0430"
+    - Shotgun cartridges
+  - Key: Ammo/Rifle
+    Translations:
+    - "\u041F\u0430\u0442\u0440\u043E\u043D\u044B \u0434\u043B\u044F \u0432\u0438\u043D\u0442\u043E\u0432\u043A\u0438"
+    - Rifle ammunition
+  - Key: Game/Location/GeneralStore
+    Translations:
+    - "\u041F\u044F\u0442\u0451\u0440\u043E\u0447\u043A\u0430"
+    - General Store
+  - Key: Game/Location/TradingHut
+    Translations:
+    - "\u0422\u043E\u0440\u0433\u043E\u0432\u044B\u0439 \u0434\u043E\u043C"
+    - Trading Hut
+  - Key: Game/Location/Sheriffs
+    Translations:
+    - "\u0428\u0435\u0440\u0438\u0444"
+    - Sheriffs
+  - Key: Game/Location/Hospital
+    Translations:
+    - "\u0411\u043E\u043B\u044C\u043D\u0438\u0446\u0430"
+    - Hospital
+  - Key: Game/Location/GunStore
+    Translations:
+    - "\u041E\u0440\u0443\u0436\u0435\u0439\u043D\u044B\u0439"
+    - Gun Store
+  - Key: Game/Location/FishermanShark
+    Translations:
+    - "\u0414\u043E\u043C \u0420\u044B\u0431\u0430\u043A\u0430"
+    - Fisherman Shark
+  - Key: Game/Location/Bank
+    Translations:
+    - "\u0411\u0430\u043D\u043A"
+    - Bank
+  - Key: Game/HelpInfo/GetPirate
+    Translations:
+    - "\u0414\u043E\u0441\u0442\u0430\u0432\u044C \u043F\u0438\u0440\u0430\u0442\u0430
+      \u0441\u044E\u0434\u0430"
+    - Get pirate here
+  - Key: Game/HelpInfo/SellItem
+    Translations:
+    - "\u041F\u0440\u043E\u0434\u0430\u0442\u044C \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u044B"
+    - Sell items
+  - Key: Game/HelpInfo/Collect
+    Translations:
+    - "\u0421\u043E\u0431\u0440\u0430\u0442\u044C"
+    - Collect
+  - Key: Tutorial/Step1/Mobile
+    Translations:
+    - "\u0412\u043E\u0437\u044C\u043C\u0438 \u0438 \u043F\u0440\u043E\u0434\u0430\u0439
+      \u044D\u0442\u043E \u0437\u043E\u043B\u043E\u0442\u043E. \u043D\u0430\u0432\u0435\u0434\u0438
+      \u043D\u0430 \u043D\u0435\u0433\u043E \u0438 \u043D\u0430\u0436\u043C\u0438
+      \u043D\u0430 \u0437\u043D\u0430\u0447\u043E\u043A"
+    - Take and sell this gold. Point and click on the icon.
+  - Key: Tutorial/Step1/Desctop
+    Translations:
+    - "\u0412\u043E\u0437\u044C\u043C\u0438 \u0438 \u043F\u0440\u043E\u0434\u0430\u0439
+      \u044D\u0442\u043E \u0437\u043E\u043B\u043E\u0442\u043E. \u0427\u0442\u043E\u0431\u044B
+      \u0432\u0437\u044F\u0442\u044C \u043F\u0440\u0435\u0434\u043C\u0435\u0442 \u043D\u0430\u0432\u0435\u0434\u0438
+      \u043D\u0430 \u043D\u0435\u0433\u043E \u043C\u044B\u0448\u043A\u0443 \u0438
+      \u043D\u0430\u0436\u043C\u0438 [\u041F\u041A\u041C]"
+    - Take and sell this gold. To take an item, hover the mouse over it and press
+      [RBM].
+  - Key: Tutorial/Step8/Mobile
+    Translations:
+    - "\u041F\u0440\u0435\u0434\u043C\u0435\u0442\u044B \u043C\u043E\u0436\u043D\u043E
+      \u043A\u043B\u0430\u0441\u0442\u044C \u0432 \u0438\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C,
+      \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043D\u0443\u0436\u043D\u043E
+      \u043D\u0430\u0432\u0435\u0441\u0442\u0438\u0441\u044C \u043D\u0430 \u043F\u0440\u0435\u0434\u043C\u0435\u0442
+      \u0438 \u043D\u0430\u0436\u0430\u0442\u044C \u043D\u0430 \u0438\u043A\u043E\u043D\u043A\u0443"
+    - Items can be placed in your inventory by hovering over the item and clicking
+      on the icon.
+  - Key: Tutorial/Step8/Desctop
+    Translations:
+    - "\u041F\u0440\u0435\u0434\u043C\u0435\u0442\u044B \u043C\u043E\u0436\u043D\u043E
+      \u043A\u043B\u0430\u0441\u0442\u044C \u0432 \u0438\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C,
+      \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043D\u0443\u0436\u043D\u043E
+      \u043D\u0430\u0432\u0435\u0441\u0442\u0438\u0441\u044C \u043D\u0430 \u043F\u0440\u0435\u0434\u043C\u0435\u0442
+      \u0438 \u043D\u0430\u0436\u0430\u0442\u044C [E]"
+    - Items can be placed in your inventory by hovering over the item and pressing
+      [E].
+  - Key: Tutorial/Step11/Any
+    Translations:
+    - "\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0438\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C
+      \u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043D\u0430 \u0443\u0433\u043E\u043B\u044C
+      \u0438\u043B\u0438 \u043F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435
+      \u0435\u0433\u043E \u0438\u0437 \u0438\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044F.\n\u041F\u043E\u043B\u043E\u0436\u0438\u0442\u0435
+      \u0443\u0433\u043E\u043B\u044C \u0432 \u043E\u0433\u043E\u043D\u044C, \u0447\u0442\u043E\u0431\u044B
+      \u0437\u0430\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043B\u043E\u0434\u043A\u0443."
+    - 'Open inventory and click on the coal or drag it out of the inventory.
+
+      Put
+      coal in the fire to refuel the boat.'
+  - Key: Tutorial/Step12/Mobile
+    Translations:
+    - "\u0427\u0442\u043E\u0431\u044B \u0434\u0432\u0438\u0433\u0430\u0442\u044C\u0441\u044F 
+      \u0432\u043F\u0435\u0440\u0435\u0434, \u043F\u0435\u0440\u0435\u0434\u0432\u0438\u043D\u044C\u0442\u0435
+      \u0441\u0442\u0438\u043A \u0432\u0432\u0435\u0440\u0445\n\u0427\u0442\u043E\u0431\u044B
+      \u0432\u044B\u0439\u0442\u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043F\u0440\u044B\u0436\u043E\u043A"
+    - 'To move forward, move the stick to the top.
+
+      To exit, click jump'
+  - Key: Tutorial/Step12/Desctop
+    Translations:
+    - "\u0427\u0442\u043E\u0431\u044B \u0434\u0432\u0438\u0433\u0430\u0442\u044C\u0441\u044F
+      \u0432\u043F\u0435\u0440\u0435\u0434, \u043D\u0430\u0436\u043C\u0438\u0442\u0435
+      [W]\n\u0427\u0442\u043E\u0431\u044B \u0432\u044B\u0439\u0442\u0438, \u043D\u0430\u0436\u043C\u0438\u0442\u0435
+      [\u041F\u0440\u043E\u0431\u0435\u043B]"
+    - 'To move forward, press [W]
+
+      To exit, click [Space]'
+  - Key: NoMoney
+    Translations:
+    - "\u041D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u0434\u0435\u043D\u0435\u0433"
+    - Not enough money
+  - Key: GoStart
+    Translations:
+    - "\u0412\u043E\u0439\u0434\u0438, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C"
+    - Enter to get started
+  - Key: Achievement
+    Translations:
+    - Achievement/
+    - Achievement/
+  - Key: Achievement/TotalDistance_10_Title
+    Translations:
+    - "\u041B\u0435\u0433\u043A\u0430\u044F \u043F\u0440\u043E\u0433\u0443\u043B\u043A\u0430"
+    - Easy stroll
+  - Key: Achievement/TotalDistance_10_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 10 \u043A\u043C."
+    - Sail 10 km
+  - Key: Achievement/TotalDistance_50_Title
+    Translations:
+    - "\u0420\u0435\u0447\u043D\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u043D\u0438\u043A"
+    - River Wanderer
+  - Key: Achievement/TotalDistance_50_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 50 \u043A\u043C."
+    - Sail 50 km
+  - Key: Achievement/TotalDistance_100_Title
+    Translations:
+    - "\u041C\u0430\u0441\u0442\u0435\u0440 \u0432\u0435\u0441\u043B\u0430"
+    - Master of the Paddle
+  - Key: Achievement/TotalDistance_100_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 100 \u043A\u043C."
+    - Sail 100 km
+  - Key: Achievement/TotalDistance_500_Title
+    Translations:
+    - "\u0412\u043B\u0430\u0441\u0442\u0435\u043B\u0438\u043D \u0442\u0435\u0447\u0435\u043D\u0438\u0439"
+    - Lord of the Currents
+  - Key: Achievement/TotalDistance_500_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 500 \u043A\u043C."
+    - Sail 500 km
+  - Key: Achievement/EnemiesKilled_1_Title
+    Translations:
+    - "\u041E\u043D \u0441\u0430\u043C \u043D\u0430\u043F\u0440\u043E\u0441\u0438\u043B\u0441\u044F"
+    - He asked for it
+  - Key: Achievement/EnemiesKilled_1_Description
+    Translations:
+    - "\u041F\u043E\u0431\u0435\u0434\u0438 \u043F\u0435\u0440\u0432\u043E\u0433\u043E
+      \u0432\u0440\u0430\u0433\u0430"
+    - Defeat the first enemy
+  - Key: Achievement/EnemiesKilled_20_Title
+    Translations:
+    - "\u0412\u043E\u0448\u0435\u043B \u0432\u043E \u0432\u043A\u0443\u0441"
+    - Got the hang of it
+  - Key: Achievement/EnemiesKilled_20_Description
+    Translations:
+    - "\u041F\u043E\u0431\u0435\u0434\u0438 20 \u0432\u0440\u0430\u0433\u043E\u0432"
+    - Defeat 20 enemies
+  - Key: Achievement/EnemiesKilled_100_Title
+    Translations:
+    - "\u041F\u043E\u0431\u0435\u0434\u0430?"
+    - Did i win?
+  - Key: Achievement/EnemiesKilled_100_Description
+    Translations:
+    - "\u041F\u043E\u0431\u0435\u0434\u0438 100 \u0432\u0440\u0430\u0433\u043E\u0432"
+    - Defeat 100 enemies
+  - Key: Achievement/Distance_5_Title
+    Translations:
+    - "\u041F\u0443\u0442\u0435\u0448\u0435\u0441\u0442\u0432\u0438\u0435 \u043D\u0430\u0447\u0438\u043D\u0430\u0435\u0442\u0441\u044F"
+    - The journey begins
+  - Key: Achievement/Distance_5_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 5 \u043A\u043C. \u0437\u0430
+      \u043E\u0434\u0438\u043D \u0437\u0430\u043F\u043B\u044B\u0432"
+    - Sail 5 km in one trip
+  - Key: Achievement/Distance_25_Title
+    Translations:
+    - "\u041D\u0430 \u043F\u043E\u043B\u043F\u0443\u0442\u0438"
+    - Halfway there
+  - Key: Achievement/Distance_25_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 25 \u043A\u043C. \u0437\u0430
+      \u043E\u0434\u0438\u043D \u0437\u0430\u043F\u043B\u044B\u0432"
+    - Sail 25 km in one trip
+  - Key: Achievement/Distance_50_Title
+    Translations:
+    - "\u042F \u043F\u043E\u0431\u0435\u0434\u0438\u043B?"
+    - Did i win?
+  - Key: Achievement/Distance_50_Description
+    Translations:
+    - "\u041F\u0440\u043E\u043F\u043B\u044B\u0432\u0438 50 \u043A\u043C. \u0437\u0430
+      \u043E\u0434\u0438\u043D \u0437\u0430\u043F\u043B\u044B\u0432"
+    - Sail 50 km in one trip
+  - Key: Level
+    Translations:
+    - Level/
+    - Level/
+  - Key: Level/Forest
+    Translations:
+    - "\u041B\u0435\u0441"
+    - Forest
+  - Key: Level/Desert
+    Translations:
+    - "\u041F\u0443\u0441\u0442\u044B\u043D\u044F"
+    - Desert
+  - Key: Level/North
+    Translations:
+    - "\u0421\u0435\u0432\u0435\u0440"
+    - North
+  - Key: UnlockLevel
+    Translations:
+    - "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0440\u0430\u0437\u0443"
+    - Unlock now
+  - Key: Leaderboard_Gems
+    Translations:
+    - "\u0422\u043E\u043F \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - Top gems
+  - Key: Leaderboard_Wins
+    Translations:
+    - "\u0422\u043E\u043F \u043F\u043E\u0431\u0435\u0434"
+    - Top wins
+  - Key: Roulette_Title
+    Translations:
+    - "\u041A\u043E\u043B\u0435\u0441\u043E \u0444\u043E\u0440\u0442\u0443\u043D\u044B"
+    - Fortune wheel
+  - Key: Roulette_Text
+    Translations:
+    - "\u041A\u0440\u0443\u0442\u0438 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E
+      \u0447\u0435\u0440\u0435\u0437"
+    - Free spin in
+  - Key: Roulette_Play
+    Translations:
+    - "\u041A\u0440\u0443\u0442\u0438\u0442\u044C"
+    - Spin
+  - Key: PlaytimeReward_Claim
+    Translations:
+    - "\u041F\u043E\u043B\u0443\u0447\u0438\u0442\u044C"
+    - Claim
+  - Key: PlaytimeReward_ClaimComplete
+    Translations:
+    - "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E"
+    - Claimed
+  - Key: PlaytimeReward_Title
+    Translations:
+    - "\u041D\u0430\u0433\u0440\u0430\u0434\u044B \u0437\u0430 \u0432\u0440\u0435\u043C\u044F"
+    - Playtime rewards
+  - Key: Quest
+    Translations:
+    - Quest/
+    - Quest/
+  - Key: Quest/Quest_SellGold_Title
+    Translations:
+    - "\u041F\u0440\u043E\u0434\u0430\u0436\u0430"
+    - Selling
+  - Key: Quest/Quest_SellGold_Description
+    Translations:
+    - "\u041F\u0440\u043E\u0434\u0430\u0439 \u0437\u043E\u043B\u043E\u0442\u043E"
+    - Sell the gold
+  - Key: Quest/Quest_RewardPirate_Title
+    Translations:
+    - "\u0422\u044E\u0440\u044C\u043C\u0430"
+    - To jail
+  - Key: Quest/Quest_RewardPirate_Description
+    Translations:
+    - "\u041F\u043E\u0441\u0430\u0434\u0438 \u043F\u0438\u0440\u0430\u0442\u0430
+      \u0432 \u0442\u044E\u0440\u044C\u043C\u0443"
+    - Put a pirate in jail
+  - Key: Quest/Quest_BuyCoal_Title
+    Translations:
+    - "\u0422\u043E\u043F\u043B\u0438\u0432\u043E"
+    - Fuel
+  - Key: Quest/Quest_BuyCoal_Description
+    Translations:
+    - "\u041A\u0443\u043F\u0438 \u0443\u0433\u043E\u043B\u044C \u0434\u043B\u044F
+      \u043B\u043E\u0434\u043A\u0438"
+    - Buy coal for the boat
+  - Key: Quest/Quest_BuyWeapon_Title
+    Translations:
+    - "\u041E\u0440\u0443\u0436\u0438\u0435"
+    - Weapons
+  - Key: Quest/Quest_BuyWeapon_Description
+    Translations:
+    - "\u041A\u0443\u043F\u0438 \u043F\u0438\u0441\u0442\u043E\u043B\u0435\u0442
+      \u0434\u043B\u044F \u0437\u0430\u0449\u0438\u0442\u044B"
+    - Buy a gun for defense
+  - Key: Quest/Quest_CheckLocation_Title
+    Translations:
+    - "\u041D\u0430\u0447\u0430\u043B\u043E \u043F\u0443\u0442\u0438"
+    - Start the journey
+  - Key: Quest/Quest_CheckLocation_Description
+    Translations:
+    - "\u041F\u0440\u043E\u0432\u0435\u0440\u044C \u0434\u043E\u043C\u0430 \u0437\u0430
+      \u043F\u0440\u0435\u0434\u0435\u043B\u0430\u043C\u0438 \u0437\u0430\u043C\u043A\u0430"
+    - Check the houses outside the castle
+  - Key: Quest/Quest_GoToCastle_Title
+    Translations:
+    - "\u041D\u0430 \u0431\u0430\u0437\u0443"
+    - To base
+  - Key: Quest/Quest_GoToCastle_Description
+    Translations:
+    - "\u0414\u043E\u0431\u0435\u0440\u0438\u0441\u044C \u0434\u043E \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u0433\u043E
+      \u0437\u0430\u043C\u043A\u0430"
+    - Get to the next castle
+  - Key: Quest/Quest_Kill5Dragon_Title
+    Translations:
+    - "\u0414\u0440\u0430\u043A\u043E\u043D\u044B"
+    - Dragons
+  - Key: Quest/Quest_Kill5Dragon_Description
+    Translations:
+    - "\u0423\u0431\u0435\u0439 5 \u0434\u0440\u0430\u043A\u043E\u043D\u043E\u0432"
+    - Kill 5 dragons
+  - Key: Quest/Quest_KillBoss_Title
+    Translations:
+    - "\u0424\u0438\u043D\u0430\u043B\u044C\u043D\u044B\u0439 \u0411\u043E\u0441\u0441"
+    - Final Boss
+  - Key: Quest/Quest_KillBoss_Description
+    Translations:
+    - "\u0423\u0431\u0435\u0439 \u0444\u0438\u043D\u0430\u043B\u044C\u043D\u043E\u0433\u043E
+      \u0431\u043E\u0441\u0441\u0430 \u044D\u0442\u043E\u0439 \u043B\u043E\u043A\u0430\u0446\u0438\u0438"
+    - Kill the final boss of this location
+  - Key: Boost
+    Translations:
+    - Boost/
+    - Boost/
+  - Key: BoostUI
+    Translations:
+    - BoostUI/
+    - BoostUI/
+  - Key: BoostUI/Title
+    Translations:
+    - Title
+    - Title
+  - Key: BoostUI/Useble
+    Translations:
+    - Useble
+    - Useble
+  - Key: BoostUI/Discription
+    Translations:
+    - Discription
+    - Discription
+  - Key: BoostUI/Stats
+    Translations:
+    - Stats
+    - Stats
+  - Key: Boost/HP/Title
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0442\u044C \u0437\u0434\u043E\u0440\u043E\u0432\u044C\u0435"
+    - Increase Health
+  - Key: Boost/HP/Useble
+    Translations:
+    - "\u0417\u0414\u041E\u0420\u041E\u0412\u042C\u0415"
+    - HEALTH
+  - Key: Boost/HP/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0432\u0430\u0448\u0435
+      \u043C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u043E\u0435 \u0437\u0434\u043E\u0440\u043E\u0432\u044C\u0435"
+    - Increases your maximum health
+  - Key: Boost/HP/Stats
+    Translations:
+    - "\u041C\u0410\u041A\u0421. \u0417\u0414\u041E\u0420\u041E\u0412\u042C\u0415"
+    - MAX HEALTH
+  - Key: Boost/MultExp/Title
+    Translations:
+    - "\u0411\u043E\u043B\u044C\u0448\u0435 \u043E\u043F\u044B\u0442\u0430"
+    - More Experience
+  - Key: Boost/MultExp/Useble
+    Translations:
+    - "\u041E\u041F\u042B\u0422"
+    - EXPERIENCE
+  - Key: Boost/MultExp/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u043C\u044B\u0439
+      \u043E\u043F\u044B\u0442"
+    - Increases the experience you gain
+  - Key: Boost/MultExp/Stats
+    Translations:
+    - "\u041E\u041F\u042B\u0422"
+    - EXPERIENCE
+  - Key: Boost/MoveSpeedMult/Title
+    Translations:
+    - "\u0423\u0441\u043A\u043E\u0440\u0435\u043D\u0438\u0435"
+    - Acceleration
+  - Key: Boost/MoveSpeedMult/Useble
+    Translations:
+    - "\u041A \u0421\u041A\u041E\u0420\u041E\u0421\u0422\u0418"
+    - SPEED
+  - Key: Boost/MoveSpeedMult/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0432\u0430\u0448\u0443
+      \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C \u0431\u0435\u0433\u0430"
+    - Increases your running speed
+  - Key: Boost/MoveSpeedMult/Stats
+    Translations:
+    - "\u0421\u041A\u041E\u0420\u041E\u0421\u0422\u042C \u041F\u0415\u0420\u0415\u0414\u0412\u0418\u0416\u0415\u041D\u0418\u042F"
+    - TRAVEL SPEED
+  - Key: Boost/MoneyMultSale/Title
+    Translations:
+    - "\u041F\u0440\u043E\u0434\u0430\u0432\u0435\u0446"
+    - Seller
+  - Key: Boost/MoneyMultSale/Useble
+    Translations:
+    - "\u0417\u041E\u041B\u041E\u0422\u041E"
+    - GOLD
+  - Key: Boost/MoneyMultSale/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E
+      \u0437\u043E\u043B\u043E\u0442\u0430, \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u043C\u043E\u0433\u043E
+      \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u043E\u0434\u0430\u0436\u0438 \u0432\u0435\u0449\u0435\u0439"
+    - Increases the amount of gold received after selling items
+  - Key: Boost/MoneyMultSale/Stats
+    Translations:
+    - "\u0417\u041E\u041B\u041E\u0422\u041E"
+    - GOLD
+  - Key: Boost/MaxFuel/Title
+    Translations:
+    - "\u041A\u0430\u043D\u0438\u0441\u0442\u0440\u0430"
+    - Canister
+  - Key: Boost/MaxFuel/Useble
+    Translations:
+    - "\u0422\u041E\u041F\u041B\u0418\u0412\u041E"
+    - FUEL
+  - Key: Boost/MaxFuel/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E
+      \u0442\u043E\u043F\u043B\u0438\u0432\u0430, \u043A\u043E\u0442\u043E\u0440\u043E\u0435
+      \u043C\u043E\u0436\u043D\u043E \u0437\u0430\u043B\u0438\u0442\u044C \u0432
+      \u043B\u043E\u0434\u043A\u0443"
+    - Increases the amount of fuel that can be poured into the boat
+  - Key: Boost/MaxFuel/Stats
+    Translations:
+    - "\u041C\u0410\u041A\u0421 \u0422\u041E\u041F\u041B\u0418\u0412\u041E"
+    - MAX FUEL
+  - Key: Boost/ConsumptionFuel/Title
+    Translations:
+    - "\u0417\u0430\u0442\u0440\u0430\u0442\u044B"
+    - Costs
+  - Key: Boost/ConsumptionFuel/Useble
+    Translations:
+    - "\u0422\u041E\u041F\u041B\u0418\u0412\u041E"
+    - FUEL
+  - Key: Boost/ConsumptionFuel/Discription
+    Translations:
+    - "\u041B\u043E\u0434\u043A\u0430 \u043F\u043E\u0442\u0440\u0435\u0431\u043B\u044F\u0435\u0442
+      \u043C\u0435\u043D\u044C\u0448\u0435 \u0442\u043E\u043F\u043B\u0438\u0432\u0430"
+    - The boat consumes less fuel
+  - Key: Boost/ConsumptionFuel/Stats
+    Translations:
+    - "\u041F\u041E\u0422\u0420\u0415\u0411\u041B\u0415\u041D\u0418\u0415 \u0422\u041E\u041F\u041B\u0418\u0412\u0410"
+    - FUEL CONSUMPTION
+  - Key: Boost/AddMultFuel/Title
+    Translations:
+    - "\u0411\u043E\u043B\u044C\u0448\u043E\u0439 \u0443\u0433\u043E\u043B\u044C"
+    - Large coal
+  - Key: Boost/AddMultFuel/Useble
+    Translations:
+    - "\u041A \u0422\u041E\u041F\u041B\u0418\u0412\u0423"
+    - FUEL
+  - Key: Boost/AddMultFuel/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E
+      \u0442\u043E\u043F\u043B\u0438\u0432\u0430, \u043F\u043E\u043B\u0443\u0447\u0430\u0435\u043C\u043E\u0433\u043E
+      \u043F\u0440\u0438 \u0441\u0436\u0438\u0433\u0430\u043D\u0438\u0438"
+    - Increases the amount of fuel obtained when burning
+  - Key: Boost/AddMultFuel/Stats
+    Translations:
+    - "\u041F\u041E\u041B\u0423\u0427\u0415\u041D\u0418\u0415 \u0422\u041E\u041F\u041B\u0418\u0412\u0410"
+    - FUEL PRODUCTION
+  - Key: Boost/MaxSpeedBoard/Title
+    Translations:
+    - "\u0421 \u0432\u0435\u0442\u0435\u0440\u043A\u043E\u043C"
+    - With the wind
+  - Key: Boost/MaxSpeedBoard/Useble
+    Translations:
+    - "\u041A \u0421\u041A\u041E\u0420\u041E\u0421\u0422\u0418"
+    - TO SPEED
+  - Key: Boost/MaxSpeedBoard/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C
+      \u043B\u043E\u0434\u043A\u0438"
+    - Increases the speed of the boat
+  - Key: Boost/MaxSpeedBoard/Stats
+    Translations:
+    - "\u041C\u0410\u041A\u0421. \u0421\u041A\u041E\u0420\u041E\u0421\u0422\u042C
+      \u041B\u041E\u0414\u041A\u0418"
+    - MAX BOAT SPEED
+  - Key: Boost/MeleDamage/Title
+    Translations:
+    - "\u0412\u0431\u043B\u0438\u0437\u0438"
+    - Close
+  - Key: Boost/MeleDamage/Useble
+    Translations:
+    - "\u0423\u0420\u041E\u041D"
+    - DAMAGE
+  - Key: Boost/MeleDamage/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0443\u0440\u043E\u043D,
+      \u043D\u0430\u043D\u043E\u0441\u0438\u043C\u044B\u0439 \u043E\u0440\u0443\u0436\u0438\u0435\u043C
+      \u0431\u043B\u0438\u0436\u043D\u0435\u0433\u043E \u0431\u043E\u044F"
+    - Increases the damage dealt by melee weapons
+  - Key: Boost/MeleDamage/Stats
+    Translations:
+    - "\u0423\u0420\u041E\u041D \u0412 \u0411\u041B\u0418\u0416\u041D\u0415\u041C
+      \u0411\u041E\u042E"
+    - MELEE DAMAGE
+  - Key: Boost/MeleAttackSpeed/Title
+    Translations:
+    - "\u0421\u043B\u0435\u0434\u0438 \u0437\u0430 \u0440\u0443\u043A\u0430\u043C\u0438"
+    - Watch your hands
+  - Key: Boost/MeleAttackSpeed/Useble
+    Translations:
+    - "\u041A \u0421\u041A\u041E\u0420\u041E\u0421\u0422\u0418"
+    - TO SPEED
+  - Key: Boost/MeleAttackSpeed/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C
+      \u0443\u0434\u0430\u0440\u043E\u0432 \u043E\u0440\u0443\u0436\u0438\u0435\u043C
+      \u0431\u043B\u0438\u0436\u043D\u0435\u0433\u043E \u0431\u043E\u044F"
+    - Increases the speed of melee weapon strikes
+  - Key: Boost/MeleAttackSpeed/Stats
+    Translations:
+    - "\u0421\u041A\u041E\u0420\u041E\u0421\u0422\u042C \u0410\u0422\u0410\u041A\u0418
+      \u0412 \u0411\u041B\u0418\u0416\u041D\u0415\u041C \u0411\u041E\u042E"
+    - MELEE ATTACK SPEED
+  - Key: Boost/RangeDamage/Title
+    Translations:
+    - "\u0412\u0434\u0430\u043B\u0438"
+    - Far away
+  - Key: Boost/RangeDamage/Useble
+    Translations:
+    - "\u0423\u0420\u041E\u041D"
+    - DAMAGE
+  - Key: Boost/RangeDamage/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0443\u0440\u043E\u043D,
+      \u043D\u0430\u043D\u043E\u0441\u0438\u043C\u044B\u0439 \u043E\u0440\u0443\u0436\u0438\u0435\u043C
+      \u0434\u0430\u043B\u044C\u043D\u0435\u0433\u043E \u0431\u043E\u044F"
+    - Increases the damage dealt by ranged weapons
+  - Key: Boost/RangeDamage/Stats
+    Translations:
+    - "\u0423\u0420\u041E\u041D \u0412 \u0414\u0410\u041B\u042C\u041D\u0415\u041C
+      \u0411\u041E\u042E"
+    - RANGED DAMAGE
+  - Key: Boost/RangeAttackSpeed/Title
+    Translations:
+    - "\u0421\u0442\u0440\u0435\u043B\u043E\u043A"
+    - Shooter
+  - Key: Boost/RangeAttackSpeed/Useble
+    Translations:
+    - "\u041A \u0421\u041A\u041E\u0420\u041E\u0421\u0422\u0418"
+    - TO SPEED
+  - Key: Boost/RangeAttackSpeed/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C
+      \u0441\u0442\u0440\u0435\u043B\u044C\u0431\u044B"
+    - Increases firing speed
+  - Key: Boost/RangeAttackSpeed/Stats
+    Translations:
+    - "\u0421\u041A\u041E\u0420\u041E\u0421\u0422\u042C \u0410\u0422\u0410\u041A\u0418
+      \u0412 \u0414\u0410\u041B\u042C\u041D\u0415\u041C \u0411\u041E\u042E"
+    - RANGED ATTACK SPEED
+  - Key: Boost/RangeReloadSpeed/Title
+    Translations:
+    - "\u041F\u0435\u0440\u0435\u0437\u0430\u0440\u044F\u0434\u043A\u0430"
+    - Reload
+  - Key: Boost/RangeReloadSpeed/Useble
+    Translations:
+    - "\u041A \u0421\u041A\u041E\u0420\u041E\u0421\u0422\u0418"
+    - TO SPEED
+  - Key: Boost/RangeReloadSpeed/Discription
+    Translations:
+    - "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C
+      \u043F\u0435\u0440\u0435\u0437\u0430\u0440\u044F\u0434\u043A\u0438 \u043E\u0440\u0443\u0436\u0438\u044F"
+    - Increases weapon reload speed
+  - Key: Boost/RangeReloadSpeed/Stats
+    Translations:
+    - "\u0421\u041A\u041E\u0420\u041E\u0421\u0422\u042C \u041F\u0415\u0420\u0415\u0417\u0410\u0420\u042F\u0414\u041A\u0418"
+    - RELOAD SPEED
+  - Key: RareType
+    Translations:
+    - RareType/
+    - RareType/
+  - Key: Boost/RareType/Common
+    Translations:
+    - "\u041E\u0431\u044B\u0447\u043D\u044B\u0439"
+    - Common
+  - Key: Boost/RareType/Uncommon
+    Translations:
+    - "\u041D\u0435\u043E\u0431\u044B\u0447\u043D\u044B\u0439"
+    - Uncommon
+  - Key: Boost/RareType/Rare
+    Translations:
+    - "\u0420\u0435\u0434\u043A\u0438\u0439"
+    - Rare
+  - Key: Boost/RareType/Epic
+    Translations:
+    - "\u042D\u043F\u0438\u0447\u0435\u0441\u043A\u0438\u0439"
+    - Epic
+  - Key: Boost/RareType/Legendary
+    Translations:
+    - "\u041B\u0435\u0433\u0435\u043D\u0434\u0430\u0440\u043D\u044B\u0439"
+    - Legendary
+  - Key: Boost/RareType/Mythic
+    Translations:
+    - "\u041C\u0438\u0444\u0438\u0447\u0435\u0441\u043A\u0438\u0439"
+    - Mythic
+  - Key: ReShow
+    Translations:
+    - ReShow/
+    - ReShow/
+  - Key: Boost/UI/ReShow
+    Translations:
+    - "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0435"
+    - Change all
+  - Key: Boost/UI/Stats
+    Translations:
+    - "\u0425\u0430\u0440\u0430\u043A\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043A\u0438"
+    - Characteristics
+  - Key: Boost/UI/NewLevel
+    Translations:
+    - "\u041D\u043E\u0432\u044B\u0439 \u0443\u0440\u043E\u0432\u0435\u043D\u044C"
+    - New Level
+  - Key: Boost/UI/UpRare
+    Translations:
+    - "\u041F\u043E\u0432\u044B\u0441\u0438\u0442\u044C \u0446\u0435\u043D\u043D\u043E\u0441\u0442\u044C
+      \u043D\u0430\u0432\u044B\u043A\u0430 ?"
+    - Increase the value of a skill ?
+  - Key: Boost/UI/level
+    Translations:
+    - "\u0423\u0440"
+    - Lv
