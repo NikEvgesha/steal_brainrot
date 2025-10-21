@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -14,6 +13,7 @@ public struct EggData
     public int SecondsToHatching;
     public List<Brainrot> Brainrots;
     public BrainrotDinamicData DinamicData;
+    public float Weight;
 }
 public class Egg : InventoryItem
 {

@@ -12,16 +12,25 @@ public class Conveyor : MonoBehaviour
     [SerializeField] private Transform _destroyPoint;
     [SerializeField] private LayerMask _egglayer;
     [SerializeField] private float _destroyDistance;
-
-    // TODO: get egg from randomizer
-    [SerializeField] private Egg _egg;
+    [SerializeField] private ConveyorLevel _startLevel;
+    [SerializeField] private ConveyorUI _ui;
+    [SerializeField] private List<ConveyorLevel> _levels;
 
     private HashSet<Egg> _eggs;
+    private ConveyorLevel _level;
+
+    public float IncomeMultiplier => _level.IncomeMultiplier;
 
     private void Start()
     {
+        SetLevel(_startLevel);
+        _ui = GetComponentInChildren<ConveyorUI>();
+        _ui.Init(_levels);
+        _ui.LevelActivated.AddListener(SetLevel);
         _eggs = new();
+        
         StartCoroutine(Spawn());
+        
     }
 
     private void FixedUpdate()
@@ -54,7 +63,7 @@ public class Conveyor : MonoBehaviour
     {
         while (enabled)
         {
-            Egg egg = Instantiate(_egg, _spawnPoint.position, _spawnPoint.rotation);
+            Egg egg = Instantiate(_level.GetRandomEgg(), _spawnPoint.position, _spawnPoint.rotation);
             _eggs.Add(egg);
             egg.EggPurchased.AddListener(OnEggPurchase);
             yield return new WaitForSeconds(_spawnInterval);
@@ -66,4 +75,27 @@ public class Conveyor : MonoBehaviour
         _eggs.Remove(egg);
     }
 
+
+    public void SetLevel(ConveyorLevel lvl)
+    {
+        if (_level != null)
+        {
+            _level.SetActive(false);
+            _level.gameObject.SetActive(false);
+        }
+        _level = lvl;
+        _level.SetActive(true);
+        _level.gameObject.SetActive(true);
+    }
+
+    public void _OnPlayerEnter()
+    {
+        _ui.ToggleOpen(true);
+    }
+
+
+    public void _OnPlayerExit()
+    {
+        _ui?.ToggleOpen(false);
+    }
 }
