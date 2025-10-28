@@ -67,6 +67,9 @@ public class Settings : MonoBehaviour
     private void OnGameStart()
     {
         Sensitivity(G.Save.LoadSensivity());
+        float[] volumes = G.Save.LoadVolume();
+        MusicVolume(volumes[0]);
+        SoundVolume(volumes[1]);
         IsReady = true;
         Ready?.Invoke();
     }

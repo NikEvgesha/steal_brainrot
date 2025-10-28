@@ -72,6 +72,12 @@ public class SaveManager : MonoBehaviour
     }
 
 
+    public float[] LoadVolume()
+    {
+        return saveProvider.LoadVolume();
+    }
+
+
     public void SaveSensivity(float sens)
     {
         saveProvider.SaveSensivity(sens);

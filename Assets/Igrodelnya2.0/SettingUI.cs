@@ -19,8 +19,10 @@ public class SettingUI : MonoBehaviour
             G.Control.CursorActive = _isOpen;
         _panel.SetActive(_isOpen);
         //_exitButton.SetActive(_isOpen);
-        PauseManager.Instance.SetPause(_isOpen, false);
-        
+        //PauseManager.Instance.SetPause(_isOpen, false);
+        G.IsPaused = _isOpen;
+
+
         if (_isOpen)
             G.Input.AOpenWindow?.Invoke(this);
         
@@ -63,4 +65,22 @@ public class SettingUI : MonoBehaviour
     {
         _sensivity.value = G.Settings.Sensivity;
     }
+
+
+    public void OnMusicVolumeChange(float value)
+    {
+        G.Settings.MusicVolume(value);
+    }
+
+    public void OnSoundVolumeChange(float value)
+    {
+        G.Settings.SoundVolume(value);
+    }
+
+    public void OnSensivityChange(float value)
+    {
+        G.Settings.Sensitivity(value);
+    }
+
+
 }
