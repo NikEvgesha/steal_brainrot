@@ -30,7 +30,7 @@ public class PlaytimeRewardPanel : MonoBehaviour
 
     private void Start()
     {
-        LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
+        //LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
         foreach (PlaytimeReward reward in _rewards)
         {
             PlaytimeRewardSlot slot = _grid.SpawnObject<PlaytimeRewardSlot>(_slotPrefab.gameObject);
@@ -77,10 +77,10 @@ public class PlaytimeRewardPanel : MonoBehaviour
     }
     public void ToggleOpen()
     {
-        if (!(LoadingManager.Instance.CurrentLocation == Location.Lobby)) 
-        { 
-            return;
-        } 
+        //if (!(LoadingManager.Instance.CurrentLocation == Location.Lobby)) 
+        //{ 
+        //    return;
+        //} 
         _isOpen = !_isOpen;
         _panel.SetActive(_isOpen);
         G.Control.CursorActive = _isOpen;

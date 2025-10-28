@@ -63,7 +63,7 @@ public class Field : MonoBehaviour
 
     private void CheckBuy(InventoryItem currentActive)
     {
-        if (!_playerOnField) return;
+        if (_unblocked || !_playerOnField) return;
         _buyPanel.gameObject.SetActive(currentActive != null && currentActive.Type == Item.Hamer);
     }
 
@@ -74,6 +74,7 @@ public class Field : MonoBehaviour
             G.Currency.RemoveCurrency(CurrencyType.Coins, _price);
             Destroy(_grassObj);
             Destroy(_buyPanel.gameObject);
+            _unblocked = true;
             foreach (FieldCell cell in _cells)
             {
                 cell.gameObject.SetActive(true);

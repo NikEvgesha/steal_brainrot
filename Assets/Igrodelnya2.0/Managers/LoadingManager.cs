@@ -48,7 +48,7 @@ public class LoadingManager : MonoBehaviour
     {
         G.GameLoader.StartAfterSDK();
         bool haveSave = false;  //SaveManager.Instance.LoadGameProgress().Item1 >= 0;
-        if (G.SaveManager.IsNewPlayer || haveSave)
+        if (G.Save.IsNewPlayer || haveSave)
         {
             _location = Location.Game;
             if (!haveSave)
@@ -58,7 +58,7 @@ public class LoadingManager : MonoBehaviour
                 // Load saved game    
             }
            
-            G.SaveManager.SetSave(true);
+            G.Save.SetSave(true);
         }
         else
         {

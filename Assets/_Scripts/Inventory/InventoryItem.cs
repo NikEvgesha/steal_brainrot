@@ -19,4 +19,6 @@ public abstract class InventoryItem : MonoBehaviour
 
     public bool SellAllowed { get; set; }
 
+    public virtual void OnInventoryAdd() {}
+
 }

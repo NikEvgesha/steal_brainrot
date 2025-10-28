@@ -131,7 +131,7 @@ public class GemsShop : MonoBehaviour
 
     public void OnRewardButtonCLick()
     {
-        AdsManager.Instance.ShowRewardedAd(
+        G.Ad.ShowRewardedAd(
                 "WatchAdToEarn",
                 (success) =>
                 {

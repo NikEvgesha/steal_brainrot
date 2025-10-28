@@ -2,10 +2,10 @@ using UnityEngine.Events;
 
 public static class G
 {
-    public static SoundManager SoundManager;
-    public static SaveManager SaveManager;
+    public static SoundManager Sound;
+    public static SaveManager Save;
     public static GameLoader GameLoader;
-    public static LocalizationManager LocalizationManager;
+    public static LocalizationManager Localization;
     public static Settings Settings;
     public static Inventory Inventory;
     public static PlayerInput Input;
@@ -15,6 +15,7 @@ public static class G
     public static QuickAccessManager QuickAccess;
     public static ElementTypeMultiplaer Elements;
     public static PlayerManager Player;
+    public static AdsManager Ad;
 
     public static bool IsPaused;
     public static UnityEvent Initialized = new();

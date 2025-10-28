@@ -18,9 +18,9 @@ public class SaveManager : MonoBehaviour
             MirraSDK.Data.DeleteAll();
         }
 
-        if (G.SaveManager == null)
+        if (G.Save == null)
         {
-            G.SaveManager = this;
+            G.Save = this;
             DontDestroyOnLoad(gameObject);
             saveProvider.Initialize();
             StartCoroutine(ProgressSavingRoutine());

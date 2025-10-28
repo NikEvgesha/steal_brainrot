@@ -30,7 +30,7 @@ public class TutorialManager : MonoBehaviour
 
     public void StartTutorial()
     {
-        if (G.SaveManager.GetTutorialProgress())
+        if (G.Save.GetTutorialProgress())
             return;
 
         if (_tutorialSteps.Count <= 0)
@@ -56,13 +56,13 @@ public class TutorialManager : MonoBehaviour
         } 
         else
         {
-            G.SaveManager.SaveTutorialProgress(true);
+            G.Save.SaveTutorialProgress(true);
             Debug.Log("Тутор завершон");
         }
     }
     public void QuickStopTutorial()
     {
-        if (G.SaveManager.GetTutorialProgress())
+        if (G.Save.GetTutorialProgress())
             return;
         if (_currentIndex >= _tutorialSteps.Count)
             return;

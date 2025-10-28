@@ -9,6 +9,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8429286113635057800}
+  - component: {fileID: 6789713887882614748}
+  - component: {fileID: 4162030901523556965}
   m_Layer: 0
   m_Name: AdsManager
   m_TagString: Untagged
@@ -31,3 +33,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6789713887882614748
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2499529268460595337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4958859b4a52bc24eb7fb63e3727592c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AdsManager
+  adsProviders:
+  - {fileID: 4162030901523556965}
+--- !u!114 &4162030901523556965
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2499529268460595337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fecdbe434b7541c46887f54a699209e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MirraSDKAdsProvider

@@ -46,7 +46,7 @@ public class PauseManager : MonoBehaviour
 
     private void Start()
     {
-        AdsManager.Instance.AdClosed += OnAdClosed;
+        G.Ad.AdClosed += OnAdClosed;
     }
 
     public void StartInitialize()
@@ -74,7 +74,7 @@ public class PauseManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        AdsManager.Instance.AdClosed -= OnAdClosed;
+        G.Ad.AdClosed -= OnAdClosed;
         if (_provider != null)
             _provider.OnPauseChanged -= OnProviderPauseChanged;
     }

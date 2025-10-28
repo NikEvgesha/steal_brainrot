@@ -53,7 +53,7 @@ public class Brainrot : InventoryItem
         // rarity считается в яйце? 
         _canvas = GetComponentInChildren<BrainrotInfoUI>();
         _dinamicData = rarity;
-        _canvas.SetInfo(_data, rarity);
+        
         //_model = Instantiate(_data.,_modelPoint);
         Vector3 scale = _canvas.transform.localScale;
         _canvas.transform.parent = _modelPoint.transform;
@@ -63,6 +63,7 @@ public class Brainrot : InventoryItem
         _currentIncome = 0;
         _dinamicData.ResultIncome = Mathf.RoundToInt(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
         NewPlace(floor);
+        _canvas.SetInfo(_data, _dinamicData);
         SetTypeVisual();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
     }

@@ -99,10 +99,6 @@ public class Egg : InventoryItem
 
             //TestBackpackBrainrot.Instance.TakeEgg(this);
             EggPurchased.Invoke(this);
-            _status = EggStatus.Purchased;
-            _infoUI.SetStatus(_status);
-            //Destroy(_infoUI.gameObject);
-            Destroy(_buyPanel.gameObject);
         }
         else
         {
@@ -253,4 +249,11 @@ public class Egg : InventoryItem
         int rand = UnityEngine.Random.Range(0, _data.Brainrots.Count);
         return _data.Brainrots[rand];
     }
+
+    public override void OnInventoryAdd() {
+        _status = EggStatus.Purchased;
+        _infoUI.SetStatus(_status);
+        Destroy(_buyPanel.gameObject);
+    }
+
 }

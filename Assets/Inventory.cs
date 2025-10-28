@@ -47,6 +47,7 @@ public class Inventory : MonoBehaviour
                 break;
             case Item.Egg:
                 _eggs.Add(item);
+                
                 break;
             default:
                 break;
@@ -54,6 +55,7 @@ public class Inventory : MonoBehaviour
         item.transform.SetParent(G.Player.transform);
         item.gameObject.SetActive(false);
         item.SellAllowed = true;
+        item.OnInventoryAdd();
         G.QuickAccess.Add(item);
     }
 

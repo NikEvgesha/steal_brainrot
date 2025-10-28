@@ -66,7 +66,7 @@ public class Settings : MonoBehaviour
 
     private void OnGameStart()
     {
-        Sensitivity(G.SaveManager.LoadSensivity());
+        Sensitivity(G.Save.LoadSensivity());
         IsReady = true;
         Ready?.Invoke();
     }
@@ -83,16 +83,16 @@ public class Settings : MonoBehaviour
     {
         Sensivity = sens;
         ChangeMouseSensitivity?.Invoke(sens);
-        G.SaveManager.SaveSensivity(sens);
+        G.Save.SaveSensivity(sens);
     }
 
     public void SoundVolume(float volume)
     {
-        G.SoundManager.SoundVolume = volume;
+        G.Sound.SoundVolume = volume;
     }
     public void MusicVolume(float volume)
     {
-        G.SoundManager.MusicVolume = volume;
+        G.Sound.MusicVolume = volume;
     }
 
 /*    private void ToggleUIOpen()

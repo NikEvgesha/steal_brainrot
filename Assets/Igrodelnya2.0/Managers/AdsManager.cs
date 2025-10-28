@@ -6,20 +6,20 @@ using System;
 // Главный менеджер рекламы
 public class AdsManager : MonoBehaviour
 {
-    private static AdsManager _instance;
-    public static AdsManager Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                GameObject go = new GameObject("AdsManager");
-                _instance = go.AddComponent<AdsManager>();
-                DontDestroyOnLoad(go);
-            }
-            return _instance;
-        }
-    }
+    //private static AdsManager _instance;
+    //public static AdsManager Instance
+    //{
+    //    get
+    //    {
+    //        if (_instance == null)
+    //        {
+    //            GameObject go = new GameObject("AdsManager");
+    //            _instance = go.AddComponent<AdsManager>();
+    //            DontDestroyOnLoad(go);
+    //        }
+    //        return _instance;
+    //    }
+    //}
 
     [SerializeField] private List<AdsProvider> adsProviders = new List<AdsProvider>(); // Список активных провайдеров
 
@@ -27,13 +27,15 @@ public class AdsManager : MonoBehaviour
 
     void Awake()
     {
-        if (_instance != null && _instance != this)
+        if (G.Ad == null)
+        {
+            G.Ad = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
         {
             Destroy(gameObject);
-            return;
         }
-        _instance = this;
-        //DontDestroyOnLoad(gameObject);
 
         // Инициализация всех провайдеров
         InitializeProviders();

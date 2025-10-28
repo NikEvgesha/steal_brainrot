@@ -28,12 +28,12 @@ public class SettingUI : MonoBehaviour
     private void Start()
     {
         G.Input.APause += ToggleOpen;
-        if (G.SoundManager.IsReady)
+        if (G.Sound.IsReady)
         {
             SetValues();
         } else
         {
-            G.SoundManager.Ready += SetValues;
+            G.Sound.Ready += SetValues;
         }
 
         if (G.Settings.IsReady)
@@ -49,14 +49,14 @@ public class SettingUI : MonoBehaviour
 
     private void OnDisable()
     {
-        G.SoundManager.Ready -= SetValues;
+        G.Sound.Ready -= SetValues;
         G.Input.APause -= ToggleOpen;
     }
 
     private void SetValues()
     {
-        _musicVolume.value = G.SoundManager.MusicVolume;
-        _soundVolume.value = G.SoundManager.SoundVolume;
+        _musicVolume.value = G.Sound.MusicVolume;
+        _soundVolume.value = G.Sound.SoundVolume;
     }
 
     private void SetSensivity()

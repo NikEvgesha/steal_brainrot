@@ -19,7 +19,7 @@ public class UISound : MonoBehaviour
     // Метод для воспроизведения звука
     private void PlaySound()
     {
-        G.SoundManager.PlayUIClick();
+        G.Sound.PlayUIClick();
     }
 
     // Очистка слушателя при уничтожении объекта

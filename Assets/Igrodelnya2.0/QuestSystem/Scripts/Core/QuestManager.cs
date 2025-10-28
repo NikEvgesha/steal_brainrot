@@ -37,7 +37,7 @@ public class QuestManager : MonoBehaviour
     }
     private void Start()
     {
-        currentIndex = G.SaveManager.LoadQuestProgress();
+        currentIndex = G.Save.LoadQuestProgress();
         StartQuest();
     }
     public void StartQuest()
@@ -147,7 +147,7 @@ public class QuestManager : MonoBehaviour
         if (G.Game.isEndGame)
             return;
 
-        G.SaveManager.SaveQuestProgress(currentIndex);
+        G.Save.SaveQuestProgress(currentIndex);
         currentIndex++;
         ShowCurrentQuest();
     }

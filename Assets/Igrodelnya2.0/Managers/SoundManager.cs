@@ -52,7 +52,7 @@ public class SoundManager : MonoBehaviour
             _mixer.audioMixer.SetFloat(_soundName, db);
             // Обновляем глобальную громкость
             //MasterVolume = _soundVolume;
-            G.SaveManager.SaveSoundVolume(_soundVolume);
+            G.Save.SaveSoundVolume(_soundVolume);
             //Debug.Log($"Sound SFX volume set to: {_soundVolume} (db={db})");
         }
     }
@@ -69,16 +69,16 @@ public class SoundManager : MonoBehaviour
             float db = Mathf.Lerp(minVolume, maxVolume, _curve.Evaluate(_musicVolume));
             _mixer.audioMixer.SetFloat(_musicName, db);
             //MasterVolume = _musicVolume;
-            G.SaveManager.SaveMusicVolume(_musicVolume);
+            G.Save.SaveMusicVolume(_musicVolume);
             //Debug.Log($"Music volume set to: {_musicVolume} (db={db})");
         }
     }
 
     private void Awake()
     {
-        if (G.SoundManager == null)
+        if (G.Sound == null)
         {
-            G.SoundManager = this;
+            G.Sound = this;
             DontDestroyOnLoad(gameObject);
         }
         else
@@ -92,7 +92,7 @@ public class SoundManager : MonoBehaviour
     private void Start()
     {
         MirraSDK.WaitForProviders(static () => {
-            G.SoundManager.StartGame();
+            G.Sound.StartGame();
             // Методы SDK не должны вызывать вылет или NullReferenceException,
             // делегат будет вызван только когда все провайдеры имеют статус IsInitialized.
         });
@@ -100,7 +100,7 @@ public class SoundManager : MonoBehaviour
     private void StartGame()
     {
         // Загружаем сохранённые параметры
-        float[] volume = G.SaveManager.GetVolume();
+        float[] volume = G.Save.GetVolume();
         MusicVolume = volume[0];
         SoundVolume = volume[1];
 

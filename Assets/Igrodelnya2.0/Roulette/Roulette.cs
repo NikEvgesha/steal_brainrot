@@ -11,7 +11,7 @@ public struct RouletteReward
 {
     public RouletteRewardType rewardType;
     public int amount;
-    public ItemData item;
+    public InventoryItem item;
     public float weight;
 }
 
@@ -68,14 +68,14 @@ public class Roulette : MonoBehaviour
 
     private void Start()
     {
-        LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
+        //LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
         for (int i = 0; i < _slots.Count; i++)
         {
             _slots[i].Init(_rewards[i]);
             _slots[i].transform.RotateAround(_wheel.transform.position, Vector3.forward, -i * _rotateAngle);
 
         }
-        _lastSpinTime = G.SaveManager.LoadRouletteDate();
+        _lastSpinTime = G.Save.LoadRouletteDate();
         CheckFreeSpinAvailable();
         if (!_freeAvailable)
         {
@@ -94,7 +94,7 @@ public class Roulette : MonoBehaviour
     private void OnDisable()
     {
         G.Input.ARoulette -= ToggleOpen;
-        LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
+        //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
         G.Input.AOpenWindow -= Close;
     }
 
@@ -114,7 +114,7 @@ public class Roulette : MonoBehaviour
 
     public void ToggleOpen()
     {
-        if (!(LoadingManager.Instance.CurrentLocation == Location.Lobby)) return;
+        //if (!(LoadingManager.Instance.CurrentLocation == Location.Lobby)) return;
         _isOpen = !_isOpen;
         G.Control.CursorActive = _isOpen;
         if (!_isOpen)
@@ -155,7 +155,7 @@ public class Roulette : MonoBehaviour
             StartSpin();
             SwitchFreePlayButton(false);
             _lastSpinTime = MirraSDK.Time.CurrentDate.ToUniversalTime();
-            G.SaveManager.SaveRouletteDate(_lastSpinTime);
+            G.Save.SaveRouletteDate(_lastSpinTime);
             SetTime();
             if (_timerCoroutine == null)
             {
@@ -164,7 +164,7 @@ public class Roulette : MonoBehaviour
             }
         } else
         {
-            AdsManager.Instance.ShowRewardedAd(
+            G.Ad.ShowRewardedAd(
                 "RouletteSpin",
                 (success) =>
                 {
@@ -337,13 +337,9 @@ public class Roulette : MonoBehaviour
             G.Currency.AddCurrency(CurrencyType.Gems, reward.amount);
         } else
         {
-
             // выдача предмета
-
-            //PickableItem item = Instantiate(reward.item);
-            //G.Inventory.AddItem(item);
-            //if (!item.HaveTag(ItemTag.Ammo))
-            //    SaveManager.Instance.SaveLobbyItem(item.Data.Name);
+            InventoryItem item = Instantiate(reward.item);
+            G.Inventory.Add(item);
         }
 
             Debug.Log("Roulette reward");

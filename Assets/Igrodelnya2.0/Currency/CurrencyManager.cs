@@ -51,8 +51,8 @@ public class CurrencyManager : MonoBehaviour
     private void Start()
     {
         AddCurrency(CurrencyType.Coins, StartCoinsAmount);
-        AddCurrency(CurrencyType.Coins, G.SaveManager.LoadGameCoin());
-        AddCurrency(CurrencyType.Gems, G.SaveManager.GetGems());
+        AddCurrency(CurrencyType.Coins, G.Save.LoadGameCoin());
+        AddCurrency(CurrencyType.Gems, G.Save.GetGems());
     }
 
 
@@ -70,9 +70,9 @@ public class CurrencyManager : MonoBehaviour
         _balance[type] += amount;
         CurrencyChanged?.Invoke(type, _balance[type]);
         if (type == CurrencyType.Gems)
-            G.SaveManager.SaveGems(_balance[type]);
+            G.Save.SaveGems(_balance[type]);
         else
-            G.SaveManager.SaveGameCoin(_balance[type]);
+            G.Save.SaveGameCoin(_balance[type]);
     }
 
     public bool RemoveCurrency(CurrencyType type, float amount)
@@ -86,9 +86,9 @@ public class CurrencyManager : MonoBehaviour
             _balance[type] -= amount;
             CurrencyChanged?.Invoke(type, _balance[type]);
             if (type == CurrencyType.Gems)
-                G.SaveManager.SaveGems(_balance[type]);
+                G.Save.SaveGems(_balance[type]);
             else
-                G.SaveManager.SaveGameCoin(_balance[type]);
+                G.Save.SaveGameCoin(_balance[type]);
             return true;
         }
         return false;
