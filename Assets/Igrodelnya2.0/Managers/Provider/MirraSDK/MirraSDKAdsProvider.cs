@@ -40,10 +40,6 @@ public class MirraSDKAdsProvider : AdsProvider
             {
             },
             rewardTag: rewardId,
-            onSuccess: () =>
-            {
-               Debug.Log($"MirraSDK: Rewarded ad succeeded (tag = {rewardId})");
-            },
             onClose: (success) =>
             {
                 PauseManager.Instance?.SetPause(false);
