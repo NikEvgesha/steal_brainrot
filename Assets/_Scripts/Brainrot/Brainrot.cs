@@ -35,6 +35,8 @@ public class Brainrot : InventoryItem
     private BrainrotDinamicData _dinamicData;
     public BrainrotDinamicData DinamicData => _dinamicData;
 
+    public GameObject Model => _modelPoint.gameObject;
+
     private BrainrotInfoUI _canvas;
     private GameObject _model;
 

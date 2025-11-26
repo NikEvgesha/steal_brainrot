@@ -82,7 +82,7 @@ public class QuickAccessManager : MonoBehaviour
         _floorListener = field;
         _currentActive.transform.SetParent(_floorListener.transform);
         _currentActive.transform.localPosition = Vector3.zero;
-        _currentActive.transform.localRotation = Quaternion.identity;
+        _currentActive.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         _inHand = Item.Hamer; // get next item
         switch (_currentActive.Type)
         {

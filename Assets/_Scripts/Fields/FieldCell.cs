@@ -16,6 +16,7 @@ public class FieldCell : MonoBehaviour
     [HideInInspector] public UnityEvent SpeedBoost;
 
     private Item _inField;
+    private bool _locked;
 
     private bool _playerOnCell;
     public string Id { get { return _id; } }
@@ -30,6 +31,7 @@ public class FieldCell : MonoBehaviour
 
     public void _OnPlayerEnter()
     {
+        if (_locked) return;
         //TestBackpackBrainrot.Instance.SwichItem.AddListener(CheckPlayer);
         G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
         //TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
@@ -105,5 +107,12 @@ public class FieldCell : MonoBehaviour
     public void _AddSpeed()
     {
         SpeedBoost?.Invoke();
+    }
+
+    public void LockCell(bool locked)
+    {
+        _locked = locked;
+        if (_locked)
+            _OnPlayerExit();
     }
 }

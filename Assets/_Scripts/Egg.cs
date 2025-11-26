@@ -19,8 +19,13 @@ public class Egg : InventoryItem
 {
     [SerializeField] private EggData _data;
     [SerializeField] private float _animationHatchingTime;
+    [SerializeField] private float _animationHatchingSpeed;
     [SerializeField] private AnimationCurve _animationCurve = new AnimationCurve();
     [SerializeField] private GameObject _mesh;
+    [SerializeField] private Transform _rouleteModelsParent;
+    [SerializeField] private Material _rouleteMaterial;
+
+    private List<GameObject> _rouleteObjects;
     private EggInfoUI _infoUI;
     private InteractionPanel _buyPanel;
     private EggStatus _status;
@@ -44,7 +49,10 @@ public class Egg : InventoryItem
         _infoUI.SetInfo(this);
         _status = EggStatus.Conveyer;
         _infoUI.SetStatus(_status);
+        _rouleteObjects = new List<GameObject>();
         SetTypeVisual();
+
+        SetRouletteModels();
     }
     private void SetTypeVisual()
     {
@@ -218,19 +226,25 @@ public class Egg : InventoryItem
         //_currentCell.InstantHatch.RemoveListener(SpeedBoostInstant); // ������: ���������
 
 
-
+        _currentCell.LockCell(true);
         StartCoroutine(ShowAnimation());
     }
     private IEnumerator ShowAnimation()
     {
         _mesh.SetActive(false);
         float startTime = _animationHatchingTime;
+        //float frameTime = _animationHatchingTime / _animationHatchingSpeed;
+        int idx = -1;
         while (_animationHatchingTime > 0) 
         {
             //������� ���������� ����������� ������� �� ������
-            _animationHatchingTime -= Time.deltaTime;
+            if (idx>=0)
+                _rouleteObjects[idx].SetActive(false);
+            idx = (idx + 1) % _rouleteObjects.Count;
+            _rouleteObjects[idx].SetActive(true);
+            _animationHatchingTime -= _animationHatchingSpeed;
             _animationCurve.Evaluate(_animationHatchingTime/ startTime);
-            yield return null;
+            yield return new WaitForSecondsRealtime(_animationHatchingSpeed);
         }
         SpawnBrainrot();
     }
@@ -243,6 +257,7 @@ public class Egg : InventoryItem
         brainrot.Init(_data.DinamicData, _currentCell);
         _currentCell.UpdateFieldItem(Item.Brainrot);
         Destroy(gameObject);
+        _currentCell.LockCell(false);
     }
     private Brainrot GetRandomBrainrot()
     {
@@ -254,6 +269,23 @@ public class Egg : InventoryItem
         _status = EggStatus.Purchased;
         _infoUI.SetStatus(_status);
         Destroy(_buyPanel.gameObject);
+    }
+
+
+    private void SetRouletteModels()
+    {
+        foreach (var brainrot in _data.Brainrots)
+        {
+            GameObject obj = Instantiate(brainrot.Model, _rouleteModelsParent).gameObject;
+            Renderer[] renderer = obj.GetComponentsInChildren<Renderer>();
+            foreach (Renderer item in renderer)
+            {
+                item.material = _rouleteMaterial;          
+            }
+            obj.transform.localRotation = Quaternion.identity;
+            _rouleteObjects.Add(obj);
+            obj.SetActive(false);
+        }
     }
 
 }
