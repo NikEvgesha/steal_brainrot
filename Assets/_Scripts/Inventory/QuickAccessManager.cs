@@ -59,18 +59,29 @@ public class QuickAccessManager : MonoBehaviour
         _items.Add(item);
         item.InQuickAccess = true;
         ItemsUpdated.Invoke(_items);
-        SwitchActive(item);
+        if (_currentActive?.Type != Item.Hamer)
+            SwitchActive(item);
         return true;
     }
 
 
     public void Remove(InventoryItem item)
     {
-        _items.Remove(item);
+        int idx = _items.IndexOf(item);
+        _items.RemoveAt(idx);
         item.InQuickAccess = false;
         if (_currentActive == item)
         {
-            SwitchActive(null);           
+            if (idx < _items.Count)
+            {
+                SwitchActive(_items[idx]);
+            } else if (idx > 0)
+            {
+                SwitchActive(_items[idx-1]);
+            } else
+            {
+                SwitchActive(null);
+            }          
         }
         ItemsUpdated.Invoke(_items);
     }
@@ -108,6 +119,8 @@ public class QuickAccessManager : MonoBehaviour
 
     public void SwitchActive(InventoryItem item)
     {
+        if (_currentActive == item) item = null;
+        
         if (_currentActive != null && !_dropping)
         {
             _currentActive.gameObject.SetActive(false);
