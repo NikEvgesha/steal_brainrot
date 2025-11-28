@@ -176,9 +176,9 @@ public class Roulette : MonoBehaviour
 
     public void OnGemsButtonClick()
     {
-        if (G.Currency.CheckEnoughCurrency(CurrencyType.Gems, _gemsPrice))
+        if (G.Currency.RemoveCurrency(CurrencyType.Gems, _gemsPrice))
         {
-            G.Currency.RemoveCurrency(CurrencyType.Gems, _gemsPrice);
+            //G.Currency.RemoveCurrency(CurrencyType.Gems, _gemsPrice);
             StartSpin();
         }
     }

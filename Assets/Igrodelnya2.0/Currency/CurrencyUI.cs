@@ -11,7 +11,7 @@ public class CurrencyUI : MonoBehaviour
 
     private void Start()
     {
-        G.Currency.CurrencyChanged += OnCurrencyChanged;
+        G.Currency.CurrencyChanged.AddListener(OnCurrencyChanged);
         OnCurrencyChanged(_type, G.Currency.GetBalance(_type));
     }
 
@@ -19,7 +19,7 @@ public class CurrencyUI : MonoBehaviour
     {
         if (G.Currency)
         {
-            G.Currency.CurrencyChanged += OnCurrencyChanged;
+            G.Currency.CurrencyChanged.AddListener(OnCurrencyChanged);
 
             OnCurrencyChanged(_type, G.Currency.GetBalance(_type));
         }
@@ -27,7 +27,7 @@ public class CurrencyUI : MonoBehaviour
 
     private void OnDisable()
     {
-        G.Currency.CurrencyChanged -= OnCurrencyChanged;
+        G.Currency.CurrencyChanged.RemoveListener(OnCurrencyChanged);
     }
 
 

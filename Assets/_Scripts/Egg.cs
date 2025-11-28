@@ -96,12 +96,9 @@ public class Egg : InventoryItem
 
     public void TryBuy()
     {
-        if (G.Currency.CheckEnoughCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)))
+        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)))
         {
-            G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)); // ��������� � CheckEnoughCurrency
-
             // �������� � ���������, ��������� ��������
-
             G.Inventory.Add(this);
             //G.QuickAccess.Add(this);
 

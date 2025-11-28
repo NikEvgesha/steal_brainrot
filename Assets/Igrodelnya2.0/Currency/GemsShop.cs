@@ -1,55 +1,52 @@
 using MirraGames.SDK;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class GemsShop : MonoBehaviour
 {
-    [SerializeField] private List<CurrencyPackData> _items;
+    [SerializeField] private List<ShopPackData> _items;
     [SerializeField] private GameObject _shopCanvas;
     [SerializeField] private DynamicGridSpawner _grid;
     [SerializeField] private GemsShopSlot _slotPrefab;
     [SerializeField] private GameObject _rewardCanvas;
     [SerializeField] private int _adReward;
-    [SerializeField] private Text _rewardAmount;
+    [SerializeField] private TextMeshProUGUI _rewardAmount;
 
 
-    private Dictionary<PurchaseData, CurrencyPackData> _purchaseData;
+    private Dictionary<PurchaseData, ShopPackData> _purchaseData;
     private bool _isOpen;
     private bool _inAppAvailable;
     //private bool _rewardEarned;
     public bool Opened => _isOpen;
 
-    private static GemsShop _instance;
-    public static GemsShop Instance => _instance;
-
-
-    private void Awake()
-    {
-        if (_instance == null)
-        {
-            _instance = this;
-            //DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Debug.LogWarning("GemsShop уже существует! Удаляем дубликат.");
-            Destroy(gameObject);
-        }
-    }
+    //private void Awake()
+    //{
+    //    if (G.GemsShop == null)
+    //    {
+    //        G.GemsShop = this;
+    //        //DontDestroyOnLoad(gameObject);
+    //    }
+    //    else
+    //    {
+    //        Debug.LogWarning("GemsShop уже существует! Удаляем дубликат.");
+    //        Destroy(gameObject);
+    //    }
+    //}
 
 
     private void Start()
     {
-        _purchaseData = new Dictionary<PurchaseData, CurrencyPackData>();
-        _inAppAvailable = PurchasesManager.Instance.PurchasesAvailable();
+        _purchaseData = new Dictionary<PurchaseData, ShopPackData>();
+        _inAppAvailable = true; //G.Purchases.PurchasesAvailable();
         if (_inAppAvailable)
         {
             InitSlots();
-            PurchasesManager.Instance.RestorePurchases();
+            G.Purchases.RestorePurchases();
         }
             
-        G.Currency.NoGems += ToggleOpen;
+        G.Currency.NoGems.AddListener(ToggleOpen);
 
    
         
@@ -59,18 +56,18 @@ public class GemsShop : MonoBehaviour
 
     private void OnDisable()
     {
-        G.Currency.NoGems -= ToggleOpen;
+        G.Currency.NoGems.RemoveListener(ToggleOpen);
     }
 
 
     public void InitSlots()
     {
-        foreach (CurrencyPackData item in _items)
+        foreach (ShopPackData item in _items)
         {
             GemsShopSlot slot = _grid.SpawnObject<GemsShopSlot>(_slotPrefab.gameObject);
-            PurchaseData data = PurchasesManager.Instance.GetPurchaseData(item.CurrencyType.ToString() + "_" + item.Amount);
-            _purchaseData.Add(data, item);
-            slot.Init(item, data, this);
+            //PurchaseData data = G.Purchases.GetPurchaseData(item.CurrencyType.ToString() + "_" + item.Amount);
+            //_purchaseData.Add(data, item);
+            //slot.Init(item, data, this);
             //if (data.CurrencyImageURL != null && data.CurrencyImageURL != "")
             //    StartCoroutine(DownloadImage(data.CurrencyImageURL, slot));
         }
@@ -99,17 +96,17 @@ public class GemsShop : MonoBehaviour
     }
 
 
-    public void TryBuy(PurchaseData purchaseData, CurrencyPackData packData)
+    public void TryBuy(PurchaseData purchaseData, ShopPackData packData)
     {
 
         PauseManager.Instance.SetPause(true, true);
-        PurchasesManager.Instance.BuyPurchase(
+        G.Purchases.BuyPurchase(
             purchaseData.Id,
             (success) =>
             {
                 if (success)
                 {
-                    G.Currency.AddCurrency(packData.CurrencyType, packData.Amount);
+                    //G.Currency.AddCurrency(packData.CurrencyType, packData.Amount);
                 }
                 PauseManager.Instance.SetPause(false, true);
             });
@@ -123,7 +120,7 @@ public class GemsShop : MonoBehaviour
         {
             if (purchase.Id == id)
             {
-                G.Currency.AddCurrency(_purchaseData[purchase].CurrencyType, _purchaseData[purchase].Amount);
+                //G.Currency.AddCurrency(_purchaseData[purchase].CurrencyType, _purchaseData[purchase].Amount);
                 break;
             }
         }

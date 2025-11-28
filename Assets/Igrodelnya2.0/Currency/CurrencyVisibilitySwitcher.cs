@@ -7,13 +7,13 @@ public class CurrencyVisibilitySwitcher : MonoBehaviour
 
     private void Start()
     {
-        G.Currency.ShowGems += SwitchGemsVisibility;
+        G.Currency.ShowGems.AddListener(SwitchGemsVisibility);
         LoadingManager.Instance.LocationChanged += OnLocationChange;
     }
 
     private void OnDisable()
     {
-        G.Currency.ShowGems -= SwitchGemsVisibility;
+        G.Currency.ShowGems.RemoveListener(SwitchGemsVisibility);
         LoadingManager.Instance.LocationChanged -= OnLocationChange;
     }
 

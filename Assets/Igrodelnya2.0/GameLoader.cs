@@ -35,7 +35,7 @@ public class GameLoader : MonoBehaviour
     {
         //_currentSceneName = _gameOptions.LobbySceneName;
         //SceneManager.LoadScene(_currentSceneName);
-        if (PurchasesManager.Instance.PurchasesAvailable())
+        if (G.Purchases.PurchasesAvailable())
         {
             _startLoadingFinished = true;
         }

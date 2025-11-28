@@ -70,7 +70,7 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
 
                 restoreData.RestoreProduct(id, onProductRestore: () => {
 
-                    GemsShop.Instance.OnPurchaseRestore(id);
+                    G.SpecialShop.OnPurchaseRestore(id);
                     Debug.Log($"Товар '{id}' восстановлен");
 
                 });

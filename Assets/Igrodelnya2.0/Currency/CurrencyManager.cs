@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class CurrencyManager : MonoBehaviour
 {
@@ -25,16 +26,17 @@ public class CurrencyManager : MonoBehaviour
     public double Gems { get { return _balance[CurrencyType.Gems]; } }
     public double Coins { get { return _balance[CurrencyType.Coins]; } }
 
-    public Action<CurrencyType, float> CurrencyChanged;
-    public Action NoGems;
-    public Action NoCoins;
-    public Action<bool> ShowGems;
+    public UnityEvent<CurrencyType, float> CurrencyChanged;
+    public UnityEvent NoGems;
+    public UnityEvent NoCoins;
+    public UnityEvent<bool> ShowGems;
 
     private void Awake()
     {
         if (G.Currency == null)
         {
             G.Currency = this;
+            DontDestroyOnLoad(gameObject);
             _currencyIcons = new Dictionary<CurrencyType, Sprite> {
             {CurrencyType.Gems, _gemsIcon},
             {CurrencyType.Coins, _coinIcon},
@@ -91,6 +93,8 @@ public class CurrencyManager : MonoBehaviour
                 G.Save.SaveGameCoin(_balance[type]);
             return true;
         }
+        if (type == CurrencyType.Gems)
+            NoGems.Invoke();
         return false;
     }
 

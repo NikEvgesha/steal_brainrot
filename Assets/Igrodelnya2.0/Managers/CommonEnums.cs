@@ -292,3 +292,15 @@ public enum Item
     Egg,
     Brainrot,
 }
+
+public enum ShopSlotType
+{
+    Small, // 2-3 в строке
+    Big // занимает всю строку
+}
+
+public enum ShopRewardType
+{
+    Item,
+    Currency
+}

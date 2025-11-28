@@ -16,6 +16,8 @@ public static class G
     public static ElementTypeMultiplaer Elements;
     public static PlayerManager Player;
     public static AdsManager Ad;
+    public static SpecialShop SpecialShop;
+    public static PurchasesManager Purchases;
 
     public static bool IsPaused;
     public static UnityEvent Initialized = new();

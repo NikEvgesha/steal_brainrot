@@ -69,9 +69,9 @@ public class Field : MonoBehaviour
 
     public void _TryBuy()
     {
-        if (G.Currency.CheckEnoughCurrency(CurrencyType.Coins, _price))
+        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _price))
         {
-            G.Currency.RemoveCurrency(CurrencyType.Coins, _price);
+            //G.Currency.RemoveCurrency(CurrencyType.Coins, _price);
             Destroy(_grassObj);
             Destroy(_buyPanel.gameObject);
             _unblocked = true;
@@ -79,9 +79,6 @@ public class Field : MonoBehaviour
             {
                 cell.gameObject.SetActive(true);
             }
-        } else
-        {
-            // Show currency shop
         }
     }
 

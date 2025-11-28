@@ -23,33 +23,33 @@ public class PurchaseData
 // Главный менеджер покупок
 public class PurchasesManager : MonoBehaviour
 {
-    private static PurchasesManager _instance;
-    public static PurchasesManager Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                GameObject go = new GameObject("PurchasesManager");
-                _instance = go.AddComponent<PurchasesManager>();
-                DontDestroyOnLoad(go);
-            }
-            return _instance;
-        }
-    }
+    //private static PurchasesManager _instance;
+    //public static PurchasesManager Instance
+    //{
+    //    get
+    //    {
+    //        if (_instance == null)
+    //        {
+    //            GameObject go = new GameObject("PurchasesManager");
+    //            _instance = go.AddComponent<PurchasesManager>();
+    //            DontDestroyOnLoad(go);
+    //        }
+    //        return _instance;
+    //    }
+    //}
 
     [SerializeField] private MonoBehaviour activeProvider; // Активный провайдер в инспекторе
     private PurchasesProvider provider;
 
     void Awake()
     {
-        if (_instance != null && _instance != this)
+        if (G.Purchases != null && G.Purchases != this)
         {
             Destroy(gameObject);
             return;
         }
-        _instance = this;
-        //DontDestroyOnLoad(gameObject);
+        G.Purchases = this;
+        DontDestroyOnLoad(gameObject);
 
         // Проверка и инициализация провайдера
         if (activeProvider == null || !activeProvider.TryGetComponent(out provider))

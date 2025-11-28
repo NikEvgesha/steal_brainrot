@@ -1,30 +1,55 @@
+using MirraGames.SDK;
+using MirraGames.SDK.Common;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public abstract class SpecialShopSlot : MonoBehaviour
+public class SpecialShopSlot : MonoBehaviour
 {
-    [SerializeField] private Text _name;
-    [SerializeField] private Text _price;
-    [SerializeField] private Image _icon;
+    [SerializeField] protected TextMeshProUGUI _name;
+    [SerializeField] protected TextMeshProUGUI _price;
     [SerializeField] protected Image _currencyIcon;
+    [SerializeField] protected TextMeshProUGUI _currencyText;
+    [SerializeField] protected SpecialShopRewardSlot _rewardPrefab;
+    [SerializeField] protected Transform _rewardParent;
 
-    private ItemData _itemData;
+    ShopPackData _shopPackData;
+    PurchaseData _productData;
 
     private void OnEnable()
     {
-        if (_itemData != null)
-            _name.text = _name.text = LocalizationManager.Instance.LocalizationData.GetTranslation(_itemData.Name, LocalizationManager.Instance.CurrentLanguage, LocalizationKeyType.Item.ToString());
+        /*if (_itemData != null)
+            _name.text = _name.text = LocalizationManager.Instance.LocalizationData.GetTranslation(_itemData.Name, LocalizationManager.Instance.CurrentLanguage, LocalizationKeyType.Item.ToString());*/
     }
-    public void Init(ItemData itemData, string price, CurrencyType type)
+    public void Init(ShopPackData pack, PurchaseData purchaseData)
     {
-        _itemData = itemData;
-        _name.text = _name.text = LocalizationManager.Instance.LocalizationData.GetTranslation(itemData.Name, LocalizationManager.Instance.CurrentLanguage, LocalizationKeyType.Item.ToString());
-        _icon.sprite = itemData.IMG;
+        _shopPackData = pack;
+        _productData = purchaseData;
+        _name.text = pack.Name; //LocalizationManager.Instance.LocalizationData.GetTranslation(itemData.Name, LocalizationManager.Instance.CurrentLanguage, LocalizationKeyType.Item.ToString());
+        _price.text = pack.Price.ToString(); //purchaseData.GetFullPriceInteger();
+        _currencyIcon.sprite = G.Currency.GetCurrencyIcon(pack.PriceCurrencyType);
 
-        _price.text = price;
-        _currencyIcon.sprite = G.Currency.GetCurrencyIcon(type);
+        foreach (ShopReward reward in pack.Rewards)
+        {
+            SpecialShopRewardSlot r = Instantiate(_rewardPrefab, _rewardParent);
+            Sprite icon = reward.Type == ShopRewardType.Item ? reward.Item.Icon : reward.Icon;
+            r.SetReward(icon, reward.Amount);
+        }
+
     }
 
-    public abstract void OnClick();
+    public void OnClick()
+    {
+        //MirraSDK.Payments.Purchase(
+        //    productTag: "exampleProduct",
+        //    onSuccess: () => {
+        //        Debug.Log("Товар успешно куплен");
+        //        // Выдать товар игроку
+        //    },
+        //    onError: () => Debug.Log("Товар не был куплен"),
+        //);
+
+        G.SpecialShop.TryBuy(_productData, _shopPackData);
+    }
 
 }
