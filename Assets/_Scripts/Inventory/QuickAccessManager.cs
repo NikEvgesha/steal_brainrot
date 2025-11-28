@@ -70,6 +70,7 @@ public class QuickAccessManager : MonoBehaviour
         int idx = _items.IndexOf(item);
         _items.RemoveAt(idx);
         item.InQuickAccess = false;
+        ItemsUpdated.Invoke(_items);
         if (_currentActive == item)
         {
             if (idx < _items.Count)
@@ -83,7 +84,7 @@ public class QuickAccessManager : MonoBehaviour
                 SwitchActive(null);
             }          
         }
-        ItemsUpdated.Invoke(_items);
+        
     }
 
     public void DropCurrent(FieldCell field)

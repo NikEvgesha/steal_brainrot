@@ -45,6 +45,7 @@ public class FieldCell : MonoBehaviour
         _dropButton.SetActive(false);
         _addSpeedButton.SetActive(false);
         _triggerIndicator.SetActive(false);
+        _takeButton.SetActive(false);
         switch (_inField)
         {
             case Item.Free:
@@ -112,7 +113,7 @@ public class FieldCell : MonoBehaviour
     public void LockCell(bool locked)
     {
         _locked = locked;
-        if (_locked)
+        //if (_locked)
             _OnPlayerExit();
     }
 }
