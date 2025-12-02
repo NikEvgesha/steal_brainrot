@@ -14,10 +14,7 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private PurchasesManager _purchaseManager;
     [SerializeField] private AdsManager _adsManager;
 
-
     [SerializeField] private GameScene _gameScene;
-
-
 
 
     private void Start()

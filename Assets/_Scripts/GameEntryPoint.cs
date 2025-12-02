@@ -9,6 +9,8 @@ public class GameEntryPoint : MonoBehaviour
     [SerializeField] private GameObject _scene;
     [SerializeField] private ElementTypeMultiplaer _elements;
 
+    [SerializeField] private IncomeModifiersHub _hubPrefab;
+    [SerializeField] private DailyPlaytimeTrackerMB _dailyPlaytimeTracker;
 
     [SerializeField] private Transform _playerSpawnPoint;
 
@@ -18,7 +20,10 @@ public class GameEntryPoint : MonoBehaviour
         Instantiate(_inventory).Init();
         Instantiate(_quickAccess).Init();
         Instantiate(_elements);
+        Instantiate(_dailyPlaytimeTracker);
+        Instantiate(_hubPrefab).Initialize(G.Currency);
         Instantiate(_ui);
+
         G.Initialized?.Invoke();
         //_scene.SetActive(true);
         G.GameLoader.ShowLoadingScreen(false);

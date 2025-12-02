@@ -66,6 +66,7 @@ public class CurrencyManager : MonoBehaviour
 
     public void AddCurrency(CurrencyType type, float amount)
     {
+        amount = Mathf.RoundToInt(amount);
         if (_audioSource)
             if(_audioSell)
                 _audioSource.PlayOneShot(_audioSell);

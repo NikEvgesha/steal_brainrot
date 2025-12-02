@@ -126,7 +126,8 @@ public class Brainrot : InventoryItem
     }
     private void GetIncome()
     {
-        G.Currency.AddCurrency(CurrencyType.Coins, _currentIncome);
+        G.Income.AddCoins(_currentIncome);
+        //G.Currency.AddCurrency(CurrencyType.Coins, _currentIncome);
         _currentIncome = 0;
         _canvas.UpdateIncome(_currentIncome);
         if (_audio)

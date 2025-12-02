@@ -1,0 +1,117 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Events;
+
+public sealed class IncomeModifiersHub : MonoBehaviour
+{
+    [SerializeField] private bool _autoCollectFromChildren = true;
+    [SerializeField] private List<IncomeModifierBehaviour> _modifiers = new();
+
+    private CurrencyManager _currencyManager;
+
+    public event UnityAction Changed;
+
+    public IReadOnlyList<IncomeModifierBehaviour> Modifiers => _modifiers;
+
+    public void Initialize(CurrencyManager currencyManager)
+    {
+        _currencyManager = currencyManager;
+    }
+
+    private void Awake()
+    {
+        if (G.Income != null && G.Income != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        G.Income = this;
+
+        if (_autoCollectFromChildren && _modifiers.Count == 0)
+        {
+            _modifiers.AddRange(GetComponentsInChildren<IncomeModifierBehaviour>(includeInactive: true));
+        }
+
+        for (int i = 0; i < _modifiers.Count; i++)
+        {
+            if (_modifiers[i] == null) continue;
+            _modifiers[i].Changed += OnAnyModifierChanged;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        for (int i = 0; i < _modifiers.Count; i++)
+        {
+            if (_modifiers[i] == null) continue;
+            _modifiers[i].Changed -= OnAnyModifierChanged;
+        }
+    }
+
+    private void OnAnyModifierChanged()
+    {
+        Changed?.Invoke();
+    }
+
+    public void Register(IncomeModifierBehaviour modifier)
+    {
+        if (modifier == null) return;
+        if (_modifiers.Contains(modifier)) return;
+
+        _modifiers.Add(modifier);
+        modifier.Changed += OnAnyModifierChanged;
+
+        Changed?.Invoke();
+    }
+
+    public void Unregister(IncomeModifierBehaviour modifier)
+    {
+        if (modifier == null) return;
+        if (!_modifiers.Remove(modifier)) return;
+
+        modifier.Changed -= OnAnyModifierChanged;
+
+        Changed?.Invoke();
+    }
+
+    public float Apply(float baseIncome)
+    {
+        float percentAdd = 0f;
+        float multiplierProduct = 1f;
+
+        for (int i = 0; i < _modifiers.Count; i++)
+        {
+            var m = _modifiers[i];
+            if (m == null || !m.IsActive) continue;
+
+            if (m.Kind == ModifierKind.PercentAdd) percentAdd += m.Value;
+            else multiplierProduct *= m.Value;
+        }
+
+        return baseIncome * (1f + percentAdd) * multiplierProduct;
+    }
+
+    public void AddCoins(float baseIncome)
+    {
+        if (_currencyManager == null)
+        {
+            Debug.LogError($"{nameof(IncomeModifiersHub)}: CurrencyManager is not initialized.");
+            return;
+        }
+
+        float final = Apply(baseIncome);
+        _currencyManager.AddCurrency(CurrencyType.Coins, final);
+    }
+
+    public void AddCurrency(CurrencyType type, float baseIncome)
+    {
+        if (_currencyManager == null)
+        {
+            Debug.LogError($"{nameof(IncomeModifiersHub)}: CurrencyManager is not initialized.");
+            return;
+        }
+
+        float final = Apply(baseIncome);
+        _currencyManager.AddCurrency(type, final);
+    }
+}
