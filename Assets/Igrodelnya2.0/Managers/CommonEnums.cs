@@ -291,6 +291,7 @@ public enum Item
     Hamer,
     Egg,
     Brainrot,
+    Food
 }
 
 public enum ShopSlotType
