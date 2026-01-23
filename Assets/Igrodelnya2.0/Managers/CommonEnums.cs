@@ -305,3 +305,9 @@ public enum ShopRewardType
     Item,
     Currency
 }
+
+public enum RaycastType
+{
+    Down,
+    Forward
+}

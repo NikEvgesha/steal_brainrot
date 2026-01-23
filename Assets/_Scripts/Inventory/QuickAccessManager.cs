@@ -87,6 +87,17 @@ public class QuickAccessManager : MonoBehaviour
         
     }
 
+    public void DropCurrent(Transform dropPoint)
+    {
+        _dropping = true;
+        PlaceItem?.Invoke(_currentActive.Type);
+        _currentActive.transform.SetParent(dropPoint.transform);
+        _currentActive.transform.localPosition = Vector3.zero;
+        _currentActive.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        G.Inventory.Remove(_currentActive);
+        _dropping = false;
+    }
+
     public void DropCurrent(FieldCell field)
     {
         _dropping = true;

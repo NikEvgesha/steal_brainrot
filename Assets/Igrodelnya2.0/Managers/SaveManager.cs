@@ -225,4 +225,38 @@ public class SaveManager : MonoBehaviour
         return saveProvider.LoadRouletteDate();
     }
 
+
+    public void SaveBigPetXP(int xp)
+    {
+        saveProvider.SaveBigPetXP(xp);
+    }
+    public void SaveBigPetLvl(int lvl)
+    {
+        saveProvider.SaveBigPetLvl(lvl);
+    }
+    public void SaveBigPetId(int id)
+    {
+        saveProvider.SaveBigPetId(id);
+    }
+    public void SaveBigPetIncome(float income)
+    {
+        saveProvider.SaveBigPetIncome(income);
+    }
+    public int LoadBigPetXP()
+    {
+        return saveProvider.LoadBigPetXP();
+    }
+    public int LoadBigPetLvl()
+    {
+        return saveProvider.LoadBigPetLvl();
+    }
+    public int LoadBigPetId()
+    {
+        return saveProvider.LoadBigPetId();
+    }
+    public float LoadBigPetIncome()
+    {
+        return saveProvider.LoadBigPetIncome();
+    }
+
 }

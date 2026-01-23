@@ -17,6 +17,14 @@ public class BrainrotInfoUI : MonoBehaviour
         _accumulationIncome.text = "$0";
         _income.text = string.Format("${0}/s", dinamicData.ResultIncome);
     }
+    public void SetInfo(float income)
+    {
+        //_name.text = data.Name;
+        _accumulationIncome.text = "$0";
+        _income.text = string.Format("${0}/s", income);
+    }
+
+
     public void UpdateIncome(float income)
     {
         _accumulationIncome.text = "$"+ income;

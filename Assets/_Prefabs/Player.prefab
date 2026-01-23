@@ -141,10 +141,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b741fd1983e2f97448251b47c66f3aab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _raycastDistance: 1
-  _layer:
+  _raycastType: 0
+  _raycastDistance: 0.1
+  _interactableMask:
     serializedVersion: 2
     m_Bits: 256
+  _occluderMask:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!1 &1281633857935659766
 GameObject:
   m_ObjectHideFlags: 0

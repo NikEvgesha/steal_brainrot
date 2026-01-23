@@ -287,7 +287,7 @@ public class MirraSDKSaveProvider : SaveProvider
         MirraSDK.Data.SetBool(SaveKey.Save.ToString(), save);
     }
 
-    public override void SaveAmmo(WeaponType type, int amount) 
+    public override void SaveAmmo(WeaponType type, int amount)
     {
         if (!isInitialize) return;
         Changed = true;
@@ -355,5 +355,64 @@ public class MirraSDKSaveProvider : SaveProvider
         }
         return DateTime.Parse(date);
     }
+
+
+
+
+    /* Big Pet */
+
+    public override void SaveBigPetXP(int xp)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetInt("BigPetXP", xp);
+    }
+    public override void SaveBigPetLvl(int lvl)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetInt("BigPetLvl", lvl);
+    }
+    public override void SaveBigPetId(int id)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetInt("BigPetId", id);
+    }
+    public override void SaveBigPetIncome(float income)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetFloat("BigPetIncome", income);
+    }
+    public override int LoadBigPetXP()
+    {
+        if (!isInitialize) return 0;
+
+        int res = MirraSDK.Data.GetInt("BigPetXP", 0);
+        return res;
+    }
+    public override int LoadBigPetLvl()
+    {
+        if (!isInitialize) return 0;
+
+        int res = MirraSDK.Data.GetInt("BigPetLvl", 1);
+        return res;
+    }
+    public override int LoadBigPetId()
+    {
+        if (!isInitialize) return 0;
+
+        int res = MirraSDK.Data.GetInt("BigPetId", 0);
+        return res;
+    }
+    public override float LoadBigPetIncome()
+    {
+        if (!isInitialize) return 0;
+
+        float res = MirraSDK.Data.GetFloat("BigPetIncome", 0);
+        return res;
+    }
+
 
 }

@@ -81,4 +81,16 @@ public abstract class SaveProvider : MonoBehaviour
 
     public abstract DateTime LoadRouletteDate();
 
+
+    public abstract void SaveBigPetXP(int xp);
+    public abstract void SaveBigPetLvl(int lvl);
+    public abstract void SaveBigPetId(int id);
+    public abstract void SaveBigPetIncome(float income);
+    public abstract int LoadBigPetXP();
+    public abstract int LoadBigPetLvl();
+    public abstract int LoadBigPetId();
+    public abstract float LoadBigPetIncome();
+
+
+
 }

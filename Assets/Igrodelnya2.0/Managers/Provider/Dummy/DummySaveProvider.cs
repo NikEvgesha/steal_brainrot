@@ -1,3 +1,4 @@
+using MirraGames.SDK;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -174,6 +175,40 @@ public class DummySaveProvider : SaveProvider
     public override DateTime LoadRouletteDate()
     {
         return DateTime.Today.AddDays(-1);
+    }
+
+
+    /* Big Pet */
+
+    public override void SaveBigPetXP(int xp)
+    {
+    }
+    public override void SaveBigPetLvl(int lvl)
+    {
+    }
+    public override void SaveBigPetId(int id)
+    {
+
+    }
+    public override void SaveBigPetIncome(float income)
+    {
+
+    }
+    public override int LoadBigPetXP()
+    {
+        return 0;
+    }
+    public override int LoadBigPetLvl()
+    {
+        return 1;
+    }
+    public override int LoadBigPetId()
+    {
+        return 0;
+    }
+    public override float LoadBigPetIncome()
+    {
+        return 0;
     }
 
 }
