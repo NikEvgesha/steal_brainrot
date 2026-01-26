@@ -34,10 +34,10 @@ public abstract class SaveProvider : MonoBehaviour
     public abstract bool CheckProgress();
 
     // Сохранение валюты
-    public abstract void SaveGems(float amount);
-    public abstract float LoadGems();
-    public abstract void SaveGameCoin(float coin);
-    public abstract float LoadGameCoin();
+    public abstract void SaveGems(double amount);
+    public abstract double LoadGems();
+    public abstract void SaveGameCoin(double coin);
+    public abstract double LoadGameCoin();
 
     // Достижения
     public abstract void SaveAchievementProgress(AchievementType id, int progress);
@@ -85,12 +85,26 @@ public abstract class SaveProvider : MonoBehaviour
     public abstract void SaveBigPetXP(int xp);
     public abstract void SaveBigPetLvl(int lvl);
     public abstract void SaveBigPetId(int id);
-    public abstract void SaveBigPetIncome(float income);
+    public abstract void SaveBigPetIncomeTime(string time);
     public abstract int LoadBigPetXP();
     public abstract int LoadBigPetLvl();
     public abstract int LoadBigPetId();
-    public abstract float LoadBigPetIncome();
+    public abstract string LoadBigPetIncomeTime();
 
+    // Conveyor Data
+
+    public abstract void SaveConveyorCurrentLevel(int id);
+    public abstract void SaveConveyorUnlockedLevel(int id);
+    public abstract int LoadConveyorCurrentLevel();
+    public abstract int LoadConveyorUnlockedLevel();
+
+    // Field Data
+
+    public abstract void SaveFieldUnblockStatus(int fieldId,bool unblocked);
+    public abstract bool LoadFieldUnblockStatus(int fieldId);
+
+    public abstract void SaveCellData(string key, CellSaveData data);
+    public abstract CellSaveData LoadCellData(string key);
 
 
 }

@@ -13,14 +13,15 @@ public class Field : MonoBehaviour
     private List<FieldCell> _cells;
     private bool _playerOnField;
     private BuyTouchHandler _touchHandler;
+    private int _id;
+
+    public int ID => _id;
     
-    
-    
+   
     private void Awake()
     {
         G.Initialized.AddListener(Init);     
     }
-
 
     private void Init()
     {
@@ -31,14 +32,7 @@ public class Field : MonoBehaviour
 
         if (_unblocked)
         {
-            Destroy(_grassObj);
-        }
-        else
-        {
-            foreach (FieldCell cell in _cells)
-            {
-                cell.gameObject.SetActive(false);
-            }
+            Unblock();
         }
     }
 
@@ -71,15 +65,33 @@ public class Field : MonoBehaviour
     {
         if (G.Currency.RemoveCurrency(CurrencyType.Coins, _price))
         {
-            //G.Currency.RemoveCurrency(CurrencyType.Coins, _price);
-            Destroy(_grassObj);
-            Destroy(_buyPanel.gameObject);
-            _unblocked = true;
-            foreach (FieldCell cell in _cells)
-            {
-                cell.gameObject.SetActive(true);
-            }
+            Unblock();
         }
+    }
+
+    public void Unblock()
+    {
+        Destroy(_grassObj);
+        Destroy(_buyPanel.gameObject);
+        _unblocked = true;
+        foreach (FieldCell cell in _cells)
+        {
+            cell.gameObject.SetActive(true);
+        }
+        G.Save.SaveFieldUnblockStatus(_id, true);
+    }
+
+
+    public void SetID(int id)
+    {
+        _id = id;
+    }
+
+
+    public void LoadData()
+    {
+        int id = 0;
+        _cells.ForEach(cell => cell.SetLoadedData(SaveKey.Field.ToString() + _id + " " + id++));
     }
 
 }

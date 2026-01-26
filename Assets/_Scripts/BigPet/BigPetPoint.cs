@@ -33,9 +33,10 @@ public class BigPetPoint : MonoBehaviour
     private int _currentPetIdx;
     private int _maxAvailablePetIdx;
     private int _maxLvl;
-    private float _currentIncome;
-    private float _accumulatedIncome;
+    private double _currentIncome;
+    private double _accumulatedIncome;
     private BigPetSetUI _setPetUI;
+    private DateTime _lastIncomeCollectTimestamp;
 
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
@@ -61,10 +62,23 @@ public class BigPetPoint : MonoBehaviour
         _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
         SetPet(_currentPetIdx);
         CheckLvl();
-        _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome;
-        _accumulatedIncome = G.Save.LoadBigPetIncome();
+        _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome; // TODO;
         _petInfoUI.SetInfo(_currentIncome);
         _foodTimeBar.gameObject.SetActive(false);
+
+        long incomeAccumulateTime;
+        string timestamp = G.Save.LoadBigPetIncomeTime();
+        if (timestamp.Length == 0)
+        {
+            incomeAccumulateTime = 0;
+            _lastIncomeCollectTimestamp = DateTime.UtcNow;
+            G.Save.SaveBigPetIncomeTime(_lastIncomeCollectTimestamp.ToString());
+        } else
+        {
+            _lastIncomeCollectTimestamp = DateTime.Parse(timestamp);
+            incomeAccumulateTime = (long)(DateTime.UtcNow - _lastIncomeCollectTimestamp).TotalSeconds;
+        }  
+        _accumulatedIncome = incomeAccumulateTime * _currentIncome;
         StartCoroutine(ProduceIncome());
         
     }
@@ -213,6 +227,8 @@ public class BigPetPoint : MonoBehaviour
         G.Income.AddCoins(_accumulatedIncome);
         _accumulatedIncome = 0;
         _petInfoUI.UpdateIncome(_accumulatedIncome);
+        _lastIncomeCollectTimestamp = DateTime.UtcNow;
+        G.Save.SaveBigPetIncomeTime(_lastIncomeCollectTimestamp.ToString());
         if (_audio)
             _audio.Play();
     }
@@ -223,9 +239,9 @@ public class BigPetPoint : MonoBehaviour
         {
             yield return new WaitForSecondsRealtime(1);
             _accumulatedIncome +=  _currentIncome; // TODO: Income math
-            _accumulatedIncome = Mathf.RoundToInt(_accumulatedIncome);
+            _accumulatedIncome = (double.IsInfinity(_accumulatedIncome)) ? float.MaxValue : _accumulatedIncome;
+            _accumulatedIncome = Math.Round(_accumulatedIncome);
             _petInfoUI.UpdateIncome(_accumulatedIncome);
-            G.Save.SaveBigPetIncome(_accumulatedIncome);
         }
     }
 

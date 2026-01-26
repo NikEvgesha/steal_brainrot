@@ -74,10 +74,10 @@ public sealed class IncomeModifiersHub : MonoBehaviour
         Changed?.Invoke();
     }
 
-    public float Apply(float baseIncome)
+    public double Apply(double baseIncome)
     {
-        float percentAdd = 0f;
-        float multiplierProduct = 1f;
+        double percentAdd = 0f;
+        double multiplierProduct = 1f;
 
         for (int i = 0; i < _modifiers.Count; i++)
         {
@@ -91,7 +91,7 @@ public sealed class IncomeModifiersHub : MonoBehaviour
         return baseIncome * (1f + percentAdd) * multiplierProduct;
     }
 
-    public void AddCoins(float baseIncome)
+    public void AddCoins(double baseIncome)
     {
         if (_currencyManager == null)
         {
@@ -99,11 +99,11 @@ public sealed class IncomeModifiersHub : MonoBehaviour
             return;
         }
 
-        float final = Apply(baseIncome);
+        double final = Apply(baseIncome);
         _currencyManager.AddCurrency(CurrencyType.Coins, final);
     }
 
-    public void AddCurrency(CurrencyType type, float baseIncome)
+    public void AddCurrency(CurrencyType type, double baseIncome)
     {
         if (_currencyManager == null)
         {
@@ -111,7 +111,7 @@ public sealed class IncomeModifiersHub : MonoBehaviour
             return;
         }
 
-        float final = Apply(baseIncome);
+        double final = Apply(baseIncome);
         _currencyManager.AddCurrency(type, final);
     }
 }

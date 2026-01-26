@@ -14,6 +14,7 @@ public enum EggStatus
     Conveyer,
     Purchased,
     Maturing,
+    ReadyToHatch,
     Hatching
 }
 
@@ -22,4 +23,11 @@ public enum GameScene
     Melomaner,
     Evgesha,
     Terabitia
+}
+
+public enum CellStatus
+{
+    Empty,
+    Egg,
+    Pet,
 }

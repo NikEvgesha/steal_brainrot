@@ -90,10 +90,11 @@ public class QuickAccessManager : MonoBehaviour
     public void DropCurrent(Transform dropPoint)
     {
         _dropping = true;
-        PlaceItem?.Invoke(_currentActive.Type);
+       
         _currentActive.transform.SetParent(dropPoint.transform);
         _currentActive.transform.localPosition = Vector3.zero;
         _currentActive.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        PlaceItem?.Invoke(_currentActive.Type);
         G.Inventory.Remove(_currentActive);
         _dropping = false;
     }
@@ -101,7 +102,7 @@ public class QuickAccessManager : MonoBehaviour
     public void DropCurrent(FieldCell field)
     {
         _dropping = true;
-        PlaceItem?.Invoke(_currentActive.Type);
+        
         _floorListener = field;
         _currentActive.transform.SetParent(_floorListener.transform);
         _currentActive.transform.localPosition = Vector3.zero;
@@ -118,6 +119,7 @@ public class QuickAccessManager : MonoBehaviour
             default:
                 break;
         }
+        PlaceItem?.Invoke(_currentActive.Type);
         G.Inventory.Remove(_currentActive);
         _dropping = false;
     }

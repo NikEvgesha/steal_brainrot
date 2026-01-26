@@ -15,23 +15,23 @@ public class BrainrotInfoUI : MonoBehaviour
     {
         //_name.text = data.Name;
         _accumulationIncome.text = "$0";
-        _income.text = string.Format("${0}/s", dinamicData.ResultIncome);
+        _income.text = string.Format("${0}/s", G.Currency.ToString(dinamicData.ResultIncome));
     }
-    public void SetInfo(float income)
+    public void SetInfo(double income)
     {
         //_name.text = data.Name;
         _accumulationIncome.text = "$0";
-        _income.text = string.Format("${0}/s", income);
+        _income.text = string.Format("${0}/s", G.Currency.ToString(income));
     }
 
 
-    public void UpdateIncome(float income)
+    public void UpdateIncome(double income)
     {
-        _accumulationIncome.text = "$"+ income;
+        _accumulationIncome.text = "$"+ G.Currency.ToString(income);
     }
-    public void UpdateOfflineIncome(float income)
+    public void UpdateOfflineIncome(double income)
     {
         _offlineIncome.gameObject.SetActive(true);
-        _offlineIncome.text = "ќфлайн инком = $" + income;
+        _offlineIncome.text = "ќфлайн инком = $" + G.Currency.ToString(income);
     }
 }

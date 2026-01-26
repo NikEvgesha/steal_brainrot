@@ -7,11 +7,11 @@ public struct BrainrotTypeData
 {
     //public GameObject Model;
 
-    public float StartIncome;
+    public double StartIncome;
     public float MinWeight;
     public float MaxWeightMult;
 
-    public float StartSellPrice;
+    public double StartSellPrice;
 }
 
 
@@ -20,7 +20,7 @@ public struct BrainrotDinamicData
 {
     public ElementType ElementType;
     public float WeightMultiplier;
-    public float ResultIncome;
+    public double ResultIncome;
 }
 public class Brainrot : InventoryItem
 {
@@ -34,11 +34,14 @@ public class Brainrot : InventoryItem
     public BrainrotDinamicData DinamicData => _dinamicData;
 
     public GameObject Model => _modelPoint.gameObject;
+    public double CurrentIncome => _currentIncome;
+    public long LastIncomeCollectTime => _lastIncomeTime;
 
     private BrainrotInfoUI _canvas;
     private GameObject _model;
 
-    private float _currentIncome;
+    private double _currentIncome;
+    private long _lastIncomeTime;
 
     private FieldCell _floorListener;
 
@@ -48,20 +51,33 @@ public class Brainrot : InventoryItem
     public Action Stealed;
     private Coroutine _incomeCorutine;
 
-    public void Init(BrainrotDinamicData rarity, FieldCell floor) //передавать плейс из яйца
+
+    public void Init(BrainrotDinamicData rarity, FieldCell floor, long lastCollectTimestamp = -1) //передавать плейс из яйца
     {
         // rarity считается в яйце? 
         _canvas = GetComponentInChildren<BrainrotInfoUI>();
         _dinamicData = rarity;
-        
         //_model = Instantiate(_data.,_modelPoint);
         Vector3 scale = _canvas.transform.localScale;
         _canvas.transform.parent = _modelPoint.transform;
         SetSize();
         _canvas.transform.parent = transform;
         _canvas.transform.localScale = scale;
-        _currentIncome = 0;
-        _dinamicData.ResultIncome = Mathf.RoundToInt(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
+
+        _dinamicData.ResultIncome = Math.Round(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
+        long incomeAccumulationTime;
+        if (lastCollectTimestamp == -1)
+        {
+            _lastIncomeTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            incomeAccumulationTime = 0;
+        }
+        else
+        {
+            _lastIncomeTime = lastCollectTimestamp;
+            incomeAccumulationTime = (long)(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(lastCollectTimestamp)).TotalSeconds;
+        }
+        _currentIncome = Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome);
+
         NewPlace(floor);
         _canvas.SetInfo(_data, _dinamicData);
         SetTypeVisual();
@@ -127,6 +143,8 @@ public class Brainrot : InventoryItem
         G.Income.AddCoins(_currentIncome);
         //G.Currency.AddCurrency(CurrencyType.Coins, _currentIncome);
         _currentIncome = 0;
+        _lastIncomeTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        _floorListener.SaveData();
         _canvas.UpdateIncome(_currentIncome);
         if (_audio)
             _audio.Play();
@@ -138,7 +156,8 @@ public class Brainrot : InventoryItem
         {
             yield return new WaitForSecondsRealtime(1);
             _currentIncome += _dinamicData.ResultIncome; //2 is the magic number
-            _currentIncome = Mathf.RoundToInt(_currentIncome);
+            _currentIncome = (double.IsInfinity(_currentIncome)) ? float.MaxValue : _currentIncome;
+            _currentIncome = Math.Round(_currentIncome);
             _canvas.UpdateIncome(_currentIncome);
         }
     }

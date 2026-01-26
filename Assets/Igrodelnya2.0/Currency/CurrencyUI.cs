@@ -31,7 +31,7 @@ public class CurrencyUI : MonoBehaviour
     }
 
 
-    private void OnCurrencyChanged(CurrencyType type, float newAmount)
+    private void OnCurrencyChanged(CurrencyType type, double newAmount)
     {
         if (type == _type)
         {
@@ -42,7 +42,8 @@ public class CurrencyUI : MonoBehaviour
             }
 
             _currentAmount = newAmount;
-            _currencyAmount.text = newAmount.ToString();
+
+            _currencyAmount.text = G.Currency.ToString(newAmount);  // newAmount.ToString();
         }
     }
 
@@ -50,6 +51,6 @@ public class CurrencyUI : MonoBehaviour
     {
         if (!gameObject.activeInHierarchy) return;
         UIMoneyChangeAnimation animation = Instantiate(_diffObj, transform);
-        animation.Config(CurrencyConverter.convertNumToString(diff), diff > 0);
+        animation.Config(G.Currency.ToString(diff), diff > 0);
     }
 }

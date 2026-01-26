@@ -106,13 +106,13 @@ public class SaveManager : MonoBehaviour
     {
         saveProvider.SaveTutorialProgress(endTutorial);
     }
-    public void SaveGems(float amount)
+    public void SaveGems(double amount)
     {
         saveProvider.SaveGems(amount);
         //LeaderboardManager.Instance.SaveScore(LBName.gems.ToString(), amount);
     }
 
-    public float GetGems()
+    public double GetGems()
     {
         return saveProvider.LoadGems();
     }
@@ -165,11 +165,11 @@ public class SaveManager : MonoBehaviour
     {
         saveProvider.SavePlayerStats(coin, hp);
     }
-    public void SaveGameCoin(float coin)
+    public void SaveGameCoin(double coin)
     {
         saveProvider.SaveGameCoin(coin);
     }
-    public float LoadGameCoin()
+    public double LoadGameCoin()
     {
         return saveProvider.LoadGameCoin();
     }
@@ -238,9 +238,9 @@ public class SaveManager : MonoBehaviour
     {
         saveProvider.SaveBigPetId(id);
     }
-    public void SaveBigPetIncome(float income)
+    public void SaveBigPetIncomeTime(string incomeTime)
     {
-        saveProvider.SaveBigPetIncome(income);
+        saveProvider.SaveBigPetIncomeTime(incomeTime);
     }
     public int LoadBigPetXP()
     {
@@ -254,9 +254,50 @@ public class SaveManager : MonoBehaviour
     {
         return saveProvider.LoadBigPetId();
     }
-    public float LoadBigPetIncome()
+    public string LoadBigPetIncomeTime()
     {
-        return saveProvider.LoadBigPetIncome();
+        return saveProvider.LoadBigPetIncomeTime();
+    }
+
+
+    public void SaveConveyorCurrentLevel(int id)
+    {
+        saveProvider.SaveConveyorCurrentLevel(id);
+    }
+    public void SaveConveyorUnlockedLevel(int id)
+    {
+        saveProvider.SaveConveyorUnlockedLevel(id);
+    }
+
+    public int LoadConveyorCurrentLevel()
+    {
+        return saveProvider.LoadConveyorCurrentLevel();
+    }
+    public int LoadConveyorUnlockedLevel()
+    {
+        return saveProvider.LoadConveyorUnlockedLevel();
+    }
+
+
+    public void SaveFieldUnblockStatus(int fieldId, bool unblocked)
+    {
+        saveProvider.SaveFieldUnblockStatus(fieldId, unblocked);
+    }
+
+    public bool LoadFieldUnblockStatus(int fieldId)
+    {
+        return saveProvider.LoadFieldUnblockStatus(fieldId);
+    }
+
+
+    public void SaveCellData(string id, CellSaveData data)
+    {
+        saveProvider.SaveCellData(id, data);
+    }
+
+    public CellSaveData LoadCellData(string id)
+    {
+        return saveProvider.LoadCellData(id);
     }
 
 }

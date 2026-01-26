@@ -33,6 +33,7 @@ public class EggInfoUI : MonoBehaviour
             case EggStatus.Conveyer:
                 _buy.SetActive(true);
                 break;
+                
             case EggStatus.Maturing:
                 _hutching.SetActive(true);
                 break;

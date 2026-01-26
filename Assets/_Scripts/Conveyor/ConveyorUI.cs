@@ -15,6 +15,7 @@ public class ConveyorUI : MonoBehaviour
     [SerializeField] private Button _buttonBuyCoins;
     [SerializeField] private Button _buttonActivate;
     [SerializeField] private GameObject _activeText;
+    [SerializeField] private GameObject _notAvailableText;
     [SerializeField] private ConveyorLevelTab _tabPrefab;
     [SerializeField] private Transform _tansParent;
 
@@ -52,7 +53,6 @@ public class ConveyorUI : MonoBehaviour
 
     public void SetInfo(ConveyorLevel level)
     {
-        Debug.Log("set info: " + level.Name);
         if (_currentLevelInfo == level) return;
 
         _currentLevelInfo = level;
@@ -67,9 +67,10 @@ public class ConveyorUI : MonoBehaviour
     private void SetButtons()
     {
         _activeText.gameObject.SetActive(_currentLevelInfo.IsActive);
+        _notAvailableText.gameObject.SetActive(!_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsAvailable);
         _buttonActivate.gameObject.SetActive(_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsActive);
-        _buttonBuyCoins.gameObject.SetActive(!_currentLevelInfo.IsPurchased);
-        _buttonBuyGems.gameObject.SetActive(!_currentLevelInfo.IsPurchased);
+        _buttonBuyCoins.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
+        _buttonBuyGems.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
         
 
         if (!_currentLevelInfo.IsPurchased)

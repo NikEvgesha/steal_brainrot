@@ -13,6 +13,7 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private CurrencyManager _cuurencyManager;
     [SerializeField] private PurchasesManager _purchaseManager;
     [SerializeField] private AdsManager _adsManager;
+    [SerializeField] private ItemPrefabStorage _storage;
 
     [SerializeField] private GameScene _gameScene;
 
@@ -33,6 +34,7 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_cuurencyManager);
         Instantiate(_adsManager);
         Instantiate(_purchaseManager);
+        Instantiate(_storage);
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
     }

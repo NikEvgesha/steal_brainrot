@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 [Serializable]
 public struct LevelEggs
@@ -12,8 +13,8 @@ public struct LevelEggs
 public class ConveyorLevel : MonoBehaviour
 {
     [SerializeField] private string _name;
-    [SerializeField] private int _priceCoin;
-    [SerializeField] private int _priceGems;
+    [SerializeField] private double _priceCoin;
+    [SerializeField] private double _priceGems;
     [SerializeField] private Sprite _icon;
     [SerializeField] private float _incomeMultiplier;
     [SerializeField] private List<LevelEggs> _eggs;
@@ -21,19 +22,24 @@ public class ConveyorLevel : MonoBehaviour
     [SerializeField] private bool _purchased;
     private float _totalWeight;
     private bool _active;
+    private bool _availableForPurchase;
 
+    public UnityEvent<ConveyorLevel> LevelPurchased;
 
     public float IncomeMultiplier => _incomeMultiplier;
     public List<LevelEggs> Eggs => _eggs;
     public Egg NewEgg => _newEgg;
 
     public string Name => _name;
-    public int PriceCoin => _priceCoin;
-    public int PriceGems => _priceGems;
+    public double PriceCoin => _priceCoin;
+    public double PriceGems => _priceGems;
     public Sprite Icon => _icon;
 
     public bool IsPurchased => _purchased;
     public bool IsActive => _active;
+    public bool IsAvailable => _availableForPurchase;
+
+
     
 
     private void Awake()
@@ -67,13 +73,24 @@ public class ConveyorLevel : MonoBehaviour
 
         if (G.Currency.RemoveCurrency(forGems ? CurrencyType.Gems : CurrencyType.Coins, forGems ? _priceGems : _priceCoin))
         {
-            _purchased = true;
+            SetPurchased(true);
+            LevelPurchased?.Invoke(this);
         }
+    }
+
+    public void SetPurchased(bool purchased)
+    {
+        _purchased = purchased;
     }
 
 
     public void SetActive(bool active)
     {
         _active = active;
+    }
+
+    public void SetPurchasingAvailable(bool available)
+    {
+        _availableForPurchase = available;
     }
 }

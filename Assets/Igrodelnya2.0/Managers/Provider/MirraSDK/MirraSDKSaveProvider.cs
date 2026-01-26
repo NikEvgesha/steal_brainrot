@@ -119,18 +119,23 @@ public class MirraSDKSaveProvider : SaveProvider
         Changed = true;
     }
 
-    public override void SaveGems(float amount)
+    public override void SaveGems(double amount)
     {
         if (!isInitialize) return;
         Changed = true;
-        MirraSDK.Data.SetFloat(SaveKey.Gems.ToString(), amount);
+        MirraSDK.Data.SetString(SaveKey.Gems.ToString(), amount.ToString());
     }
 
-    public override float LoadGems()
+    public override double LoadGems()
     {
-        if (!isInitialize)
-            return 0;
-        return MirraSDK.Data.GetFloat(SaveKey.Gems.ToString());
+        double res = 0;
+
+        if (isInitialize)
+        {
+            string resStr = MirraSDK.Data.GetString(SaveKey.Gems.ToString());
+            res = Double.Parse(resStr);
+        }
+        return res;
     }
 
     public override void SaveProgress()
@@ -219,11 +224,11 @@ public class MirraSDKSaveProvider : SaveProvider
         MirraSDK.Data.SetInt(SaveKey.Coins.ToString(), coin);
         MirraSDK.Data.SetFloat(SaveKey.Health.ToString(), health);
     }
-    public override void SaveGameCoin(float coin)
+    public override void SaveGameCoin(double coin)
     {
         if (!isInitialize) return;
         Changed = true;
-        MirraSDK.Data.SetFloat(SaveKey.Coins.ToString(), coin);
+        MirraSDK.Data.SetString(SaveKey.Coins.ToString(), coin.ToString());
     }
     public override void SavePlayerHealth(float health)
     {
@@ -246,13 +251,15 @@ public class MirraSDKSaveProvider : SaveProvider
         }
         return (0, 0);
     }
-    public override float LoadGameCoin()
+    public override double LoadGameCoin()
     {
+        double res = -1;
         if (isInitialize)
         {
-            return MirraSDK.Data.GetFloat(SaveKey.Coins.ToString());
+            string coinsStr = MirraSDK.Data.GetString(SaveKey.Coins.ToString(), "-1");
+            Double.TryParse(coinsStr, out res);
         }
-        return 0;
+        return res;
     }
     public override float LoadPlayerHealth()
     {
@@ -379,11 +386,11 @@ public class MirraSDKSaveProvider : SaveProvider
         Changed = true;
         MirraSDK.Data.SetInt("BigPetId", id);
     }
-    public override void SaveBigPetIncome(float income)
+    public override void SaveBigPetIncomeTime(string incomeTime)
     {
         if (!isInitialize) return;
         Changed = true;
-        MirraSDK.Data.SetFloat("BigPetIncome", income);
+        MirraSDK.Data.SetString("BigPetIncomeTime", incomeTime);
     }
     public override int LoadBigPetXP()
     {
@@ -406,13 +413,73 @@ public class MirraSDKSaveProvider : SaveProvider
         int res = MirraSDK.Data.GetInt("BigPetId", 0);
         return res;
     }
-    public override float LoadBigPetIncome()
+    public override string LoadBigPetIncomeTime()
     {
-        if (!isInitialize) return 0;
+        if (!isInitialize) return "";
 
-        float res = MirraSDK.Data.GetFloat("BigPetIncome", 0);
+        string res = MirraSDK.Data.GetString("BigPetIncomeTime", "");
         return res;
     }
 
+
+    public override void SaveConveyorCurrentLevel(int id)
+    {
+        if (!isInitialize) return;
+
+        Changed = true;
+        MirraSDK.Data.SetInt("ConveyorCurrentLvl", id);
+    }
+    public override void SaveConveyorUnlockedLevel(int id)
+    {
+        if (!isInitialize) return;
+
+        Changed = true;
+        MirraSDK.Data.SetInt("ConveyorUnlockedLvl", id);
+    }
+    public override int LoadConveyorCurrentLevel()
+    {
+        if (!isInitialize) return 0 ;
+
+        int res = MirraSDK.Data.GetInt("ConveyorCurrentLvl", 0);
+        return res;
+    }
+    public override int LoadConveyorUnlockedLevel()
+    {
+        if (!isInitialize) return 0;
+
+        int res = MirraSDK.Data.GetInt("ConveyorUnlockedLvl", 0);
+        return res;
+    }
+
+    public override void SaveFieldUnblockStatus(int fieldId, bool unblocked)
+    {
+        if (!isInitialize) return;
+
+        Changed = true;
+        MirraSDK.Data.SetBool(SaveKey.Field.ToString() + fieldId, unblocked);
+
+    }
+    public override bool LoadFieldUnblockStatus(int fieldId)
+    {
+        if (!isInitialize) return false;
+
+        bool res = MirraSDK.Data.GetBool(SaveKey.Field.ToString() + fieldId, false);
+        return res;
+    }
+
+    public override void SaveCellData(string key, CellSaveData data)
+    {
+        if (!isInitialize) return;
+
+        Changed = true;
+        MirraSDK.Data.SetObject<CellSaveData>(key, data);
+    }
+    public override CellSaveData LoadCellData(string key)
+    {
+        if (!isInitialize) return null;
+
+        CellSaveData res = MirraSDK.Data.GetObject<CellSaveData>(key, null);
+        return res;
+    }
 
 }

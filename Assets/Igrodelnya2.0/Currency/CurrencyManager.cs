@@ -9,13 +9,14 @@ public class CurrencyManager : MonoBehaviour
     [SerializeField] private Sprite _coinIcon;
     [SerializeField] private Sprite _realIcon; // Tmp
 
-    [SerializeField] private float StartCoinsAmount;
+    [SerializeField] private double StartCoinsAmount;
+    [SerializeField] private List<String> _amountAbbreviation;
 
     [SerializeField] private AudioClip _audioBuy;
     [SerializeField] private AudioClip _audioSell;
     [SerializeField] private AudioSource _audioSource;
 
-    private Dictionary<CurrencyType, float> _balance = new() 
+    private Dictionary<CurrencyType, double> _balance = new() 
     {
         { CurrencyType.Coins, 0},
         { CurrencyType.Gems, 0}
@@ -26,7 +27,7 @@ public class CurrencyManager : MonoBehaviour
     public double Gems { get { return _balance[CurrencyType.Gems]; } }
     public double Coins { get { return _balance[CurrencyType.Coins]; } }
 
-    public UnityEvent<CurrencyType, float> CurrencyChanged;
+    public UnityEvent<CurrencyType, double> CurrencyChanged;
     public UnityEvent NoGems;
     public UnityEvent NoCoins;
     public UnityEvent<bool> ShowGems;
@@ -52,8 +53,11 @@ public class CurrencyManager : MonoBehaviour
 
     private void Start()
     {
-        AddCurrency(CurrencyType.Coins, StartCoinsAmount);
-        AddCurrency(CurrencyType.Coins, G.Save.LoadGameCoin());
+        double coins = G.Save.LoadGameCoin();
+        if (coins == -1)
+            AddCurrency(CurrencyType.Coins, StartCoinsAmount);
+        else
+            AddCurrency(CurrencyType.Coins, coins);
         AddCurrency(CurrencyType.Gems, G.Save.GetGems());
     }
 
@@ -64,13 +68,14 @@ public class CurrencyManager : MonoBehaviour
         AddCurrency(CurrencyType.Coins, StartCoinsAmount);
     }
 
-    public void AddCurrency(CurrencyType type, float amount)
+    public void AddCurrency(CurrencyType type, double amount)
     {
-        amount = Mathf.RoundToInt(amount);
+        amount = Math.Round(amount);
         if (_audioSource)
             if(_audioSell)
                 _audioSource.PlayOneShot(_audioSell);
         _balance[type] += amount;
+        _balance[type] = (double.IsInfinity(_balance[type])) ? float.MaxValue : _balance[type];
         CurrencyChanged?.Invoke(type, _balance[type]);
         if (type == CurrencyType.Gems)
             G.Save.SaveGems(_balance[type]);
@@ -78,7 +83,7 @@ public class CurrencyManager : MonoBehaviour
             G.Save.SaveGameCoin(_balance[type]);
     }
 
-    public bool RemoveCurrency(CurrencyType type, float amount)
+    public bool RemoveCurrency(CurrencyType type, double amount)
     {
         if (_balance[type] >= amount)
         {
@@ -99,12 +104,12 @@ public class CurrencyManager : MonoBehaviour
         return false;
     }
 
-    public float GetBalance(CurrencyType type)
+    public double GetBalance(CurrencyType type)
     {
         return _balance[type];
     }
 
-    public bool CheckEnoughCurrency(CurrencyType type, float amount, bool showNoGemsShop = true)
+    public bool CheckEnoughCurrency(CurrencyType type, double amount, bool showNoGemsShop = true)
     {
         if (amount <= _balance[type])
         {
@@ -126,6 +131,21 @@ public class CurrencyManager : MonoBehaviour
     public Sprite GetCurrencyIcon(CurrencyType type)
     {
         return _currencyIcons[type];
+    }
+
+    public String ToString(double amount)
+    {
+        double res = amount;
+        int abbrId = 0;
+        while (res >= 1000)
+        {
+            res = res / 1000;
+            abbrId++;
+        }
+
+        string s = $"{res:F2}".Substring(0, 4).TrimEnd('0').TrimEnd(',') + _amountAbbreviation[abbrId];
+        return s;
+
     }
     
 }

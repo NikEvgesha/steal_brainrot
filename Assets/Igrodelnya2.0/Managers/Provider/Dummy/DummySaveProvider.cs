@@ -18,11 +18,11 @@ public class DummySaveProvider : SaveProvider
         }
         return volumes;
     }
-    public override void SaveGems(float amount) {
-        PlayerPrefs.SetFloat("Gems", amount);
+    public override void SaveGems(double amount) {
+        PlayerPrefs.SetFloat("Gems", (float)amount);
     }
 
-    public override float LoadGems()
+    public override double LoadGems()
     {
         float gems = 0;
         if (PlayerPrefs.HasKey("Gems"))
@@ -106,7 +106,7 @@ public class DummySaveProvider : SaveProvider
 
     public override void SaveInventory(List<ItemData> items) { }
     public override void SavePlayerStats(int coin, float hp) { }
-    public override void SaveGameCoin(float coin)
+    public override void SaveGameCoin(double coin)
     {
         throw new NotImplementedException();
     }
@@ -122,7 +122,7 @@ public class DummySaveProvider : SaveProvider
     {
         throw new NotImplementedException();
     }
-    public override float LoadGameCoin()
+    public override double LoadGameCoin()
     {
         throw new NotImplementedException();
     }
@@ -190,7 +190,7 @@ public class DummySaveProvider : SaveProvider
     {
 
     }
-    public override void SaveBigPetIncome(float income)
+    public override void SaveBigPetIncomeTime(string income)
     {
 
     }
@@ -206,9 +206,42 @@ public class DummySaveProvider : SaveProvider
     {
         return 0;
     }
-    public override float LoadBigPetIncome()
+    public override string LoadBigPetIncomeTime()
+    {
+        return "";
+    }
+
+
+    public override void SaveConveyorCurrentLevel(int id)
+    {
+    }
+    public override void SaveConveyorUnlockedLevel(int id)
+    {
+    }
+    public override int LoadConveyorCurrentLevel()
+    {
+        return 0;
+    }
+    public override int LoadConveyorUnlockedLevel()
     {
         return 0;
     }
 
+
+    public override void SaveFieldUnblockStatus(int fieldId, bool unblocked)
+    {
+
+    }
+    public override bool LoadFieldUnblockStatus(int fieldId)
+    {
+        return false;
+    }
+
+    public override void SaveCellData(string key, CellSaveData data)
+    {
+    }
+    public override CellSaveData LoadCellData(string key)
+    {
+        return null;
+    }
 }

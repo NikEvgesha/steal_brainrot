@@ -1,6 +1,18 @@
+using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 
+
+[Serializable]
+public class CellSaveData
+{
+    public Item Status;
+    public string ID;
+    public BrainrotDinamicData DinamicData;
+    public long HatchingTimestamp;
+    public long IncomeLastTime;
+}
 public class FieldCell : MonoBehaviour
 {
 
@@ -9,24 +21,29 @@ public class FieldCell : MonoBehaviour
     [SerializeField] private GameObject _takeButton;
     [SerializeField] private GameObject _dropButton;
     [SerializeField] private GameObject _addSpeedButton;
+    [SerializeField] private GameObject _hatchButton;
 
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
     [HideInInspector] public UnityEvent TakeBrainrot;
     [HideInInspector] public UnityEvent SpeedBoost;
+    [HideInInspector] public UnityEvent HatchEgg;
 
     private Item _inField;
     private bool _locked;
+    private Egg _currentEgg;
+    private Brainrot _currentPet;
+    private Coroutine _saveCoroutine;
 
     private bool _playerOnCell;
     public string Id { get { return _id; } }
     private void Awake()
     {
         // Если id ещё не назначен — генерируем новый
-        if (string.IsNullOrEmpty(_id))
-        {
-            _id = System.Guid.NewGuid().ToString();
-        }
+        //if (string.IsNullOrEmpty(_id))
+        //{
+        //    _id = System.Guid.NewGuid().ToString();    
+        //}
     }
 
     public void _OnPlayerEnter()
@@ -36,8 +53,9 @@ public class FieldCell : MonoBehaviour
         G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
         //TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
         G.QuickAccess.PlaceItem.AddListener(UpdateFieldItem);
-        CheckPlayer();
+        
         _playerOnCell = true;
+        CheckPlayer();
         PlayerEnter?.Invoke();
     }
     public void CheckPlayer(InventoryItem item=null)
@@ -46,13 +64,26 @@ public class FieldCell : MonoBehaviour
         _addSpeedButton.SetActive(false);
         _triggerIndicator.SetActive(false);
         _takeButton.SetActive(false);
+        _hatchButton.SetActive(false);
+        if (!_playerOnCell) return;
         switch (_inField)
         {
             case Item.Free:
                 FieldFree();
                 break;
             case Item.Egg:
-                _addSpeedButton.SetActive(true);
+                switch (_currentEgg.Status)
+                {
+                    case EggStatus.Maturing:
+                        _addSpeedButton.SetActive(true);
+                        break;
+                    case EggStatus.ReadyToHatch:
+                        _hatchButton.SetActive(true);
+                        break;
+                    default:
+                        break;
+                }
+                
                 break;
             case Item.Brainrot:
                 if (G.QuickAccess.CheckHand() == Item.Hamer)
@@ -83,6 +114,23 @@ public class FieldCell : MonoBehaviour
     public void UpdateFieldItem(Item item)
     {
         _inField = item;
+        switch (_inField)
+        {
+            case Item.Egg:
+                _currentEgg = GetComponentInChildren<Egg>();
+                _currentPet = null;
+                break;
+            case Item.Brainrot:
+                _currentEgg = null;
+                _currentPet = GetComponentInChildren<Brainrot>();
+                break;
+            default:
+                _currentEgg = null;
+                _currentPet = null;
+                break;
+        }
+        SaveData();
+
         CheckPlayer();
     }
     public void _OnPlayerExit()
@@ -110,10 +158,71 @@ public class FieldCell : MonoBehaviour
         SpeedBoost?.Invoke();
     }
 
+    public void _Hatch()
+    {
+        HatchEgg?.Invoke();
+    }
+
     public void LockCell(bool locked)
     {
         _locked = locked;
         //if (_locked)
             _OnPlayerExit();
+    }
+
+    public void SaveData()
+    {
+        CellSaveData data = new CellSaveData();
+        data.Status = _inField;
+        switch (_inField)
+        {
+            case Item.Egg:
+               data.DinamicData = _currentEgg.Data.DinamicData;
+                data.ID = _currentEgg.Name;
+                data.HatchingTimestamp = _currentEgg.HatchingTime;
+                break;
+            case Item.Brainrot:
+                data.DinamicData = _currentPet.DinamicData;
+                data.ID = _currentPet.Name;
+                data.IncomeLastTime = _currentPet.LastIncomeCollectTime;
+                break;
+            default:
+                break;
+        }
+        G.Save.SaveCellData(_id, data);
+    }
+
+    public void SetLoadedData(string id)
+    {
+        _id = id;
+        CellSaveData data = G.Save.LoadCellData(_id);
+
+        if (data == null || data.Status == Item.Free) return;
+        switch (data.Status)
+        {
+            case Item.Egg:
+                Egg prefabEgg = G.Storage.GetEgg(data.ID);
+                if (prefabEgg != null)
+                {
+                    Egg egg = Instantiate(prefabEgg, transform);
+                    egg.SetData(data.DinamicData);
+                    egg.InitTimer(this, DateTimeOffset.FromUnixTimeSeconds(data.HatchingTimestamp));
+                }
+
+                break;
+            case Item.Brainrot:
+                Brainrot prefabPet = G.Storage.GetPet(data.ID);
+                if (prefabPet != null)
+                {
+                    Brainrot pet = Instantiate(prefabPet, transform);
+                    pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                    pet.Init(data.DinamicData, this, data.IncomeLastTime);
+                }
+                break;
+            default:
+                break;
+        }
+        UpdateFieldItem(data.Status);
+
     }
 }

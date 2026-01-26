@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 
 public class FoodShopSlot : MonoBehaviour
@@ -26,8 +27,8 @@ public class FoodShopSlot : MonoBehaviour
         _icon.sprite = _food.Icon;
         _name.text = _food.Name;
         //_amountText.text = _food..ToString();
-        _coinPrice.text = _food.Data.MoneyPrice.ToString();
-        _gemPrice.text = _food.Data.GemPrice.ToString();
+        _coinPrice.text = G.Currency.ToString(_food.Data.MoneyPrice);
+        _gemPrice.text = G.Currency.ToString(_food.Data.GemPrice);
     }
 
     public void SetAvailability(bool available)

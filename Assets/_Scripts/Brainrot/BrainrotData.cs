@@ -7,11 +7,11 @@ public class BrainrotData : ScriptableObject
     [SerializeField] private RareType _rareType;
     [SerializeField] private GameObject _model;
 
-    [SerializeField] private float _startIncome; // in second
+    [SerializeField] private double _startIncome; // in second
     [SerializeField] private float _minWeight;
     [SerializeField] private float _maxWeightMult = 3F;
 
-    [SerializeField] private float _startSellPrice;
+    [SerializeField] private double _startSellPrice;
 
     public string Name
     {
@@ -23,8 +23,8 @@ public class BrainrotData : ScriptableObject
     }
 
     public GameObject Model => _model;
-    public float StartSellPrice => _startSellPrice;
-    public float Income => _startIncome;
+    public double StartSellPrice => _startSellPrice;
+    public double Income => _startIncome;
     public float MinWeight => _minWeight;
     public float MaxWeightMult => _maxWeightMult;
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -13,7 +14,7 @@ public struct EggData
     public int SecondsToHatching;
     public List<Brainrot> Brainrots;
     public BrainrotDinamicData DinamicData;
-    public float Weight;
+    //public float Weight;
 }
 public class Egg : InventoryItem
 {
@@ -31,28 +32,45 @@ public class Egg : InventoryItem
     private EggStatus _status;
     private FieldCell _currentCell;
     private int _currentHatchingTime;
+    private long _hatchingTimectamp;
 
     private int _totalDurationSec;      // ������ ������������ ����������
-    private DateTime _endUtc;           // ������ ��������� (UTC)
+    private DateTimeOffset _endUtc;           // ������ ��������� (UTC)
     private Coroutine _ticker;
     private string SaveKey => $"egg_endUtc_{_currentCell.Id}";//���� �������� ��������� � �������� id ������/����)
 
+    public long HatchingTime => _hatchingTimectamp;
+    public EggStatus Status => _status;
     public EggData Data { get { return _data; } }
     [HideInInspector] public UnityEvent<Egg> EggPurchased;
 
     private void Awake()
     {
-        _data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
+        //_data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
         _infoUI = GetComponentInChildren<EggInfoUI>();
         _buyPanel = GetComponentInChildren<InteractionPanel>();
         _buyPanel.gameObject.SetActive(false);
-        _infoUI.SetInfo(this);
         _status = EggStatus.Conveyer;
         _infoUI.SetStatus(_status);
         _rouleteObjects = new List<GameObject>();
-        SetTypeVisual();
+        //SetTypeVisual();
 
         SetRouletteModels();
+    }
+
+
+    public void SetRandomData()
+    {
+        _data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
+        SetTypeVisual();
+        _infoUI.SetInfo(this);
+    }
+
+    public void SetData(BrainrotDinamicData data)
+    {
+        _data.DinamicData = data;
+        SetTypeVisual();
+        _infoUI.SetInfo(this);
     }
     private void SetTypeVisual()
     {
@@ -138,7 +156,9 @@ public class Egg : InventoryItem
             PlayerPrefs.Save();
         }
        */
-        _endUtc = DateTime.UtcNow.AddSeconds(_totalDurationSec); // �������� ��� ����������
+        _endUtc = DateTimeOffset.UtcNow.AddSeconds(_totalDurationSec); // �������� ��� ����������
+        _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+
 
         if (_ticker != null) StopCoroutine(_ticker);
         _ticker = StartCoroutine(Ticker());
@@ -170,6 +190,23 @@ public class Egg : InventoryItem
         _currentHatchingTime = 0; //���������� �� �������� �����, �������� ��������� - �� ������� - 30 �����, �� ����� �����
     }
 
+    public void InitTimer(FieldCell cell, DateTimeOffset endTime)
+    {
+        _status = EggStatus.Maturing;
+        _infoUI.SetStatus(_status);
+        _currentCell = cell;
+        _currentCell.SpeedBoost.AddListener(SpeedBoostInstant);
+
+        _totalDurationSec = Mathf.RoundToInt(
+            _data.SecondsToHatching * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)
+        );
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        _endUtc = endTime < now ? now : endTime;
+        _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+        if (_ticker != null) StopCoroutine(_ticker);
+        _ticker = StartCoroutine(Ticker());
+    }
+
     private IEnumerator Ticker()
     {
         // ����� ���������� ��� � 0.2�0.5� ��� ��������� ���������
@@ -182,7 +219,9 @@ public class Egg : InventoryItem
             if (remainingSec <= 0)
             {
                 _infoUI.ShowTimeUI(0, 1f); // 100% ���������
-                Hatching();
+                _currentCell.HatchEgg.AddListener(Hatching);
+                _status = EggStatus.ReadyToHatch;
+                //Hatching();
                 yield break;
             }
             float progress01 = 1f - Mathf.Clamp01((float)(remainingSec / _totalDurationSec));

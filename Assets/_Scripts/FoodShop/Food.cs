@@ -1,11 +1,10 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
 public struct FoodData
 {
-    public float MoneyPrice;
-    public float GemPrice;
+    public double MoneyPrice;
+    public double GemPrice;
     public int SecondsDuration;
     public int XPPerSecond;
     public float SupplyProbability;

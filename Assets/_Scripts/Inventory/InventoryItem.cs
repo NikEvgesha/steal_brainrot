@@ -6,7 +6,7 @@ public abstract class InventoryItem : MonoBehaviour
     [SerializeField] protected Item _type;
     [SerializeField] protected Sprite _icon;
     [SerializeField] protected RareType _rareType;
-    [SerializeField] protected int _baseSellPrice;
+    [SerializeField] protected double _baseSellPrice;
 
     private protected bool _inQuickAccess;
     private protected bool _sellAllowed = true;
@@ -20,7 +20,7 @@ public abstract class InventoryItem : MonoBehaviour
 
     public bool SellAllowed { get; set; }
 
-    public int BaseSellPrice => _baseSellPrice;
+    public double BaseSellPrice => _baseSellPrice;
 
     public virtual void OnInventoryAdd() {}
 
