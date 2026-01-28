@@ -8,6 +8,7 @@
 
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.Build;
 
 namespace TouchControlsKit.Inspector
 {
@@ -94,14 +95,19 @@ namespace TouchControlsKit.Inspector
                     }
                 }
 
-                PlayerSettings.SetScriptingDefineSymbolsForGroup( group, string.Join( ";", defines.ToArray() ) );
+                PlayerSettings.SetScriptingDefineSymbols(
+                    NamedBuildTarget.FromBuildTargetGroup(group),
+                    defines.ToArray()
+                );
             }
         }
 
         // Get DefinesList
         private static List<string> GetDefinesList( BuildTargetGroup group )
         {
-            return new List<string>( PlayerSettings.GetScriptingDefineSymbolsForGroup( group ).Split( ';' ) );
+            var namedTarget = NamedBuildTarget.FromBuildTargetGroup(group);
+            PlayerSettings.GetScriptingDefineSymbols(namedTarget, out string[] defines);
+            return new List<string>(defines);
         }
     };
 }

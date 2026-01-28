@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class GemsShopSlot : SpecialShopSlot
 {
-    [SerializeField] private TextMeshProUGUI _currencyText;
+    //[SerializeField] private TextMeshProUGUI _currencyText;
 
     ShopPackData _packData;
     PurchaseData _purchaseData;

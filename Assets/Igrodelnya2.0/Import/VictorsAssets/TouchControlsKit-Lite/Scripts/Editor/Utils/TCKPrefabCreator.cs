@@ -56,7 +56,7 @@ namespace TouchControlsKit.Inspector
 
             if( tckUIobj == null )
             {
-                TCKInput tckInputObj = Object.FindObjectOfType<TCKInput>();
+                TCKInput tckInputObj = Object.FindAnyObjectByType<TCKInput>();
                 tckUIobj = ( tckInputObj != null ) ? tckInputObj.gameObject : null;
             }          
 
@@ -76,7 +76,7 @@ namespace TouchControlsKit.Inspector
             UpdateSpritesPath<GuiCamera>( camTransform.gameObject );
 
             float maxCameraDepth = -1f;
-            Array.ForEach( Object.FindObjectsOfType<Camera>(), cam => maxCameraDepth = Mathf.Max( cam.depth, maxCameraDepth ) );
+            Array.ForEach( Object.FindObjectsByType<Camera>(FindObjectsSortMode.None), cam => maxCameraDepth = Mathf.Max( cam.depth, maxCameraDepth ) );
 
             Camera camera = camTransform.GetComponent<Camera>();
             camera.useOcclusionCulling = false;
@@ -107,7 +107,7 @@ namespace TouchControlsKit.Inspector
         [MenuItem( k_MenuAbbrev + "TCK Canvas", true )]
         private static bool ValidateCreateTouchManager()
         {
-            return ( Object.FindObjectOfType<TCKInput>() == null );
+            return ( Object.FindAnyObjectByType<TCKInput>() == null );
         }
 
         // CreateButton [MenuItem]
@@ -115,7 +115,7 @@ namespace TouchControlsKit.Inspector
         private static void CreateButton()
         {
             CreateTouchManager();
-            SetupController<TCKButton>( ref buttonObj, tckUIobj.transform, "Button" + Object.FindObjectsOfType<TCKButton>().Length, true );
+            SetupController<TCKButton>( ref buttonObj, tckUIobj.transform, "Button" + Object.FindObjectsByType<TCKButton>(FindObjectsSortMode.None).Length, true );
 
             TCKButton btn = buttonObj.GetComponent<TCKButton>();
             btn.baseImage = buttonObj.GetComponent<Image>();
@@ -135,7 +135,7 @@ namespace TouchControlsKit.Inspector
         private static void CreateJoystick()
         {
             CreateTouchManager();
-            SetupController<TCKJoystick>( ref joystickMainObj, tckUIobj.transform, "Joystick" + Object.FindObjectsOfType<TCKJoystick>().Length, true );
+            SetupController<TCKJoystick>( ref joystickMainObj, tckUIobj.transform, "Joystick" + Object.FindObjectsByType<TCKJoystick>(FindObjectsSortMode.None).Length, true );
 
             TCKJoystick joy = joystickMainObj.GetComponent<TCKJoystick>();            
             joy.baseImage = joystickMainObj.GetComponent<Image>();
@@ -168,7 +168,7 @@ namespace TouchControlsKit.Inspector
         private static void CreateTouchpad()
         {
             CreateTouchManager();
-            SetupController<TCKTouchpad>( ref touchpadObj, tckUIobj.transform, "Touchpad" + Object.FindObjectsOfType<TCKTouchpad>().Length, true );
+            SetupController<TCKTouchpad>( ref touchpadObj, tckUIobj.transform, "Touchpad" + Object.FindObjectsByType<TCKTouchpad>(FindObjectsSortMode.None).Length, true );
 
             TCKTouchpad tpd = touchpadObj.GetComponent<TCKTouchpad>();
             tpd.baseImage = touchpadObj.GetComponent<Image>();

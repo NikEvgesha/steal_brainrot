@@ -20,6 +20,7 @@ public static class G
     public static PurchasesManager Purchases;
     public static IncomeModifiersHub Income;
     public static ItemPrefabStorage Storage;
+    public static ZooBackendClient Backend;
 
     public static bool IsPaused;
     public static UnityEvent Initialized = new();

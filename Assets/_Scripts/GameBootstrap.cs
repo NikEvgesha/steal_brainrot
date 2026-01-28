@@ -14,6 +14,7 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private PurchasesManager _purchaseManager;
     [SerializeField] private AdsManager _adsManager;
     [SerializeField] private ItemPrefabStorage _storage;
+    [SerializeField] private ZooBackendClient _backend;
 
     [SerializeField] private GameScene _gameScene;
 
@@ -35,6 +36,7 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_adsManager);
         Instantiate(_purchaseManager);
         Instantiate(_storage);
+        Instantiate(_backend);
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
     }

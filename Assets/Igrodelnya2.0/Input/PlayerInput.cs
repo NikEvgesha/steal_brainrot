@@ -1,6 +1,8 @@
 using System;
+using TMPro;
 using TouchControlsKit;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class PlayerInput : MonoBehaviour
 {
@@ -126,6 +128,7 @@ public class PlayerInput : MonoBehaviour
     private bool _rotationY;
     private bool _pause;
     private bool _roulette;
+    private bool _friends;
     private bool _playtime;
 
 
@@ -144,6 +147,7 @@ public class PlayerInput : MonoBehaviour
     public Action AHealing;
     public Action APause;
     public Action ARoulette;
+    public Action AFriends;
     public Action APlaytime;
     public Action<MonoBehaviour> AOpenWindow;
 
@@ -166,11 +170,19 @@ public class PlayerInput : MonoBehaviour
 
     private void Update()
     {
+        if (TMP_InputFieldIsFocused())
+            return;
         CheckControls();
         UpdateMovement();
         UpdateRotation();
     }
+    bool TMP_InputFieldIsFocused()
+    {
+        var go = EventSystem.current?.currentSelectedGameObject;
+        if (go == null) return false;
 
+        return go.GetComponent<TMP_InputField>() != null;
+    }
     private void CheckControls()
     {
        /* if (Input.GetKeyDown(KeyCode.Tab))
@@ -206,6 +218,7 @@ public class PlayerInput : MonoBehaviour
             //_rotationX = Input.GetKey(KeyCode.Q);
             _pause = Input.GetKeyDown(KeyCode.P);
             _roulette = Input.GetKeyDown(KeyCode.K);
+            _friends = Input.GetKeyDown(KeyCode.U);
             _playtime = Input.GetKeyDown(KeyCode.L);
             //if (!G.Control.CursorActive)
             //{
@@ -230,6 +243,7 @@ public class PlayerInput : MonoBehaviour
         //if (_healing) AHealing?.Invoke();
         if (_pause) APause?.Invoke();
         if (_roulette) ARoulette?.Invoke();
+        if (_friends) AFriends?.Invoke();
         if (_playtime) APlaytime?.Invoke();
 
     // _useItem = _pickUp; //Переработать смысл кнопки

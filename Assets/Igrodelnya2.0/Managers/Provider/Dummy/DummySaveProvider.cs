@@ -252,4 +252,13 @@ public class DummySaveProvider : SaveProvider
     {
         return new List<ItemSaveData>();
     }
+    public override void SaveBackendProfile(string playerId, string friendCode, string displayName)
+    {
+    }
+
+    public override (string playerId, string friendCode, string displayName) LoadBackendProfile()
+    {
+        return ("", "", "");
+    }
+
 }

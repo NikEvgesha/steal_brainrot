@@ -111,5 +111,9 @@ public abstract class SaveProvider : MonoBehaviour
     public abstract void SaveItemsList(Item type, string items);
     public abstract List<ItemSaveData> LoadItemsList(Item type);
 
+    // Backend auth
+    public abstract void SaveBackendProfile(string playerId, string friendCode, string displayName);
+    public abstract (string playerId, string friendCode, string displayName) LoadBackendProfile();
+
 
 }

@@ -310,5 +310,15 @@ public class SaveManager : MonoBehaviour
     {
         return saveProvider.LoadItemsList(type);
     }
+    public void SaveBackendProfile(string playerId, string friendCode, string displayName)
+    {
+        saveProvider.SaveBackendProfile(playerId, friendCode, displayName);
+    }
+
+    public (string playerId, string friendCode, string displayName) LoadBackendProfile()
+    {
+        return saveProvider.LoadBackendProfile();
+    }
+
 
 }

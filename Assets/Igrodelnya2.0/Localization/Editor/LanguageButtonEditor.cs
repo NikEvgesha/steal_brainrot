@@ -9,7 +9,7 @@ public class LanguageButtonEditor : Editor
 
     private void OnEnable()
     {
-        manager = FindObjectOfType<LocalizationManager>();
+        manager = G.Localization;
     }
 
     public override void OnInspectorGUI()
@@ -45,7 +45,7 @@ public class LanguageButtonEditor : Editor
 
         if (GUILayout.Button("Обновить список языков"))
         {
-            manager = FindObjectOfType<LocalizationManager>();
+            manager = G.Localization;
             EditorUtility.SetDirty(langButton);
         }
 

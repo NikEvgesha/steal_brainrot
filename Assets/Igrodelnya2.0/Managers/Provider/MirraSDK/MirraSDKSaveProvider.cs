@@ -496,5 +496,23 @@ public class MirraSDKSaveProvider : SaveProvider
         List<ItemSaveData> res = JsonConvert.DeserializeObject<List<ItemSaveData>>(json);
         return res != null ? res : new List<ItemSaveData>();
     }
+    public override void SaveBackendProfile(string playerId, string friendCode, string displayName)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetString("BackendPlayerId", playerId ?? "");
+        MirraSDK.Data.SetString("BackendFriendCode", friendCode ?? "");
+        MirraSDK.Data.SetString("BackendDisplayName", displayName ?? "");
+    }
+
+    public override (string playerId, string friendCode, string displayName) LoadBackendProfile()
+    {
+        if (!isInitialize) return ("", "", "");
+        var pid = MirraSDK.Data.GetString("BackendPlayerId", "");
+        var code = MirraSDK.Data.GetString("BackendFriendCode", "");
+        var name = MirraSDK.Data.GetString("BackendDisplayName", "");
+        return (pid, code, name);
+    }
+
 
 }
