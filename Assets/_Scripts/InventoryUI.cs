@@ -54,7 +54,16 @@ public class InventoryUI : MonoBehaviour
     {
         UpdateItems(G.Inventory.GetItems(Item.Egg));
     }
+    public void _ShowFood()
+    {
+        UpdateItems(G.Inventory.GetItems(Item.Food));
+    }
 
+
+    public void _Show(Item type)
+    {
+
+    }
 
     private void UpdateItems(ReadOnlyCollection<InventoryItem> items)
     {

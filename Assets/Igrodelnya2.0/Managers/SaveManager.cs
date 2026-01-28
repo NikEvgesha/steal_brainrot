@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using MirraGames.SDK;
 using System;
+using Newtonsoft.Json;
 
 public class SaveManager : MonoBehaviour
 {
@@ -298,6 +299,16 @@ public class SaveManager : MonoBehaviour
     public CellSaveData LoadCellData(string id)
     {
         return saveProvider.LoadCellData(id);
+    }
+
+    public void SaveInventory(Item type, List<ItemSaveData> items)
+    {
+        saveProvider.SaveItemsList(type, JsonConvert.SerializeObject(items));
+    }
+
+    public List<ItemSaveData> LoadInventory(Item type)
+    {
+        return saveProvider.LoadItemsList(type);
     }
 
 }

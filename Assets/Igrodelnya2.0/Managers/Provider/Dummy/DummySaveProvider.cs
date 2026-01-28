@@ -244,4 +244,12 @@ public class DummySaveProvider : SaveProvider
     {
         return null;
     }
+
+    public override void SaveItemsList(Item type, string items)
+    {
+    }
+    public override List<ItemSaveData> LoadItemsList(Item type)
+    {
+        return new List<ItemSaveData>();
+    }
 }

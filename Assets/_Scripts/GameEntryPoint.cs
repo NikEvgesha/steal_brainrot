@@ -17,9 +17,10 @@ public class GameEntryPoint : MonoBehaviour
     private void Start()
     {
         Instantiate(_playerManager).Init(_playerSpawnPoint);
-        Instantiate(_inventory).Init();
-        Instantiate(_quickAccess).Init();
         Instantiate(_elements);
+        Instantiate(_quickAccess).Init();
+        Instantiate(_inventory).Init();
+        
         Instantiate(_dailyPlaytimeTracker);
         Instantiate(_hubPrefab).Initialize(G.Currency);
         Instantiate(_ui);

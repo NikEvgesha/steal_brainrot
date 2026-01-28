@@ -20,10 +20,16 @@ public class Conveyor : MonoBehaviour
     private ConveyorLevel _level;
     private int _currentLevel = 0;
     private int _lastUnlockedLevel = 0;
+    private bool _initialized;
 
     public float IncomeMultiplier => _level.IncomeMultiplier;
 
-    private void Start()
+    private void Awake()
+    {
+        G.Initialized.AddListener(Init);
+    }
+
+    private void Init()
     {
         _currentLevel = G.Save.LoadConveyorCurrentLevel();
         _lastUnlockedLevel = G.Save.LoadConveyorUnlockedLevel();
@@ -39,19 +45,19 @@ public class Conveyor : MonoBehaviour
             _levels[i].SetPurchasingAvailable(i == _lastUnlockedLevel + 1 ? true : false);
         }
 
-        SetLevel(_levels[_currentLevel]);
-
         _ui = GetComponentInChildren<ConveyorUI>();
         _ui.Init(_levels);
         _ui.LevelActivated.AddListener(SetLevel);
+        SetLevel(_levels[_currentLevel]);
         _eggs = new();
-        
+        _initialized = true;
         StartCoroutine(Spawn());
         
     }
 
     private void FixedUpdate()
     {
+        if (!_initialized) return;
         _mt.mainTextureOffset = new Vector2(0, Time.time * _speed * _matSpeedMultiplier * Time.fixedDeltaTime);
 
 
@@ -101,10 +107,12 @@ public class Conveyor : MonoBehaviour
             _level.SetActive(false);
             _level.gameObject.SetActive(false);
         }
+        _currentLevel = _levels.IndexOf(lvl);
         _level = lvl;
         _level.SetActive(true);
         _level.gameObject.SetActive(true);
         G.Save.SaveConveyorCurrentLevel(_levels.IndexOf(lvl));
+        _ui.UpdateActiveLvl(_currentLevel);
     }
 
     private void OnLevelPurchase(ConveyorLevel lvl)

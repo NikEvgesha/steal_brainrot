@@ -33,6 +33,7 @@ public class Egg : InventoryItem
     private FieldCell _currentCell;
     private int _currentHatchingTime;
     private long _hatchingTimectamp;
+    private bool _initialized;
 
     private int _totalDurationSec;      // ������ ������������ ����������
     private DateTimeOffset _endUtc;           // ������ ��������� (UTC)
@@ -46,21 +47,29 @@ public class Egg : InventoryItem
 
     private void Awake()
     {
-        //_data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
+        if (!_initialized)
+        {
+            Init();
+        }
+    }
+    private void Init()
+    {
         _infoUI = GetComponentInChildren<EggInfoUI>();
         _buyPanel = GetComponentInChildren<InteractionPanel>();
         _buyPanel.gameObject.SetActive(false);
         _status = EggStatus.Conveyer;
         _infoUI.SetStatus(_status);
         _rouleteObjects = new List<GameObject>();
-        //SetTypeVisual();
-
         SetRouletteModels();
+        _initialized = true;
     }
-
 
     public void SetRandomData()
     {
+        if (!_initialized)
+        {
+            Init();
+        }
         _data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
         SetTypeVisual();
         _infoUI.SetInfo(this);
@@ -68,6 +77,10 @@ public class Egg : InventoryItem
 
     public void SetData(BrainrotDinamicData data)
     {
+        if (!_initialized)
+        {
+            Init();
+        }
         _data.DinamicData = data;
         SetTypeVisual();
         _infoUI.SetInfo(this);
@@ -221,6 +234,7 @@ public class Egg : InventoryItem
                 _infoUI.ShowTimeUI(0, 1f); // 100% ���������
                 _currentCell.HatchEgg.AddListener(Hatching);
                 _status = EggStatus.ReadyToHatch;
+                _currentCell.CheckPlayer();
                 //Hatching();
                 yield break;
             }
@@ -251,7 +265,7 @@ public class Egg : InventoryItem
     {
         _status = EggStatus.Hatching;
         _infoUI.SetStatus(_status);
-
+        _currentCell.CheckPlayer();
         /*
         PlayerPrefs.DeleteKey(SaveKey);
         PlayerPrefs.Save();

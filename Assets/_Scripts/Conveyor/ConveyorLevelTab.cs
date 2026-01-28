@@ -4,6 +4,7 @@ using UnityEngine.UI;
 
 public class ConveyorLevelTab : MonoBehaviour
 {
+    [SerializeField] GameObject _activeIndicator;
     private Text _name;
     private ConveyorLevel _level;
 
@@ -20,5 +21,10 @@ public class ConveyorLevelTab : MonoBehaviour
     public void _OnClick()
     {
         OnClick?.Invoke(_level);
+    }
+
+    public void SetLvlActive(bool active)
+    {
+        _activeIndicator.SetActive(active);
     }
 }

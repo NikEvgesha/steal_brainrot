@@ -1,15 +1,11 @@
 using System;
-using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 
 
 [Serializable]
-public class CellSaveData
+public class CellSaveData : ItemSaveData
 {
-    public Item Status;
-    public string ID;
-    public BrainrotDinamicData DinamicData;
     public long HatchingTimestamp;
     public long IncomeLastTime;
 }

@@ -52,7 +52,7 @@ public class Brainrot : InventoryItem
     private Coroutine _incomeCorutine;
 
 
-    public void Init(BrainrotDinamicData rarity, FieldCell floor, long lastCollectTimestamp = -1) //передавать плейс из яйца
+    public void Init(BrainrotDinamicData rarity, FieldCell floor=null, long lastCollectTimestamp = -1) //передавать плейс из яйца
     {
         // rarity считается в яйце? 
         _canvas = GetComponentInChildren<BrainrotInfoUI>();
@@ -77,8 +77,8 @@ public class Brainrot : InventoryItem
             incomeAccumulationTime = (long)(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(lastCollectTimestamp)).TotalSeconds;
         }
         _currentIncome = Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome);
-
-        NewPlace(floor);
+        if (floor != null)
+            NewPlace(floor);
         _canvas.SetInfo(_data, _dinamicData);
         SetTypeVisual();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);

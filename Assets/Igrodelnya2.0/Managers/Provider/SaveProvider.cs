@@ -106,5 +106,10 @@ public abstract class SaveProvider : MonoBehaviour
     public abstract void SaveCellData(string key, CellSaveData data);
     public abstract CellSaveData LoadCellData(string key);
 
+    // Inventory
+
+    public abstract void SaveItemsList(Item type, string items);
+    public abstract List<ItemSaveData> LoadItemsList(Item type);
+
 
 }

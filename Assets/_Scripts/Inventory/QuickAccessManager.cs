@@ -68,6 +68,7 @@ public class QuickAccessManager : MonoBehaviour
     public void Remove(InventoryItem item)
     {
         int idx = _items.IndexOf(item);
+        if (idx < 0) return;
         _items.RemoveAt(idx);
         item.InQuickAccess = false;
         ItemsUpdated.Invoke(_items);

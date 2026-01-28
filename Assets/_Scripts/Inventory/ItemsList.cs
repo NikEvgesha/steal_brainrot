@@ -9,7 +9,7 @@ public class ItemsList : ScriptableObject
     private Dictionary<string, InventoryItem> _dict;
 
 
-    private void Init()
+    public void Init()
     {
         _dict = new Dictionary<string, InventoryItem>();
         _items.ForEach(x => _dict.Add(x.Name, x));

@@ -1,7 +1,8 @@
-using UnityEngine;
 using MirraGames.SDK;
-using System.Collections.Generic;
+using Newtonsoft.Json;
 using System;  // доступ к MirraSDK.Data
+using System.Collections.Generic;
+using UnityEngine;
 
 [System.Serializable]
 public class ListSaver
@@ -132,7 +133,7 @@ public class MirraSDKSaveProvider : SaveProvider
 
         if (isInitialize)
         {
-            string resStr = MirraSDK.Data.GetString(SaveKey.Gems.ToString());
+            string resStr = MirraSDK.Data.GetString(SaveKey.Gems.ToString(), "0");
             res = Double.Parse(resStr);
         }
         return res;
@@ -480,6 +481,20 @@ public class MirraSDKSaveProvider : SaveProvider
 
         CellSaveData res = MirraSDK.Data.GetObject<CellSaveData>(key, null);
         return res;
+    }
+
+    public override void SaveItemsList(Item type, string json)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetString(SaveKey.InventoryList + type.ToString(), json);
+    }
+    public override List<ItemSaveData> LoadItemsList(Item type)
+    {
+        if (!isInitialize) return new List<ItemSaveData>();
+        string json = MirraSDK.Data.GetString(SaveKey.InventoryList + type.ToString(), "");
+        List<ItemSaveData> res = JsonConvert.DeserializeObject<List<ItemSaveData>>(json);
+        return res != null ? res : new List<ItemSaveData>();
     }
 
 }

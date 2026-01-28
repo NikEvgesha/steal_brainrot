@@ -22,6 +22,8 @@ public class ConveyorUI : MonoBehaviour
     private GameObject _panel;
     private bool _isOpen;
     private ConveyorLevel _currentLevelInfo;
+    private int _currentActiveIdx;
+    private List<ConveyorLevelTab> _tabs;
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
@@ -30,11 +32,14 @@ public class ConveyorUI : MonoBehaviour
 
     public void Init(List<ConveyorLevel> levels)
     {
+        _tabs = new();
         foreach (ConveyorLevel level in levels) {
             ConveyorLevelTab tab = Instantiate(_tabPrefab, _tansParent);
             tab.Init(level);
             tab.OnClick.AddListener(SetInfo);
+            _tabs.Add(tab);
         }
+        _tabs[_currentActiveIdx].SetLvlActive(true);
         //_currentLevelInfo = levels[0];
         SetInfo(levels[0]);
     }
@@ -107,5 +112,11 @@ public class ConveyorUI : MonoBehaviour
         SetButtons();
     }
 
+    public void UpdateActiveLvl(int idx)
+    {
+        _tabs[_currentActiveIdx].SetLvlActive(false);
+        _currentActiveIdx = idx;
+        _tabs[_currentActiveIdx].SetLvlActive(true);
+    }
 
 }

@@ -21,6 +21,10 @@ public class ItemPrefabStorage : MonoBehaviour
 
     }
 
+    public void Init()
+    {
+    }
+
     public Egg GetEgg(string name)
     {
         InventoryItem item = _eggs.GetByName(name);
@@ -31,5 +35,12 @@ public class ItemPrefabStorage : MonoBehaviour
     {
         InventoryItem item = _pets.GetByName(name);
         return item.GetComponent<Brainrot>();
+    }
+
+
+    public Food GetFood(string name)
+    {
+        InventoryItem item = _food.GetByName(name);
+        return item.GetComponent<Food>();
     }
 }
