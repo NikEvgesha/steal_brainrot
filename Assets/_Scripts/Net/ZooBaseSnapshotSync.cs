@@ -29,8 +29,8 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     private void Awake()
     {
-        if (backend == null) backend = FindObjectOfType<ZooBackendClient>();
-        if (save == null) save = FindObjectOfType<SaveManager>();
+        if (backend == null) backend = G.Backend;
+        if (save == null) save = G.Save;
     }
 
     private void Start()

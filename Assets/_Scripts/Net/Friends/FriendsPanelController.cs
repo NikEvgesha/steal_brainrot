@@ -39,6 +39,7 @@ public class FriendsPanelController : MonoBehaviour
     [Header("Close")]
     [SerializeField] private Button _closeButton;
     [SerializeField] private Button _toggleButton;
+    private Coroutine _openFlow;
     private bool _isOpen;
     private void Awake()
     {
@@ -61,17 +62,19 @@ public class FriendsPanelController : MonoBehaviour
         _ui.SetActive(_isOpen);
         if (!_isOpen)
         {
-
+            if (_openFlow != null) StopCoroutine(_openFlow);
+            _openFlow = null;
         }
         else
         {
+            _openFlow = StartCoroutine(OpenFlow());
             G.Input.AOpenWindow?.Invoke(this);
         }
 
     }
     private void OnEnable()
     {
-        StartCoroutine(OpenFlow());
+        
         G.Input.AFriends += ToggleOpen;
         G.Input.AOpenWindow += Close;
     }
@@ -112,13 +115,13 @@ public class FriendsPanelController : MonoBehaviour
         switch (code)
         {
             case 400:
-                addStatusText.text = "Некорректный код";
+                addStatusText.text = "Ошибка загрузки списка друзей";
                 break;
             case 404:
-                addStatusText.text = "Игрок с таким кодом не найден";
+                addStatusText.text = "Ошибка загрузки списка друзей";
                 break;
             default:
-                addStatusText.text = "Ошибка добавления в друзья";
+                addStatusText.text = "Ошибка загрузки списка друзей";
                 break;
         }
     });

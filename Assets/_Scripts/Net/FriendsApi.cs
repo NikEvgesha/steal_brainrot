@@ -27,6 +27,7 @@ public class FriendsApi : MonoBehaviour
         public string lastSeenAt;
     }
 
+
     [Serializable] private class FriendAddRequest { public string friendCode; }
     [Serializable] private class RenameRequest { public string displayName; }
 
