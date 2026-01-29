@@ -1,5 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -18,6 +21,30 @@ public class ZooSaveRequest
     public string data;
 }
 
+[Serializable]
+public class ZooLocationItem
+{
+    public string playerId;
+    public string friendCode;
+    public string displayName;
+    public string lastSeenAt;
+    public bool isOnline;
+    public bool isFriend;
+    public BaseSnapshotDto baseData;
+    public string baseDataRaw;
+}
+
+[Serializable]
+public class FriendBaseResponse
+{
+    public string friendCode;
+    public string displayName;
+    public string lastSeenAt;
+    public bool isOnline;
+    public BaseSnapshotDto data;
+    public string dataRaw;
+}
+
 public class ZooBackendClient : MonoBehaviour
 {
     [Header("Server")]
@@ -28,6 +55,21 @@ public class ZooBackendClient : MonoBehaviour
     [SerializeField] private FriendsApi friendsApi;   // опционально
 
     public FriendsApi FriendsApi { get { return friendsApi; } }
+
+    [Header("Locations")]
+    [SerializeField] private bool autoFetchLocations = true;
+    [SerializeField] private float locationsRefreshSec = 30f;
+    [SerializeField] private int locationsLimit = 5;
+    [SerializeField] private int locationsOnlineSec = 60;
+
+    public event Action<List<ZooLocationItem>> LocationsUpdated;
+    public event Action<FriendBaseResponse> FriendBaseLoaded;
+
+    private readonly List<ZooLocationItem> _lastLocations = new();
+    public IReadOnlyList<ZooLocationItem> LastLocations => _lastLocations;
+    public FriendBaseResponse LastFriendBase { get; private set; }
+
+    private Coroutine _locationsLoop;
 
     private void Awake()
     {
@@ -44,6 +86,14 @@ public class ZooBackendClient : MonoBehaviour
         
         if (saveManager == null) saveManager = G.Save;
 
+    }
+
+    private void Start()
+    {
+        if (autoFetchLocations)
+        {
+            _locationsLoop = StartCoroutine(LocationsLoop());
+        }
     }
 
     private (string playerId, string friendCode, string displayName) Profile()
@@ -166,5 +216,115 @@ public class ZooBackendClient : MonoBehaviour
         }
 
         onOk?.Invoke(true);
+    }
+
+    // ===== LOCATIONS =====
+    private IEnumerator LocationsLoop()
+    {
+        while (true)
+        {
+            yield return GetLocations(locationsLimit, locationsOnlineSec);
+            yield return new WaitForSeconds(locationsRefreshSec);
+        }
+    }
+
+    public IEnumerator GetLocations(int limit, int onlineSec, Action<List<ZooLocationItem>> onOk = null, Action<long, string> onErr = null)
+    {
+        yield return EnsureGuest();
+
+        var url = $"{baseUrl}/zoo/locations?limit={limit}&onlineSec={onlineSec}";
+        using var req = UnityWebRequest.Get(url);
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        var list = new List<ZooLocationItem>();
+        try
+        {
+            var arr = JArray.Parse(req.downloadHandler.text);
+            foreach (var token in arr)
+            {
+                var item = token.ToObject<ZooLocationItem>() ?? new ZooLocationItem();
+                var baseToken = token["baseData"];
+                if (baseToken != null && baseToken.Type != JTokenType.Null)
+                {
+                    item.baseDataRaw = baseToken.ToString(Formatting.None);
+                    try
+                    {
+                        item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw);
+                    }
+                    catch
+                    {
+                        item.baseData = null;
+                    }
+                }
+
+                list.Add(item);
+            }
+        }
+        catch
+        {
+            onErr?.Invoke(500, "Failed to parse locations response");
+            yield break;
+        }
+
+        _lastLocations.Clear();
+        _lastLocations.AddRange(list);
+        LocationsUpdated?.Invoke(_lastLocations);
+        onOk?.Invoke(_lastLocations);
+    }
+
+    // ===== FRIEND BASE =====
+    public IEnumerator GetFriendBase(string friendCode, Action<FriendBaseResponse> onOk = null, Action<long, string> onErr = null)
+    {
+        yield return EnsureGuest();
+
+        var code = (friendCode ?? "").Trim().ToUpperInvariant();
+        var url = $"{baseUrl}/friends/by-code/{code}/base";
+        using var req = UnityWebRequest.Get(url);
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        try
+        {
+            var obj = JObject.Parse(req.downloadHandler.text);
+            var resp = obj.ToObject<FriendBaseResponse>() ?? new FriendBaseResponse();
+            var dataToken = obj["data"];
+            if (dataToken != null && dataToken.Type != JTokenType.Null)
+            {
+                resp.dataRaw = dataToken.ToString(Formatting.None);
+                try
+                {
+                    resp.data = JsonConvert.DeserializeObject<BaseSnapshotDto>(resp.dataRaw);
+                }
+                catch
+                {
+                    resp.data = null;
+                }
+            }
+
+            LastFriendBase = resp;
+            FriendBaseLoaded?.Invoke(resp);
+            onOk?.Invoke(resp);
+        }
+        catch
+        {
+            onErr?.Invoke(500, "Failed to parse friend base response");
+        }
     }
 }

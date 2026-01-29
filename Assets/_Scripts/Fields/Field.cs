@@ -28,7 +28,7 @@ public class Field : MonoBehaviour
         G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
         _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
-        _buyPanel.SetInfo("Ðàçáëîêèðîâàòü", _price.ToString());
+        _buyPanel.SetInfo("Ð Ð°Ð·Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ", _price.ToString());
 
         if (_unblocked)
         {
@@ -71,13 +71,7 @@ public class Field : MonoBehaviour
 
     public void Unblock()
     {
-        Destroy(_grassObj);
-        Destroy(_buyPanel.gameObject);
-        _unblocked = true;
-        foreach (FieldCell cell in _cells)
-        {
-            cell.gameObject.SetActive(true);
-        }
+        ApplyUnblockedVisual(true);
         G.Save.SaveFieldUnblockStatus(_id, true);
     }
 
@@ -92,6 +86,44 @@ public class Field : MonoBehaviour
     {
         int id = 0;
         _cells.ForEach(cell => cell.SetLoadedData(SaveKey.Field.ToString() + _id + " " + id++));
+    }
+
+    public void AssignIdsForRemote(int id)
+    {
+        _id = id;
+        EnsureCells();
+        int cellId = 0;
+        foreach (var cell in _cells)
+        {
+            cell.SetId(SaveKey.Field.ToString() + _id + " " + cellId++);
+        }
+    }
+
+    public void SetUnblockedVisual(bool unblocked)
+    {
+        ApplyUnblockedVisual(unblocked);
+    }
+
+    private void EnsureCells()
+    {
+        if (_cells == null || _cells.Count == 0)
+        {
+            _cells = _cellsParent.GetComponentsInChildren<FieldCell>(true).ToList();
+        }
+    }
+
+    private void ApplyUnblockedVisual(bool unblocked)
+    {
+        EnsureCells();
+        _unblocked = unblocked;
+
+        if (_grassObj != null) _grassObj.SetActive(!unblocked);
+        if (_buyPanel != null) _buyPanel.gameObject.SetActive(false);
+
+        foreach (FieldCell cell in _cells)
+        {
+            cell.gameObject.SetActive(unblocked);
+        }
     }
 
 }

@@ -35,7 +35,7 @@ public class FieldCell : MonoBehaviour
     public string Id { get { return _id; } }
     private void Awake()
     {
-        // Если id ещё не назначен — генерируем новый
+        // Р•СЃР»Рё id РµС‰С‘ РЅРµ РЅР°Р·РЅР°С‡РµРЅ вЂ” РіРµРЅРµСЂРёСЂСѓРµРј РЅРѕРІС‹Р№
         //if (string.IsNullOrEmpty(_id))
         //{
         //    _id = System.Guid.NewGuid().ToString();    
@@ -220,5 +220,10 @@ public class FieldCell : MonoBehaviour
         }
         UpdateFieldItem(data.Status);
 
+    }
+
+    public void SetId(string id)
+    {
+        _id = id;
     }
 }
