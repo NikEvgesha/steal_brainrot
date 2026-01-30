@@ -20,6 +20,7 @@ public class FieldManager : MonoBehaviour
             _fields[i].ForEach(x =>
             {
                 x.SetID(fieldId);
+                x.Init();
                 if (G.Save.LoadFieldUnblockStatus(fieldId))
                 {
                     x.Unblock();

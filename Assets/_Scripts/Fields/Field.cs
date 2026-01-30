@@ -18,12 +18,8 @@ public class Field : MonoBehaviour
     public int ID => _id;
     
    
-    private void Awake()
-    {
-        G.Initialized.AddListener(Init);     
-    }
 
-    private void Init()
+    public void Init()
     {
         G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
