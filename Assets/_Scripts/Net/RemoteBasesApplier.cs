@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+[DefaultExecutionOrder(-1000)]
 public class RemoteBasesApplier : MonoBehaviour
 {
     [Serializable]
@@ -27,6 +28,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private void Awake()
     {
         if (backend == null) backend = G.Backend;
+        MarkRemoteComponents();
     }
 
     private void OnEnable()
@@ -48,6 +50,19 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (backend.LastLocations != null && backend.LastLocations.Count > 0)
             ApplyLocations(new List<ZooLocationItem>(backend.LastLocations));
+    }
+
+    private void MarkRemoteComponents()
+    {
+        if (slots == null) return;
+        foreach (var slot in slots)
+        {
+            if (slot == null || slot.root == null) continue;
+            foreach (var conveyor in slot.root.GetComponentsInChildren<Conveyor>(true))
+                conveyor.SetRemoteMode(true);
+            foreach (var bigPet in slot.root.GetComponentsInChildren<BigPetPoint>(true))
+                bigPet.SetRemoteMode(true);
+        }
     }
 
     private void ApplyLocations(List<ZooLocationItem> locations)
@@ -74,6 +89,9 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (snapshot == null)
             return;
+
+        ApplyConveyor(slot, snapshot);
+        ApplyBigPet(slot, snapshot);
 
         if (slot.applyLand && snapshot.land != null)
         {
@@ -146,6 +164,22 @@ public class RemoteBasesApplier : MonoBehaviour
         }
     }
 
+    private void ApplyConveyor(RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        if (snapshot.conveyor == null) return;
+        var conveyor = slot.root.GetComponentInChildren<Conveyor>(true);
+        if (conveyor == null) return;
+        conveyor.ApplyRemoteLevel(snapshot.conveyor.lvl);
+    }
+
+    private void ApplyBigPet(RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        if (snapshot.bigPet == null) return;
+        var bigPet = slot.root.GetComponentInChildren<BigPetPoint>(true);
+        if (bigPet == null) return;
+        bigPet.ApplyRemoteState(snapshot.bigPet.id, snapshot.bigPet.lvl, snapshot.bigPet.xp);
+    }
+
     private void SpawnEgg(FieldCell cell, string id, BrainrotDinamicData dinamic)
     {
         if (string.IsNullOrEmpty(id))
@@ -214,5 +248,34 @@ public class RemoteBasesApplier : MonoBehaviour
                 map.Add(cell.Id, cell);
         }
         return map;
+    }
+
+    public void ApplyFriendBase(BaseSnapshotDto snapshot, int slotIndex = 0)
+    {
+        if (slots == null || slots.Count == 0) return;
+        slotIndex = Mathf.Clamp(slotIndex, 0, slots.Count - 1);
+        ApplySnapshotToSlot(slots[slotIndex], snapshot);
+    }
+
+    public Transform GetSlotEntryPoint(int slotIndex = 0)
+    {
+        if (slots == null || slots.Count == 0) return null;
+        slotIndex = Mathf.Clamp(slotIndex, 0, slots.Count - 1);
+
+        var slot = slots[slotIndex];
+        if (slot == null || slot.root == null) return null;
+
+        var playerBase = slot.root.GetComponentInChildren<PlayerBase>(true);
+        if (playerBase != null)
+            return playerBase.EntryPoint;
+
+        return slot.root;
+    }
+
+    public void TeleportPlayerToSlot(int slotIndex = 0)
+    {
+        var target = GetSlotEntryPoint(slotIndex);
+        if (target == null || G.Player == null) return;
+        G.Player.transform.position = target.position;
     }
 }

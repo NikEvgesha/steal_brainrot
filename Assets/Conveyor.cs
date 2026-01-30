@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Conveyor : MonoBehaviour
 {
+    [SerializeField] private bool _remoteMode;
     [SerializeField] private float _spawnInterval;
     [SerializeField] private Material _mt;
     [SerializeField] private float _speed;
@@ -26,11 +27,13 @@ public class Conveyor : MonoBehaviour
 
     private void Awake()
     {
-        G.Initialized.AddListener(Init);
+        if (!_remoteMode)
+            G.Initialized.AddListener(Init);
     }
 
     private void Init()
     {
+        if (_remoteMode) return;
         _currentLevel = G.Save.LoadConveyorCurrentLevel();
         _lastUnlockedLevel = G.Save.LoadConveyorUnlockedLevel();
 
@@ -57,7 +60,7 @@ public class Conveyor : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!_initialized) return;
+        if (!_initialized || _remoteMode) return;
         _mt.mainTextureOffset = new Vector2(0, Time.time * _speed * _matSpeedMultiplier * Time.fixedDeltaTime);
 
 
@@ -111,12 +114,16 @@ public class Conveyor : MonoBehaviour
         _level = lvl;
         _level.SetActive(true);
         _level.gameObject.SetActive(true);
-        G.Save.SaveConveyorCurrentLevel(_levels.IndexOf(lvl));
-        _ui.UpdateActiveLvl(_currentLevel);
+        if (!_remoteMode)
+        {
+            G.Save.SaveConveyorCurrentLevel(_levels.IndexOf(lvl));
+            _ui.UpdateActiveLvl(_currentLevel);
+        }
     }
 
     private void OnLevelPurchase(ConveyorLevel lvl)
     {
+        if (_remoteMode) return;
         int id = _levels.IndexOf(lvl);
         G.Save.SaveConveyorUnlockedLevel(id);
         if (id < _levels.Count - 1)
@@ -128,12 +135,36 @@ public class Conveyor : MonoBehaviour
 
     public void _OnPlayerEnter()
     {
+        if (_remoteMode) return;
         _ui.ToggleOpen(true);
     }
 
 
     public void _OnPlayerExit()
     {
+        if (_remoteMode) return;
         _ui?.ToggleOpen(false);
+    }
+
+    public void ApplyRemoteLevel(int level)
+    {
+        _remoteMode = true;
+        StopAllCoroutines();
+        _initialized = false;
+
+        if (_ui != null)
+            _ui.gameObject.SetActive(false);
+
+        if (_levels == null || _levels.Count == 0)
+            return;
+
+        level = Mathf.Clamp(level, 0, _levels.Count - 1);
+        SetLevel(_levels[level]);
+        _initialized = true;
+    }
+
+    public void SetRemoteMode(bool remote)
+    {
+        _remoteMode = remote;
     }
 }

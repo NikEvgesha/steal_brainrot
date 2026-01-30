@@ -7,6 +7,7 @@ using UnityEngine.UI;
 
 public class BigPetPoint : MonoBehaviour
 {
+    [SerializeField] private bool _remoteMode;
     [SerializeField] private List<Brainrot> _pets;
     [SerializeField] private GameObject _feedButton;
     [SerializeField] private Transform _foodPoint;
@@ -19,7 +20,7 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private Text _foodTimeBarText;
     [SerializeField] private float _foodScaler;
     [SerializeField] private float _petScaler;
-    [SerializeField] private int _lvlsPerPet = 5; // через сколько уровней открывается новый пет
+    [SerializeField] private int _lvlsPerPet = 5; // С‡РµСЂРµР· СЃРєРѕР»СЊРєРѕ СѓСЂРѕРІРЅРµР№ РѕС‚РєСЂС‹РІР°РµС‚СЃСЏ РЅРѕРІС‹Р№ РїРµС‚
     [SerializeField] private BrainrotInfoUI _petInfoUI;
     [SerializeField] private AudioSource _audio;
 
@@ -43,6 +44,7 @@ public class BigPetPoint : MonoBehaviour
 
     private void Start()
     {
+        if (_remoteMode) return;
         // TODO load current xp
         // load current pet
         // load food
@@ -85,6 +87,7 @@ public class BigPetPoint : MonoBehaviour
 
     public void _OnPlayerEnter()
     {
+        if (_remoteMode) return;
         G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
         _playerInArea = true;
         CheckPlayer(G.QuickAccess.CurrentActive);
@@ -93,6 +96,7 @@ public class BigPetPoint : MonoBehaviour
     }
 
     public void _OnPlayerExit() {
+        if (_remoteMode) return;
         G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
         _feedButton.SetActive(false);
         _playerInArea = false;
@@ -102,12 +106,14 @@ public class BigPetPoint : MonoBehaviour
 
     private void CheckPlayer(InventoryItem item = null)
     {
+        if (_remoteMode) return;
         if (_feeding || !_playerInArea) return;
         _feedButton.SetActive(item != null && item.Type == Item.Food);
     }
 
     public void _Feed()
     {
+        if (_remoteMode) return;
         if (_feeding) return;
 
         InventoryItem currentItem = G.QuickAccess.CurrentActive;
@@ -125,6 +131,7 @@ public class BigPetPoint : MonoBehaviour
 
     private IEnumerator FeedProcess()
     {
+        if (_remoteMode) yield break;
         _foodTimeBar.gameObject.SetActive(true);
         int secondsRemains = _currentFood.Data.SecondsDuration;
         _foodTimeBarText.text = String.Format(
@@ -158,6 +165,7 @@ public class BigPetPoint : MonoBehaviour
 
     private void CheckLvl()
     {
+        if (_remoteMode) return;
         //if (_currentLvl >= _maxLvl) return;
 
         if (_currentXp >= _xpForNextLvl)
@@ -205,15 +213,18 @@ public class BigPetPoint : MonoBehaviour
             Destroy(_currentPet.gameObject);
         }
         _currentPetIdx = idx;
-        G.Save.SaveBigPetId(_currentPetIdx);
+        if (!_remoteMode)
+            G.Save.SaveBigPetId(_currentPetIdx);
         _currentPet = Instantiate(_pets[idx].Model, _petPoint);
-        _setPetUI.ChangeActivePet(_pets[idx]);
+        if (_setPetUI != null)
+            _setPetUI.ChangeActivePet(_pets[idx]);
         CheckScale();
 
     }
 
     private void ChangeActivePet(Brainrot pet)
     {
+        if (_remoteMode) return;
         int idx = _pets.IndexOf(pet);
 
         if (idx < 0) return;
@@ -224,6 +235,7 @@ public class BigPetPoint : MonoBehaviour
 
     private void GetIncome()
     {
+        if (_remoteMode) return;
         G.Income.AddCoins(_accumulatedIncome);
         _accumulatedIncome = 0;
         _petInfoUI.UpdateIncome(_accumulatedIncome);
@@ -235,6 +247,7 @@ public class BigPetPoint : MonoBehaviour
 
     private IEnumerator ProduceIncome()
     {
+        if (_remoteMode) yield break;
         while (true)
         {
             yield return new WaitForSecondsRealtime(1);
@@ -248,12 +261,50 @@ public class BigPetPoint : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        if (_remoteMode) return;
         _petInfoUI.gameObject.SetActive(true);
     }
 
     private void OnTriggerExit(Collider other)
     {
+        if (_remoteMode) return;
         _petInfoUI.gameObject.SetActive(false);
+    }
+
+    public void ApplyRemoteState(int petId, int lvl, int xp)
+    {
+        _remoteMode = true;
+
+        _currentLvl = Mathf.Max(1, lvl);
+        _currentXp = Mathf.Max(0, xp);
+        _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
+
+        _maxAvailablePetIdx = _currentLvl / _lvlsPerPet;
+        _maxAvailablePetIdx = _maxAvailablePetIdx > (_pets.Count - 1) ? _pets.Count - 1 : _maxAvailablePetIdx;
+        _maxLvl = _pets.Count * _lvlsPerPet;
+
+        if (_setPetUI != null)
+        {
+            _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
+        }
+
+        petId = Mathf.Clamp(petId, 0, _pets.Count - 1);
+        SetPet(petId);
+
+        if (_petInfoUI != null)
+        {
+            _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome;
+            _petInfoUI.SetInfo(_currentIncome);
+            _petInfoUI.UpdateIncome(0);
+        }
+
+        if (_feedButton != null) _feedButton.SetActive(false);
+        if (_foodTimeBar != null) _foodTimeBar.gameObject.SetActive(false);
+    }
+
+    public void SetRemoteMode(bool remote)
+    {
+        _remoteMode = remote;
     }
 
 }

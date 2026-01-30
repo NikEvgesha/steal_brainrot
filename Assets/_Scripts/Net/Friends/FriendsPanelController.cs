@@ -16,6 +16,8 @@ public class FriendsPanelController : MonoBehaviour
 
     [Header("Deps")]
     private FriendsApi api;
+    [SerializeField] private RemoteBasesApplier remoteBases;
+    [SerializeField] private int remoteSlotIndex = 0;
 
     [Header("Top")]
     [SerializeField] private TMP_Text myNameText;
@@ -46,6 +48,7 @@ public class FriendsPanelController : MonoBehaviour
         if (backend == null) backend = G.Backend;
         if (save == null) save = G.Save;
         if (api == null) api = G.Backend.FriendsApi;
+        if (remoteBases == null) remoteBases = FindObjectOfType<RemoteBasesApplier>();
 
         renameButton.onClick.AddListener(() => StartCoroutine(RenameFlow()));
 
@@ -203,6 +206,11 @@ public class FriendsPanelController : MonoBehaviour
         if (resp == null)
             yield break;
 
+        if (remoteBases != null && resp.data != null)
+        {
+            remoteBases.ApplyFriendBase(resp.data, remoteSlotIndex);
+            remoteBases.TeleportPlayerToSlot(remoteSlotIndex);
+        }
         Debug.Log($"[Friends] Loaded base for {friendCode}");
     }
 

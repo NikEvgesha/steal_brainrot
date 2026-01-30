@@ -13,7 +13,7 @@ public class GameEntryPoint : MonoBehaviour
     [SerializeField] private DailyPlaytimeTrackerMB _dailyPlaytimeTracker;
 
     [SerializeField] private Transform _playerSpawnPoint;
-
+    [SerializeField] private RemoteBasesApplier _remoteBasesApplier;
     private void Start()
     {
         Instantiate(_playerManager).Init(_playerSpawnPoint);
@@ -24,6 +24,7 @@ public class GameEntryPoint : MonoBehaviour
         Instantiate(_dailyPlaytimeTracker);
         Instantiate(_hubPrefab).Initialize(G.Currency);
         Instantiate(_ui);
+        Instantiate(_remoteBasesApplier);
 
         G.Initialized?.Invoke();
         //_scene.SetActive(true);
