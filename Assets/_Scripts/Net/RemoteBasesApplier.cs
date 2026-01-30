@@ -12,6 +12,7 @@ public class RemoteBasesApplier : MonoBehaviour
         public string name;
         public Transform root;
         public Transform fieldsRoot;
+        public Transform teleportTarget;
         public bool lockCells = true;
         public bool applyLand = true;
     }
@@ -93,7 +94,7 @@ public class RemoteBasesApplier : MonoBehaviour
         ApplyConveyor(slot, snapshot);
         ApplyBigPet(slot, snapshot);
 
-        if (slot.applyLand && snapshot.land != null)
+        if (slot.applyLand && snapshot.land != null && snapshot.land.boughtCells != null)
         {
             var land = new HashSet<int>(snapshot.land.boughtCells ?? new List<int>());
             foreach (var field in GetFields(slot))
@@ -185,9 +186,18 @@ public class RemoteBasesApplier : MonoBehaviour
         if (string.IsNullOrEmpty(id))
             return;
 
+        if (G.Storage == null)
+        {
+            Debug.LogWarning("[RemoteBases] ItemPrefabStorage is not initialized.");
+            return;
+        }
+
         var prefab = G.Storage.GetEgg(id);
         if (prefab == null)
+        {
+            Debug.LogWarning($"[RemoteBases] Egg prefab not found: {id}");
             return;
+        }
 
         var egg = Instantiate(prefab, cell.transform);
         egg.SetData(dinamic);
@@ -199,9 +209,18 @@ public class RemoteBasesApplier : MonoBehaviour
         if (string.IsNullOrEmpty(id))
             return;
 
+        if (G.Storage == null)
+        {
+            Debug.LogWarning("[RemoteBases] ItemPrefabStorage is not initialized.");
+            return;
+        }
+
         var prefab = G.Storage.GetPet(id);
         if (prefab == null)
+        {
+            Debug.LogWarning($"[RemoteBases] Brainrot prefab not found: {id}");
             return;
+        }
 
         var pet = Instantiate(prefab, cell.transform);
         pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
@@ -264,6 +283,9 @@ public class RemoteBasesApplier : MonoBehaviour
 
         var slot = slots[slotIndex];
         if (slot == null || slot.root == null) return null;
+
+        if (slot.teleportTarget != null)
+            return slot.teleportTarget;
 
         var playerBase = slot.root.GetComponentInChildren<PlayerBase>(true);
         if (playerBase != null)

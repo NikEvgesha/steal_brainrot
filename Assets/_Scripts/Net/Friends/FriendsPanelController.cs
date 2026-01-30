@@ -48,7 +48,7 @@ public class FriendsPanelController : MonoBehaviour
         if (backend == null) backend = G.Backend;
         if (save == null) save = G.Save;
         if (api == null) api = G.Backend.FriendsApi;
-        if (remoteBases == null) remoteBases = FindObjectOfType<RemoteBasesApplier>();
+        EnsureRemoteBases();
 
         renameButton.onClick.AddListener(() => StartCoroutine(RenameFlow()));
 
@@ -77,15 +77,20 @@ public class FriendsPanelController : MonoBehaviour
     }
     private void OnEnable()
     {
-        
+        G.Initialized.AddListener(OnGameInitialized);
         G.Input.AFriends += ToggleOpen;
         G.Input.AOpenWindow += Close;
     }
     private void OnDisable()
     {
+        G.Initialized.RemoveListener(OnGameInitialized);
         G.Input.AFriends -= ToggleOpen;
         //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
         G.Input.AOpenWindow -= Close;
+    }
+    private void OnGameInitialized()
+    {
+        EnsureRemoteBases();
     }
     public void Close(MonoBehaviour ui)
     {
@@ -206,12 +211,29 @@ public class FriendsPanelController : MonoBehaviour
         if (resp == null)
             yield break;
 
-        if (remoteBases != null && resp.data != null)
+        EnsureRemoteBases();
+        if (remoteBases == null)
+        {
+            Debug.LogWarning("[Friends] RemoteBasesApplier not found in scene.");
+        }
+        else if (resp.data == null)
+        {
+            Debug.LogWarning($"[Friends] Friend base data is empty. raw={resp.dataRaw}");
+        }
+        else
         {
             remoteBases.ApplyFriendBase(resp.data, remoteSlotIndex);
             remoteBases.TeleportPlayerToSlot(remoteSlotIndex);
         }
         Debug.Log($"[Friends] Loaded base for {friendCode}");
+    }
+
+    private void EnsureRemoteBases()
+    {
+        if (remoteBases != null) return;
+        var found = FindObjectsOfType<RemoteBasesApplier>(true);
+        if (found != null && found.Length > 0)
+            remoteBases = found[0];
     }
 
     void CopyMyCode()
