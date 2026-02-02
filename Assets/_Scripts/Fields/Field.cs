@@ -29,6 +29,9 @@ public class Field : MonoBehaviour
         if (_unblocked)
         {
             Unblock();
+        } else
+        {
+            G.Save.SaveFieldUnblockStatus(_id, false);
         }
     }
 
