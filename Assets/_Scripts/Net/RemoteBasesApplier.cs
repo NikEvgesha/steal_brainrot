@@ -25,10 +25,14 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool clearEmptySlots = true;
 
     private ZooBackendClient backend;
+    private readonly Dictionary<string, int> _playerToSlot = new();
+    private string[] _slotPlayerIds;
+    private string[] _slotUpdatedAt;
 
     private void Awake()
     {
         if (backend == null) backend = G.Backend;
+        EnsureSlotState();
         MarkRemoteComponents();
     }
 
@@ -71,12 +75,69 @@ public class RemoteBasesApplier : MonoBehaviour
         if (slots == null || slots.Count == 0)
             return;
 
+        EnsureSlotState();
+
+        var available = new Dictionary<string, ZooLocationItem>();
+        if (locations != null)
+        {
+            foreach (var loc in locations)
+            {
+                if (loc == null || string.IsNullOrEmpty(loc.playerId)) continue;
+                if (!available.ContainsKey(loc.playerId))
+                    available.Add(loc.playerId, loc);
+            }
+        }
+
+        var usedPlayers = new HashSet<string>();
+
+        // keep existing assignments if player still in list
         for (int i = 0; i < slots.Count; i++)
         {
-            if (i < locations.Count)
-                ApplySnapshotToSlot(slots[i], locations[i]?.baseData);
-            else if (clearEmptySlots)
-                ClearSlot(slots[i]);
+            var pid = _slotPlayerIds[i];
+            if (!string.IsNullOrEmpty(pid) && available.TryGetValue(pid, out var loc))
+            {
+                usedPlayers.Add(pid);
+                ApplyIfChanged(i, slots[i], loc);
+            }
+            else if (!string.IsNullOrEmpty(pid))
+            {
+                _playerToSlot.Remove(pid);
+                _slotPlayerIds[i] = null;
+                _slotUpdatedAt[i] = null;
+                if (clearEmptySlots)
+                    ClearSlot(slots[i]);
+            }
+        }
+
+        // assign new players to free slots
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (!string.IsNullOrEmpty(_slotPlayerIds[i])) continue;
+            if (available.Count == 0) break;
+
+            ZooLocationItem pick = null;
+            foreach (var kv in available)
+            {
+                if (usedPlayers.Contains(kv.Key)) continue;
+                pick = kv.Value;
+                break;
+            }
+
+            if (pick == null) break;
+
+            _slotPlayerIds[i] = pick.playerId;
+            _playerToSlot[pick.playerId] = i;
+            usedPlayers.Add(pick.playerId);
+            ApplyIfChanged(i, slots[i], pick, force: true);
+        }
+
+        if (clearEmptySlots)
+        {
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (string.IsNullOrEmpty(_slotPlayerIds[i]))
+                    ClearSlot(slots[i]);
+            }
         }
     }
 
@@ -143,6 +204,28 @@ public class RemoteBasesApplier : MonoBehaviour
                 SpawnBrainrot(cell, item.id, item.dinamic, item.incomeLastTime);
             }
         }
+    }
+
+    private void ApplyIfChanged(int slotIndex, RemoteBaseSlot slot, ZooLocationItem loc, bool force = false)
+    {
+        if (loc == null)
+            return;
+
+        var updatedAt = loc.baseData?.updatedAt ?? "";
+        if (!force && _slotUpdatedAt[slotIndex] == updatedAt)
+            return;
+
+        _slotUpdatedAt[slotIndex] = updatedAt;
+        ApplySnapshotToSlot(slot, loc.baseData);
+    }
+
+    private void EnsureSlotState()
+    {
+        if (slots == null) return;
+        if (_slotPlayerIds == null || _slotPlayerIds.Length != slots.Count)
+            _slotPlayerIds = new string[slots.Count];
+        if (_slotUpdatedAt == null || _slotUpdatedAt.Length != slots.Count)
+            _slotUpdatedAt = new string[slots.Count];
     }
 
     private void ClearSlot(RemoteBaseSlot slot)
