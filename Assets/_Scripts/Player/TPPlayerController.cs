@@ -1,10 +1,10 @@
 using UnityEngine;
 
 /// <summary>
-/// TPS контроллер с анимациями через Animator:
-/// - BlendTree по Speed (Idle/Run или IdleEgg/IdleRun при IsHolding)
-/// - Переключение "держать" по булю и, опционально, по триггеру для красивого входного перехода.
-/// Оптимизировано под WebGL: без лишних аллокаций, Animator-хеши кэшируются.
+/// TPS РєРѕРЅС‚СЂРѕР»Р»РµСЂ СЃ Р°РЅРёРјР°С†РёСЏРјРё С‡РµСЂРµР· Animator:
+/// - BlendTree РїРѕ Speed (Idle/Run РёР»Рё IdleEgg/IdleRun РїСЂРё IsHolding)
+/// - РџРµСЂРµРєР»СЋС‡РµРЅРёРµ "РґРµСЂР¶Р°С‚СЊ" РїРѕ Р±СѓР»СЋ Рё, РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ, РїРѕ С‚СЂРёРіРіРµСЂСѓ РґР»СЏ РєСЂР°СЃРёРІРѕРіРѕ РІС…РѕРґРЅРѕРіРѕ РїРµСЂРµС…РѕРґР°.
+/// РћРїС‚РёРјРёР·РёСЂРѕРІР°РЅРѕ РїРѕРґ WebGL: Р±РµР· Р»РёС€РЅРёС… Р°Р»Р»РѕРєР°С†РёР№, Animator-С…РµС€Рё РєСЌС€РёСЂСѓСЋС‚СЃСЏ.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class TPPlayerController : MonoBehaviour
@@ -22,27 +22,27 @@ public class TPPlayerController : MonoBehaviour
     [SerializeField] private float groundedStick = -2f;
 
     [Header("References")]
-    [SerializeField] private Transform cameraTransform; // Камера для направления движения
+    [SerializeField] private Transform cameraTransform; // РљР°РјРµСЂР° РґР»СЏ РЅР°РїСЂР°РІР»РµРЅРёСЏ РґРІРёР¶РµРЅРёСЏ
 
     // === Animation ===
     public enum AnimParamName
     {
         Speed,       // float
         IsHolding,   // bool
-        HoldTrigger  // trigger (опц.)
+        HoldTrigger  // trigger (РѕРїС†.)
     }
 
     [Header("Animation")]
     [SerializeField] private Animator animator;
-    [SerializeField] private float speedDampTime = 0.08f;  // сглаживание параметра Speed
-    [SerializeField] private bool useHoldTriggerOnToggle = true; // жать триггер при смене hold
-    [SerializeField] private bool debugToggleHoldWithKey = false;
-    [SerializeField] private KeyCode debugHoldKey = KeyCode.E;
+    [SerializeField] private float speedDampTime = 0.08f;  // СЃРіР»Р°Р¶РёРІР°РЅРёРµ РїР°СЂР°РјРµС‚СЂР° Speed
+    //[SerializeField] private bool useHoldTriggerOnToggle = true; // Р¶Р°С‚СЊ С‚СЂРёРіРіРµСЂ РїСЂРё СЃРјРµРЅРµ hold
+    //[SerializeField] private bool debugToggleHoldWithKey = false;
+    //[SerializeField] private KeyCode debugHoldKey = KeyCode.E;
 
     private CharacterController _cc;
     private float _verticalVel;
     private float _currentSpeed;
-    private bool _isHolding; // текущее логическое состояние "держать"
+    private bool _isHolding; // С‚РµРєСѓС‰РµРµ Р»РѕРіРёС‡РµСЃРєРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ "РґРµСЂР¶Р°С‚СЊ"
 
     private void Awake()
     {
@@ -51,7 +51,7 @@ public class TPPlayerController : MonoBehaviour
         //if (cameraTransform == null && Camera.main != null)
         //    cameraTransform = Camera.main.transform;
 
-        // На всякий случай выключим root motion (контроль у CharacterController)
+        // РќР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№ РІС‹РєР»СЋС‡РёРј root motion (РєРѕРЅС‚СЂРѕР»СЊ Сѓ CharacterController)
         if (animator != null) animator.applyRootMotion = false;
     }
 
@@ -68,7 +68,7 @@ public class TPPlayerController : MonoBehaviour
         float h;
         float v;
         bool running;
-        // ===== Ввод =====
+        // ===== Р’РІРѕРґ =====
         if (G.Input == null)
         {
             h = Input.GetAxisRaw("Horizontal");
@@ -83,7 +83,7 @@ public class TPPlayerController : MonoBehaviour
             running = G.Input.Sprint;
         }
 
-        // ===== Направление по камере =====
+        // ===== РќР°РїСЂР°РІР»РµРЅРёРµ РїРѕ РєР°РјРµСЂРµ =====
         Vector3 camForward = cameraTransform ? cameraTransform.forward : Vector3.forward;
         Vector3 camRight = cameraTransform ? cameraTransform.right : Vector3.right;
         camForward.y = 0f; camRight.y = 0f;
@@ -93,19 +93,19 @@ public class TPPlayerController : MonoBehaviour
         
         if (moveDir.sqrMagnitude > 1f) moveDir.Normalize();
 
-        // ===== Скорость (плавно) =====
+        // ===== РЎРєРѕСЂРѕСЃС‚СЊ (РїР»Р°РІРЅРѕ) =====
         float targetSpeed = (running ? runSpeed : walkSpeed) * moveDir.magnitude;
         _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, acceleration * Time.deltaTime);
 
         Vector3 velocity = moveDir * _currentSpeed;
 
-        // ===== Гравитация =====
+        // ===== Р“СЂР°РІРёС‚Р°С†РёСЏ =====
         if (_cc.isGrounded)
         {
             if (_verticalVel < 0f) _verticalVel = groundedStick;
             if (G.Input && G.Input.JumpTriggered)
             {
-                _verticalVel = jumpForce; // Применяем силу прыжка
+                _verticalVel = jumpForce; // РџСЂРёРјРµРЅСЏРµРј СЃРёР»Сѓ РїСЂС‹Р¶РєР°
             }
         }
         else
@@ -114,20 +114,20 @@ public class TPPlayerController : MonoBehaviour
         }
         velocity.y = _verticalVel;
 
-        // ===== Поворот к движению =====
+        // ===== РџРѕРІРѕСЂРѕС‚ Рє РґРІРёР¶РµРЅРёСЋ =====
         if (moveDir.sqrMagnitude > 0.0001f)
         {
             Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationLerp * Time.deltaTime);
         }
 
-        // ===== Движение =====
+        // ===== Р”РІРёР¶РµРЅРёРµ =====
         _cc.Move(velocity * Time.deltaTime);
 
-        // ===== Анимация =====
+        // ===== РђРЅРёРјР°С†РёСЏ =====
         if (animator != null)
         {
-            // Нормализуем скорость в [0..1] относительно runSpeed (один и тот же BlendTree param для обычного/hold набора)
+            // РќРѕСЂРјР°Р»РёР·СѓРµРј СЃРєРѕСЂРѕСЃС‚СЊ РІ [0..1] РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ runSpeed (РѕРґРёРЅ Рё С‚РѕС‚ Р¶Рµ BlendTree param РґР»СЏ РѕР±С‹С‡РЅРѕРіРѕ/hold РЅР°Р±РѕСЂР°)
             float normalized = runSpeed > 0.0001f ? (_currentSpeed / runSpeed) : 0f;
             animator.SetFloat(AnimParamName.Speed.ToString(), normalized, speedDampTime, Time.deltaTime);
             animator.SetBool(AnimParamName.IsHolding.ToString(), _isHolding);
@@ -135,7 +135,7 @@ public class TPPlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Установить состояние "держать". Поддерживает триггер для входного/выходного перехода.
+    /// РЈСЃС‚Р°РЅРѕРІРёС‚СЊ СЃРѕСЃС‚РѕСЏРЅРёРµ "РґРµСЂР¶Р°С‚СЊ". РџРѕРґРґРµСЂР¶РёРІР°РµС‚ С‚СЂРёРіРіРµСЂ РґР»СЏ РІС…РѕРґРЅРѕРіРѕ/РІС‹С…РѕРґРЅРѕРіРѕ РїРµСЂРµС…РѕРґР°.
     /// </summary>
     public void SetHolding(bool holding)
     {
@@ -146,12 +146,12 @@ public class TPPlayerController : MonoBehaviour
         {
             animator.SetBool(AnimParamName.IsHolding.ToString(), _isHolding);
 
-            // Если нужен отдельный переходный клип (взять/убрать предмет) — дёрнем триггер
+            // Р•СЃР»Рё РЅСѓР¶РµРЅ РѕС‚РґРµР»СЊРЅС‹Р№ РїРµСЂРµС…РѕРґРЅС‹Р№ РєР»РёРї (РІР·СЏС‚СЊ/СѓР±СЂР°С‚СЊ РїСЂРµРґРјРµС‚) вЂ” РґС‘СЂРЅРµРј С‚СЂРёРіРіРµСЂ
             //if (useHoldTriggerOnToggle)
             //    animator.SetTrigger(AnimParamName.HoldTrigger.ToString());
         }
     }
 
-    /// <summary>Удобный вызов из других скриптов (или через UnityEvent).</summary>
+    /// <summary>РЈРґРѕР±РЅС‹Р№ РІС‹Р·РѕРІ РёР· РґСЂСѓРіРёС… СЃРєСЂРёРїС‚РѕРІ (РёР»Рё С‡РµСЂРµР· UnityEvent).</summary>
     public void ToggleHolding() => SetHolding(!_isHolding);
 }

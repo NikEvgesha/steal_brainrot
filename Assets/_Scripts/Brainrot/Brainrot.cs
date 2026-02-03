@@ -59,9 +59,9 @@ public class Brainrot : InventoryItem
         _dinamicData = rarity;
         //_model = Instantiate(_data.,_modelPoint);
         Vector3 scale = _canvas.transform.localScale;
-        _canvas.transform.parent = _modelPoint.transform;
+        _canvas.transform.SetParent(_modelPoint.transform, false);
         SetSize();
-        _canvas.transform.parent = transform;
+        _canvas.transform.SetParent(transform, false);
         _canvas.transform.localScale = scale;
 
         _dinamicData.ResultIncome = Math.Round(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));

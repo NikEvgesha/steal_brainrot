@@ -20,7 +20,7 @@ namespace TouchControlsKit
             get
             {
                 if( m_Instance == null ) {
-                    m_Instance = FindObjectOfType<TCKInput>();
+                    m_Instance = FindAnyObjectByType<TCKInput>();
                 }
 
                 return m_Instance;
@@ -82,7 +82,7 @@ namespace TouchControlsKit
         // Check UIEventSystem
         public static void CheckUIEventSystem()
         {
-            if( FindObjectOfType<EventSystem>() != null )
+            if( FindAnyObjectByType<EventSystem>() != null )
             {
                 return;
             }

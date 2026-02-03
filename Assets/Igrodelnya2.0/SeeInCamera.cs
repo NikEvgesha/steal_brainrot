@@ -10,8 +10,8 @@ public class SeeInCamera : MonoBehaviour
     private void OnEnable()
     {
         _canvas = gameObject.GetComponent<Canvas>();
-        _mainCamera = FindObjectOfType<Camera>();
-        Camera[] cameras = FindObjectsOfType<Camera>();
+        _mainCamera = FindFirstObjectByType<Camera>();
+        Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
         foreach (var camera in cameras)
         {
             if(camera.tag == "MainCamera") 

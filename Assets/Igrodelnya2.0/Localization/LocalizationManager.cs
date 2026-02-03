@@ -7,7 +7,7 @@ public class LocalizationManager : MonoBehaviour
 
     [SerializeField] private LocalizationData localizationData;
     [SerializeField] private string currentLanguage;
-    public LocalizationProvider LocalizationProvider { get; private set; } // Назначаем нужный провайдер в инспекторе
+    public LocalizationProvider LocalizationProvider { get; private set; } // РќР°Р·РЅР°С‡Р°РµРј РЅСѓР¶РЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ РІ РёРЅСЃРїРµРєС‚РѕСЂРµ
 
     public event Action<string> OnLanguageChanged;
     public LocalizationData LocalizationData => localizationData;
@@ -21,7 +21,7 @@ public class LocalizationManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("LocalizationManager уже существует! Удаляем дубликат.");
+            Debug.LogWarning("LocalizationManager СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚! РЈРґР°Р»СЏРµРј РґСѓР±Р»РёРєР°С‚.");
             Destroy(gameObject);
         }
         LocalizationProvider = GetComponent<LocalizationProvider>();
@@ -33,7 +33,7 @@ public class LocalizationManager : MonoBehaviour
         {
             LocalizationProvider.OnSwitchLang += OnSwitchLanguage;
 
-            // Если провайдер вернул язык, используем его
+            // Р•СЃР»Рё РїСЂРѕРІР°Р№РґРµСЂ РІРµСЂРЅСѓР» СЏР·С‹Рє, РёСЃРїРѕР»СЊР·СѓРµРј РµРіРѕ
             string providerLang = LocalizationProvider.GetCurrentLanguage();
             if (!string.IsNullOrEmpty(providerLang))
             {
@@ -45,12 +45,12 @@ public class LocalizationManager : MonoBehaviour
             }
             else if (localizationData != null && localizationData.Languages.Count > 0)
             {
-                ChangeLanguage(localizationData.Languages[0]); // Язык по умолчанию
+                ChangeLanguage(localizationData.Languages[0]); // РЇР·С‹Рє РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
             }
         }
         else
         {
-            Debug.LogWarning("LocalizationProvider не назначен!");
+            Debug.LogWarning("LocalizationProvider РЅРµ РЅР°Р·РЅР°С‡РµРЅ!");
         }
     }
 
@@ -64,7 +64,7 @@ public class LocalizationManager : MonoBehaviour
 
     public void ChangeLanguage(string newLanguage)
     {
-        //Debug.Log($"Язык начал изменяться на: {newLanguage}");
+        //Debug.Log($"РЇР·С‹Рє РЅР°С‡Р°Р» РёР·РјРµРЅСЏС‚СЊСЃСЏ РЅР°: {newLanguage}");
         if (localizationData == null || newLanguage == currentLanguage)
         {
             return;
@@ -77,27 +77,27 @@ public class LocalizationManager : MonoBehaviour
 
         currentLanguage = newLanguage;
 
-        // Оповещаем подписчиков об изменении языка
+        // РћРїРѕРІРµС‰Р°РµРј РїРѕРґРїРёСЃС‡РёРєРѕРІ РѕР± РёР·РјРµРЅРµРЅРёРё СЏР·С‹РєР°
         OnLanguageChanged?.Invoke(newLanguage);
 
-        // Обновляем все объекты с локализованным текстом
-        foreach (LocalizedText text in FindObjectsOfType<LocalizedText>())
+        // РћР±РЅРѕРІР»СЏРµРј РІСЃРµ РѕР±СЉРµРєС‚С‹ СЃ Р»РѕРєР°Р»РёР·РѕРІР°РЅРЅС‹Рј С‚РµРєСЃС‚РѕРј
+        foreach (LocalizedText text in FindObjectsByType<LocalizedText>(FindObjectsSortMode.None))
         {
             text.SetLanguage(newLanguage);
         }
 
-        //Debug.Log($"Язык изменен на: {newLanguage}");
+        //Debug.Log($"РЇР·С‹Рє РёР·РјРµРЅРµРЅ РЅР°: {newLanguage}");
     }
 
     private void OnSwitchLanguage(string langCode)
     {
         if (string.IsNullOrEmpty(langCode))
         {
-            Debug.LogWarning("Получен пустой код языка!");
+            Debug.LogWarning("РџРѕР»СѓС‡РµРЅ РїСѓСЃС‚РѕР№ РєРѕРґ СЏР·С‹РєР°!");
             return;
         }
-        //Debug.LogWarning("Получен код языка!" + langCode);
-        // Приводим код к нужному формату (например, первая буква в верхнем регистре)
+        //Debug.LogWarning("РџРѕР»СѓС‡РµРЅ РєРѕРґ СЏР·С‹РєР°!" + langCode);
+        // РџСЂРёРІРѕРґРёРј РєРѕРґ Рє РЅСѓР¶РЅРѕРјСѓ С„РѕСЂРјР°С‚Сѓ (РЅР°РїСЂРёРјРµСЂ, РїРµСЂРІР°СЏ Р±СѓРєРІР° РІ РІРµСЂС…РЅРµРј СЂРµРіРёСЃС‚СЂРµ)
         string formattedLang = char.ToUpper(langCode[0]) + langCode.Substring(1);
         ChangeLanguage(formattedLang);
     }

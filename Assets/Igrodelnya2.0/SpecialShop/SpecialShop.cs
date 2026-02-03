@@ -14,7 +14,7 @@ public class SpecialShop : MonoBehaviour
     private Dictionary<PurchaseData, ShopPackData> _purchaseData;
     private List<ShopRow> _rows;
     private bool _isOpen;
-    private bool _inAppAvailable;
+    //private bool _inAppAvailable;
     public bool Opened => _isOpen;
 
     private void Awake()
@@ -26,7 +26,7 @@ public class SpecialShop : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("GemsShop уже существует! Удаляем дубликат.");
+            Debug.LogWarning("GemsShop СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚! РЈРґР°Р»СЏРµРј РґСѓР±Р»РёРєР°С‚.");
             Destroy(gameObject);
         }
     }
@@ -34,7 +34,7 @@ public class SpecialShop : MonoBehaviour
     private void Start()
     {
         _purchaseData = new Dictionary<PurchaseData, ShopPackData>();
-        _inAppAvailable = true; //G.Purchases.PurchasesAvailable();
+        //_inAppAvailable = true; //G.Purchases.PurchasesAvailable();
         _rows = new List<ShopRow>();
         InitSlots();
         G.Purchases.RestorePurchases();
@@ -63,7 +63,7 @@ public class SpecialShop : MonoBehaviour
     {
         if (!big)
         {
-            // Проверяем существующие строки
+            // РџСЂРѕРІРµСЂСЏРµРј СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ СЃС‚СЂРѕРєРё
             foreach (ShopRow row in _rows)
             {
                 if (row.ItemsCount < row.MaxItems)
@@ -72,7 +72,7 @@ public class SpecialShop : MonoBehaviour
                 }
             }
         }
-        // Если нет свободной строки, создаём новую
+        // Р•СЃР»Рё РЅРµС‚ СЃРІРѕР±РѕРґРЅРѕР№ СЃС‚СЂРѕРєРё, СЃРѕР·РґР°С‘Рј РЅРѕРІСѓСЋ
         ShopRow newRow = Instantiate(_rowPrefab, _content);
         newRow.setMaxItems(big ? 1 : _maxItemsPerRow);
         _rows.Add(newRow);

@@ -231,7 +231,7 @@ public class FriendsPanelController : MonoBehaviour
     private void EnsureRemoteBases()
     {
         if (remoteBases != null) return;
-        var found = FindObjectsOfType<RemoteBasesApplier>(true);
+        var found = FindObjectsByType<RemoteBasesApplier>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         if (found != null && found.Length > 0)
             remoteBases = found[0];
     }

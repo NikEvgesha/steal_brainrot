@@ -10,10 +10,10 @@ public class PlayerBaseManager : MonoBehaviour
     private void Start()
     {
         _bases = new List<PlayerBase>(GetComponentsInChildren<PlayerBase>());
-        _players = new List<BaseOwner>(FindObjectsOfType<BaseOwner>());
+        _players = new List<BaseOwner>(FindObjectsByType<BaseOwner>(FindObjectsSortMode.None));
 
         if (_bases.Count != _players.Count)
-            Debug.Log("Количество баз и игроков не одинаковое!");
+            Debug.Log("РљРѕР»РёС‡РµСЃС‚РІРѕ Р±Р°Р· Рё РёРіСЂРѕРєРѕРІ РЅРµ РѕРґРёРЅР°РєРѕРІРѕРµ!");
 
         for (int i = 0; i < _bases.Count; i++)
         {

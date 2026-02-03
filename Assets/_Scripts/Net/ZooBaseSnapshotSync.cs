@@ -31,8 +31,8 @@ public class BaseSnapshotDto
 
 public class ZooBaseSnapshotSync : MonoBehaviour
 {
-    [SerializeField] private ZooBackendClient backend;   // твой существующий клиент
-    [SerializeField] private SaveManager save;           // твой SaveManager
+    [SerializeField] private ZooBackendClient backend;   // С‚РІРѕР№ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ РєР»РёРµРЅС‚
+    [SerializeField] private SaveManager save;           // С‚РІРѕР№ SaveManager
 
     [Header("How often to publish base snapshot")]
     [SerializeField] private float publishIntervalSec = 5f;
@@ -50,8 +50,8 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     IEnumerator PublishLoop()
     {
-        // ZooBackendClient сам делает EnsureAuthThenLoad() в Start :contentReference[oaicite:7]{index=7}
-        // но если порядок инициализации на сцене плавает — перестрахуемся:
+        // ZooBackendClient СЃР°Рј РґРµР»Р°РµС‚ EnsureAuthThenLoad() РІ Start :contentReference[oaicite:7]{index=7}
+        // РЅРѕ РµСЃР»Рё РїРѕСЂСЏРґРѕРє РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РЅР° СЃС†РµРЅРµ РїР»Р°РІР°РµС‚ вЂ” РїРµСЂРµСЃС‚СЂР°С…СѓРµРјСЃСЏ:
        // if (string.IsNullOrEmpty(backend.Token))
            // yield return backend.AuthGuest();
 
@@ -92,21 +92,21 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         return JsonUtility.ToJson(dto);
     }
 
-    // ====== ТУТ ТЫ “ВСТРАИВАЕШЬСЯ” В СВОЮ ИГРУ ======
-    // Я оставляю заглушки, чтобы ты просто подключил свои источники данных.
+    // ====== РўРЈРў РўР« вЂњР’РЎРўР РђРР’РђР•РЁР¬РЎРЇвЂќ Р’ РЎР’РћР® РР“Р РЈ ======
+    // РЇ РѕСЃС‚Р°РІР»СЏСЋ Р·Р°РіР»СѓС€РєРё, С‡С‚РѕР±С‹ С‚С‹ РїСЂРѕСЃС‚Рѕ РїРѕРґРєР»СЋС‡РёР» СЃРІРѕРё РёСЃС‚РѕС‡РЅРёРєРё РґР°РЅРЅС‹С….
 
     private int LoadConveyorLevel_SOMEHOW()
     {
-        // Варианты:
-        // - из SaveManager (если есть сохранение/ключ)
-        // - из ConveyorManager.CurrentLevel
+        // Р’Р°СЂРёР°РЅС‚С‹:
+        // - РёР· SaveManager (РµСЃР»Рё РµСЃС‚СЊ СЃРѕС…СЂР°РЅРµРЅРёРµ/РєР»СЋС‡)
+        // - РёР· ConveyorManager.CurrentLevel
         return save.LoadConveyorCurrentLevel();
     }
 
     private List<int> LoadBoughtCells_SOMEHOW()
     {
         var list = new List<int>();
-        var fields = FindObjectsOfType<Field>();
+        var fields = FindObjectsByType<Field>(FindObjectsSortMode.None);
         foreach (var field in fields)
         {
             if (save.LoadFieldUnblockStatus(field.ID))
@@ -118,7 +118,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     private List<CellSnapshotDto> LoadCells_SOMEHOW()
     {
         var list = new List<CellSnapshotDto>();
-        var cells = FindObjectsOfType<FieldCell>();
+        var cells = FindObjectsByType<FieldCell>(FindObjectsSortMode.None);
         foreach (var cell in cells)
         {
             var data = save.LoadCellData(cell.Id);
@@ -154,7 +154,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     private List<AnimalOnCellDto> LoadAnimalsOnCells_SOMEHOW()
     {
         var list = new List<AnimalOnCellDto>();
-        var cells = FindObjectsOfType<FieldCell>();
+        var cells = FindObjectsByType<FieldCell>(FindObjectsSortMode.None);
         foreach (var cell in cells)
         {
             var data = save.LoadCellData(cell.Id);
