@@ -3170,6 +3170,55 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6248208750218364527, guid: ae78c44f30d6c2747acdfb5e6995216e, type: 3}
   m_PrefabInstance: {fileID: 1852420968}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1904663626
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1904663628}
+  - component: {fileID: 1904663627}
+  m_Layer: 0
+  m_Name: Global Volume
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1904663627
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1904663626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
+  m_IsGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: cc0daa9b14777ed4a96835200e80edcd, type: 2}
+--- !u!4 &1904663628
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1904663626}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 11.225129, y: 19.331633, z: -29.865456}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1905258968
 GameObject:
   m_ObjectHideFlags: 0
@@ -3732,6 +3781,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 385261312}
     m_Modifications:
+    - target: {fileID: 2508914346207209830, guid: a3d1ff7e08b2fc740a644f6c5be6b238, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
     - target: {fileID: 3743318974389042424, guid: a3d1ff7e08b2fc740a644f6c5be6b238, type: 3}
       propertyPath: m_Name
       value: BigPetPoint
@@ -3789,6 +3842,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 385261312}
     m_Modifications:
+    - target: {fileID: 191662797287099194, guid: 9cf1f3c7ea53e0d4c8c33147bab74bba, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
     - target: {fileID: 1348408955364022889, guid: 9cf1f3c7ea53e0d4c8c33147bab74bba, type: 3}
       propertyPath: m_AnchorMax.x
       value: 0
@@ -3813,6 +3870,10 @@ PrefabInstance:
       propertyPath: m_AnchorMin.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4241067016707010062, guid: 9cf1f3c7ea53e0d4c8c33147bab74bba, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
     - target: {fileID: 4916290114679468796, guid: 9cf1f3c7ea53e0d4c8c33147bab74bba, type: 3}
       propertyPath: m_Name
       value: Conveyor
@@ -4121,3 +4182,4 @@ SceneRoots:
   - {fileID: 385261312}
   - {fileID: 1905258969}
   - {fileID: 1609975661}
+  - {fileID: 1904663628}

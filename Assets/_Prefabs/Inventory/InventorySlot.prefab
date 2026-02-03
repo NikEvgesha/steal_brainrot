@@ -549,7 +549,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 300d848682f96a04d8b889169972c14d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _animator: {fileID: 0}
 --- !u!114 &8259979196452647899
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -608,7 +607,7 @@ MonoBehaviour:
         m_CallState: 2
 --- !u!95 &2410979180256569452
 Animator:
-  serializedVersion: 5
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -622,6 +621,7 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
   m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
