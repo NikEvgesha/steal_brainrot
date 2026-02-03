@@ -13,6 +13,8 @@ public class RemoteBasesApplier : MonoBehaviour
         public Transform root;
         public Transform fieldsRoot;
         public Transform teleportTarget;
+        public GiftChestController chest;
+        public RemoteFriendBoard friendBoard;
         public bool lockCells = true;
         public bool applyLand = true;
     }
@@ -97,6 +99,8 @@ public class RemoteBasesApplier : MonoBehaviour
             if (!string.IsNullOrEmpty(pid) && available.TryGetValue(pid, out var loc))
             {
                 usedPlayers.Add(pid);
+                UpdateChest(slots[i], loc);
+                UpdateFriendBoard(slots[i], loc);
                 ApplyIfChanged(i, slots[i], loc);
             }
             else if (!string.IsNullOrEmpty(pid))
@@ -104,6 +108,8 @@ public class RemoteBasesApplier : MonoBehaviour
                 _playerToSlot.Remove(pid);
                 _slotPlayerIds[i] = null;
                 _slotUpdatedAt[i] = null;
+                UpdateChest(slots[i], null);
+                UpdateFriendBoard(slots[i], null);
                 if (clearEmptySlots)
                     ClearSlot(slots[i]);
             }
@@ -128,6 +134,8 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotPlayerIds[i] = pick.playerId;
             _playerToSlot[pick.playerId] = i;
             usedPlayers.Add(pick.playerId);
+            UpdateChest(slots[i], pick);
+            UpdateFriendBoard(slots[i], pick);
             ApplyIfChanged(i, slots[i], pick, force: true);
         }
 
@@ -139,6 +147,30 @@ public class RemoteBasesApplier : MonoBehaviour
                     ClearSlot(slots[i]);
             }
         }
+    }
+
+    private void UpdateChest(RemoteBaseSlot slot, ZooLocationItem loc)
+    {
+        if (slot == null || slot.chest == null) return;
+        if (loc == null)
+        {
+            slot.chest.SetRemoteTarget(null, false);
+            return;
+        }
+
+        slot.chest.SetRemoteTarget(loc.friendCode, loc.isOnline);
+    }
+
+    private void UpdateFriendBoard(RemoteBaseSlot slot, ZooLocationItem loc)
+    {
+        if (slot == null || slot.friendBoard == null) return;
+        if (loc == null)
+        {
+            slot.friendBoard.SetRemote(null, null, false, false);
+            return;
+        }
+
+        slot.friendBoard.SetRemote(loc.friendCode, loc.displayName, loc.isFriend, loc.isOnline);
     }
 
     private void ApplySnapshotToSlot(RemoteBaseSlot slot, BaseSnapshotDto snapshot)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -37,6 +37,12 @@ public class FriendsPanelController : MonoBehaviour
     [Header("List")]
     [SerializeField] private Transform listContent;
     [SerializeField] private FriendRowView rowPrefab;
+
+    [Header("Requests")]
+    [SerializeField] private Transform requestsContent;
+    [SerializeField] private FriendRequestRowView requestRowPrefab;
+    [SerializeField] private TMP_Text requestsStatusText;
+    [SerializeField] private GameObject requestsBadge;
 
     [Header("Close")]
     [SerializeField] private Button _closeButton;
@@ -101,17 +107,19 @@ public class FriendsPanelController : MonoBehaviour
     {
         addStatusText.text = "";
         renameStatusText.text = "";
+        if (requestsStatusText != null) requestsStatusText.text = "";
 
         yield return api.EnsureGuest();
 
         var p = api.LocalProfile();
-        myNameText.text = $"Ник: {p.displayName}";
-        myCodeText.text = $"Код: {p.friendCode}";
+        myNameText.text = $"РќРёРє: {p.displayName}";
+        myCodeText.text = $"РљРѕРґ: {p.friendCode}";
 
-        // “онлайн” — пингуем при открытии и потом можно раз в 20 сек в отдельном месте
+        // вЂњРѕРЅР»Р°Р№РЅвЂќ вЂ” РїРёРЅРіСѓРµРј РїСЂРё РѕС‚РєСЂС‹С‚РёРё Рё РїРѕС‚РѕРј РјРѕР¶РЅРѕ СЂР°Р· РІ 20 СЃРµРє РІ РѕС‚РґРµР»СЊРЅРѕРј РјРµСЃС‚Рµ
         yield return api.PresencePing();
 
         yield return RefreshFriends();
+        yield return RefreshRequests();
     }
 
     IEnumerator RefreshFriends()
@@ -123,13 +131,13 @@ public class FriendsPanelController : MonoBehaviour
         switch (code)
         {
             case 400:
-                addStatusText.text = "Ошибка загрузки списка друзей";
+                addStatusText.text = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РґСЂСѓР·РµР№";
                 break;
             case 404:
-                addStatusText.text = "Ошибка загрузки списка друзей";
+                addStatusText.text = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РґСЂСѓР·РµР№";
                 break;
             default:
-                addStatusText.text = "Ошибка загрузки списка друзей";
+                addStatusText.text = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РґСЂСѓР·РµР№";
                 break;
         }
     });
@@ -149,6 +157,34 @@ public class FriendsPanelController : MonoBehaviour
         }
     }
 
+    IEnumerator RefreshRequests()
+    {
+        if (requestsContent == null || requestRowPrefab == null) yield break;
+
+        ClearRequests();
+
+        List<FriendsApi.FriendRequestItem> list = null;
+        yield return api.GetFriendRequests(items => list = items, (code, err) =>
+        {
+            if (requestsStatusText != null)
+                requestsStatusText.text = "Ошибка загрузки заявок";
+        });
+
+        if (list == null) yield break;
+
+        if (requestsBadge != null)
+            requestsBadge.SetActive(list.Count > 0);
+
+        foreach (var r in list)
+        {
+            var row = Instantiate(requestRowPrefab, requestsContent);
+            row.Bind(r,
+                onAccept: () => StartCoroutine(AcceptRequestFlow(r.requestId)),
+                onDecline: () => StartCoroutine(DeclineRequestFlow(r.requestId))
+            );
+        }
+    }
+
     IEnumerator AddFriendFlow()
     {
         addStatusText.text = "";
@@ -160,7 +196,7 @@ public class FriendsPanelController : MonoBehaviour
 
         if (!ok)
         {
-            addStatusText.text = "Не удалось добавить (проверь код).";
+            addStatusText.text = "РќРµ СѓРґР°Р»РѕСЃСЊ РґРѕР±Р°РІРёС‚СЊ (РїСЂРѕРІРµСЂСЊ РєРѕРґ).";
             yield break;
         }
 
@@ -175,11 +211,32 @@ public class FriendsPanelController : MonoBehaviour
         if (ok) yield return RefreshFriends();
     }
 
+    IEnumerator AcceptRequestFlow(string requestId)
+    {
+        bool ok = false;
+        yield return api.AcceptFriendRequest(requestId, success => ok = success);
+        if (ok)
+        {
+            yield return RefreshRequests();
+            yield return RefreshFriends();
+        }
+    }
+
+    IEnumerator DeclineRequestFlow(string requestId)
+    {
+        bool ok = false;
+        yield return api.DeclineFriendRequest(requestId, success => ok = success);
+        if (ok)
+        {
+            yield return RefreshRequests();
+        }
+    }
+
     IEnumerator RenameFlow()
     {
         renameStatusText.text = "";
         var name = (renameInput.text ?? "").Trim();
-        if (name.Length < 3) { renameStatusText.text = "Минимум 3 символа"; yield break; }
+        if (name.Length < 3) { renameStatusText.text = "РњРёРЅРёРјСѓРј 3 СЃРёРјРІРѕР»Р°"; yield break; }
 
         bool ok = false;
         string fail = null;
@@ -189,14 +246,14 @@ public class FriendsPanelController : MonoBehaviour
 
         if (!ok)
         {
-            renameStatusText.text = fail ?? "Не удалось сменить ник";
+            renameStatusText.text = fail ?? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРјРµРЅРёС‚СЊ РЅРёРє";
             yield break;
         }
 
         renameInput.text = "";
         var p = api.LocalProfile();
-        myNameText.text = $"Ник: {p.displayName}";
-        renameStatusText.text = "Ник изменён!";
+        myNameText.text = $"РќРёРє: {p.displayName}";
+        renameStatusText.text = "РќРёРє РёР·РјРµРЅС‘РЅ!";
     }
 
     IEnumerator ViewFriendBaseStub(string friendCode)
@@ -206,7 +263,7 @@ public class FriendsPanelController : MonoBehaviour
         FriendBaseResponse resp = null;
         yield return backend.GetFriendBase(friendCode,
             ok => resp = ok,
-            (code, err) => addStatusText.text = "Не удалось загрузить базу друга");
+            (code, err) => addStatusText.text = "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р±Р°Р·Сѓ РґСЂСѓРіР°");
 
         if (resp == null)
             yield break;
@@ -247,4 +304,12 @@ public class FriendsPanelController : MonoBehaviour
         for (int i = listContent.childCount - 1; i >= 0; i--)
             Destroy(listContent.GetChild(i).gameObject);
     }
+
+    void ClearRequests()
+    {
+        if (requestsContent == null) return;
+        for (int i = requestsContent.childCount - 1; i >= 0; i--)
+            Destroy(requestsContent.GetChild(i).gameObject);
+    }
 }
+

@@ -45,6 +45,39 @@ public class FriendBaseResponse
     public string dataRaw;
 }
 
+[Serializable]
+public class ChestItemData
+{
+    public string id;
+    public BrainrotDinamicData dinamic;
+}
+
+[Serializable]
+public class ChestSlotDto
+{
+    public int slotIndex;
+    public string itemType;
+    public ChestItemData itemData;
+    public string itemDataRaw;
+}
+
+[Serializable]
+public class ChestStateResponse
+{
+    public string updatedAt;
+    public List<ChestSlotDto> slots = new();
+}
+
+[Serializable]
+public class ChestClaimResponse
+{
+    public bool ok;
+    public int slotIndex;
+    public string itemType;
+    public ChestItemData itemData;
+    public string itemDataRaw;
+}
+
 public class ZooBackendClient : MonoBehaviour
 {
     [Header("Server")]
@@ -325,6 +358,146 @@ public class ZooBackendClient : MonoBehaviour
         catch
         {
             onErr?.Invoke(500, "Failed to parse friend base response");
+        }
+    }
+
+    // ===== CHEST =====
+    public IEnumerator GetChest(Action<ChestStateResponse> onOk = null, Action<long, string> onErr = null)
+    {
+        yield return EnsureGuest();
+
+        var url = $"{baseUrl}/chest";
+        using var req = UnityWebRequest.Get(url);
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        try
+        {
+            var obj = JObject.Parse(req.downloadHandler.text);
+            var resp = obj.ToObject<ChestStateResponse>() ?? new ChestStateResponse();
+            resp.updatedAt = obj["updatedAt"]?.ToString();
+            resp.slots = new List<ChestSlotDto>();
+
+            var slots = obj["slots"] as JArray;
+            if (slots != null)
+            {
+                foreach (var token in slots)
+                {
+                    var slot = token.ToObject<ChestSlotDto>() ?? new ChestSlotDto();
+                    slot.slotIndex = token["slotIndex"]?.Value<int>() ?? slot.slotIndex;
+                    slot.itemType = token["itemType"]?.ToString();
+                    var dataToken = token["itemData"];
+                    if (dataToken != null && dataToken.Type != JTokenType.Null)
+                    {
+                        slot.itemDataRaw = dataToken.ToString(Formatting.None);
+                        try
+                        {
+                            slot.itemData = JsonConvert.DeserializeObject<ChestItemData>(slot.itemDataRaw);
+                        }
+                        catch
+                        {
+                            slot.itemData = null;
+                        }
+                    }
+                    resp.slots.Add(slot);
+                }
+            }
+
+            onOk?.Invoke(resp);
+        }
+        catch
+        {
+            onErr?.Invoke(500, "Failed to parse chest response");
+        }
+    }
+
+    public IEnumerator DepositToChest(string targetFriendCode, string itemType, ChestItemData itemData, Action<bool> onOk = null, Action<long, string> onErr = null)
+    {
+        yield return EnsureGuest();
+
+        var url = $"{baseUrl}/chest/deposit";
+        var payload = new JObject
+        {
+            ["targetFriendCode"] = (targetFriendCode ?? "").Trim().ToUpperInvariant(),
+            ["itemType"] = itemType,
+            ["itemData"] = itemData != null ? JToken.FromObject(itemData) : null
+        };
+        var json = payload.ToString(Formatting.None);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            onOk?.Invoke(false);
+            yield break;
+        }
+
+        onOk?.Invoke(true);
+    }
+
+    public IEnumerator ClaimChest(int slotIndex, Action<ChestClaimResponse> onOk = null, Action<long, string> onErr = null)
+    {
+        yield return EnsureGuest();
+
+        var url = $"{baseUrl}/chest/claim";
+        var payload = new JObject
+        {
+            ["slotIndex"] = slotIndex
+        };
+        var json = payload.ToString(Formatting.None);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        try
+        {
+            var obj = JObject.Parse(req.downloadHandler.text);
+            var resp = obj.ToObject<ChestClaimResponse>() ?? new ChestClaimResponse();
+            resp.itemType = obj["itemType"]?.ToString();
+            var dataToken = obj["itemData"];
+            if (dataToken != null && dataToken.Type != JTokenType.Null)
+            {
+                resp.itemDataRaw = dataToken.ToString(Formatting.None);
+                try
+                {
+                    resp.itemData = JsonConvert.DeserializeObject<ChestItemData>(resp.itemDataRaw);
+                }
+                catch
+                {
+                    resp.itemData = null;
+                }
+            }
+            onOk?.Invoke(resp);
+        }
+        catch
+        {
+            onErr?.Invoke(500, "Failed to parse chest claim response");
         }
     }
 }

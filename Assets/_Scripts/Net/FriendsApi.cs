@@ -1,4 +1,4 @@
-using System;
+п»їusing System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -27,8 +27,19 @@ public class FriendsApi : MonoBehaviour
         public string lastSeenAt;
     }
 
+    [Serializable]
+    public class FriendRequestItem
+    {
+        public string requestId;
+        public string friendCode;
+        public string displayName;
+        public string createdAt;
+    }
+
 
     [Serializable] private class FriendAddRequest { public string friendCode; }
+    [Serializable] private class FriendRequestCreateRequest { public string targetFriendCode; }
+    [Serializable] private class FriendRequestDecisionRequest { public string requestId; }
     [Serializable] private class RenameRequest { public string displayName; }
 
     private void Awake()
@@ -78,7 +89,7 @@ public class FriendsApi : MonoBehaviour
         req.SetRequestHeader("X-Player-Id", p.playerId);
 
         yield return req.SendWebRequest();
-        // ошибки можно игнорить (просто онлайн-индикатор)
+        // РѕС€РёР±РєРё РјРѕР¶РЅРѕ РёРіРЅРѕСЂРёС‚СЊ (РїСЂРѕСЃС‚Рѕ РѕРЅР»Р°Р№РЅ-РёРЅРґРёРєР°С‚РѕСЂ)
     }
 
     public IEnumerator GetFriends(Action<List<FriendItem>> onOk, Action<long, string> onErr = null)
@@ -103,12 +114,13 @@ public class FriendsApi : MonoBehaviour
             yield break;
         }
 
-        // массив -> обёртка
+        // РјР°СЃСЃРёРІ -> РѕР±С‘СЂС‚РєР°
         var wrapper = JsonUtility.FromJson<FriendsWrapper>("{\"items\":" + req.downloadHandler.text + "}");
         onOk?.Invoke(wrapper.items ?? new List<FriendItem>());
     }
 
     [Serializable] private class FriendsWrapper { public List<FriendItem> items; }
+    [Serializable] private class FriendRequestsWrapper { public List<FriendRequestItem> items; }
 
     public IEnumerator AddFriend(string friendCode, Action<bool> onOk = null)
     {
@@ -116,6 +128,86 @@ public class FriendsApi : MonoBehaviour
         var url = baseUrl + "/friends/add";
 
         var body = new FriendAddRequest { friendCode = (friendCode ?? "").Trim().ToUpperInvariant() };
+        var json = JsonUtility.ToJson(body);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        req.SetRequestHeader("X-Player-Id", p.playerId);
+
+        yield return req.SendWebRequest();
+        onOk?.Invoke(req.result == UnityWebRequest.Result.Success);
+    }
+
+    public IEnumerator SendFriendRequest(string friendCode, Action<bool> onOk = null)
+    {
+        var p = LocalProfile();
+        var url = baseUrl + "/friends/request";
+
+        var body = new FriendRequestCreateRequest { targetFriendCode = (friendCode ?? "").Trim().ToUpperInvariant() };
+        var json = JsonUtility.ToJson(body);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        req.SetRequestHeader("X-Player-Id", p.playerId);
+
+        yield return req.SendWebRequest();
+        onOk?.Invoke(req.result == UnityWebRequest.Result.Success);
+    }
+
+    public IEnumerator GetFriendRequests(Action<List<FriendRequestItem>> onOk, Action<long, string> onErr = null)
+    {
+        var p = LocalProfile();
+        if (string.IsNullOrEmpty(p.playerId))
+        {
+            onErr?.Invoke(0, "No playerId. Call EnsureGuest first.");
+            yield break;
+        }
+
+        var url = baseUrl + "/friends/requests";
+        using var req = UnityWebRequest.Get(url);
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("X-Player-Id", p.playerId);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        var wrapper = JsonUtility.FromJson<FriendRequestsWrapper>("{\"items\":" + req.downloadHandler.text + "}");
+        onOk?.Invoke(wrapper.items ?? new List<FriendRequestItem>());
+    }
+
+    public IEnumerator AcceptFriendRequest(string requestId, Action<bool> onOk = null)
+    {
+        var p = LocalProfile();
+        var url = baseUrl + "/friends/requests/accept";
+
+        var body = new FriendRequestDecisionRequest { requestId = requestId };
+        var json = JsonUtility.ToJson(body);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        req.SetRequestHeader("X-Player-Id", p.playerId);
+
+        yield return req.SendWebRequest();
+        onOk?.Invoke(req.result == UnityWebRequest.Result.Success);
+    }
+
+    public IEnumerator DeclineFriendRequest(string requestId, Action<bool> onOk = null)
+    {
+        var p = LocalProfile();
+        var url = baseUrl + "/friends/requests/decline";
+
+        var body = new FriendRequestDecisionRequest { requestId = requestId };
         var json = JsonUtility.ToJson(body);
 
         using var req = new UnityWebRequest(url, "POST");
@@ -171,7 +263,7 @@ public class FriendsApi : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            // 403: сервер вернёт currentDisplayName — восстановим его в сохранениях (на всякий случай)
+            // 403: СЃРµСЂРІРµСЂ РІРµСЂРЅС‘С‚ currentDisplayName вЂ” РІРѕСЃСЃС‚Р°РЅРѕРІРёРј РµРіРѕ РІ СЃРѕС…СЂР°РЅРµРЅРёСЏС… (РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№)
             if (req.responseCode == 403)
             {
                 try
@@ -182,18 +274,18 @@ public class FriendsApi : MonoBehaviour
                 }
                 catch { /* ignore */ }
 
-                onFail?.Invoke("Бесплатная смена уже использована. Нажми кнопку платной смены.");
+                onFail?.Invoke("Р‘РµСЃРїР»Р°С‚РЅР°СЏ СЃРјРµРЅР° СѓР¶Рµ РёСЃРїРѕР»СЊР·РѕРІР°РЅР°. РќР°Р¶РјРё РєРЅРѕРїРєСѓ РїР»Р°С‚РЅРѕР№ СЃРјРµРЅС‹.");
             }
             else
             {
-                onFail?.Invoke(string.IsNullOrEmpty(req.downloadHandler.text) ? "Не удалось сменить ник" : req.downloadHandler.text);
+                onFail?.Invoke(string.IsNullOrEmpty(req.downloadHandler.text) ? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРјРµРЅРёС‚СЊ РЅРёРє" : req.downloadHandler.text);
             }
 
             onOk?.Invoke(false);
             yield break;
         }
 
-        // success -> сохраняем
+        // success -> СЃРѕС…СЂР°РЅСЏРµРј
         saveManager.SaveBackendProfile(p.playerId, p.friendCode, body.displayName);
         onOk?.Invoke(true);
     }
@@ -215,7 +307,7 @@ public class FriendsApi : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            onFail?.Invoke(string.IsNullOrEmpty(req.downloadHandler.text) ? "Не удалось сменить ник" : req.downloadHandler.text);
+            onFail?.Invoke(string.IsNullOrEmpty(req.downloadHandler.text) ? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРјРµРЅРёС‚СЊ РЅРёРє" : req.downloadHandler.text);
             onOk?.Invoke(false);
             yield break;
         }
@@ -225,3 +317,4 @@ public class FriendsApi : MonoBehaviour
     }
 
 }
+
