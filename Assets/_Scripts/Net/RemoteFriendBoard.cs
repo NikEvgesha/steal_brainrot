@@ -10,6 +10,7 @@ public class RemoteFriendBoard : MonoBehaviour
     [SerializeField] private string friendLabel = "Друг";
     [SerializeField] private string addLabel = "Добавить в друзья";
     [SerializeField] private string sentLabel = "Запрос отправлен";
+    [SerializeField] private string giftLabel = "Подарить";
     [SerializeField] private string offlineLabel = "Оффлайн";
 
     private FriendsApi api;
@@ -18,6 +19,7 @@ public class RemoteFriendBoard : MonoBehaviour
     private bool isOnline;
     private string friendCode;
     private string displayName;
+    private string playerId;
     private bool requestInFlight;
 
     private void Awake()
@@ -40,6 +42,18 @@ public class RemoteFriendBoard : MonoBehaviour
 
     public void SetRemote(string code, string name, bool friend, bool online)
     {
+        playerId = null;
+        SetRemoteInternal(code, name, friend, online);
+    }
+
+    public void SetRemoteWithId(string pid, string code, string name, bool friend, bool online)
+    {
+        playerId = pid;
+        SetRemoteInternal(code, name, friend, online);
+    }
+
+    private void SetRemoteInternal(string code, string name, bool friend, bool online)
+    {
         friendCode = code;
         displayName = name;
         isFriend = friend;
@@ -48,7 +62,7 @@ public class RemoteFriendBoard : MonoBehaviour
         if (nameText != null)
             nameText.text = string.IsNullOrEmpty(displayName) ? "Player" : displayName;
 
-        gameObject.SetActive(online);
+        gameObject.SetActive(!string.IsNullOrEmpty(friendCode) || !string.IsNullOrEmpty(displayName));
         UpdatePanel();
     }
 
@@ -75,27 +89,34 @@ public class RemoteFriendBoard : MonoBehaviour
             return;
         }
 
-        if (!isOnline)
+        if (statusText != null)
         {
-            interactionPanel.gameObject.SetActive(false);
-            if (statusText != null) statusText.text = offlineLabel;
-            return;
+            var baseText = CanGiftFromHand() ? giftLabel : (isFriend ? friendLabel : addLabel);
+            if (!isOnline)
+                baseText = $"{baseText} • {offlineLabel}";
+            statusText.text = baseText;
         }
 
-        if (statusText != null)
-            statusText.text = isFriend ? friendLabel : addLabel;
-
-        interactionPanel.gameObject.SetActive(!isFriend);
-        if (!isFriend)
-            interactionPanel.SetInfo(addLabel);
+        var canGift = CanGiftFromHand();
+        interactionPanel.gameObject.SetActive(isOnline && (canGift || !isFriend));
+        if (isOnline)
+            interactionPanel.SetInfo(canGift ? giftLabel : addLabel);
     }
 
     private void OnInteract()
     {
         if (requestInFlight) return;
-        if (isFriend || !isOnline) return;
-        if (string.IsNullOrWhiteSpace(friendCode)) return;
+        if (!isOnline) return;
 
+        if (CanGiftFromHand())
+        {
+            if (string.IsNullOrWhiteSpace(playerId)) return;
+            StartCoroutine(SendGift());
+            return;
+        }
+
+        if (isFriend) return;
+        if (string.IsNullOrWhiteSpace(friendCode)) return;
         StartCoroutine(SendRequest());
     }
 
@@ -110,5 +131,42 @@ public class RemoteFriendBoard : MonoBehaviour
             if (interactionPanel != null) interactionPanel.gameObject.SetActive(false);
         }
         requestInFlight = false;
+    }
+
+    private IEnumerator SendGift()
+    {
+        requestInFlight = true;
+        bool ok = false;
+
+        var current = G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
+        if (current == null)
+        {
+            requestInFlight = false;
+            yield break;
+        }
+
+        var itemType = current.Type == Item.Egg ? "egg" :
+            current.Type == Item.Brainrot ? "brainrot" : null;
+        if (string.IsNullOrEmpty(itemType))
+        {
+            requestInFlight = false;
+            yield break;
+        }
+
+        yield return LobbyClient.Instance.SendGift(playerId, itemType, current.Name, success => ok = success);
+        if (ok)
+        {
+            G.Inventory?.Remove(current);
+            Destroy(current.gameObject);
+            if (statusText != null) statusText.text = giftLabel;
+        }
+        requestInFlight = false;
+    }
+
+    private bool CanGiftFromHand()
+    {
+        var current = G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
+        if (current == null) return false;
+        return current.Type == Item.Egg || current.Type == Item.Brainrot;
     }
 }

@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class GiftChestController : MonoBehaviour
 {
+    public static bool Disabled = true;
+
     [Header("Mode")]
     [SerializeField] private bool isOwnerChest = false;
     [SerializeField] private string targetFriendCode;
@@ -34,6 +36,11 @@ public class GiftChestController : MonoBehaviour
 
     private void Awake()
     {
+        if (Disabled)
+        {
+            gameObject.SetActive(false);
+            return;
+        }
         if (backend == null) backend = G.Backend;
         if (interactionPanel == null) interactionPanel = GetComponentInChildren<InteractionPanel>(true);
     }

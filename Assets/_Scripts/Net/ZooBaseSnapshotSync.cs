@@ -36,6 +36,13 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     [Header("How often to publish base snapshot")]
     [SerializeField] private float publishIntervalSec = 5f;
+    [SerializeField] private bool autoPublish = true;
+    [SerializeField] private float changeCheckIntervalSec = 5f;
+
+    private string _lastJson;
+    private bool _dirty;
+    private Coroutine _publishLoop;
+    private Coroutine _checkLoop;
 
     private void Awake()
     {
@@ -45,7 +52,9 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     private void Start()
     {
-        StartCoroutine(PublishLoop());
+        if (autoPublish)
+            _publishLoop = StartCoroutine(PublishLoop());
+        _checkLoop = StartCoroutine(ChangeCheckLoop());
     }
 
     IEnumerator PublishLoop()
@@ -65,9 +74,48 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         }
     }
 
-    private string BuildSnapshotJson()
+    IEnumerator ChangeCheckLoop()
     {
-        var dto = new BaseSnapshotDto
+        yield return new WaitForSeconds(1f);
+        while (true)
+        {
+            var json = BuildSnapshotJson();
+            if (_lastJson == null || _lastJson != json)
+            {
+                _lastJson = json;
+                _dirty = true;
+            }
+            yield return new WaitForSeconds(changeCheckIntervalSec);
+        }
+    }
+
+    public void SetAutoPublish(bool enabled)
+    {
+        autoPublish = enabled;
+        if (autoPublish && _publishLoop == null)
+            _publishLoop = StartCoroutine(PublishLoop());
+        if (!autoPublish && _publishLoop != null)
+        {
+            StopCoroutine(_publishLoop);
+            _publishLoop = null;
+        }
+    }
+
+    public string ConsumeDirtySnapshot()
+    {
+        if (!_dirty) return null;
+        _dirty = false;
+        return _lastJson;
+    }
+
+    public string BuildSnapshotJson()
+    {
+        return JsonUtility.ToJson(BuildSnapshotDto());
+    }
+
+    public BaseSnapshotDto BuildSnapshotDto()
+    {
+        return new BaseSnapshotDto
         {
             updatedAt = DateTime.UtcNow.ToString("o"),
             bigPet = new BigPetDto
@@ -88,8 +136,6 @@ public class ZooBaseSnapshotSync : MonoBehaviour
             cells = LoadCells_SOMEHOW(),
             animalsOnCells = LoadAnimalsOnCells_SOMEHOW()
         };
-
-        return JsonUtility.ToJson(dto);
     }
 
     // ====== РўРЈРў РўР« вЂњР’РЎРўР РђРР’РђР•РЁР¬РЎРЇвЂќ Р’ РЎР’РћР® РР“Р РЈ ======

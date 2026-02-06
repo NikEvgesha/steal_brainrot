@@ -52,7 +52,7 @@ public class GameLoader : MonoBehaviour
             else
                 _startLoadingFinished = true;
 
-            _loadingImage.SetActive(true);
+            if (_loadingImage != null) _loadingImage.SetActive(true);
             StartCoroutine("SceneLoad", _currentSceneName);
             // G.Ad.ShowInterstitialAd();
         }
@@ -79,11 +79,11 @@ public class GameLoader : MonoBehaviour
         if (!PauseManager.Instance.IsInitialize)
             PauseManager.Instance.StartInitialize();
 
-        _loadingImage.SetActive(false);
+        if (_loadingImage != null) _loadingImage.SetActive(false);
         //G.Ad.ShowInterstitialAd();
         OnSceneLoaded?.Invoke();
     }
 
-    public void ShowLoadingScreen(bool show) { _loadingImage.SetActive(show); }
+    public void ShowLoadingScreen(bool show) { if (_loadingImage != null) _loadingImage.SetActive(show); }
 
 }

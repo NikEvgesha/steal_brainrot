@@ -25,6 +25,7 @@ public class GameEntryPoint : MonoBehaviour
         Instantiate(_hubPrefab).Initialize(G.Currency);
         Instantiate(_ui);
         Instantiate(_remoteBasesApplier);
+        new GameObject("LobbyDebugPanel").AddComponent<LobbyDebugPanel>();
 
         G.Initialized?.Invoke();
         //_scene.SetActive(true);

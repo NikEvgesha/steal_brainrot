@@ -37,6 +37,9 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_purchaseManager);
         Instantiate(_storage);
         Instantiate(_backend);
+        new GameObject("LobbyClient").AddComponent<LobbyClient>();
+        new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
+        new GameObject("LobbyDebugPanel").AddComponent<LobbyDebugPanel>();
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
     }
