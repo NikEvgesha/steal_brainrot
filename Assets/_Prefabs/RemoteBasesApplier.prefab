@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8583250768408127419}
   - component: {fileID: 1605766216065109416}
+  - component: {fileID: 4815477962529768275}
   m_Layer: 0
   m_Name: RemoteBasesApplier
   m_TagString: Untagged
@@ -92,6 +93,31 @@ MonoBehaviour:
     applyLand: 1
   applyOnStart: 1
   clearEmptySlots: 1
+  disableEmptySlots: 1
+  deterministicSlots: 1
+  spawnRemotePlayers: 1
+  remotePlayerPrefab: {fileID: 0}
+  moveFriendBoardToRemotePlayer: 1
+  remotePlayerDelaySec: 0.1
+--- !u!114 &4815477962529768275
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1941093714092709032}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a148227047d2dbb42869efd0dc499f79, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LobbyClient
+  autoJoinOnStart: 1
+  updateIntervalSec: 1
+  stateIntervalSec: 1
+  maxConsecutiveErrors: 3
+  positionSampleRate: 30
+  backend: {fileID: 0}
+  snapshotSync: {fileID: 0}
 --- !u!1001 &191943311441494920
 PrefabInstance:
   m_ObjectHideFlags: 0
