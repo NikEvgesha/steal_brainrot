@@ -8,6 +8,7 @@ public class GameEntryPoint : MonoBehaviour
     [SerializeField] private GameObject _ui;
     [SerializeField] private GameObject _scene;
     [SerializeField] private ElementTypeMultiplaer _elements;
+    [SerializeField] private ZooBackendClient _backend;
 
     [SerializeField] private IncomeModifiersHub _hubPrefab;
     [SerializeField] private DailyPlaytimeTrackerMB _dailyPlaytimeTracker;
@@ -24,7 +25,10 @@ public class GameEntryPoint : MonoBehaviour
         Instantiate(_dailyPlaytimeTracker);
         Instantiate(_hubPrefab).Initialize(G.Currency);
         Instantiate(_ui);
-        Instantiate(_remoteBasesApplier);
+        //Instantiate(_remoteBasesApplier);
+
+        if (G.Backend == null && _backend != null)
+            Instantiate(_backend);
         new GameObject("LobbyDebugPanel").AddComponent<LobbyDebugPanel>();
 
         G.Initialized?.Invoke();

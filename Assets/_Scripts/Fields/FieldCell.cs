@@ -126,6 +126,7 @@ public class FieldCell : MonoBehaviour
                 break;
         }
         SaveData();
+        BaseDirtyTracker.MarkDirty();
 
         CheckPlayer();
     }

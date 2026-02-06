@@ -38,6 +38,7 @@ public class BigPetPoint : MonoBehaviour
     private double _accumulatedIncome;
     private BigPetSetUI _setPetUI;
     private DateTime _lastIncomeCollectTimestamp;
+    private bool _initializedLocal;
 
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
@@ -45,6 +46,14 @@ public class BigPetPoint : MonoBehaviour
     private void Start()
     {
         if (_remoteMode) return;
+        InitLocal();
+    }
+
+    private void InitLocal()
+    {
+        if (_initializedLocal) return;
+        if (_remoteMode) return;
+        _initializedLocal = true;
         // TODO load current xp
         // load current pet
         // load food
@@ -52,6 +61,16 @@ public class BigPetPoint : MonoBehaviour
         // set pet scale
         // load income
         _setPetUI = GetComponentInChildren<BigPetSetUI>();
+        if (_setPetUI == null)
+        {
+            Debug.LogWarning("[BigPetPoint] BigPetSetUI not found.");
+            return;
+        }
+        if (_pets == null || _pets.Count == 0)
+        {
+            Debug.LogWarning("[BigPetPoint] Pets list is empty.");
+            return;
+        }
         _setPetUI.PetSlotClicked.AddListener(ChangeActivePet);
         _setPetUI.InitUI(_pets);
         _currentLvl = G.Save.LoadBigPetLvl();
@@ -82,7 +101,6 @@ public class BigPetPoint : MonoBehaviour
         }  
         _accumulatedIncome = incomeAccumulateTime * _currentIncome;
         StartCoroutine(ProduceIncome());
-        
     }
 
     public void _OnPlayerEnter()
@@ -103,6 +121,30 @@ public class BigPetPoint : MonoBehaviour
         PlayerExit?.Invoke();
     }
 
+
+
+    private void HideRemoteUI()
+    {
+        if (_feedButton != null) _feedButton.SetActive(false);
+        if (_foodTimeBar != null) _foodTimeBar.gameObject.SetActive(false);
+        if (_xpProgressBar != null) _xpProgressBar.gameObject.SetActive(false);
+        if (_foodTimeBarText != null) _foodTimeBarText.gameObject.SetActive(false);
+        if (_xpProgressText != null) _xpProgressText.gameObject.SetActive(false);
+        if (_setPetUI != null) _setPetUI.gameObject.SetActive(false);
+        if (_petInfoUI != null) _petInfoUI.gameObject.SetActive(false);
+    }
+
+
+    private void ShowLocalUI()
+    {
+        if (_feedButton != null) _feedButton.SetActive(true);
+        if (_foodTimeBar != null) _foodTimeBar.gameObject.SetActive(false);
+        if (_xpProgressBar != null) _xpProgressBar.gameObject.SetActive(true);
+        if (_foodTimeBarText != null) _foodTimeBarText.gameObject.SetActive(false);
+        if (_xpProgressText != null) _xpProgressText.gameObject.SetActive(true);
+        if (_setPetUI != null) _setPetUI.gameObject.SetActive(true);
+        if (_petInfoUI != null) _petInfoUI.gameObject.SetActive(true);
+    }
 
     private void CheckPlayer(InventoryItem item = null)
     {
@@ -172,6 +214,7 @@ public class BigPetPoint : MonoBehaviour
         {
             _currentLvl++;
             G.Save.SaveBigPetLvl(_currentLvl);
+            BaseDirtyTracker.MarkDirty();
             _currentXp -= _xpForNextLvl;
             _xpForNextLvl += _xpAddintPerLvl;
             if (_currentLvl % _lvlsPerPet == 1 && (_maxAvailablePetIdx < _pets.Count - 1))
@@ -215,6 +258,8 @@ public class BigPetPoint : MonoBehaviour
         _currentPetIdx = idx;
         if (!_remoteMode)
             G.Save.SaveBigPetId(_currentPetIdx);
+        if (!_remoteMode)
+            BaseDirtyTracker.MarkDirty();
         _currentPet = Instantiate(_pets[idx].Model, _petPoint);
         if (_setPetUI != null)
             _setPetUI.ChangeActivePet(_pets[idx]);
@@ -274,6 +319,7 @@ public class BigPetPoint : MonoBehaviour
     public void ApplyRemoteState(int petId, int lvl, int xp)
     {
         _remoteMode = true;
+        HideRemoteUI();
 
         _currentLvl = Mathf.Max(1, lvl);
         _currentXp = Mathf.Max(0, xp);
@@ -305,6 +351,8 @@ public class BigPetPoint : MonoBehaviour
     public void SetRemoteMode(bool remote)
     {
         _remoteMode = remote;
+        if (_remoteMode) HideRemoteUI();
+        else ShowLocalUI();
     }
 
 }

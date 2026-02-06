@@ -24,7 +24,7 @@ public class PlayerManager : MonoBehaviour
 
     public void Init(Transform spawnPos)
     {
-        transform.position = spawnPos.position;
+        //transform.position = spawnPos.position;
         TPCameraController camera = Instantiate(_camera);
         camera.SetTarget(_cameraPivot);
         _tPPlayer.SetCamera(camera.transform);

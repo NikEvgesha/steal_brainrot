@@ -35,6 +35,7 @@ public class LobbyMemberStateDto
     public string baseDataRaw;
     public LobbyHandItemDto hand;
     public List<LobbyPosSampleDto> positions;
+    public int slotIndex;
 }
 
 [Serializable]
@@ -66,6 +67,14 @@ public class LobbyStateResponseDto
     public List<LobbyMemberStateDto> members = new();
 }
 
+public class LobbyJoinResponseDto
+{
+    public string lobbyId;
+    public long version;
+    public List<LobbyMemberStateDto> members = new();
+    public List<int> availableSlots = new();
+}
+
 public class LobbyClient : MonoBehaviour
 {
     public static LobbyClient Instance { get; private set; }
@@ -73,9 +82,16 @@ public class LobbyClient : MonoBehaviour
     [Header("Behavior")]
     [SerializeField] private bool autoJoinOnStart = true;
     [SerializeField] private float updateIntervalSec = 1f;
-    [SerializeField] private float stateIntervalSec = 1f;
+    [SerializeField] private float stateIntervalSec = 2f;
     [SerializeField] private int maxConsecutiveErrors = 3;
+    [SerializeField] private float reconnectIntervalSec = 60f;
     [SerializeField] private float positionSampleRate = 30f;
+    [SerializeField] private float positionMinDistance = 0.05f;
+    [SerializeField] private int maxSamplesPerUpdate = 20;
+    [Header("Lobby Slots")]
+    [SerializeField] private bool debugSlots = false;
+    [SerializeField] private int claimRetryCount = 10;
+    [SerializeField] private float claimRetryDelaySec = 0.5f;
 
     [Header("Deps (optional)")]
     [SerializeField] private ZooBackendClient backend;
@@ -91,11 +107,14 @@ public class LobbyClient : MonoBehaviour
     private Coroutine _updateLoop;
     private Coroutine _stateLoop;
     private Coroutine _sampleLoop;
+    private Coroutine _reconnectLoop;
     private int _errors;
     private RemoteBasesApplier _remoteBases;
     private long _lastVersion;
     private readonly List<LobbyPosSampleDto> _pendingSamples = new();
     private float _batchStartTime;
+    private Vector3 _lastSamplePos;
+    private bool _hasSamplePos;
 
     private void Awake()
     {
@@ -123,6 +142,7 @@ public class LobbyClient : MonoBehaviour
 
     public IEnumerator JoinLobbyFlow()
     {
+        if (IsOnline) yield break;
         if (backend == null)
         {
             var tries = 0;
@@ -254,6 +274,31 @@ public class LobbyClient : MonoBehaviour
         if (_remoteBases != null)
             _remoteBases.ApplyLobbyMembers(new List<LobbyMemberStateDto>());
         Debug.LogWarning($"[Lobby] Offline: {reason}");
+
+        _pendingSamples.Clear();
+        _hasSamplePos = false;
+
+        if (_reconnectLoop == null)
+            _reconnectLoop = StartCoroutine(ReconnectLoop());
+    }
+
+    private IEnumerator ReconnectLoop()
+    {
+        while (!IsOnline)
+        {
+            yield return new WaitForSeconds(reconnectIntervalSec);
+            if (IsOnline) yield break;
+            if (backend == null)
+                backend = G.Backend != null ? G.Backend : FindAnyObjectByType<ZooBackendClient>();
+
+            if (backend == null) continue;
+            if (snapshotSync == null)
+                snapshotSync = FindAnyObjectByType<ZooBaseSnapshotSync>();
+
+            yield return JoinLobbyFlow();
+        }
+
+        _reconnectLoop = null;
     }
 
     private void OnApplicationQuit()
@@ -284,20 +329,50 @@ public class LobbyClient : MonoBehaviour
             var tr = G.Player != null ? G.Player.transform : null;
             if (tr != null)
             {
-                var dt = (Time.realtimeSinceStartup - _batchStartTime) * 1000f;
-                _pendingSamples.Add(new LobbyPosSampleDto
+                var pos = tr.position;
+                if (!_hasSamplePos)
                 {
-                    dt = dt,
-                    x = tr.position.x,
-                    y = tr.position.y,
-                    z = tr.position.z
-                });
+                    _hasSamplePos = true;
+                    _lastSamplePos = pos;
+                    _batchStartTime = Time.realtimeSinceStartup;
+                    _pendingSamples.Add(new LobbyPosSampleDto
+                    {
+                        dt = 0f,
+                        x = pos.x,
+                        y = pos.y,
+                        z = pos.z
+                    });
+                }
+                else
+                {
+                    var delta = pos - _lastSamplePos;
+                    if (delta.sqrMagnitude >= positionMinDistance * positionMinDistance)
+                    {
+                        if (_pendingSamples.Count == 0)
+                            _batchStartTime = Time.realtimeSinceStartup;
+                        var dt = (Time.realtimeSinceStartup - _batchStartTime) * 1000f;
+                        _pendingSamples.Add(new LobbyPosSampleDto
+                        {
+                            dt = dt,
+                            x = pos.x,
+                            y = pos.y,
+                            z = pos.z
+                        });
+                        _lastSamplePos = pos;
+                    }
+                }
             }
             yield return wait;
         }
     }
 
     private string BaseUrl => backend != null ? backend.baseUrl : "";
+
+    private string GetLocalPlayerId()
+    {
+        if (G.Save == null) return null;
+        return G.Save.LoadBackendProfile().playerId;
+    }
 
     private void SetPlayerHeader(UnityWebRequest req)
     {
@@ -321,17 +396,63 @@ public class LobbyClient : MonoBehaviour
             yield break;
         }
 
+        int slotPick = -1;
+        bool needAutoClaim = false;
+        List<int> availableSlotsCache = new List<int>();
         try
         {
             var obj = JObject.Parse(req.downloadHandler.text);
             LobbyId = obj["lobbyId"]?.ToString();
             _lastVersion = obj["version"]?.Value<long>() ?? _lastVersion;
-            ParseMembers(obj["members"] as JArray);
+            var membersArr = obj["members"] as JArray;
+            ParseMembers(membersArr);
+
+            var slotIndex = -1;
+            var myId = GetLocalPlayerId();
+            if (!string.IsNullOrEmpty(myId) && membersArr != null)
+            {
+                foreach (var token in membersArr)
+                {
+                    if (token?["playerId"]?.ToString() == myId)
+                    {
+                        slotIndex = token["slotIndex"]?.Value<int>() ?? -1;
+                        break;
+                    }
+                }
+            }
+
+            if (slotIndex < 0)
+            {
+                availableSlotsCache = obj["availableSlots"]?.ToObject<List<int>>() ?? new List<int>();
+                slotPick = PickRandomSlot(availableSlotsCache);
+                if (slotPick < 0) needAutoClaim = true;
+            }
+
+            if (debugSlots) Debug.Log($"[Lobby] join slotIndex={slotIndex} available={availableSlotsCache.Count} auto={needAutoClaim}");
             onDone?.Invoke(true);
         }
         catch
         {
             onDone?.Invoke(false);
+        }
+
+        if (slotPick >= 0)
+        {
+            bool claimed = false;
+            yield return TryClaimSlotWithRetry(availableSlotsCache, v => claimed = v);
+            if (claimed)
+                yield return FetchState();
+        }
+        else if (needAutoClaim)
+        {
+            yield return ClaimSlotAuto();
+            yield return FetchState();
+        }
+
+        if (IsOnline && _reconnectLoop != null)
+        {
+            StopCoroutine(_reconnectLoop);
+            _reconnectLoop = null;
         }
     }
 
@@ -358,18 +479,122 @@ public class LobbyClient : MonoBehaviour
             yield break;
         }
 
+        int slotPick = -1;
+        bool needAutoClaim = false;
+        List<int> availableSlotsCache = new List<int>();
         try
         {
             var obj = JObject.Parse(req.downloadHandler.text);
             LobbyId = obj["lobbyId"]?.ToString();
             _lastVersion = obj["version"]?.Value<long>() ?? _lastVersion;
-            ParseMembers(obj["members"] as JArray);
+            var membersArr = obj["members"] as JArray;
+            ParseMembers(membersArr);
+
+            var slotIndex = -1;
+            var myId = GetLocalPlayerId();
+            if (!string.IsNullOrEmpty(myId) && membersArr != null)
+            {
+                foreach (var token in membersArr)
+                {
+                    if (token?["playerId"]?.ToString() == myId)
+                    {
+                        slotIndex = token["slotIndex"]?.Value<int>() ?? -1;
+                        break;
+                    }
+                }
+            }
+
+            if (slotIndex < 0)
+            {
+                availableSlotsCache = obj["availableSlots"]?.ToObject<List<int>>() ?? new List<int>();
+                slotPick = PickRandomSlot(availableSlotsCache);
+                if (slotPick < 0) needAutoClaim = true;
+            }
+
+            if (debugSlots) Debug.Log($"[Lobby] join slotIndex={slotIndex} available={availableSlotsCache.Count} auto={needAutoClaim}");
             onDone?.Invoke(true);
         }
         catch
         {
             onDone?.Invoke(false);
         }
+
+        if (slotPick >= 0)
+        {
+            bool claimed = false;
+            yield return TryClaimSlotWithRetry(availableSlotsCache, v => claimed = v);
+            if (claimed)
+                yield return FetchState();
+        }
+        else if (needAutoClaim)
+        {
+            yield return ClaimSlotAuto();
+            yield return FetchState();
+        }
+    }
+
+
+    private IEnumerator ClaimSlot(int slotIndex, Action<long> onDone = null)
+    {
+        var url = $"{BaseUrl}/lobby/slot";
+        var payload = new JObject { ["slotIndex"] = slotIndex };
+        var json = payload.ToString(Formatting.None);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+        onDone?.Invoke(req.responseCode);
+    }
+
+    private int PickRandomSlot(List<int> slots)
+    {
+        if (slots == null || slots.Count == 0) return -1;
+        var idx = UnityEngine.Random.Range(0, slots.Count);
+        return slots[idx];
+    }
+
+
+
+    private IEnumerator ClaimSlotAuto()
+    {
+        var url = $"{BaseUrl}/lobby/slot/auto";
+        using var req = new UnityWebRequest(url, "POST");
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+    }
+
+    private IEnumerator TryClaimSlotWithRetry(List<int> availableSlots, Action<bool> onDone = null)
+    {
+        var slots = availableSlots != null ? new List<int>(availableSlots) : new List<int>();
+        for (int attempt = 0; attempt < claimRetryCount && slots.Count > 0; attempt++)
+        {
+            var pick = PickRandomSlot(slots);
+            if (pick < 0) break;
+            long code = 0;
+            if (debugSlots) Debug.Log($"[Lobby] claim attempt slot={pick}");
+            yield return ClaimSlot(pick, v => code = v);
+            if (debugSlots) Debug.Log($"[Lobby] claim response {code}");
+            if (code >= 200 && code < 300)
+            {
+                onDone?.Invoke(true);
+                yield break;
+            }
+
+            // remove claimed slot and retry
+            slots.Remove(pick);
+            if (claimRetryDelaySec > 0f)
+                yield return new WaitForSeconds(claimRetryDelaySec);
+        }
+
+        // fallback: let server assign slot
+        yield return ClaimSlotAuto();
+        onDone?.Invoke(true);
     }
 
     public IEnumerator SendGift(string toPlayerId, string itemType, string itemId, Action<bool> onDone = null)
@@ -489,13 +714,30 @@ public class LobbyClient : MonoBehaviour
         List<LobbyPosSampleDto> samplesToSend = null;
         if (_pendingSamples.Count > 0)
         {
-            samplesToSend = new List<LobbyPosSampleDto>(_pendingSamples);
+            if (maxSamplesPerUpdate > 0 && _pendingSamples.Count > maxSamplesPerUpdate)
+            {
+                var skip = _pendingSamples.Count - maxSamplesPerUpdate;
+                samplesToSend = _pendingSamples.GetRange(skip, maxSamplesPerUpdate);
+                var baseDt = samplesToSend[0].dt;
+                if (baseDt > 0.001f)
+                {
+                    for (var i = 0; i < samplesToSend.Count; i++)
+                        samplesToSend[i].dt -= baseDt;
+                }
+            }
+            else
+            {
+                samplesToSend = new List<LobbyPosSampleDto>(_pendingSamples);
+            }
             _pendingSamples.Clear();
             _batchStartTime = Time.realtimeSinceStartup;
         }
 
         if (samplesToSend != null)
             payload["positions"] = JToken.FromObject(samplesToSend);
+
+        if (payload.Count == 0)
+            yield break;
 
         var json = payload.ToString(Formatting.None);
 

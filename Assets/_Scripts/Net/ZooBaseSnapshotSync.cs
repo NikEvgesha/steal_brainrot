@@ -37,12 +37,8 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     [Header("How often to publish base snapshot")]
     [SerializeField] private float publishIntervalSec = 5f;
     [SerializeField] private bool autoPublish = true;
-    [SerializeField] private float changeCheckIntervalSec = 5f;
 
-    private string _lastJson;
-    private bool _dirty;
     private Coroutine _publishLoop;
-    private Coroutine _checkLoop;
 
     private void Awake()
     {
@@ -54,7 +50,6 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     {
         if (autoPublish)
             _publishLoop = StartCoroutine(PublishLoop());
-        _checkLoop = StartCoroutine(ChangeCheckLoop());
     }
 
     IEnumerator PublishLoop()
@@ -68,24 +63,12 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
         while (true)
         {
-            var json = BuildSnapshotJson();
-            yield return backend.SaveZoo(json); // PUT /zoo/me :contentReference[oaicite:8]{index=8}
-            yield return new WaitForSeconds(publishIntervalSec);
-        }
-    }
-
-    IEnumerator ChangeCheckLoop()
-    {
-        yield return new WaitForSeconds(1f);
-        while (true)
-        {
-            var json = BuildSnapshotJson();
-            if (_lastJson == null || _lastJson != json)
+            if (BaseDirtyTracker.Consume())
             {
-                _lastJson = json;
-                _dirty = true;
+                var json = BuildSnapshotJson();
+                yield return backend.SaveZoo(json); // PUT /zoo/me
             }
-            yield return new WaitForSeconds(changeCheckIntervalSec);
+            yield return new WaitForSeconds(publishIntervalSec);
         }
     }
 
@@ -103,9 +86,8 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     public string ConsumeDirtySnapshot()
     {
-        if (!_dirty) return null;
-        _dirty = false;
-        return _lastJson;
+        if (!BaseDirtyTracker.Consume()) return null;
+        return BuildSnapshotJson();
     }
 
     public string BuildSnapshotJson()

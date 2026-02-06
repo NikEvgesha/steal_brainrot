@@ -15,6 +15,7 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private AdsManager _adsManager;
     [SerializeField] private ItemPrefabStorage _storage;
     [SerializeField] private ZooBackendClient _backend;
+    [SerializeField] private LobbyClient _lobby;
 
     [SerializeField] private GameScene _gameScene;
 
@@ -37,7 +38,8 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_purchaseManager);
         Instantiate(_storage);
         Instantiate(_backend);
-        new GameObject("LobbyClient").AddComponent<LobbyClient>();
+        Instantiate(_lobby);
+
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
         new GameObject("LobbyDebugPanel").AddComponent<LobbyDebugPanel>();
 

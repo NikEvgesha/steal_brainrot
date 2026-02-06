@@ -31,6 +31,13 @@ public class Conveyor : MonoBehaviour
             G.Initialized.AddListener(Init);
     }
 
+
+    private void EnsureLocalInit()
+    {
+        if (_initialized || _remoteMode) return;
+        Init();
+    }
+
     private void Init()
     {
         if (_remoteMode) return;
@@ -42,6 +49,12 @@ public class Conveyor : MonoBehaviour
             _levels[i].SetPurchased(true);
         }
 
+        if (_levels == null || _levels.Count == 0)
+        {
+            Debug.LogWarning("[Conveyor] Levels list is empty.");
+            return;
+        }
+
         for (int i = _lastUnlockedLevel + 1; i < _levels.Count; i++)
         {
             _levels[i].LevelPurchased.AddListener(OnLevelPurchase);
@@ -49,6 +62,11 @@ public class Conveyor : MonoBehaviour
         }
 
         _ui = GetComponentInChildren<ConveyorUI>();
+        if (_ui == null)
+        {
+            Debug.LogWarning("[Conveyor] ConveyorUI not found.");
+            return;
+        }
         _ui.Init(_levels);
         _ui.LevelActivated.AddListener(SetLevel);
         SetLevel(_levels[_currentLevel]);
@@ -103,6 +121,18 @@ public class Conveyor : MonoBehaviour
     }
 
 
+
+    private void HideRemoteUI()
+    {
+        if (_ui != null) _ui.gameObject.SetActive(false);
+    }
+
+
+    private void ShowLocalUI()
+    {
+        if (_ui != null) _ui.gameObject.SetActive(true);
+    }
+
     public void SetLevel(ConveyorLevel lvl)
     {
         if (_level != null)
@@ -118,6 +148,7 @@ public class Conveyor : MonoBehaviour
         {
             G.Save.SaveConveyorCurrentLevel(_levels.IndexOf(lvl));
             _ui.UpdateActiveLvl(_currentLevel);
+            BaseDirtyTracker.MarkDirty();
         }
     }
 
@@ -126,6 +157,7 @@ public class Conveyor : MonoBehaviour
         if (_remoteMode) return;
         int id = _levels.IndexOf(lvl);
         G.Save.SaveConveyorUnlockedLevel(id);
+        BaseDirtyTracker.MarkDirty();
         if (id < _levels.Count - 1)
         {
             _levels[id + 1].SetPurchasingAvailable(true);
@@ -149,6 +181,7 @@ public class Conveyor : MonoBehaviour
     public void ApplyRemoteLevel(int level)
     {
         _remoteMode = true;
+        HideRemoteUI();
         StopAllCoroutines();
         _initialized = false;
 
@@ -166,5 +199,14 @@ public class Conveyor : MonoBehaviour
     public void SetRemoteMode(bool remote)
     {
         _remoteMode = remote;
+        if (_remoteMode)
+        {
+            HideRemoteUI();
+        }
+        else
+        {
+            ShowLocalUI();
+            EnsureLocalInit();
+        }
     }
 }
