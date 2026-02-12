@@ -1456,6 +1456,18 @@ public class RemoteBasesApplier : MonoBehaviour
         return null;
     }
 
+    public Transform GetLocalSlotEntryPoint()
+    {
+        if (slots == null || slots.Count == 0)
+            return null;
+
+        var idx = GetLocalSlotIndex();
+        if (idx < 0 || idx >= slots.Count)
+            return null;
+
+        return GetSlotEntryPoint(idx);
+    }
+
     public void ApplyFriendBase(BaseSnapshotDto snapshot, int slotIndex = 0)
     {
         if (slots == null || slots.Count == 0) return;

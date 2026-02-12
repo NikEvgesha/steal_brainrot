@@ -3,7 +3,10 @@ using UnityEngine;
 
 public class Teleporter : MonoBehaviour
 {
-    private Dictionary<ScenePoint, Transform> _points = new();
+    [SerializeField] private bool useLobbySlotTeleport = true;
+
+    private readonly Dictionary<ScenePoint, List<Transform>> _points = new();
+    private RemoteBasesApplier _remoteBases;
 
     private void Start()
     {
@@ -18,20 +21,66 @@ public class Teleporter : MonoBehaviour
 
     public void RegisterPoint(TeleportPoint point)
     {
-        if (_points.ContainsKey(point.Destination))
+        if (point == null) return;
+
+        if (!_points.TryGetValue(point.Destination, out var list))
         {
-            Debug.Log("Trying to register existing teleport point");
-            return;
+            list = new List<Transform>();
+            _points.Add(point.Destination, list);
         }
 
-        _points.Add(point.Destination, point.transform);
+        if (!list.Contains(point.transform))
+            list.Add(point.transform);
     }
 
     private void Teleport(ScenePoint destination)
     {
-        if (!_points.ContainsKey(destination)) return;
+        var target = ResolveDestination(destination);
+        if (target == null) return;
 
+        G.Player.Teleport(target);
+    }
 
-        G.Player.Teleport(_points[destination]);
+    private Transform ResolveDestination(ScenePoint destination)
+    {
+        var remoteBases = GetRemoteBases();
+        if (useLobbySlotTeleport && destination == ScenePoint.HOME && remoteBases != null)
+        {
+            var localEntry = remoteBases.GetLocalSlotEntryPoint();
+            if (localEntry != null)
+                return localEntry;
+        }
+
+        if (!_points.TryGetValue(destination, out var list) || list == null || list.Count == 0)
+            return null;
+
+        if (remoteBases != null)
+        {
+            var localRoot = remoteBases.GetLocalSlotRoot();
+            if (localRoot != null)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var t = list[i];
+                    if (t != null && t.IsChildOf(localRoot))
+                        return t;
+                }
+            }
+        }
+
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i] != null)
+                return list[i];
+        }
+
+        return null;
+    }
+
+    private RemoteBasesApplier GetRemoteBases()
+    {
+        if (_remoteBases == null)
+            _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        return _remoteBases;
     }
 }
