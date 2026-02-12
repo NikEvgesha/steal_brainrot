@@ -8,6 +8,8 @@ public class RemotePlayerMover : MonoBehaviour
     [SerializeField] private float rotateLerp = 12f;
     [SerializeField] private string speedParam = "Speed";
     [SerializeField] private string holdingParam = "IsHolding";
+    [SerializeField] private string handPointName = "handPoint";
+    [SerializeField] private string carryPointName = "GetItem";
 
     private struct Sample
     {
@@ -24,6 +26,11 @@ public class RemotePlayerMover : MonoBehaviour
     private float _lastTime;
     private Animator _animator;
     private bool _isHolding;
+    private Transform _handPoint;
+    private Transform _carryPoint;
+    private GameObject _heldVisual;
+    private string _heldType;
+    private string _heldId;
 
     public void SetDelay(float delay)
     {
@@ -36,6 +43,38 @@ public class RemotePlayerMover : MonoBehaviour
         if (_animator == null) _animator = GetComponentInChildren<Animator>();
         if (_animator != null)
             _animator.SetBool(holdingParam, _isHolding);
+    }
+
+    public void SetHand(LobbyHandItemDto hand)
+    {
+        var type = hand != null ? (hand.type ?? string.Empty).Trim().ToLowerInvariant() : string.Empty;
+        var id = hand != null ? hand.id : null;
+
+        var hasVisualItem = !string.IsNullOrEmpty(type) &&
+                            !string.IsNullOrEmpty(id) &&
+                            type != "hammer";
+        SetHolding(hasVisualItem);
+
+        if (!hasVisualItem)
+        {
+            ClearHeldVisual();
+            return;
+        }
+
+        if (_heldVisual != null && _heldType == type && _heldId == id)
+            return;
+
+        ClearHeldVisual();
+        var parent = ResolveHoldParent(type);
+        if (parent == null)
+            parent = transform;
+
+        _heldVisual = BuildHandVisual(type, id, parent);
+        if (_heldVisual == null)
+            return;
+
+        _heldType = type;
+        _heldId = id;
     }
 
     public void PushSamples(List<LobbyPosSampleDto> samples)
@@ -183,5 +222,109 @@ public class RemotePlayerMover : MonoBehaviour
             _samples.RemoveRange(0, overflow);
             _head = Mathf.Max(0, _head - overflow);
         }
+    }
+
+    private Transform ResolveHoldParent(string type)
+    {
+        if (_carryPoint == null)
+            _carryPoint = FindDeepChildByName(transform, carryPointName);
+        if (_handPoint == null)
+            _handPoint = FindDeepChildByName(transform, handPointName);
+
+        if (type == "hammer" && _handPoint != null)
+            return _handPoint;
+
+        if (_carryPoint != null)
+            return _carryPoint;
+        if (_handPoint != null)
+            return _handPoint;
+
+        return transform;
+    }
+
+    private GameObject BuildHandVisual(string type, string id, Transform parent)
+    {
+        if (G.Storage == null || parent == null)
+            return null;
+
+        GameObject visual = null;
+        switch (type)
+        {
+            case "egg":
+            {
+                var prefab = G.Storage.GetEgg(id);
+                if (prefab != null)
+                    visual = Instantiate(prefab.gameObject, parent, false);
+                break;
+            }
+            case "brainrot":
+            {
+                var prefab = G.Storage.GetPet(id);
+                if (prefab != null && prefab.Model != null)
+                    visual = Instantiate(prefab.Model, parent, false);
+                break;
+            }
+            case "food":
+            {
+                var prefab = G.Storage.GetFood(id);
+                if (prefab != null)
+                    visual = Instantiate(prefab.gameObject, parent, false);
+                break;
+            }
+        }
+
+        if (visual == null)
+            return null;
+
+        PrepareHandVisual(visual);
+        visual.transform.localPosition = Vector3.zero;
+        visual.transform.localRotation = Quaternion.identity;
+        return visual;
+    }
+
+    private void PrepareHandVisual(GameObject visual)
+    {
+        if (visual == null)
+            return;
+
+        foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
+            collider.enabled = false;
+        foreach (var body in visual.GetComponentsInChildren<Rigidbody>(true))
+        {
+            body.isKinematic = true;
+            body.detectCollisions = false;
+        }
+        foreach (var canvas in visual.GetComponentsInChildren<Canvas>(true))
+            canvas.enabled = false;
+        foreach (var behaviour in visual.GetComponentsInChildren<MonoBehaviour>(true))
+            behaviour.enabled = false;
+    }
+
+    private void ClearHeldVisual()
+    {
+        if (_heldVisual != null)
+            Destroy(_heldVisual);
+        _heldVisual = null;
+        _heldType = null;
+        _heldId = null;
+    }
+
+    private static Transform FindDeepChildByName(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrEmpty(name))
+            return null;
+
+        var queue = new Queue<Transform>();
+        queue.Enqueue(root);
+        while (queue.Count > 0)
+        {
+            var t = queue.Dequeue();
+            if (t.name == name)
+                return t;
+            for (int i = 0; i < t.childCount; i++)
+                queue.Enqueue(t.GetChild(i));
+        }
+
+        return null;
     }
 }

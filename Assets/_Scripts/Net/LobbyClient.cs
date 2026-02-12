@@ -92,6 +92,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float soloStateIntervalSec = 2.5f;
     [SerializeField] private int maxConsecutiveErrors = 3;
     [SerializeField] private float reconnectIntervalSec = 60f;
+    [SerializeField] private float reconnectFirstDelaySec = 5f;
     [SerializeField] private float positionSampleRate = 30f;
     [SerializeField] private float positionMinDistance = 0.05f;
     [SerializeField] private float positionSendWindowSec = 1.5f;
@@ -132,7 +133,6 @@ public class LobbyClient : MonoBehaviour
     private readonly List<PositionHistorySample> _positionHistory = new();
     private readonly Dictionary<string, string> _remoteBaseRawCache = new();
     private readonly Dictionary<string, BaseSnapshotDto> _remoteBaseSnapshotCache = new();
-    private int _preferredSlotIndex = -1;
     private Vector3 _lastSamplePos;
     private bool _hasSamplePos;
     private string _cachedLocalPlayerId;
@@ -340,10 +340,17 @@ public class LobbyClient : MonoBehaviour
 
     private IEnumerator ReconnectLoop()
     {
+        var firstAttempt = true;
         while (!IsOnline)
         {
-            yield return new WaitForSeconds(reconnectIntervalSec);
-            if (IsOnline) yield break;
+            var delay = firstAttempt
+                ? Mathf.Max(1f, Mathf.Min(reconnectFirstDelaySec, reconnectIntervalSec))
+                : Mathf.Max(1f, reconnectIntervalSec);
+            firstAttempt = false;
+
+            yield return new WaitForSeconds(delay);
+            if (IsOnline)
+                break;
             if (backend == null)
                 backend = G.Backend != null ? G.Backend : FindAnyObjectByType<ZooBackendClient>();
 
@@ -779,9 +786,6 @@ public class LobbyClient : MonoBehaviour
 
     private int PickPreferredOrRandomSlot(List<int> slots)
     {
-        if (slots == null || slots.Count == 0) return -1;
-        if (_preferredSlotIndex >= 0 && slots.Contains(_preferredSlotIndex))
-            return _preferredSlotIndex;
         return PickRandomSlot(slots);
     }
 
@@ -1221,9 +1225,6 @@ public class LobbyClient : MonoBehaviour
 
                 if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
                     seenRemoteIds.Add(item.playerId);
-
-                if (!string.IsNullOrEmpty(localId) && item.playerId == localId && item.slotIndex >= 0)
-                    _preferredSlotIndex = item.slotIndex;
 
                 _lastMembers.Add(item);
             }

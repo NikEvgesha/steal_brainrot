@@ -233,37 +233,6 @@ public class RemoteBasesApplier : MonoBehaviour
                     break;
                 }
             }
-
-            if (localMember == null && previousServerLocalSlotIndex >= 0 && previousServerLocalSlotIndex < slots.Count)
-            {
-                foreach (var m in members)
-                {
-                    if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
-                    if (m.slotIndex != previousServerLocalSlotIndex) continue;
-                    localMember = m;
-                    localId = m.playerId;
-                    break;
-                }
-            }
-
-            if (localMember == null)
-            {
-                LobbyMemberStateDto onlyMember = null;
-                var validMembersCount = 0;
-                foreach (var m in members)
-                {
-                    if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
-                    validMembersCount++;
-                    onlyMember = m;
-                    if (validMembersCount > 1) break;
-                }
-
-                if (validMembersCount == 1)
-                {
-                    localMember = onlyMember;
-                    localId = onlyMember.playerId;
-                }
-            }
         }
 
         if (localMember != null && localMember.slotIndex >= 0 && localMember.slotIndex < slots.Count)
@@ -298,6 +267,7 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
                 if (localMember != null && m.playerId == localMember.playerId) continue;
+                if (!m.isOnline) continue;
                 remoteMembersCount++;
             }
         }
@@ -308,6 +278,8 @@ public class RemoteBasesApplier : MonoBehaviour
             foreach (var m in members)
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
+                if (!m.isOnline && (localMember == null || m.playerId != localMember.playerId))
+                    continue;
                 var slotIndex = m.slotIndex;
                 if (slotIndex < 0 || slotIndex >= slots.Count)
                     slotIndex = FindSlotForPlayer(m.playerId);
@@ -1625,7 +1597,12 @@ public class RemoteBasesApplier : MonoBehaviour
     {
         if (_slotRemotePlayers == null || slotIndex < 0 || slotIndex >= _slotRemotePlayers.Length) return;
         if (_slotRemotePlayers[slotIndex] != null)
+        {
+            var mover = _slotRemotePlayers[slotIndex].GetComponent<RemotePlayerMover>();
+            if (mover != null)
+                mover.SetHand(null);
             _slotRemotePlayers[slotIndex].SetActive(false);
+        }
     }
 
     private void ApplyRemotePositions(int slotIndex, List<LobbyPosSampleDto> positions)
@@ -1645,8 +1622,7 @@ public class RemoteBasesApplier : MonoBehaviour
         if (go == null) return;
         var mover = go.GetComponent<RemotePlayerMover>();
         if (mover == null) return;
-        var holding = hand != null && !string.IsNullOrEmpty(hand.type) && hand.type != "hammer";
-        mover.SetHolding(holding);
+        mover.SetHand(hand);
     }
 
     private string GetLocalPlayerId()
