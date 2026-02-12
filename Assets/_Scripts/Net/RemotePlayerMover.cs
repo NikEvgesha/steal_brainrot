@@ -31,6 +31,9 @@ public class RemotePlayerMover : MonoBehaviour
     private GameObject _heldVisual;
     private string _heldType;
     private string _heldId;
+    private int? _heldElement;
+    private float? _heldWeight;
+    private double? _heldIncome;
 
     public void SetDelay(float delay)
     {
@@ -49,6 +52,9 @@ public class RemotePlayerMover : MonoBehaviour
     {
         var type = hand != null ? (hand.type ?? string.Empty).Trim().ToLowerInvariant() : string.Empty;
         var id = hand != null ? hand.id : null;
+        var element = hand != null ? hand.element : null;
+        var weight = hand != null ? hand.weight : null;
+        var income = hand != null ? hand.income : null;
 
         var hasVisualItem = !string.IsNullOrEmpty(type) &&
                             !string.IsNullOrEmpty(id) &&
@@ -61,7 +67,12 @@ public class RemotePlayerMover : MonoBehaviour
             return;
         }
 
-        if (_heldVisual != null && _heldType == type && _heldId == id)
+        if (_heldVisual != null &&
+            _heldType == type &&
+            _heldId == id &&
+            _heldElement == element &&
+            NullableFloatEquals(_heldWeight, weight) &&
+            NullableDoubleEquals(_heldIncome, income))
             return;
 
         ClearHeldVisual();
@@ -73,8 +84,12 @@ public class RemotePlayerMover : MonoBehaviour
         if (_heldVisual == null)
             return;
 
+        ApplyHandTraits(type, hand, _heldVisual);
         _heldType = type;
         _heldId = id;
+        _heldElement = element;
+        _heldWeight = weight;
+        _heldIncome = income;
     }
 
     public void PushSamples(List<LobbyPosSampleDto> samples)
@@ -282,6 +297,68 @@ public class RemotePlayerMover : MonoBehaviour
         return visual;
     }
 
+    private void ApplyHandTraits(string type, LobbyHandItemDto hand, GameObject visual)
+    {
+        if (hand == null || visual == null)
+            return;
+
+        if ((type == "brainrot" || type == "egg") && hand.element.HasValue)
+            ApplyElementColor(visual, hand.element.Value);
+
+        if (type == "brainrot" && hand.weight.HasValue)
+            ApplyWeightScale(visual, hand.weight.Value);
+    }
+
+    private void ApplyElementColor(GameObject visual, int elementRaw)
+    {
+        var color = GetElementColor(elementRaw);
+        if (color.a <= 0f)
+            return;
+
+        var renderers = visual.GetComponentsInChildren<Renderer>(true);
+        foreach (var renderer in renderers)
+        {
+            if (renderer == null) continue;
+
+            var materialCount = renderer.sharedMaterials != null ? renderer.sharedMaterials.Length : 0;
+            if (materialCount <= 0)
+                materialCount = 1;
+
+            for (int i = 0; i < materialCount; i++)
+            {
+                var block = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(block, i);
+                block.SetColor("_Color", color);
+                block.SetColor("_BaseColor", color);
+                renderer.SetPropertyBlock(block, i);
+            }
+        }
+    }
+
+    private void ApplyWeightScale(GameObject visual, float weightMultiplier)
+    {
+        var m = Mathf.Max(1f, weightMultiplier);
+        var scale = 1f + (m - 1f) * 0.25f;
+        visual.transform.localScale = visual.transform.localScale * scale;
+    }
+
+    private Color GetElementColor(int elementRaw)
+    {
+        switch ((ElementType)elementRaw)
+        {
+            case ElementType.Gold:
+                return Color.yellow;
+            case ElementType.Diamond:
+                return Color.blue;
+            case ElementType.Electric:
+                return Color.magenta;
+            case ElementType.Fire:
+                return Color.red;
+            default:
+                return new Color(0f, 0f, 0f, 0f);
+        }
+    }
+
     private void PrepareHandVisual(GameObject visual)
     {
         if (visual == null)
@@ -307,6 +384,23 @@ public class RemotePlayerMover : MonoBehaviour
         _heldVisual = null;
         _heldType = null;
         _heldId = null;
+        _heldElement = null;
+        _heldWeight = null;
+        _heldIncome = null;
+    }
+
+    private static bool NullableFloatEquals(float? a, float? b)
+    {
+        if (!a.HasValue && !b.HasValue) return true;
+        if (!a.HasValue || !b.HasValue) return false;
+        return Mathf.Abs(a.Value - b.Value) <= 0.0001f;
+    }
+
+    private static bool NullableDoubleEquals(double? a, double? b)
+    {
+        if (!a.HasValue && !b.HasValue) return true;
+        if (!a.HasValue || !b.HasValue) return false;
+        return System.Math.Abs(a.Value - b.Value) <= 0.0001d;
     }
 
     private static Transform FindDeepChildByName(Transform root, string name)

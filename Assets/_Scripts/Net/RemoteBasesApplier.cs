@@ -48,6 +48,10 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool smoothSnapshotApply = true;
     [SerializeField] private int snapshotOpsPerFrame = 12;
     [SerializeField] private bool incrementalSnapshotApply = true;
+    [Header("Proximity Sync")]
+    [SerializeField] private bool syncOnlyNearSlots = true;
+    [SerializeField] private float syncDistanceMeters = 10f;
+    [SerializeField] private float syncDistanceHysteresisMeters = 2f;
     [Header("Debug")]
     [SerializeField] private bool debugLogs = false;
     [SerializeField] private bool testCloneLocalToRandomSlot = false;
@@ -71,6 +75,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private bool _lobbyModeActive;
     private int _lastPreparedLocalSlotIndex = -1;
     private int[] _slotModeState;
+    private bool[] _slotWithinSyncRange;
 
     private void Awake()
     {
@@ -98,6 +103,57 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (backend.LastLocations != null && backend.LastLocations.Count > 0)
             ApplyLocations(new List<ZooLocationItem>(backend.LastLocations));
+    }
+
+    public void SetOfflineLocalOnly(bool enabled)
+    {
+        if (!enabled)
+        {
+            _lobbyModeActive = false;
+            return;
+        }
+
+        ApplyOfflineLocalOnly();
+    }
+
+    public void ApplyOfflineLocalOnly()
+    {
+        if (slots == null || slots.Count == 0)
+            return;
+
+        EnsureSlotState();
+        EnsureLocalSlot();
+        _lobbyModeActive = true;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            if (slot == null || slot.root == null)
+                continue;
+
+            if (IsLocalSlotIndex(i))
+            {
+                slot.root.gameObject.SetActive(true);
+                ApplySlotMode(i, false);
+                if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
+                    _slotWithinSyncRange[i] = true;
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(_slotPlayerIds[i]))
+            {
+                _playerToSlot.Remove(_slotPlayerIds[i]);
+                _slotPlayerIds[i] = null;
+            }
+
+            _slotUpdatedAt[i] = EmptySlotMarker;
+            if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
+                _slotWithinSyncRange[i] = false;
+            UpdateChestLobby(slot, null);
+            UpdateFriendBoardLobby(slot, null);
+            ClearSlot(slot);
+            DisableRemotePlayer(i);
+        }
     }
 
     private void MarkRemoteComponents()
@@ -150,10 +206,21 @@ public class RemoteBasesApplier : MonoBehaviour
             if (!string.IsNullOrEmpty(pid) && available.TryGetValue(pid, out var loc))
             {
                 usedPlayers.Add(pid);
-                EnsureRemotePlayer(i);
-                UpdateChestLocation(slots[i], loc);
-                UpdateFriendBoardLocation(slots[i], loc);
-                ApplyIfChanged(i, slots[i], loc);
+                if (IsSlotInSyncRange(i))
+                {
+                    if (slots[i].root != null)
+                        slots[i].root.gameObject.SetActive(true);
+                    EnsureRemotePlayer(i);
+                    UpdateChestLocation(slots[i], loc);
+                    UpdateFriendBoardLocation(slots[i], loc);
+                    ApplyIfChanged(i, slots[i], loc);
+                }
+                else
+                {
+                    if (disableEmptySlots && slots[i].root != null)
+                        slots[i].root.gameObject.SetActive(false);
+                    DisableRemotePlayer(i);
+                }
             }
             else if (!string.IsNullOrEmpty(pid))
             {
@@ -178,10 +245,21 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotPlayerIds[slotIndex] = pick.playerId;
             _playerToSlot[pick.playerId] = slotIndex;
             usedPlayers.Add(pick.playerId);
-            EnsureRemotePlayer(slotIndex);
-            UpdateChestLocation(slots[slotIndex], pick);
-            UpdateFriendBoardLocation(slots[slotIndex], pick);
-            ApplyIfChanged(slotIndex, slots[slotIndex], pick, force: true);
+            if (IsSlotInSyncRange(slotIndex))
+            {
+                if (slots[slotIndex].root != null)
+                    slots[slotIndex].root.gameObject.SetActive(true);
+                EnsureRemotePlayer(slotIndex);
+                UpdateChestLocation(slots[slotIndex], pick);
+                UpdateFriendBoardLocation(slots[slotIndex], pick);
+                ApplyIfChanged(slotIndex, slots[slotIndex], pick, force: true);
+            }
+            else
+            {
+                if (disableEmptySlots && slots[slotIndex].root != null)
+                    slots[slotIndex].root.gameObject.SetActive(false);
+                DisableRemotePlayer(slotIndex);
+            }
         }
 
         if (clearEmptySlots)
@@ -325,6 +403,18 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 _slotPlayerIds[i] = member.playerId;
                 _playerToSlot[member.playerId] = i;
+                var inSyncRange = IsSlotInSyncRange(i);
+                if (!inSyncRange)
+                {
+                    if (disableEmptySlots && slots[i].root != null)
+                        slots[i].root.gameObject.SetActive(false);
+                    DisableRemotePlayer(i);
+                    continue;
+                }
+
+                if (slots[i].root != null)
+                    slots[i].root.gameObject.SetActive(true);
+
                 EnsureRemotePlayer(i);
                 UpdateChestLobby(slots[i], member);
                 UpdateFriendBoardLobby(slots[i], member);
@@ -403,6 +493,46 @@ public class RemoteBasesApplier : MonoBehaviour
         if (slot == null || slot.root == null) return;
         foreach (var cell in slot.root.GetComponentsInChildren<FieldCell>(true))
             cell.LockCell(false);
+    }
+
+    private bool IsSlotInSyncRange(int slotIndex)
+    {
+        if (!syncOnlyNearSlots || syncDistanceMeters <= 0f)
+            return true;
+
+        if (IsLocalSlotIndex(slotIndex))
+            return true;
+
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return false;
+
+        if (_slotWithinSyncRange == null || slotIndex >= _slotWithinSyncRange.Length)
+            return true;
+
+        var slot = slots[slotIndex];
+        if (slot == null || slot.root == null)
+        {
+            _slotWithinSyncRange[slotIndex] = false;
+            return false;
+        }
+
+        var player = G.Player;
+        if (player == null)
+        {
+            _slotWithinSyncRange[slotIndex] = true;
+            return true;
+        }
+
+        var anchor = slot.teleportTarget != null ? slot.teleportTarget.position : slot.root.position;
+        var sqrDist = (anchor - player.transform.position).sqrMagnitude;
+
+        var enterDist = Mathf.Max(0.5f, syncDistanceMeters);
+        var exitDist = Mathf.Max(enterDist, enterDist + Mathf.Max(0f, syncDistanceHysteresisMeters));
+        var wasNear = _slotWithinSyncRange[slotIndex];
+        var threshold = wasNear ? exitDist : enterDist;
+        var near = sqrDist <= threshold * threshold;
+        _slotWithinSyncRange[slotIndex] = near;
+        return near;
     }
 
 
@@ -1135,6 +1265,12 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotModeState = new int[slots.Count];
             for (int i = 0; i < _slotModeState.Length; i++)
                 _slotModeState[i] = -1;
+        }
+        if (_slotWithinSyncRange == null || _slotWithinSyncRange.Length != slots.Count)
+        {
+            _slotWithinSyncRange = new bool[slots.Count];
+            for (int i = 0; i < _slotWithinSyncRange.Length; i++)
+                _slotWithinSyncRange[i] = true;
         }
     }
 

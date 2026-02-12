@@ -11,6 +11,9 @@ public class LobbyHandItemDto
 {
     public string type;
     public string id;
+    public int? element;
+    public float? weight;
+    public double? income;
 }
 
 [Serializable]
@@ -139,6 +142,9 @@ public class LobbyClient : MonoBehaviour
     private bool _hasLastSentHand;
     private string _lastSentHandType;
     private string _lastSentHandId;
+    private int? _lastSentHandElement;
+    private float? _lastSentHandWeight;
+    private double? _lastSentHandIncome;
     private float _trafficSummaryAt;
     private int _trafficReqCount;
     private long _trafficTxBytes;
@@ -146,6 +152,8 @@ public class LobbyClient : MonoBehaviour
     private float _trafficHttpMs;
     private float _trafficParseMs;
     private float _trafficApplyMs;
+    private bool _isAppPaused;
+    private bool _hasAppFocus = true;
 
     private void Awake()
     {
@@ -207,6 +215,10 @@ public class LobbyClient : MonoBehaviour
 
         IsOnline = true;
         _errors = 0;
+        if (_remoteBases == null)
+            _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        if (_remoteBases != null)
+            _remoteBases.SetOfflineLocalOnly(false);
 
         if (snapshotSync != null)
             snapshotSync.SetAutoPublish(false);
@@ -257,6 +269,10 @@ public class LobbyClient : MonoBehaviour
 
         IsOnline = true;
         _errors = 0;
+        if (_remoteBases == null)
+            _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        if (_remoteBases != null)
+            _remoteBases.SetOfflineLocalOnly(false);
         if (snapshotSync != null)
             snapshotSync.SetAutoPublish(false);
         if (_updateLoop == null)
@@ -274,6 +290,12 @@ public class LobbyClient : MonoBehaviour
     {
         while (IsOnline)
         {
+            if (IsAppBackgrounded())
+            {
+                yield return new WaitForSeconds(0.25f);
+                continue;
+            }
+
             yield return UpdateLobby();
             yield return new WaitForSeconds(updateIntervalSec);
         }
@@ -283,6 +305,12 @@ public class LobbyClient : MonoBehaviour
     {
         while (IsOnline)
         {
+            if (IsAppBackgrounded())
+            {
+                yield return new WaitForSeconds(0.25f);
+                continue;
+            }
+
             yield return FetchState();
             var pollDelay = stateIntervalSec;
             if (_lastMembers.Count <= 1)
@@ -314,12 +342,32 @@ public class LobbyClient : MonoBehaviour
         _hasLastSentHand = false;
         _lastSentHandType = null;
         _lastSentHandId = null;
+        _lastSentHandElement = null;
+        _lastSentHandWeight = null;
+        _lastSentHandIncome = null;
         _remoteBaseRawCache.Clear();
         _remoteBaseSnapshotCache.Clear();
+        _lastMembers.Clear();
         FlushTrafficSummary(force: true);
+
+        if (_remoteBases == null)
+            _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        if (_remoteBases != null)
+            _remoteBases.ApplyOfflineLocalOnly();
 
         if (_reconnectLoop == null)
             _reconnectLoop = StartCoroutine(ReconnectLoop());
+    }
+
+    private bool IsAppBackgrounded()
+    {
+        if (_isAppPaused)
+            return true;
+
+        if (Application.platform == RuntimePlatform.WebGLPlayer && !_hasAppFocus)
+            return true;
+
+        return false;
     }
 
     private void EnsureDebugMirrorLoopState()
@@ -366,13 +414,21 @@ public class LobbyClient : MonoBehaviour
 
     private void OnApplicationQuit()
     {
+        if (IsOnline)
+            StartCoroutine(LeaveLobby());
         StartCoroutine(FlushSnapshotOnce());
     }
 
     private void OnApplicationPause(bool pause)
     {
+        _isAppPaused = pause;
         if (pause)
             StartCoroutine(FlushSnapshotOnce());
+    }
+
+    private void OnApplicationFocus(bool focus)
+    {
+        _hasAppFocus = focus;
     }
 
     private IEnumerator FlushSnapshotOnce()
@@ -383,11 +439,40 @@ public class LobbyClient : MonoBehaviour
         yield return backend.SaveZoo(json);
     }
 
+    private IEnumerator LeaveLobby()
+    {
+        if (backend == null)
+            backend = G.Backend != null ? G.Backend : FindAnyObjectByType<ZooBackendClient>();
+        if (backend == null)
+            yield break;
+
+        var url = $"{BaseUrl}/lobby/leave";
+        using var req = new UnityWebRequest(url, "POST");
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req);
+
+        yield return req.SendWebRequest();
+
+        if (req.result == UnityWebRequest.Result.Success || req.responseCode != 404)
+            yield break;
+
+        using var fallbackReq = new UnityWebRequest(url, "DELETE");
+        fallbackReq.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(fallbackReq);
+        yield return fallbackReq.SendWebRequest();
+    }
+
     private IEnumerator SampleLoop()
     {
         var wait = new WaitForSeconds(1f / Mathf.Max(1f, positionSampleRate));
         while (IsOnline)
         {
+            if (IsAppBackgrounded())
+            {
+                yield return wait;
+                continue;
+            }
+
             var tr = G.Player != null ? G.Player.transform : null;
             if (tr != null)
             {
@@ -1278,7 +1363,10 @@ public class LobbyClient : MonoBehaviour
             item.hand = new LobbyHandItemDto
             {
                 type = handObj["type"]?.ToString(),
-                id = handObj["id"]?.ToString()
+                id = handObj["id"]?.ToString(),
+                element = handObj["element"]?.Type == JTokenType.Null ? null : handObj["element"]?.Value<int?>(),
+                weight = handObj["weight"]?.Type == JTokenType.Null ? null : handObj["weight"]?.Value<float?>(),
+                income = handObj["income"]?.Type == JTokenType.Null ? null : handObj["income"]?.Value<double?>()
             };
         }
 
@@ -1305,6 +1393,9 @@ public class LobbyClient : MonoBehaviour
 
     private void RegisterError()
     {
+        if (IsAppBackgrounded())
+            return;
+
         _errors++;
         if (_errors >= maxConsecutiveErrors)
             DisableOnline("server_unreachable");
@@ -1319,31 +1410,73 @@ public class LobbyClient : MonoBehaviour
         var type = MapHandType(active.Type);
         if (string.IsNullOrEmpty(type)) return null;
 
-        return new LobbyHandItemDto
+        var dto = new LobbyHandItemDto
         {
             type = type,
             id = active.Name
         };
+
+        if (active.Type == Item.Brainrot && active is Brainrot brainrot)
+        {
+            dto.element = (int)brainrot.DinamicData.ElementType;
+            dto.weight = brainrot.DinamicData.WeightMultiplier;
+            dto.income = brainrot.DinamicData.ResultIncome;
+        }
+        else if (active.Type == Item.Egg && active is Egg egg)
+        {
+            dto.element = (int)egg.Data.DinamicData.ElementType;
+            dto.weight = egg.Data.DinamicData.WeightMultiplier;
+            dto.income = egg.Data.DinamicData.ResultIncome;
+        }
+
+        return dto;
     }
 
     private bool HasHandChanged(LobbyHandItemDto hand)
     {
         var type = hand != null ? hand.type : null;
         var id = hand != null ? hand.id : null;
+        var element = hand != null ? hand.element : null;
+        var weight = hand != null ? hand.weight : null;
+        var income = hand != null ? hand.income : null;
         if (!_hasLastSentHand)
         {
             _hasLastSentHand = true;
             _lastSentHandType = type;
             _lastSentHandId = id;
+            _lastSentHandElement = element;
+            _lastSentHandWeight = weight;
+            _lastSentHandIncome = income;
             return hand != null;
         }
 
-        if (_lastSentHandType == type && _lastSentHandId == id)
+        if (_lastSentHandType == type &&
+            _lastSentHandId == id &&
+            _lastSentHandElement == element &&
+            NullableFloatEquals(_lastSentHandWeight, weight) &&
+            NullableDoubleEquals(_lastSentHandIncome, income))
             return false;
 
         _lastSentHandType = type;
         _lastSentHandId = id;
+        _lastSentHandElement = element;
+        _lastSentHandWeight = weight;
+        _lastSentHandIncome = income;
         return true;
+    }
+
+    private static bool NullableFloatEquals(float? a, float? b)
+    {
+        if (!a.HasValue && !b.HasValue) return true;
+        if (!a.HasValue || !b.HasValue) return false;
+        return Mathf.Abs(a.Value - b.Value) <= 0.0001f;
+    }
+
+    private static bool NullableDoubleEquals(double? a, double? b)
+    {
+        if (!a.HasValue && !b.HasValue) return true;
+        if (!a.HasValue || !b.HasValue) return false;
+        return Math.Abs(a.Value - b.Value) <= 0.0001d;
     }
 
     private string MapHandType(Item item)
