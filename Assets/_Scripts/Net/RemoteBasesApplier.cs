@@ -45,6 +45,8 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private GameObject remotePlayerPrefab;
     [SerializeField] private bool moveFriendBoardToRemotePlayer = true;
     [SerializeField] private float remotePlayerDelaySec = 1.1f;
+    [SerializeField] private GameObject remoteInteractionCanvasPrefab;
+    [SerializeField] private float remoteInteractionDistance = 2.5f;
     [SerializeField] private bool smoothSnapshotApply = true;
     [SerializeField] private int snapshotOpsPerFrame = 12;
     [SerializeField] private bool incrementalSnapshotApply = true;
@@ -76,6 +78,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private int _lastPreparedLocalSlotIndex = -1;
     private int[] _slotModeState;
     private bool[] _slotWithinSyncRange;
+    private bool _didInitialFullLobbySync;
 
     private void Awake()
     {
@@ -110,6 +113,7 @@ public class RemoteBasesApplier : MonoBehaviour
         if (!enabled)
         {
             _lobbyModeActive = false;
+            _didInitialFullLobbySync = false;
             return;
         }
 
@@ -124,6 +128,7 @@ public class RemoteBasesApplier : MonoBehaviour
         EnsureSlotState();
         EnsureLocalSlot();
         _lobbyModeActive = true;
+        _didInitialFullLobbySync = false;
 
         for (int i = 0; i < slots.Count; i++)
         {
@@ -345,10 +350,10 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
                 if (localMember != null && m.playerId == localMember.playerId) continue;
-                if (!m.isOnline) continue;
                 remoteMembersCount++;
             }
         }
+        var applyDistanceCulling = syncOnlyNearSlots && syncDistanceMeters > 0f && _didInitialFullLobbySync;
 
         var desiredBySlot = new Dictionary<int, LobbyMemberStateDto>();
         if (members != null)
@@ -356,8 +361,6 @@ public class RemoteBasesApplier : MonoBehaviour
             foreach (var m in members)
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
-                if (!m.isOnline && (localMember == null || m.playerId != localMember.playerId))
-                    continue;
                 var slotIndex = m.slotIndex;
                 if (slotIndex < 0 || slotIndex >= slots.Count)
                     slotIndex = FindSlotForPlayer(m.playerId);
@@ -403,23 +406,24 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 _slotPlayerIds[i] = member.playerId;
                 _playerToSlot[member.playerId] = i;
-                var inSyncRange = IsSlotInSyncRange(i);
+                EnsureRemotePlayer(i);
+                ApplyRemotePositions(i, member.positions);
+                ApplyRemoteHolding(i, member.hand);
+                UpdateFriendBoardLobby(slots[i], member);
+
+                var inSyncRange = !applyDistanceCulling || IsSlotInSyncRange(i);
                 if (!inSyncRange)
                 {
                     if (disableEmptySlots && slots[i].root != null)
                         slots[i].root.gameObject.SetActive(false);
-                    DisableRemotePlayer(i);
+                    UpdateChestLobby(slots[i], null);
                     continue;
                 }
 
                 if (slots[i].root != null)
                     slots[i].root.gameObject.SetActive(true);
 
-                EnsureRemotePlayer(i);
                 UpdateChestLobby(slots[i], member);
-                UpdateFriendBoardLobby(slots[i], member);
-                ApplyRemotePositions(i, member.positions);
-                ApplyRemoteHolding(i, member.hand);
                 ApplyIfChangedLobby(i, slots[i], member);
             }
             else
@@ -445,6 +449,8 @@ public class RemoteBasesApplier : MonoBehaviour
         // Debug clone is only useful for solo local testing; disable it when real remote members exist.
         if (remoteMembersCount == 0)
             ApplyTestClone(localMember);
+        else
+            _didInitialFullLobbySync = true;
         if (localMember != null)
             TryTeleportLocalPlayer();
     }
@@ -1704,7 +1710,7 @@ public class RemoteBasesApplier : MonoBehaviour
             var go = Instantiate(remotePlayerPrefab, spawn.position, spawn.rotation);
             go.name = $"RemotePlayer_{slotIndex}";
             _slotRemotePlayers[slotIndex] = go;
-            _slotRemoteBoards[slotIndex] = go.GetComponentInChildren<RemoteFriendBoard>(true);
+
             var mover = go.GetComponent<RemotePlayerMover>();
             if (mover == null) mover = go.AddComponent<RemotePlayerMover>();
             mover.SetDelay(Mathf.Max(remotePlayerDelaySec, 1f));
@@ -1718,15 +1724,71 @@ public class RemoteBasesApplier : MonoBehaviour
             }
             var rb = go.GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = true;
+        }
 
-            if (moveFriendBoardToRemotePlayer && _slotRemoteBoards[slotIndex] == null && slot.friendBoard != null)
+        var remotePlayer = _slotRemotePlayers[slotIndex];
+        if (remotePlayer == null)
+            return;
+        _slotRemoteBoards[slotIndex] = EnsureRemoteBoard(slotIndex, remotePlayer);
+        remotePlayer.SetActive(true);
+    }
+
+    private RemoteFriendBoard EnsureRemoteBoard(int slotIndex, GameObject remotePlayer)
+    {
+        if (remotePlayer == null || slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return null;
+
+        var slot = slots[slotIndex];
+        var board = remotePlayer.GetComponentInChildren<RemoteFriendBoard>(true);
+        if (board == null && moveFriendBoardToRemotePlayer && slot != null && slot.friendBoard != null)
+        {
+            slot.friendBoard.transform.SetParent(remotePlayer.transform, worldPositionStays: false);
+            board = slot.friendBoard;
+        }
+        if (board == null)
+            board = remotePlayer.AddComponent<RemoteFriendBoard>();
+
+        var interactionPanel = board.InteractionPanel;
+        if (interactionPanel == null)
+        {
+            interactionPanel = remotePlayer.GetComponentInChildren<InteractionPanel>(true);
+            if (interactionPanel == null && remoteInteractionCanvasPrefab != null)
             {
-                slot.friendBoard.transform.SetParent(go.transform, worldPositionStays: false);
-                _slotRemoteBoards[slotIndex] = slot.friendBoard;
+                var panelInstance = Instantiate(remoteInteractionCanvasPrefab, remotePlayer.transform, false);
+                panelInstance.name = $"RemoteInteractionCanvas_{slotIndex}";
+                var panelTransform = panelInstance.transform;
+                panelTransform.localPosition = new Vector3(0f, 2f, 0f);
+                panelTransform.localRotation = Quaternion.identity;
+                interactionPanel = panelInstance.GetComponentInChildren<InteractionPanel>(true);
             }
         }
 
-        _slotRemotePlayers[slotIndex].SetActive(true);
+        if (interactionPanel != null)
+        {
+            board.SetInteractionPanel(interactionPanel);
+            interactionPanel.gameObject.SetActive(false);
+        }
+
+        var listener = EnsureRemoteInteractionListener(remotePlayer);
+        board.BindRaycastListener(listener, Mathf.Max(0.1f, remoteInteractionDistance));
+        return board;
+    }
+
+    private InteractionRaycastListener EnsureRemoteInteractionListener(GameObject remotePlayer)
+    {
+        if (remotePlayer == null)
+            return null;
+
+        var listener = remotePlayer.GetComponent<InteractionRaycastListener>();
+        if (listener == null)
+            listener = remotePlayer.AddComponent<InteractionRaycastListener>();
+
+        var interactableLayer = LayerMask.NameToLayer("Interactable");
+        if (interactableLayer >= 0)
+            remotePlayer.layer = interactableLayer;
+
+        listener.MaxDistance = Mathf.Max(0.1f, remoteInteractionDistance);
+        return listener;
     }
 
     private void DisableRemotePlayer(int slotIndex)
