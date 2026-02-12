@@ -31,3 +31,10 @@ public enum CellStatus
     Egg,
     Pet,
 }
+
+public enum ScenePoint
+{
+    HOME,
+    SELL,
+    FOOD
+}

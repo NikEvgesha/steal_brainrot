@@ -8,6 +8,7 @@ public class PlayerManager : MonoBehaviour
     [SerializeField] private Transform _cameraPivot;
 
     private TPPlayerController _tPPlayer;
+    private CharacterController _controller;
 
     private void Awake()
     {
@@ -15,6 +16,7 @@ public class PlayerManager : MonoBehaviour
         {
             G.Player = this;
             _tPPlayer = GetComponent<TPPlayerController>();
+            _controller = GetComponent<CharacterController>();
         }
         else
         {
@@ -26,7 +28,8 @@ public class PlayerManager : MonoBehaviour
     {
         //transform.position = spawnPos.position;
         TPCameraController camera = Instantiate(_camera);
-        camera.SetTarget(_cameraPivot);
+        _camera = camera;
+        _camera.SetTarget(_cameraPivot);
         _tPPlayer.SetCamera(camera.transform);
     }
 
@@ -50,4 +53,14 @@ public class PlayerManager : MonoBehaviour
         _tPPlayer.SetHolding(false);
     }
     
+    public void Teleport(Transform position)
+    {
+        //_tPPlayer.SetTeleportPosition(position);
+        _controller.enabled = false;
+        transform.position = position.position;
+        transform.rotation = position.rotation;
+        _controller.enabled = true;
+        _camera.ResetCamera();
+        
+    }
 }

@@ -288,6 +288,11 @@ public class TPCameraController : MonoBehaviour
 
     }
 
+    public void ResetCamera()
+    {
+        yaw = target.eulerAngles.y;
+    }
+
 #endif
 
 }

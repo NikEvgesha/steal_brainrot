@@ -13,9 +13,13 @@ public class FoodShop : MonoBehaviour
     [SerializeField] private int _resupplyTime;
     [SerializeField] private int _priceResupply;
     [SerializeField] private Text _updateTimer;
+    [SerializeField] private Transform _teleportPoint;
 
     private Dictionary<Food, int> _foodAmount;
     private int _timeToResupply;
+
+
+    public Transform TeleportPoint => _teleportPoint;
 
     private void Awake()
     {

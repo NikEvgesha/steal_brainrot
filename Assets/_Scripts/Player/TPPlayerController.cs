@@ -43,6 +43,8 @@ public class TPPlayerController : MonoBehaviour
     private float _verticalVel;
     private float _currentSpeed;
     private bool _isHolding; // текущее логическое состояние "держать"
+    //private bool _teleportiong;
+    //private Transform _teleportPoint;
 
     private void Awake()
     {
@@ -154,4 +156,5 @@ public class TPPlayerController : MonoBehaviour
 
     /// <summary>Удобный вызов из других скриптов (или через UnityEvent).</summary>
     public void ToggleHolding() => SetHolding(!_isHolding);
+
 }

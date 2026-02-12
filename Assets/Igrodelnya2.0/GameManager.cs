@@ -6,6 +6,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Transform _playerSpawnPoint;
     [SerializeField] private int _reward;
     [SerializeField] private GameObject _startQuest;
+    private Teleporter _teleporter;
+    public Teleporter Teleporter => _teleporter;
     public PlayerManager Player { get { return _player; } }
 
     public bool isEndGame = false;
@@ -35,6 +37,11 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
        
+    }
+
+    public void SetTeleporter(Teleporter teleporter)
+    {
+        _teleporter = teleporter;
     }
 
     private void StartQuest()

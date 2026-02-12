@@ -1530,6 +1530,7 @@ Transform:
   m_Children:
   - {fileID: 6526271910738652181}
   - {fileID: 8521259328676788063}
+  - {fileID: 1984425590509453275}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3784382378593382711
@@ -1548,6 +1549,52 @@ MonoBehaviour:
   _animalsParent: {fileID: 167269943468668063}
   _eggsParent: {fileID: 5588769147484210107}
   _slotPrefab: {fileID: 5437038544252176021, guid: dcc1b114d24c0c84181b4b9d79509b15, type: 3}
+  _teleportPoint: {fileID: 1984425590509453275}
+--- !u!1 &6761037096178781925
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1984425590509453275}
+  - component: {fileID: 5462902259583544292}
+  m_Layer: 0
+  m_Name: TeleportPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1984425590509453275
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6761037096178781925}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 8.11, y: 0, z: 0.54}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8635927476646949363}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+--- !u!114 &5462902259583544292
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6761037096178781925}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca3c1b7f2947e0a409faaee3dfa88829, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  _destination: 1
 --- !u!1 &6839894240315145753
 GameObject:
   m_ObjectHideFlags: 0

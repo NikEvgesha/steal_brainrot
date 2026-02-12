@@ -8,6 +8,10 @@ public class SellPoint : MonoBehaviour
     [SerializeField] private Transform _eggsParent;
     [SerializeField] private SellSlot _slotPrefab;
 
+    [SerializeField] private Transform  _teleportPoint;
+
+    public Transform TeleportPoint => _teleportPoint;
+
     private void Open()
     {
         ReadOnlyCollection<InventoryItem> _animals = G.Inventory.GetItems(Item.Brainrot);
