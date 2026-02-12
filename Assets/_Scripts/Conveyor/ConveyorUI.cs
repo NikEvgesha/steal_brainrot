@@ -46,13 +46,22 @@ public class ConveyorUI : MonoBehaviour
 
     private void Awake()
     {
-        _panel = transform.GetChild(0).gameObject;
+        EnsurePanel();
     }
 
     public void ToggleOpen(bool open)
     {
         _isOpen = open;
+        EnsurePanel();
+        if (_panel == null) return;
         _panel.SetActive(open);
+    }
+
+    private void EnsurePanel()
+    {
+        if (_panel != null) return;
+        if (transform.childCount <= 0) return;
+        _panel = transform.GetChild(0).gameObject;
     }
 
 

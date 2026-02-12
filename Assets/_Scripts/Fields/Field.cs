@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Field : MonoBehaviour
 {
+    [SerializeField] private bool _remoteMode;
     [SerializeField] private float _price;
     [SerializeField] private GameObject _grassObj;
     [SerializeField] private Transform _cellsParent;
@@ -14,6 +15,7 @@ public class Field : MonoBehaviour
     private bool _playerOnField;
     private BuyTouchHandler _touchHandler;
     private int _id;
+    private bool _initialized;
 
     public int ID => _id;
     
@@ -21,6 +23,7 @@ public class Field : MonoBehaviour
 
     public void Init()
     {
+        if (_initialized) return;
         G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
         _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
@@ -33,10 +36,12 @@ public class Field : MonoBehaviour
         {
             G.Save.SaveFieldUnblockStatus(_id, false);
         }
+        _initialized = true;
     }
 
     public void _OnPlayerEnter()
     {
+        if (_remoteMode) return;
         if (_unblocked) return;
 
         _playerOnField = true;
@@ -47,6 +52,7 @@ public class Field : MonoBehaviour
 
     public void _OnPlayerExit()
     {
+        if (_remoteMode) return;
         if (_unblocked) return;
 
         _buyPanel.gameObject.SetActive(false);
@@ -56,12 +62,14 @@ public class Field : MonoBehaviour
 
     private void CheckBuy(InventoryItem currentActive)
     {
+        if (_remoteMode) return;
         if (_unblocked || !_playerOnField) return;
         _buyPanel.gameObject.SetActive(currentActive != null && currentActive.Type == Item.Hamer);
     }
 
     public void _TryBuy()
     {
+        if (_remoteMode) return;
         if (G.Currency.RemoveCurrency(CurrencyType.Coins, _price))
         {
             Unblock();
@@ -123,6 +131,19 @@ public class Field : MonoBehaviour
         {
             cell.gameObject.SetActive(unblocked);
         }
+    }
+
+    public void SetRemoteMode(bool remote)
+    {
+        _remoteMode = remote;
+        if (_buyPanel != null)
+            _buyPanel.gameObject.SetActive(false);
+        if (_touchHandler == null)
+            _touchHandler = GetComponentInChildren<BuyTouchHandler>(true);
+        if (_touchHandler != null)
+            _touchHandler.enabled = !_remoteMode;
+        if (_remoteMode)
+            _playerOnField = false;
     }
 
 }

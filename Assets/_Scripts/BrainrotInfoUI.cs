@@ -6,6 +6,7 @@ public class BrainrotInfoUI : MonoBehaviour
     [SerializeField] private Text _income;
     [SerializeField] private Text _accumulationIncome;
     [SerializeField] private Text _offlineIncome;
+    private bool _remoteView;
     private void Start()
     {
         _offlineIncome.gameObject.SetActive(false);
@@ -31,7 +32,17 @@ public class BrainrotInfoUI : MonoBehaviour
     }
     public void UpdateOfflineIncome(double income)
     {
+        if (_remoteView) return;
         _offlineIncome.gameObject.SetActive(true);
         _offlineIncome.text = "ќфлайн инком = $" + G.Currency.ToString(income);
+    }
+
+    public void SetRemoteView(bool remote)
+    {
+        _remoteView = remote;
+        if (_accumulationIncome != null)
+            _accumulationIncome.gameObject.SetActive(!remote);
+        if (_offlineIncome != null)
+            _offlineIncome.gameObject.SetActive(false);
     }
 }

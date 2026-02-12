@@ -34,11 +34,13 @@ public class Egg : InventoryItem
     //private int _currentHatchingTime;
     private long _hatchingTimectamp;
     private bool _initialized;
+    private bool _remoteConveyorPurchase;
+    private bool _purchaseInProgress;
 
-    private int _totalDurationSec;      // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
-    private DateTimeOffset _endUtc;           // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (UTC)
+    private int _totalDurationSec;      // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
+    private DateTimeOffset _endUtc;           // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… (UTC)
     private Coroutine _ticker;
-    private string SaveKey => $"egg_endUtc_{_currentCell.Id}";//пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ id пїЅпїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅ)
+    private string SaveKey => $"egg_endUtc_{_currentCell.Id}";//РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… id РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…/РїС—Р…РїС—Р…РїС—Р…РїС—Р…)
 
     public long HatchingTime => _hatchingTimectamp;
     public EggStatus Status => _status;
@@ -85,6 +87,11 @@ public class Egg : InventoryItem
         SetTypeVisual();
         _infoUI.SetInfo(this);
     }
+
+    public void SetConveyorPurchaseMode(bool remoteRewardPurchase)
+    {
+        _remoteConveyorPurchase = remoteRewardPurchase;
+    }
     private void SetTypeVisual()
     {
         switch (_data.DinamicData.ElementType)
@@ -127,18 +134,27 @@ public class Egg : InventoryItem
 
     public void TryBuy()
     {
+        if (_purchaseInProgress) return;
+
+        if (_remoteConveyorPurchase)
+        {
+            if (G.Ad == null) return;
+
+            _purchaseInProgress = true;
+            G.Ad.ShowRewardedAd("ConveyorRemoteEgg", success =>
+            {
+                _purchaseInProgress = false;
+                if (!success) return;
+                G.Inventory.Add(this);
+                EggPurchased.Invoke(this);
+            });
+            return;
+        }
+
         if (G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)))
         {
-            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             G.Inventory.Add(this);
-            //G.QuickAccess.Add(this);
-
-            //TestBackpackBrainrot.Instance.TakeEgg(this);
             EggPurchased.Invoke(this);
-        }
-        else
-        {
-            // Show currency shop пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ CheckEnoughCurrency
         }
     }
     public void InitTimer(FieldCell field)
@@ -150,13 +166,13 @@ public class Egg : InventoryItem
             _data.SecondsToHatching * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)
         );
 
-        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
         _currentCell.SpeedBoost.AddListener(SpeedBoostInstant);
-        //_currentCell.SpeedBoost.AddListener(SpeedBoostAd);     // пїЅпїЅпїЅпїЅпїЅпїЅ: -30 пїЅпїЅпїЅ
-        //_currentCell.InstantHatch.AddListener(SpeedBoostInstant); // пїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        //_currentCell.SpeedBoost.AddListener(SpeedBoostAd);     // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: -30 РїС—Р…РїС—Р…РїС—Р…
+        //_currentCell.InstantHatch.AddListener(SpeedBoostInstant); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
-        /* пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+        /* РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
         if (PlayerPrefs.HasKey(SaveKey))
         {
             long ticks = long.Parse(PlayerPrefs.GetString(SaveKey));
@@ -169,7 +185,7 @@ public class Egg : InventoryItem
             PlayerPrefs.Save();
         }
        */
-        _endUtc = DateTimeOffset.UtcNow.AddSeconds(_totalDurationSec); // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        _endUtc = DateTimeOffset.UtcNow.AddSeconds(_totalDurationSec); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
 
 
@@ -178,20 +194,20 @@ public class Egg : InventoryItem
 
     }
     /// <summary>
-    /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅ 30 пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+    /// РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… 30 РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р….
     /// </summary>
     public void SpeedBoostAd()
     {
         const int minusSeconds = 30 * 60;
         _endUtc = _endUtc.AddSeconds(-minusSeconds);
 
-        // пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        // РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
         if (_endUtc < DateTime.UtcNow) _endUtc = DateTime.UtcNow;
 
         //SaveDeadline();
     }
     /// <summary>
-    /// пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+    /// РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р….
     /// </summary>
     public void SpeedBoostInstant()
     {
@@ -200,7 +216,7 @@ public class Egg : InventoryItem
     }
     public void SpeedBoost()
     {
-        //_currentHatchingTime = 0; //пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ - пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ - 30 пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
+        //_currentHatchingTime = 0; //РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…, РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… - РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… - 30 РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…, РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
     }
 
     public void InitTimer(FieldCell cell, DateTimeOffset endTime)
@@ -222,7 +238,7 @@ public class Egg : InventoryItem
 
     private IEnumerator Ticker()
     {
-        // пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅ 0.2пїЅ0.5пїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р… 0.2РїС—Р…0.5РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
         var wait = new WaitForSeconds(0.25f);
 
         while (true)
@@ -231,7 +247,7 @@ public class Egg : InventoryItem
 
             if (remainingSec <= 0)
             {
-                _infoUI.ShowTimeUI(0, 1f); // 100% пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                _infoUI.ShowTimeUI(0, 1f); // 100% РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
                 _currentCell.HatchEgg.AddListener(Hatching);
                 _status = EggStatus.ReadyToHatch;
                 _currentCell.CheckPlayer();
@@ -251,7 +267,7 @@ public class Egg : InventoryItem
         PlayerPrefs.Save();
     }
 
-    // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ/пїЅпїЅпїЅпїЅпїЅпїЅ (пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅ endUtc пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
+    // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…/РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… (РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…, РїС—Р…РїС—Р…РїС—Р…РїС—Р… endUtc РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…)
     private void OnApplicationPause(bool pause)
     {
         if (pause) SaveDeadline();
@@ -272,8 +288,8 @@ public class Egg : InventoryItem
         */
 
         _currentCell.SpeedBoost.RemoveListener(SpeedBoost);
-        //_currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);     // пїЅпїЅпїЅпїЅпїЅпїЅ: -30 пїЅпїЅпїЅ
-        //_currentCell.InstantHatch.RemoveListener(SpeedBoostInstant); // пїЅпїЅпїЅпїЅпїЅпїЅ: пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+        //_currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);     // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: -30 РїС—Р…РїС—Р…РїС—Р…
+        //_currentCell.InstantHatch.RemoveListener(SpeedBoostInstant); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
 
         _currentCell.LockCell(true);
@@ -287,7 +303,7 @@ public class Egg : InventoryItem
         int idx = -1;
         while (_animationHatchingTime > 0) 
         {
-            //пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+            //РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
             if (idx>=0)
                 _rouleteObjects[idx].SetActive(false);
             idx = (idx + 1) % _rouleteObjects.Count;
@@ -339,3 +355,5 @@ public class Egg : InventoryItem
     }
 
 }
+
+

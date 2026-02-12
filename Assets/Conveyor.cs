@@ -22,84 +22,118 @@ public class Conveyor : MonoBehaviour
     private int _currentLevel = 0;
     private int _lastUnlockedLevel = 0;
     private bool _initialized;
+    private bool _localConfigured;
+    private Coroutine _spawnRoutine;
 
-    public float IncomeMultiplier => _level.IncomeMultiplier;
+    public float IncomeMultiplier => _level != null ? _level.IncomeMultiplier : 1f;
 
     private void Awake()
     {
+        EnsureEggStorage();
         if (!_remoteMode)
             G.Initialized.AddListener(Init);
     }
 
+    private void OnDisable()
+    {
+        StopSpawnLoop();
+    }
 
     private void EnsureLocalInit()
     {
-        if (_initialized || _remoteMode) return;
+        if (_remoteMode) return;
+        if (G.Save == null) return;
+        if (_localConfigured && _initialized)
+            return;
+
         Init();
+    }
+
+    private void EnsureEggStorage()
+    {
+        if (_eggs == null)
+            _eggs = new HashSet<Egg>();
     }
 
     private void Init()
     {
         if (_remoteMode) return;
-        _currentLevel = G.Save.LoadConveyorCurrentLevel();
-        _lastUnlockedLevel = G.Save.LoadConveyorUnlockedLevel();
-
-        for (int i = 0; i <= _lastUnlockedLevel; i++)
-        {
-            _levels[i].SetPurchased(true);
-        }
-
+        if (G.Save == null) return;
         if (_levels == null || _levels.Count == 0)
         {
             Debug.LogWarning("[Conveyor] Levels list is empty.");
             return;
         }
 
-        for (int i = _lastUnlockedLevel + 1; i < _levels.Count; i++)
+        EnsureEggStorage();
+
+        if (!_localConfigured)
         {
-            _levels[i].LevelPurchased.AddListener(OnLevelPurchase);
-            _levels[i].SetPurchasingAvailable(i == _lastUnlockedLevel + 1 ? true : false);
+            _currentLevel = Mathf.Clamp(G.Save.LoadConveyorCurrentLevel(), 0, _levels.Count - 1);
+            _lastUnlockedLevel = Mathf.Clamp(G.Save.LoadConveyorUnlockedLevel(), 0, _levels.Count - 1);
+
+            for (int i = 0; i <= _lastUnlockedLevel; i++)
+                _levels[i].SetPurchased(true);
+
+            for (int i = _lastUnlockedLevel + 1; i < _levels.Count; i++)
+            {
+                _levels[i].LevelPurchased.AddListener(OnLevelPurchase);
+                _levels[i].SetPurchasingAvailable(i == _lastUnlockedLevel + 1);
+            }
+
+            _ui = _ui != null ? _ui : GetComponentInChildren<ConveyorUI>(true);
+            if (_ui == null)
+            {
+                Debug.LogWarning("[Conveyor] ConveyorUI not found.");
+                return;
+            }
+
+            _ui.Init(_levels);
+            _ui.LevelActivated.AddListener(SetLevel);
+            _localConfigured = true;
         }
 
-        _ui = GetComponentInChildren<ConveyorUI>();
-        if (_ui == null)
-        {
-            Debug.LogWarning("[Conveyor] ConveyorUI not found.");
-            return;
-        }
-        _ui.Init(_levels);
-        _ui.LevelActivated.AddListener(SetLevel);
         SetLevel(_levels[_currentLevel]);
-        _eggs = new();
         _initialized = true;
-        StartCoroutine(Spawn());
-        
+        ShowLocalUI();
+        EnableInteractionListeners(true);
+        StartSpawnLoop();
     }
 
     private void FixedUpdate()
     {
-        if (!_initialized || _remoteMode) return;
+        if (!_initialized) return;
+        if (_mt == null || _destroyPoint == null || _eggs == null) return;
+
         _mt.mainTextureOffset = new Vector2(0, Time.time * _speed * _matSpeedMultiplier * Time.fixedDeltaTime);
 
-
-        Egg destroyEgg = null;
-        
+        List<Egg> toRemove = null;
         foreach (Egg egg in _eggs)
         {
+            if (egg == null)
+            {
+                if (toRemove == null) toRemove = new List<Egg>();
+                toRemove.Add(egg);
+                continue;
+            }
+
             if (Vector3.Distance(egg.transform.position, _destroyPoint.position) < _destroyDistance)
             {
-                destroyEgg = egg;
-            } else
+                if (toRemove == null) toRemove = new List<Egg>();
+                toRemove.Add(egg);
+            }
+            else
             {
                 egg.transform.position += egg.transform.forward * _speed * Time.fixedDeltaTime;
             }
-                
         }
 
-        if (destroyEgg)
+        if (toRemove == null) return;
+        foreach (var egg in toRemove)
         {
-            _eggs.Remove(destroyEgg);
-            Destroy(destroyEgg.gameObject);
+            _eggs.Remove(egg);
+            if (egg != null)
+                Destroy(egg.gameObject);
         }
     }
 
@@ -107,47 +141,89 @@ public class Conveyor : MonoBehaviour
     {
         while (enabled)
         {
-            Egg egg = Instantiate(_level.GetRandomEgg(), _spawnPoint.position, _spawnPoint.rotation);
-            egg.SetRandomData();
-            _eggs.Add(egg);
-            egg.EggPurchased.AddListener(OnEggPurchase);
+            if (!_initialized || _level == null || _spawnPoint == null)
+            {
+                yield return null;
+                continue;
+            }
+
+            var prefab = _level.GetRandomEgg();
+            if (prefab != null)
+            {
+                Egg egg = Instantiate(prefab, _spawnPoint.position, _spawnPoint.rotation);
+                egg.SetRandomData();
+                egg.SetConveyorPurchaseMode(_remoteMode);
+                _eggs.Add(egg);
+                egg.EggPurchased.AddListener(OnEggPurchase);
+            }
+
             yield return new WaitForSeconds(_spawnInterval);
         }
     }
 
+    private void StartSpawnLoop()
+    {
+        if (!_initialized) return;
+        if (_spawnRoutine != null) return;
+        _spawnRoutine = StartCoroutine(Spawn());
+    }
+
+    private void StopSpawnLoop()
+    {
+        if (_spawnRoutine == null) return;
+        StopCoroutine(_spawnRoutine);
+        _spawnRoutine = null;
+    }
+
     private void OnEggPurchase(Egg egg)
     {
+        if (_eggs == null) return;
         _eggs.Remove(egg);
     }
 
-
-
     private void HideRemoteUI()
     {
-        if (_ui != null) _ui.gameObject.SetActive(false);
+        if (_ui == null) return;
+        _ui.ToggleOpen(false);
+        _ui.gameObject.SetActive(false);
     }
-
 
     private void ShowLocalUI()
     {
-        if (_ui != null) _ui.gameObject.SetActive(true);
+        if (_ui == null) return;
+        _ui.gameObject.SetActive(true);
+    }
+
+    private void EnableInteractionListeners(bool enabled)
+    {
+        var listeners = GetComponentsInChildren<InteractionRaycastListener>(true);
+        foreach (var listener in listeners)
+            listener.enabled = enabled;
     }
 
     public void SetLevel(ConveyorLevel lvl)
     {
+        if (lvl == null || _levels == null || _levels.Count == 0)
+            return;
+
         if (_level != null)
         {
             _level.SetActive(false);
             _level.gameObject.SetActive(false);
         }
+
         _currentLevel = _levels.IndexOf(lvl);
-        _level = lvl;
+        if (_currentLevel < 0) _currentLevel = 0;
+
+        _level = _levels[_currentLevel];
         _level.SetActive(true);
         _level.gameObject.SetActive(true);
+
         if (!_remoteMode)
         {
-            G.Save.SaveConveyorCurrentLevel(_levels.IndexOf(lvl));
-            _ui.UpdateActiveLvl(_currentLevel);
+            G.Save.SaveConveyorCurrentLevel(_currentLevel);
+            if (_ui != null)
+                _ui.UpdateActiveLvl(_currentLevel);
             BaseDirtyTracker.MarkDirty();
         }
     }
@@ -156,21 +232,19 @@ public class Conveyor : MonoBehaviour
     {
         if (_remoteMode) return;
         int id = _levels.IndexOf(lvl);
+        if (id < 0) return;
+
         G.Save.SaveConveyorUnlockedLevel(id);
         BaseDirtyTracker.MarkDirty();
         if (id < _levels.Count - 1)
-        {
             _levels[id + 1].SetPurchasingAvailable(true);
-        }
     }
-
 
     public void _OnPlayerEnter()
     {
         if (_remoteMode) return;
-        _ui.ToggleOpen(true);
+        _ui?.ToggleOpen(true);
     }
-
 
     public void _OnPlayerExit()
     {
@@ -181,31 +255,55 @@ public class Conveyor : MonoBehaviour
     public void ApplyRemoteLevel(int level)
     {
         _remoteMode = true;
+        EnsureEggStorage();
+        _initialized = true;
         HideRemoteUI();
-        StopAllCoroutines();
-        _initialized = false;
-
-        if (_ui != null)
-            _ui.gameObject.SetActive(false);
+        EnableInteractionListeners(false);
 
         if (_levels == null || _levels.Count == 0)
             return;
 
         level = Mathf.Clamp(level, 0, _levels.Count - 1);
         SetLevel(_levels[level]);
-        _initialized = true;
+        StartSpawnLoop();
+    }
+
+    public void ClearSpawnedEggs()
+    {
+        if (_eggs == null || _eggs.Count == 0) return;
+
+        foreach (var egg in _eggs)
+        {
+            if (egg != null)
+                Destroy(egg.gameObject);
+        }
+        _eggs.Clear();
     }
 
     public void SetRemoteMode(bool remote)
     {
+        if (_remoteMode == remote)
+        {
+            if (!_remoteMode)
+                EnsureLocalInit();
+            return;
+        }
+
         _remoteMode = remote;
+        StopSpawnLoop();
+        ClearSpawnedEggs();
+
         if (_remoteMode)
         {
+            _initialized = true;
             HideRemoteUI();
+            EnableInteractionListeners(false);
         }
         else
         {
+            _initialized = false;
             ShowLocalUI();
+            EnableInteractionListeners(true);
             EnsureLocalInit();
         }
     }

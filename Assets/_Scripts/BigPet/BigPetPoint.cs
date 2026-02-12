@@ -66,6 +66,7 @@ public class BigPetPoint : MonoBehaviour
             Debug.LogWarning("[BigPetPoint] BigPetSetUI not found.");
             return;
         }
+        _setPetUI.SetRemoteMode(false);
         if (_pets == null || _pets.Count == 0)
         {
             Debug.LogWarning("[BigPetPoint] Pets list is empty.");
@@ -137,7 +138,7 @@ public class BigPetPoint : MonoBehaviour
 
     private void ShowLocalUI()
     {
-        if (_feedButton != null) _feedButton.SetActive(true);
+        if (_feedButton != null) _feedButton.SetActive(false);
         if (_foodTimeBar != null) _foodTimeBar.gameObject.SetActive(false);
         if (_xpProgressBar != null) _xpProgressBar.gameObject.SetActive(true);
         if (_foodTimeBarText != null) _foodTimeBarText.gameObject.SetActive(false);
@@ -351,8 +352,18 @@ public class BigPetPoint : MonoBehaviour
     public void SetRemoteMode(bool remote)
     {
         _remoteMode = remote;
-        if (_remoteMode) HideRemoteUI();
-        else ShowLocalUI();
+        if (_setPetUI == null)
+            _setPetUI = GetComponentInChildren<BigPetSetUI>(true);
+        if (_setPetUI != null)
+            _setPetUI.SetRemoteMode(remote);
+
+        if (_remoteMode)
+            HideRemoteUI();
+        else
+        {
+            ShowLocalUI();
+            InitLocal();
+        }
     }
 
 }

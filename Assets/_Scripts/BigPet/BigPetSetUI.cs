@@ -7,6 +7,7 @@ public class BigPetSetUI : MonoBehaviour
     [SerializeField] private GameObject _uiPanel;
     [SerializeField] private BigPetSetSlot _slotPrefab;
     [SerializeField] private Transform _slotParent;
+    [SerializeField] private bool _remoteMode;
 
     private List<BigPetSetSlot> _slots = new();
 
@@ -56,11 +57,24 @@ public class BigPetSetUI : MonoBehaviour
 
     public void OpenUI(bool open)
     {
+        if (_remoteMode)
+        {
+            if (_uiPanel != null)
+                _uiPanel.SetActive(false);
+            return;
+        }
         _uiPanel.SetActive(open);
     }
 
     public void ChangeActivePet(Brainrot pet)
     {
         ActiveChanged?.Invoke(pet);
+    }
+
+    public void SetRemoteMode(bool remote)
+    {
+        _remoteMode = remote;
+        if (_remoteMode && _uiPanel != null)
+            _uiPanel.SetActive(false);
     }
 }

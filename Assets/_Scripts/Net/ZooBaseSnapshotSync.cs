@@ -33,6 +33,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 {
     [SerializeField] private ZooBackendClient backend;   // С‚РІРѕР№ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ РєР»РёРµРЅС‚
     [SerializeField] private SaveManager save;           // С‚РІРѕР№ SaveManager
+    [SerializeField] private RemoteBasesApplier remoteBases;
 
     [Header("How often to publish base snapshot")]
     [SerializeField] private float publishIntervalSec = 5f;
@@ -44,6 +45,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     {
         if (backend == null) backend = G.Backend;
         if (save == null) save = G.Save;
+        if (remoteBases == null) remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
     }
 
     private void Start()
@@ -134,21 +136,31 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     private List<int> LoadBoughtCells_SOMEHOW()
     {
         var list = new List<int>();
-        var fields = FindObjectsByType<Field>(FindObjectsSortMode.None);
+        var seen = new HashSet<int>();
+        var fields = GetSnapshotFields();
         foreach (var field in fields)
         {
+            if (field == null) continue;
+            if (!seen.Add(field.ID)) continue;
             if (save.LoadFieldUnblockStatus(field.ID))
                 list.Add(field.ID);
         }
+        list.Sort();
         return list;
     }
 
     private List<CellSnapshotDto> LoadCells_SOMEHOW()
     {
         var list = new List<CellSnapshotDto>();
-        var cells = FindObjectsByType<FieldCell>(FindObjectsSortMode.None);
+        var seen = new HashSet<string>();
+        var cells = GetSnapshotCells();
         foreach (var cell in cells)
         {
+            if (cell == null || string.IsNullOrEmpty(cell.Id))
+                continue;
+            if (!seen.Add(cell.Id))
+                continue;
+
             var data = save.LoadCellData(cell.Id);
             if (data == null)
                 continue;
@@ -176,15 +188,22 @@ public class ZooBaseSnapshotSync : MonoBehaviour
                 });
             }
         }
+        list.Sort((a, b) => string.CompareOrdinal(a.cell, b.cell));
         return list;
     }
 
     private List<AnimalOnCellDto> LoadAnimalsOnCells_SOMEHOW()
     {
         var list = new List<AnimalOnCellDto>();
-        var cells = FindObjectsByType<FieldCell>(FindObjectsSortMode.None);
+        var seen = new HashSet<string>();
+        var cells = GetSnapshotCells();
         foreach (var cell in cells)
         {
+            if (cell == null || string.IsNullOrEmpty(cell.Id))
+                continue;
+            if (!seen.Add(cell.Id))
+                continue;
+
             var data = save.LoadCellData(cell.Id);
             if (data == null || data.Status != Item.Brainrot)
                 continue;
@@ -196,6 +215,30 @@ public class ZooBaseSnapshotSync : MonoBehaviour
                 lvl = 1
             });
         }
+        list.Sort((a, b) => string.CompareOrdinal(a.cell, b.cell));
         return list;
+    }
+
+    private Field[] GetSnapshotFields()
+    {
+        var root = GetSnapshotRoot();
+        return root != null
+            ? root.GetComponentsInChildren<Field>(true)
+            : FindObjectsByType<Field>(FindObjectsSortMode.None);
+    }
+
+    private FieldCell[] GetSnapshotCells()
+    {
+        var root = GetSnapshotRoot();
+        return root != null
+            ? root.GetComponentsInChildren<FieldCell>(true)
+            : FindObjectsByType<FieldCell>(FindObjectsSortMode.None);
+    }
+
+    private Transform GetSnapshotRoot()
+    {
+        if (remoteBases == null)
+            remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        return remoteBases != null ? remoteBases.GetLocalSlotRoot() : null;
     }
 }

@@ -7,6 +7,18 @@ using UnityEngine;
 [DefaultExecutionOrder(-1000)]
 public class RemoteBasesApplier : MonoBehaviour
 {
+    private const string EmptySlotMarker = "__empty__";
+
+    private class SlotSnapshotCache
+    {
+        public int conveyorLevel = int.MinValue;
+        public int bigPetId = int.MinValue;
+        public int bigPetLvl = int.MinValue;
+        public int bigPetXp = int.MinValue;
+        public HashSet<int> land = new();
+        public Dictionary<string, string> cells = new();
+    }
+
     [Serializable]
     public class RemoteBaseSlot
     {
@@ -32,7 +44,10 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool spawnRemotePlayers = true;
     [SerializeField] private GameObject remotePlayerPrefab;
     [SerializeField] private bool moveFriendBoardToRemotePlayer = true;
-    [SerializeField] private float remotePlayerDelaySec = 0.1f;
+    [SerializeField] private float remotePlayerDelaySec = 1.1f;
+    [SerializeField] private bool smoothSnapshotApply = true;
+    [SerializeField] private int snapshotOpsPerFrame = 12;
+    [SerializeField] private bool incrementalSnapshotApply = true;
     [Header("Debug")]
     [SerializeField] private bool debugLogs = false;
     [SerializeField] private bool testCloneLocalToRandomSlot = false;
@@ -44,11 +59,18 @@ public class RemoteBasesApplier : MonoBehaviour
     private string[] _slotUpdatedAt;
     private GameObject[] _slotRemotePlayers;
     private RemoteFriendBoard[] _slotRemoteBoards;
+    private Coroutine[] _slotSnapshotApplyRoutines;
+    private BaseSnapshotDto[] _slotSnapshotApplyPending;
+    private bool[] _slotHadSnapshot;
+    private SlotSnapshotCache[] _slotSnapshotCaches;
     private string _lastLocalPlayerId;
     private int _serverLocalSlotIndex = -1;
     private int _lastTeleportedSlotIndex = -2;
     private string _lastTeleportedPlayerId;
     private Coroutine _teleportRoutine;
+    private bool _lobbyModeActive;
+    private int _lastPreparedLocalSlotIndex = -1;
+    private int[] _slotModeState;
 
     private void Awake()
     {
@@ -81,20 +103,24 @@ public class RemoteBasesApplier : MonoBehaviour
     private void MarkRemoteComponents()
     {
         if (slots == null) return;
-        foreach (var slot in slots)
+        var hasConfiguredLocalSlot = _serverLocalSlotIndex >= 0 || slots.Any(s => s != null && s.isLocalSlot);
+        if (!hasConfiguredLocalSlot)
+            return;
+
+        for (int i = 0; i < slots.Count; i++)
         {
+            var slot = slots[i];
             if (slot == null || slot.root == null) continue;
-            if (IsLocalSlot(slot)) continue;
-            foreach (var conveyor in slot.root.GetComponentsInChildren<Conveyor>(true))
-                conveyor.SetRemoteMode(true);
-            foreach (var bigPet in slot.root.GetComponentsInChildren<BigPetPoint>(true))
-                bigPet.SetRemoteMode(true);
-            SetFieldManagersForSlot(slot, false);
+            ApplySlotMode(i, !IsLocalSlotIndex(i));
         }
     }
 
     private void ApplyLocations(List<ZooLocationItem> locations)
     {
+        // In lobby mode we use only lobby snapshots to avoid slot flicker from legacy locations feed.
+        if (_lobbyModeActive)
+            return;
+
         if (slots == null || slots.Count == 0)
             return;
 
@@ -178,21 +204,101 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         EnsureSlotState();
+        _lobbyModeActive = members != null && members.Count > 0;
 
         var localId = GetLocalPlayerId();
-        _serverLocalSlotIndex = -1;
+        var previousServerLocalSlotIndex = _serverLocalSlotIndex;
+        var resolvedServerLocalSlotIndex = -1;
         LobbyMemberStateDto localMember = null;
-
-        if (members != null && !string.IsNullOrEmpty(localId))
+        if (members != null)
         {
             foreach (var m in members)
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
-                if (m.playerId != localId) continue;
-                localMember = m;
-                if (m.slotIndex >= 0 && m.slotIndex < slots.Count)
-                    _serverLocalSlotIndex = m.slotIndex;
-                if (debugLogs) Debug.Log($"[Lobby] local slotIndex={_serverLocalSlotIndex}");
+                if (!string.IsNullOrEmpty(localId) && m.playerId == localId)
+                {
+                    localMember = m;
+                    break;
+                }
+            }
+
+            if (localMember == null && !string.IsNullOrEmpty(_lastLocalPlayerId))
+            {
+                foreach (var m in members)
+                {
+                    if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
+                    if (m.playerId != _lastLocalPlayerId) continue;
+                    localMember = m;
+                    localId = m.playerId;
+                    break;
+                }
+            }
+
+            if (localMember == null && previousServerLocalSlotIndex >= 0 && previousServerLocalSlotIndex < slots.Count)
+            {
+                foreach (var m in members)
+                {
+                    if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
+                    if (m.slotIndex != previousServerLocalSlotIndex) continue;
+                    localMember = m;
+                    localId = m.playerId;
+                    break;
+                }
+            }
+
+            if (localMember == null)
+            {
+                LobbyMemberStateDto onlyMember = null;
+                var validMembersCount = 0;
+                foreach (var m in members)
+                {
+                    if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
+                    validMembersCount++;
+                    onlyMember = m;
+                    if (validMembersCount > 1) break;
+                }
+
+                if (validMembersCount == 1)
+                {
+                    localMember = onlyMember;
+                    localId = onlyMember.playerId;
+                }
+            }
+        }
+
+        if (localMember != null && localMember.slotIndex >= 0 && localMember.slotIndex < slots.Count)
+            resolvedServerLocalSlotIndex = localMember.slotIndex;
+
+        if (resolvedServerLocalSlotIndex >= 0)
+            _serverLocalSlotIndex = resolvedServerLocalSlotIndex;
+        else if (previousServerLocalSlotIndex >= 0 && previousServerLocalSlotIndex < slots.Count)
+            _serverLocalSlotIndex = previousServerLocalSlotIndex;
+        else
+            _serverLocalSlotIndex = -1;
+
+        if (!string.IsNullOrEmpty(localId))
+            _lastLocalPlayerId = localId;
+
+        var hasResolvedLocalSlot = _serverLocalSlotIndex >= 0 && _serverLocalSlotIndex < slots.Count;
+        if (!hasResolvedLocalSlot)
+        {
+            // Avoid switching every slot into remote mode when local player id is still bootstrapping.
+            if (debugLogs)
+                Debug.LogWarning("[Lobby] local slot unresolved, skip apply.");
+            return;
+        }
+
+        if (debugLogs && localMember != null)
+            Debug.Log($"[Lobby] local slotIndex={_serverLocalSlotIndex}");
+
+        var remoteMembersCount = 0;
+        if (members != null)
+        {
+            foreach (var m in members)
+            {
+                if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
+                if (localMember != null && m.playerId == localMember.playerId) continue;
+                remoteMembersCount++;
             }
         }
 
@@ -222,13 +328,12 @@ public class RemoteBasesApplier : MonoBehaviour
                 if (slots[i].root != null)
                     slots[i].root.gameObject.SetActive(true);
 
-                foreach (var conveyor in slots[i].root.GetComponentsInChildren<Conveyor>(true))
-                    conveyor.SetRemoteMode(false);
-                foreach (var bigPet in slots[i].root.GetComponentsInChildren<BigPetPoint>(true))
-                    bigPet.SetRemoteMode(false);
-                foreach (var fm in slots[i].root.GetComponentsInChildren<FieldManager>(true))
-                    fm.EnsureInitialized();
-                SetFieldManagersForSlot(slots[i], true);
+                ApplySlotMode(i, false);
+                if (_lastPreparedLocalSlotIndex != i)
+                {
+                    UnlockCellsForSlot(slots[i]);
+                    _lastPreparedLocalSlotIndex = i;
+                }
 
                 if (!string.IsNullOrEmpty(localId))
                 {
@@ -239,14 +344,9 @@ public class RemoteBasesApplier : MonoBehaviour
             }
             else
             {
-                if (slots[i].root != null)
-                {
-                    foreach (var conveyor in slots[i].root.GetComponentsInChildren<Conveyor>(true))
-                        conveyor.SetRemoteMode(true);
-                    foreach (var bigPet in slots[i].root.GetComponentsInChildren<BigPetPoint>(true))
-                        bigPet.SetRemoteMode(true);
-                    SetFieldManagersForSlot(slots[i], false);
-                }
+                ApplySlotMode(i, true);
+                if (_lastPreparedLocalSlotIndex == i)
+                    _lastPreparedLocalSlotIndex = -1;
             }
 
             if (desiredBySlot.TryGetValue(i, out var member))
@@ -262,6 +362,7 @@ public class RemoteBasesApplier : MonoBehaviour
             }
             else
             {
+                var hadPlayer = !string.IsNullOrEmpty(_slotPlayerIds[i]);
                 if (!string.IsNullOrEmpty(_slotPlayerIds[i]))
                 {
                     _playerToSlot.Remove(_slotPlayerIds[i]);
@@ -270,14 +371,20 @@ public class RemoteBasesApplier : MonoBehaviour
                 }
                 UpdateChestLobby(slots[i], null);
                 UpdateFriendBoardLobby(slots[i], null);
-                if (clearEmptySlots)
+                if (clearEmptySlots && (hadPlayer || _slotUpdatedAt[i] != EmptySlotMarker))
+                {
                     ClearSlot(slots[i]);
+                    _slotUpdatedAt[i] = EmptySlotMarker;
+                }
                 DisableRemotePlayer(i);
             }
         }
 
-        ApplyTestClone(localMember);
-        TryTeleportLocalPlayer();
+        // Debug clone is only useful for solo local testing; disable it when real remote members exist.
+        if (remoteMembersCount == 0)
+            ApplyTestClone(localMember);
+        if (localMember != null)
+            TryTeleportLocalPlayer();
     }
 
 
@@ -286,6 +393,44 @@ public class RemoteBasesApplier : MonoBehaviour
         if (slot == null || slot.root == null) return;
         foreach (var fm in slot.root.GetComponentsInChildren<FieldManager>(true))
             fm.enabled = enabled;
+        if (enabled)
+        {
+            foreach (var fm in slot.root.GetComponentsInChildren<FieldManager>(true))
+                fm.EnsureInitialized();
+        }
+    }
+
+    private void SetFieldsRemoteMode(RemoteBaseSlot slot, bool remote)
+    {
+        if (slot == null || slot.root == null) return;
+        foreach (var field in slot.root.GetComponentsInChildren<Field>(true))
+            field.SetRemoteMode(remote);
+    }
+
+    private void ApplySlotMode(int slotIndex, bool remote)
+    {
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count) return;
+        if (_slotModeState == null || _slotModeState.Length != slots.Count) return;
+        if (_slotModeState[slotIndex] == (remote ? 1 : 0)) return;
+
+        var slot = slots[slotIndex];
+        if (slot == null || slot.root == null) return;
+
+        foreach (var conveyor in slot.root.GetComponentsInChildren<Conveyor>(true))
+            conveyor.SetRemoteMode(remote);
+        foreach (var bigPet in slot.root.GetComponentsInChildren<BigPetPoint>(true))
+            bigPet.SetRemoteMode(remote);
+        SetFieldManagersForSlot(slot, !remote);
+        SetFieldsRemoteMode(slot, remote);
+
+        _slotModeState[slotIndex] = remote ? 1 : 0;
+    }
+
+    private void UnlockCellsForSlot(RemoteBaseSlot slot)
+    {
+        if (slot == null || slot.root == null) return;
+        foreach (var cell in slot.root.GetComponentsInChildren<FieldCell>(true))
+            cell.LockCell(false);
     }
 
 
@@ -323,6 +468,7 @@ public class RemoteBasesApplier : MonoBehaviour
         foreach (var bigPet in slot.root.GetComponentsInChildren<BigPetPoint>(true))
             bigPet.SetRemoteMode(true);
         SetFieldManagersForSlot(slot, false);
+        SetFieldsRemoteMode(slot, true);
 
         ApplySnapshotToSlot(slot, baseData);
     }
@@ -387,22 +533,83 @@ public class RemoteBasesApplier : MonoBehaviour
         board.SetRemoteWithId(member.playerId, member.friendCode, member.displayName, member.isFriend, member.isOnline);
     }
 
-    private void ApplySnapshotToSlot(RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    private void QueueSnapshotApply(int slotIndex, RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        if (slot == null || slot.root == null)
+            return;
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return;
+
+        if (!smoothSnapshotApply)
+        {
+            ApplySnapshotToSlot(slotIndex, slot, snapshot);
+            _slotHadSnapshot[slotIndex] = snapshot != null;
+            return;
+        }
+
+        _slotSnapshotApplyPending[slotIndex] = snapshot;
+        if (_slotSnapshotApplyRoutines[slotIndex] == null)
+            _slotSnapshotApplyRoutines[slotIndex] = StartCoroutine(ApplySnapshotWorker(slotIndex, slot));
+    }
+
+    private IEnumerator ApplySnapshotWorker(int slotIndex, RemoteBaseSlot slot)
+    {
+        while (true)
+        {
+            var snapshot = _slotSnapshotApplyPending[slotIndex];
+            _slotSnapshotApplyPending[slotIndex] = null;
+
+            var skipClear = !_slotHadSnapshot[slotIndex] && snapshot != null;
+            yield return ApplySnapshotToSlotAsync(slotIndex, slot, snapshot, skipClear);
+            _slotHadSnapshot[slotIndex] = snapshot != null;
+
+            if (_slotSnapshotApplyPending[slotIndex] == null)
+                break;
+
+            yield return null;
+        }
+
+        _slotSnapshotApplyRoutines[slotIndex] = null;
+    }
+
+    private IEnumerator ApplySnapshotToSlotAsync(int slotIndex, RemoteBaseSlot slot, BaseSnapshotDto snapshot, bool skipClear)
     {
         if (slot == null || slot.root == null || IsLocalSlot(slot))
-            return;
+            yield break;
 
         if (disableEmptySlots)
             slot.root.gameObject.SetActive(true);
 
         EnsureFieldIds(slot);
-        ClearSlot(slot, disableRoot: false);
 
         if (snapshot == null)
-            return;
+        {
+            yield return ClearSlotAsync(slotIndex, slot, disableRoot: false);
+            yield break;
+        }
+
+        var canApplyIncremental =
+            incrementalSnapshotApply &&
+            !skipClear &&
+            _slotSnapshotCaches != null &&
+            slotIndex >= 0 &&
+            slotIndex < _slotSnapshotCaches.Length &&
+            _slotSnapshotCaches[slotIndex] != null;
+
+        if (canApplyIncremental)
+        {
+            yield return ApplySnapshotDeltaAsync(slotIndex, slot, snapshot);
+            yield break;
+        }
+
+        if (!skipClear)
+            yield return ClearSlotAsync(slotIndex, slot, disableRoot: false);
 
         ApplyConveyor(slot, snapshot);
         ApplyBigPet(slot, snapshot);
+
+        var opsBudget = Mathf.Max(1, snapshotOpsPerFrame);
+        var ops = 0;
 
         if (slot.applyLand && snapshot.land != null && snapshot.land.boughtCells != null)
         {
@@ -410,30 +617,17 @@ public class RemoteBasesApplier : MonoBehaviour
             foreach (var field in GetFields(slot))
             {
                 field.SetUnblockedVisual(land.Contains(field.ID));
+                if (++ops >= opsBudget)
+                {
+                    ops = 0;
+                    yield return null;
+                }
             }
         }
 
         var cellMap = BuildCellMap(slot);
-        var cells = snapshot.cells;
-        if (cells == null || cells.Count == 0)
-        {
-            if (snapshot.animalsOnCells != null && snapshot.animalsOnCells.Count > 0)
-            {
-                foreach (var old in snapshot.animalsOnCells)
-                {
-                    if (old == null || string.IsNullOrEmpty(old.cell))
-                        continue;
-
-                    if (cellMap.TryGetValue(old.cell, out var cell))
-                    {
-                        SpawnBrainrot(cell, old.animalId, default, 0);
-                    }
-                }
-            }
-            return;
-        }
-
-        foreach (var item in cells)
+        var cells = BuildSnapshotCells(snapshot);
+        foreach (var item in cells.Values)
         {
             if (item == null || string.IsNullOrEmpty(item.cell))
                 continue;
@@ -444,15 +638,434 @@ public class RemoteBasesApplier : MonoBehaviour
             if (slot.lockCells)
                 cell.LockCell(true);
 
-            if (item.kind == "egg")
+            SpawnSnapshotCell(cell, item);
+            if (++ops >= opsBudget)
             {
-                SpawnEgg(cell, item.id, item.dinamic);
-            }
-            else if (item.kind == "brainrot")
-            {
-                SpawnBrainrot(cell, item.id, item.dinamic, item.incomeLastTime);
+                ops = 0;
+                yield return null;
             }
         }
+
+        SetSlotSnapshotCache(slotIndex, BuildSnapshotCache(snapshot));
+    }
+
+    private IEnumerator ApplySnapshotDeltaAsync(int slotIndex, RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        var cache = GetOrCreateSlotSnapshotCache(slotIndex);
+        ApplyConveyorDiff(slot, snapshot, cache);
+        ApplyBigPetDiff(slot, snapshot, cache);
+
+        var opsBudget = Mathf.Max(1, snapshotOpsPerFrame);
+        var ops = 0;
+
+        if (slot.applyLand && snapshot.land != null && snapshot.land.boughtCells != null)
+        {
+            var newLand = new HashSet<int>(snapshot.land.boughtCells ?? new List<int>());
+            if (!cache.land.SetEquals(newLand))
+            {
+                foreach (var field in GetFields(slot))
+                {
+                    field.SetUnblockedVisual(newLand.Contains(field.ID));
+                    if (++ops >= opsBudget)
+                    {
+                        ops = 0;
+                        yield return null;
+                    }
+                }
+                cache.land = newLand;
+            }
+        }
+
+        var desiredCells = BuildSnapshotCells(snapshot);
+        var desiredSignatures = BuildCellSignatures(desiredCells);
+        var cellMap = BuildCellMap(slot);
+
+        if (cache.cells.Count > 0)
+        {
+            var removed = new List<string>();
+            foreach (var existing in cache.cells.Keys)
+            {
+                if (!desiredSignatures.ContainsKey(existing))
+                    removed.Add(existing);
+            }
+
+            foreach (var cellId in removed)
+            {
+                if (cellMap.TryGetValue(cellId, out var cell))
+                {
+                    if (slot.lockCells)
+                        cell.LockCell(true);
+                    ClearCellActors(cell);
+                }
+                cache.cells.Remove(cellId);
+                if (++ops >= opsBudget)
+                {
+                    ops = 0;
+                    yield return null;
+                }
+            }
+        }
+
+        foreach (var kv in desiredCells)
+        {
+            var cellId = kv.Key;
+            var item = kv.Value;
+            if (item == null)
+                continue;
+
+            var sig = desiredSignatures[cellId];
+            if (cache.cells.TryGetValue(cellId, out var oldSig) && oldSig == sig)
+                continue;
+
+            if (cellMap.TryGetValue(cellId, out var cell))
+            {
+                if (slot.lockCells)
+                    cell.LockCell(true);
+                ClearCellActors(cell);
+                SpawnSnapshotCell(cell, item);
+            }
+
+            cache.cells[cellId] = sig;
+            if (++ops >= opsBudget)
+            {
+                ops = 0;
+                yield return null;
+            }
+        }
+    }
+
+    private IEnumerator ClearSlotAsync(int slotIndex, RemoteBaseSlot slot, bool disableRoot)
+    {
+        if (slot == null || slot.root == null || IsLocalSlot(slot))
+            yield break;
+
+        ResetSlotSnapshotCache(slotIndex);
+
+        if (disableRoot)
+            slot.root.gameObject.SetActive(false);
+
+        foreach (var conveyor in slot.root.GetComponentsInChildren<Conveyor>(true))
+            conveyor.ClearSpawnedEggs();
+
+        var opsBudget = Mathf.Max(1, snapshotOpsPerFrame);
+        var ops = 0;
+        foreach (var cell in GetCells(slot))
+        {
+            if (slot.lockCells)
+                cell.LockCell(true);
+
+            ClearCellActors(cell);
+            if (++ops >= opsBudget)
+            {
+                ops = 0;
+                yield return null;
+            }
+        }
+    }
+
+    private void ApplySnapshotToSlot(int slotIndex, RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        if (slot == null || slot.root == null || IsLocalSlot(slot))
+            return;
+
+        if (disableEmptySlots)
+            slot.root.gameObject.SetActive(true);
+
+        EnsureFieldIds(slot);
+
+        if (snapshot == null)
+        {
+            ClearSlot(slot, disableRoot: false);
+            ResetSlotSnapshotCache(slotIndex);
+            return;
+        }
+
+        var canApplyIncremental =
+            incrementalSnapshotApply &&
+            _slotSnapshotCaches != null &&
+            slotIndex >= 0 &&
+            slotIndex < _slotSnapshotCaches.Length &&
+            _slotSnapshotCaches[slotIndex] != null;
+
+        if (canApplyIncremental)
+        {
+            ApplySnapshotDeltaImmediate(slotIndex, slot, snapshot);
+            return;
+        }
+
+        ClearSlot(slot, disableRoot: false);
+
+        ApplyConveyor(slot, snapshot);
+        ApplyBigPet(slot, snapshot);
+
+        if (slot.applyLand && snapshot.land != null && snapshot.land.boughtCells != null)
+        {
+            var land = new HashSet<int>(snapshot.land.boughtCells ?? new List<int>());
+            foreach (var field in GetFields(slot))
+                field.SetUnblockedVisual(land.Contains(field.ID));
+        }
+
+        var cellMap = BuildCellMap(slot);
+        var cells = BuildSnapshotCells(snapshot);
+        foreach (var item in cells.Values)
+        {
+            if (item == null || string.IsNullOrEmpty(item.cell))
+                continue;
+
+            if (!cellMap.TryGetValue(item.cell, out var cell))
+                continue;
+
+            if (slot.lockCells)
+                cell.LockCell(true);
+            SpawnSnapshotCell(cell, item);
+        }
+
+        SetSlotSnapshotCache(slotIndex, BuildSnapshotCache(snapshot));
+    }
+
+    private void ApplySnapshotToSlot(RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        var slotIndex = slots != null ? slots.IndexOf(slot) : -1;
+        ApplySnapshotToSlot(slotIndex, slot, snapshot);
+    }
+
+    private void ApplySnapshotDeltaImmediate(int slotIndex, RemoteBaseSlot slot, BaseSnapshotDto snapshot)
+    {
+        var cache = GetOrCreateSlotSnapshotCache(slotIndex);
+        ApplyConveyorDiff(slot, snapshot, cache);
+        ApplyBigPetDiff(slot, snapshot, cache);
+
+        if (slot.applyLand && snapshot.land != null && snapshot.land.boughtCells != null)
+        {
+            var newLand = new HashSet<int>(snapshot.land.boughtCells ?? new List<int>());
+            if (!cache.land.SetEquals(newLand))
+            {
+                foreach (var field in GetFields(slot))
+                    field.SetUnblockedVisual(newLand.Contains(field.ID));
+                cache.land = newLand;
+            }
+        }
+
+        var desiredCells = BuildSnapshotCells(snapshot);
+        var desiredSignatures = BuildCellSignatures(desiredCells);
+        var cellMap = BuildCellMap(slot);
+
+        if (cache.cells.Count > 0)
+        {
+            var removed = new List<string>();
+            foreach (var existing in cache.cells.Keys)
+            {
+                if (!desiredSignatures.ContainsKey(existing))
+                    removed.Add(existing);
+            }
+
+            foreach (var cellId in removed)
+            {
+                if (cellMap.TryGetValue(cellId, out var cell))
+                {
+                    if (slot.lockCells)
+                        cell.LockCell(true);
+                    ClearCellActors(cell);
+                }
+                cache.cells.Remove(cellId);
+            }
+        }
+
+        foreach (var kv in desiredCells)
+        {
+            var cellId = kv.Key;
+            var item = kv.Value;
+            if (item == null)
+                continue;
+
+            var sig = desiredSignatures[cellId];
+            if (cache.cells.TryGetValue(cellId, out var oldSig) && oldSig == sig)
+                continue;
+
+            if (cellMap.TryGetValue(cellId, out var cell))
+            {
+                if (slot.lockCells)
+                    cell.LockCell(true);
+                ClearCellActors(cell);
+                SpawnSnapshotCell(cell, item);
+            }
+            cache.cells[cellId] = sig;
+        }
+    }
+
+    private void ApplyConveyorDiff(RemoteBaseSlot slot, BaseSnapshotDto snapshot, SlotSnapshotCache cache)
+    {
+        if (snapshot?.conveyor == null)
+            return;
+
+        if (cache.conveyorLevel == snapshot.conveyor.lvl)
+            return;
+
+        ApplyConveyor(slot, snapshot);
+        cache.conveyorLevel = snapshot.conveyor.lvl;
+    }
+
+    private void ApplyBigPetDiff(RemoteBaseSlot slot, BaseSnapshotDto snapshot, SlotSnapshotCache cache)
+    {
+        if (snapshot?.bigPet == null)
+            return;
+
+        if (cache.bigPetId == snapshot.bigPet.id &&
+            cache.bigPetLvl == snapshot.bigPet.lvl &&
+            cache.bigPetXp == snapshot.bigPet.xp)
+            return;
+
+        ApplyBigPet(slot, snapshot);
+        cache.bigPetId = snapshot.bigPet.id;
+        cache.bigPetLvl = snapshot.bigPet.lvl;
+        cache.bigPetXp = snapshot.bigPet.xp;
+    }
+
+    private Dictionary<string, CellSnapshotDto> BuildSnapshotCells(BaseSnapshotDto snapshot)
+    {
+        var result = new Dictionary<string, CellSnapshotDto>();
+        if (snapshot == null)
+            return result;
+
+        if (snapshot.cells != null && snapshot.cells.Count > 0)
+        {
+            foreach (var item in snapshot.cells)
+            {
+                if (item == null || string.IsNullOrEmpty(item.cell))
+                    continue;
+                if (result.ContainsKey(item.cell))
+                    continue;
+                result.Add(item.cell, item);
+            }
+            return result;
+        }
+
+        if (snapshot.animalsOnCells == null || snapshot.animalsOnCells.Count == 0)
+            return result;
+
+        foreach (var legacy in snapshot.animalsOnCells)
+        {
+            if (legacy == null || string.IsNullOrEmpty(legacy.cell))
+                continue;
+            if (result.ContainsKey(legacy.cell))
+                continue;
+
+            result.Add(legacy.cell, new CellSnapshotDto
+            {
+                cell = legacy.cell,
+                kind = "brainrot",
+                id = legacy.animalId
+            });
+        }
+
+        return result;
+    }
+
+    private Dictionary<string, string> BuildCellSignatures(Dictionary<string, CellSnapshotDto> cells)
+    {
+        var result = new Dictionary<string, string>();
+        if (cells == null || cells.Count == 0)
+            return result;
+
+        foreach (var kv in cells)
+            result[kv.Key] = BuildCellSignature(kv.Value);
+
+        return result;
+    }
+
+    private string BuildCellSignature(CellSnapshotDto item)
+    {
+        if (item == null)
+            return string.Empty;
+
+        var d = item.dinamic;
+        return string.Concat(
+            item.kind ?? string.Empty, "|",
+            item.id ?? string.Empty, "|",
+            item.hatchingTimestamp, "|",
+            item.incomeLastTime, "|",
+            (int)d.ElementType, "|",
+            d.WeightMultiplier.ToString("R"), "|",
+            d.ResultIncome.ToString("R"));
+    }
+
+    private void SpawnSnapshotCell(FieldCell cell, CellSnapshotDto item)
+    {
+        if (cell == null || item == null)
+            return;
+
+        if (item.kind == "egg")
+            SpawnEgg(cell, item.id, item.dinamic);
+        else if (item.kind == "brainrot")
+            SpawnBrainrot(cell, item.id, item.dinamic, item.incomeLastTime);
+    }
+
+    private void ClearCellActors(FieldCell cell)
+    {
+        if (cell == null)
+            return;
+
+        var eggs = cell.GetComponentsInChildren<Egg>(true);
+        foreach (var egg in eggs)
+        {
+            if (egg != null)
+                Destroy(egg.gameObject);
+        }
+
+        var pets = cell.GetComponentsInChildren<Brainrot>(true);
+        foreach (var pet in pets)
+        {
+            if (pet != null)
+                Destroy(pet.gameObject);
+        }
+    }
+
+    private SlotSnapshotCache BuildSnapshotCache(BaseSnapshotDto snapshot)
+    {
+        if (snapshot == null)
+            return null;
+
+        var cache = new SlotSnapshotCache();
+        if (snapshot.conveyor != null)
+            cache.conveyorLevel = snapshot.conveyor.lvl;
+        if (snapshot.bigPet != null)
+        {
+            cache.bigPetId = snapshot.bigPet.id;
+            cache.bigPetLvl = snapshot.bigPet.lvl;
+            cache.bigPetXp = snapshot.bigPet.xp;
+        }
+
+        if (snapshot.land != null && snapshot.land.boughtCells != null)
+            cache.land = new HashSet<int>(snapshot.land.boughtCells);
+
+        var cells = BuildSnapshotCells(snapshot);
+        cache.cells = BuildCellSignatures(cells);
+        return cache;
+    }
+
+    private SlotSnapshotCache GetOrCreateSlotSnapshotCache(int slotIndex)
+    {
+        if (_slotSnapshotCaches == null || slotIndex < 0 || slotIndex >= _slotSnapshotCaches.Length)
+            return new SlotSnapshotCache();
+
+        if (_slotSnapshotCaches[slotIndex] == null)
+            _slotSnapshotCaches[slotIndex] = new SlotSnapshotCache();
+
+        return _slotSnapshotCaches[slotIndex];
+    }
+
+    private void SetSlotSnapshotCache(int slotIndex, SlotSnapshotCache cache)
+    {
+        if (_slotSnapshotCaches == null || slotIndex < 0 || slotIndex >= _slotSnapshotCaches.Length)
+            return;
+        _slotSnapshotCaches[slotIndex] = cache;
+    }
+
+    private void ResetSlotSnapshotCache(int slotIndex)
+    {
+        if (_slotSnapshotCaches == null || slotIndex < 0 || slotIndex >= _slotSnapshotCaches.Length)
+            return;
+        _slotSnapshotCaches[slotIndex] = null;
     }
 
     private void ApplyIfChanged(int slotIndex, RemoteBaseSlot slot, ZooLocationItem loc, bool force = false)
@@ -465,7 +1078,7 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         _slotUpdatedAt[slotIndex] = updatedAt;
-        ApplySnapshotToSlot(slot, loc.baseData);
+        QueueSnapshotApply(slotIndex, slot, loc.baseData);
     }
 
     private void ApplyIfChangedLobby(int slotIndex, RemoteBaseSlot slot, LobbyMemberStateDto member, bool force = false)
@@ -474,13 +1087,56 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         // Для лобби обновляем базу только когда реально изменилась база
-        var updatedAt = member.baseData?.updatedAt ?? "";
+        var updatedAt = BuildLobbySnapshotSignature(member);
 
         if (!force && _slotUpdatedAt[slotIndex] == updatedAt)
             return;
 
         _slotUpdatedAt[slotIndex] = updatedAt;
-        ApplySnapshotToSlot(slot, member.baseData);
+        QueueSnapshotApply(slotIndex, slot, member.baseData);
+    }
+
+    private string BuildLobbySnapshotSignature(LobbyMemberStateDto member)
+    {
+        if (member == null)
+            return string.Empty;
+
+        var raw = member.baseDataRaw;
+        if (!string.IsNullOrEmpty(raw))
+        {
+            // Ignore snapshot.updatedAt noise to prevent full base reapply on every lobby tick.
+            raw = NormalizeSnapshotRawForHash(raw);
+
+            unchecked
+            {
+                var hash = 17;
+                for (int i = 0; i < raw.Length; i++)
+                    hash = hash * 31 + raw[i];
+                return "raw:" + hash;
+            }
+        }
+
+        return member.baseData?.updatedAt ?? string.Empty;
+    }
+
+    private string NormalizeSnapshotRawForHash(string raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+            return string.Empty;
+
+        const string marker = "\"updatedAt\":";
+        var markerIdx = raw.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIdx < 0)
+            return raw;
+
+        var quoteStart = raw.IndexOf('"', markerIdx + marker.Length);
+        if (quoteStart < 0)
+            return raw;
+        var quoteEnd = raw.IndexOf('"', quoteStart + 1);
+        if (quoteEnd <= quoteStart)
+            return raw;
+
+        return raw.Remove(quoteStart + 1, quoteEnd - quoteStart - 1);
     }
 
     private void EnsureSlotState()
@@ -494,11 +1150,32 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotRemotePlayers = new GameObject[slots.Count];
         if (_slotRemoteBoards == null || _slotRemoteBoards.Length != slots.Count)
             _slotRemoteBoards = new RemoteFriendBoard[slots.Count];
+        if (_slotSnapshotApplyRoutines == null || _slotSnapshotApplyRoutines.Length != slots.Count)
+            _slotSnapshotApplyRoutines = new Coroutine[slots.Count];
+        if (_slotSnapshotApplyPending == null || _slotSnapshotApplyPending.Length != slots.Count)
+            _slotSnapshotApplyPending = new BaseSnapshotDto[slots.Count];
+        if (_slotHadSnapshot == null || _slotHadSnapshot.Length != slots.Count)
+            _slotHadSnapshot = new bool[slots.Count];
+        if (_slotSnapshotCaches == null || _slotSnapshotCaches.Length != slots.Count)
+            _slotSnapshotCaches = new SlotSnapshotCache[slots.Count];
+        if (_slotModeState == null || _slotModeState.Length != slots.Count)
+        {
+            _slotModeState = new int[slots.Count];
+            for (int i = 0; i < _slotModeState.Length; i++)
+                _slotModeState[i] = -1;
+        }
     }
 
     private int FindSlotForPlayer(string playerId)
     {
         if (slots == null || slots.Count == 0) return -1;
+        if (string.IsNullOrEmpty(playerId)) return -1;
+
+        if (_playerToSlot.TryGetValue(playerId, out var assigned) &&
+            assigned >= 0 &&
+            assigned < slots.Count &&
+            !IsLocalSlotIndex(assigned))
+            return assigned;
 
         if (!deterministicSlots)
         {
@@ -553,8 +1230,27 @@ public class RemoteBasesApplier : MonoBehaviour
         if (slot == null || slot.root == null || IsLocalSlot(slot))
             return;
 
+        if (slots != null)
+        {
+            var slotIndex = slots.IndexOf(slot);
+            if (slotIndex >= 0 && _slotSnapshotApplyRoutines != null && slotIndex < _slotSnapshotApplyRoutines.Length)
+            {
+                if (_slotSnapshotApplyRoutines[slotIndex] != null)
+                    StopCoroutine(_slotSnapshotApplyRoutines[slotIndex]);
+                _slotSnapshotApplyRoutines[slotIndex] = null;
+                if (_slotSnapshotApplyPending != null && slotIndex < _slotSnapshotApplyPending.Length)
+                    _slotSnapshotApplyPending[slotIndex] = null;
+                if (_slotHadSnapshot != null && slotIndex < _slotHadSnapshot.Length)
+                    _slotHadSnapshot[slotIndex] = false;
+                ResetSlotSnapshotCache(slotIndex);
+            }
+        }
+
         if (disableRoot)
             slot.root.gameObject.SetActive(false);
+
+        foreach (var conveyor in slot.root.GetComponentsInChildren<Conveyor>(true))
+            conveyor.ClearSpawnedEggs();
 
         foreach (var cell in GetCells(slot))
         {
@@ -631,6 +1327,9 @@ public class RemoteBasesApplier : MonoBehaviour
         var pet = Instantiate(prefab, cell.transform);
         pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         pet.Init(dinamic, null, incomeLastTime);
+        var info = pet.GetComponentInChildren<BrainrotInfoUI>(true);
+        if (info != null)
+            info.SetRemoteView(true);
     }
 
     private void EnsureFieldIds(RemoteBaseSlot slot)
@@ -693,6 +1392,10 @@ public class RemoteBasesApplier : MonoBehaviour
         if (slots == null || slots.Count == 0) return -1;
         if (_serverLocalSlotIndex >= 0 && _serverLocalSlotIndex < slots.Count)
             return _serverLocalSlotIndex;
+        if (_lastPreparedLocalSlotIndex >= 0 && _lastPreparedLocalSlotIndex < slots.Count)
+            return _lastPreparedLocalSlotIndex;
+        if (_lastTeleportedSlotIndex >= 0 && _lastTeleportedSlotIndex < slots.Count)
+            return _lastTeleportedSlotIndex;
         for (int i = 0; i < slots.Count; i++)
         {
             if (slots[i].isLocalSlot) return i;
@@ -713,6 +1416,44 @@ public class RemoteBasesApplier : MonoBehaviour
         if (slots == null || slot == null) return false;
         var idx = slots.IndexOf(slot);
         return IsLocalSlotIndex(idx);
+    }
+
+    public Transform GetLocalSlotRoot()
+    {
+        if (slots == null || slots.Count == 0)
+            return null;
+
+        var idx = GetLocalSlotIndex();
+        if (idx >= 0 && idx < slots.Count && slots[idx] != null && slots[idx].root != null)
+            return slots[idx].root;
+
+        if (G.Player != null)
+        {
+            var playerPos = G.Player.transform.position;
+            var bestDist = float.MaxValue;
+            Transform bestRoot = null;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var slot = slots[i];
+                if (slot == null || slot.root == null) continue;
+                var anchor = slot.teleportTarget != null ? slot.teleportTarget.position : slot.root.position;
+                var dist = (anchor - playerPos).sqrMagnitude;
+                if (dist >= bestDist) continue;
+                bestDist = dist;
+                bestRoot = slot.root;
+            }
+
+            if (bestRoot != null)
+                return bestRoot;
+        }
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (slots[i] != null && slots[i].root != null)
+                return slots[i].root;
+        }
+
+        return null;
     }
 
     public void ApplyFriendBase(BaseSnapshotDto snapshot, int slotIndex = 0)
@@ -846,7 +1587,7 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotRemoteBoards[slotIndex] = go.GetComponentInChildren<RemoteFriendBoard>(true);
             var mover = go.GetComponent<RemotePlayerMover>();
             if (mover == null) mover = go.AddComponent<RemotePlayerMover>();
-            mover.SetDelay(remotePlayerDelaySec);
+            mover.SetDelay(Mathf.Max(remotePlayerDelaySec, 1f));
 
             var cc = go.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
@@ -898,7 +1639,20 @@ public class RemoteBasesApplier : MonoBehaviour
 
     private string GetLocalPlayerId()
     {
-        if (G.Save == null) return null;
-        return G.Save.LoadBackendProfile().playerId;
+        try
+        {
+            if (G.Save == null)
+                return _lastLocalPlayerId;
+
+            var id = G.Save.LoadBackendProfile().playerId;
+            if (!string.IsNullOrEmpty(id))
+                _lastLocalPlayerId = id;
+        }
+        catch
+        {
+            // Ignore profile-read race during bootstrap and keep last known id.
+        }
+
+        return _lastLocalPlayerId;
     }
 }

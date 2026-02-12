@@ -77,21 +77,38 @@ public class LobbyJoinResponseDto
 
 public class LobbyClient : MonoBehaviour
 {
+    private struct PositionHistorySample
+    {
+        public float t;
+        public Vector3 pos;
+    }
+
     public static LobbyClient Instance { get; private set; }
 
     [Header("Behavior")]
     [SerializeField] private bool autoJoinOnStart = true;
     [SerializeField] private float updateIntervalSec = 1f;
-    [SerializeField] private float stateIntervalSec = 2f;
+    [SerializeField] private float stateIntervalSec = 1f;
+    [SerializeField] private float soloStateIntervalSec = 2.5f;
     [SerializeField] private int maxConsecutiveErrors = 3;
     [SerializeField] private float reconnectIntervalSec = 60f;
     [SerializeField] private float positionSampleRate = 30f;
     [SerializeField] private float positionMinDistance = 0.05f;
-    [SerializeField] private int maxSamplesPerUpdate = 20;
+    [SerializeField] private float positionSendWindowSec = 1.5f;
+    [SerializeField] private int maxSamplesPerUpdate = 60;
+    [SerializeField] private int positionTargetSamplesPerUpdate = 24;
     [Header("Lobby Slots")]
     [SerializeField] private bool debugSlots = false;
     [SerializeField] private int claimRetryCount = 10;
     [SerializeField] private float claimRetryDelaySec = 0.5f;
+    [Header("Debug Mirror Bot")]
+    [SerializeField] private bool debugMirrorBotEnabled = false;
+    [SerializeField] private string debugMirrorBotPlayerId = "11111111-1111-1111-1111-111111111111";
+    [SerializeField] private bool debugMirrorAroundWorldZero = true;
+    [Header("Debug Traffic")]
+    [SerializeField] private bool debugTrafficLogs = false;
+    [SerializeField] private bool debugTrafficVerbose = false;
+    [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
 
     [Header("Deps (optional)")]
     [SerializeField] private ZooBackendClient backend;
@@ -108,13 +125,27 @@ public class LobbyClient : MonoBehaviour
     private Coroutine _stateLoop;
     private Coroutine _sampleLoop;
     private Coroutine _reconnectLoop;
+    private Coroutine _debugMirrorLoop;
     private int _errors;
     private RemoteBasesApplier _remoteBases;
     private long _lastVersion;
-    private readonly List<LobbyPosSampleDto> _pendingSamples = new();
-    private float _batchStartTime;
+    private readonly List<PositionHistorySample> _positionHistory = new();
+    private readonly Dictionary<string, string> _remoteBaseRawCache = new();
+    private readonly Dictionary<string, BaseSnapshotDto> _remoteBaseSnapshotCache = new();
+    private int _preferredSlotIndex = -1;
     private Vector3 _lastSamplePos;
     private bool _hasSamplePos;
+    private string _cachedLocalPlayerId;
+    private bool _hasLastSentHand;
+    private string _lastSentHandType;
+    private string _lastSentHandId;
+    private float _trafficSummaryAt;
+    private int _trafficReqCount;
+    private long _trafficTxBytes;
+    private long _trafficRxBytes;
+    private float _trafficHttpMs;
+    private float _trafficParseMs;
+    private float _trafficApplyMs;
 
     private void Awake()
     {
@@ -186,6 +217,7 @@ public class LobbyClient : MonoBehaviour
             _stateLoop = StartCoroutine(StateLoop());
         if (_sampleLoop == null)
             _sampleLoop = StartCoroutine(SampleLoop());
+        EnsureDebugMirrorLoopState();
     }
 
     public IEnumerator JoinWithFriend(string friendCode, Action<bool> onDone = null)
@@ -233,6 +265,7 @@ public class LobbyClient : MonoBehaviour
             _stateLoop = StartCoroutine(StateLoop());
         if (_sampleLoop == null)
             _sampleLoop = StartCoroutine(SampleLoop());
+        EnsureDebugMirrorLoopState();
 
         onDone?.Invoke(true);
     }
@@ -251,7 +284,10 @@ public class LobbyClient : MonoBehaviour
         while (IsOnline)
         {
             yield return FetchState();
-            yield return new WaitForSeconds(stateIntervalSec);
+            var pollDelay = stateIntervalSec;
+            if (_lastMembers.Count <= 1)
+                pollDelay = Mathf.Max(stateIntervalSec, soloStateIntervalSec);
+            yield return new WaitForSeconds(pollDelay);
         }
     }
 
@@ -269,17 +305,37 @@ public class LobbyClient : MonoBehaviour
         _updateLoop = null;
         _stateLoop = null;
         _sampleLoop = null;
-        if (_remoteBases == null)
-            _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
-        if (_remoteBases != null)
-            _remoteBases.ApplyLobbyMembers(new List<LobbyMemberStateDto>());
+        if (_debugMirrorLoop != null) StopCoroutine(_debugMirrorLoop);
+        _debugMirrorLoop = null;
         Debug.LogWarning($"[Lobby] Offline: {reason}");
 
-        _pendingSamples.Clear();
+        _positionHistory.Clear();
         _hasSamplePos = false;
+        _hasLastSentHand = false;
+        _lastSentHandType = null;
+        _lastSentHandId = null;
+        _remoteBaseRawCache.Clear();
+        _remoteBaseSnapshotCache.Clear();
+        FlushTrafficSummary(force: true);
 
         if (_reconnectLoop == null)
             _reconnectLoop = StartCoroutine(ReconnectLoop());
+    }
+
+    private void EnsureDebugMirrorLoopState()
+    {
+        if (!debugMirrorBotEnabled || !IsOnline)
+        {
+            if (_debugMirrorLoop != null)
+            {
+                StopCoroutine(_debugMirrorLoop);
+                _debugMirrorLoop = null;
+            }
+            return;
+        }
+
+        if (_debugMirrorLoop == null)
+            _debugMirrorLoop = StartCoroutine(DebugMirrorBotLoop());
     }
 
     private IEnumerator ReconnectLoop()
@@ -322,7 +378,6 @@ public class LobbyClient : MonoBehaviour
 
     private IEnumerator SampleLoop()
     {
-        _batchStartTime = Time.realtimeSinceStartup;
         var wait = new WaitForSeconds(1f / Mathf.Max(1f, positionSampleRate));
         while (IsOnline)
         {
@@ -330,17 +385,15 @@ public class LobbyClient : MonoBehaviour
             if (tr != null)
             {
                 var pos = tr.position;
+                var now = Time.realtimeSinceStartup;
                 if (!_hasSamplePos)
                 {
                     _hasSamplePos = true;
                     _lastSamplePos = pos;
-                    _batchStartTime = Time.realtimeSinceStartup;
-                    _pendingSamples.Add(new LobbyPosSampleDto
+                    _positionHistory.Add(new PositionHistorySample
                     {
-                        dt = 0f,
-                        x = pos.x,
-                        y = pos.y,
-                        z = pos.z
+                        t = now,
+                        pos = pos
                     });
                 }
                 else
@@ -348,35 +401,199 @@ public class LobbyClient : MonoBehaviour
                     var delta = pos - _lastSamplePos;
                     if (delta.sqrMagnitude >= positionMinDistance * positionMinDistance)
                     {
-                        if (_pendingSamples.Count == 0)
-                            _batchStartTime = Time.realtimeSinceStartup;
-                        var dt = (Time.realtimeSinceStartup - _batchStartTime) * 1000f;
-                        _pendingSamples.Add(new LobbyPosSampleDto
+                        _positionHistory.Add(new PositionHistorySample
                         {
-                            dt = dt,
-                            x = pos.x,
-                            y = pos.y,
-                            z = pos.z
+                            t = now,
+                            pos = pos
                         });
                         _lastSamplePos = pos;
                     }
                 }
+                TrimPositionHistory(now);
             }
             yield return wait;
         }
     }
 
+    private void TrimPositionHistory(float now)
+    {
+        var keepSec = Mathf.Max(positionSendWindowSec + 1f, 2f);
+        var minTime = now - keepSec;
+        while (_positionHistory.Count > 0 && _positionHistory[0].t < minTime)
+            _positionHistory.RemoveAt(0);
+    }
+
+    private List<LobbyPosSampleDto> BuildPositionSamplesForSend(float now, bool mirror)
+    {
+        if (_positionHistory.Count == 0) return null;
+
+        TrimPositionHistory(now);
+        if (_positionHistory.Count == 0) return null;
+
+        var last = _positionHistory[_positionHistory.Count - 1];
+        var staleSec = now - last.t;
+        if (staleSec > positionSendWindowSec + 0.05f)
+            return null;
+
+        var windowStart = now - Mathf.Max(positionSendWindowSec, updateIntervalSec);
+        var startIndex = 0;
+        while (startIndex < _positionHistory.Count && _positionHistory[startIndex].t < windowStart)
+            startIndex++;
+        if (startIndex >= _positionHistory.Count)
+            startIndex = _positionHistory.Count - 1;
+
+        var count = _positionHistory.Count - startIndex;
+        if (maxSamplesPerUpdate > 0 && count > maxSamplesPerUpdate)
+        {
+            startIndex = _positionHistory.Count - maxSamplesPerUpdate;
+            count = maxSamplesPerUpdate;
+        }
+
+        if (count <= 0) return null;
+
+        var endIndex = _positionHistory.Count - 1;
+        var targetSamples = Mathf.Clamp(positionTargetSamplesPerUpdate, 4, 60);
+        if (maxSamplesPerUpdate > 0)
+            targetSamples = Mathf.Min(targetSamples, maxSamplesPerUpdate);
+        targetSamples = Mathf.Min(targetSamples, count);
+
+        var selected = new List<int>(targetSamples);
+        if (targetSamples == count)
+        {
+            for (var i = startIndex; i <= endIndex; i++)
+                selected.Add(i);
+        }
+        else
+        {
+            for (var i = 0; i < targetSamples; i++)
+            {
+                var t = targetSamples == 1 ? 0f : (float)i / (targetSamples - 1);
+                var idx = startIndex + Mathf.RoundToInt((endIndex - startIndex) * t);
+                if (selected.Count > 0 && idx <= selected[selected.Count - 1])
+                    idx = selected[selected.Count - 1] + 1;
+                if (idx > endIndex) idx = endIndex;
+                selected.Add(idx);
+            }
+        }
+
+        var baseTime = _positionHistory[selected[0]].t;
+        var samples = new List<LobbyPosSampleDto>(selected.Count);
+        for (var k = 0; k < selected.Count; k++)
+        {
+            var i = selected[k];
+            var s = _positionHistory[i];
+            var x = s.pos.x;
+            var z = s.pos.z;
+            if (mirror && debugMirrorAroundWorldZero)
+            {
+                x = -x;
+                z = -z;
+            }
+
+            samples.Add(new LobbyPosSampleDto
+            {
+                dt = (s.t - baseTime) * 1000f,
+                x = x,
+                y = s.pos.y,
+                z = z
+            });
+        }
+
+        return samples;
+    }
+
     private string BaseUrl => backend != null ? backend.baseUrl : "";
+
+    private void TrackHttpTraffic(string tag, UnityWebRequest req, int txBytes, float startedAt, string details = null)
+    {
+        if (!debugTrafficLogs) return;
+
+        var elapsedMs = (Time.realtimeSinceStartup - startedAt) * 1000f;
+        var rxBytes = req.downloadHandler != null && req.downloadHandler.data != null
+            ? req.downloadHandler.data.Length
+            : 0;
+        var code = (int)req.responseCode;
+
+        _trafficReqCount++;
+        _trafficTxBytes += Mathf.Max(0, txBytes);
+        _trafficRxBytes += Mathf.Max(0, rxBytes);
+        _trafficHttpMs += Mathf.Max(0f, elapsedMs);
+
+        if (debugTrafficVerbose)
+            Debug.Log($"[LobbyTraffic] {tag} code={code} ms={elapsedMs:0.0} tx={txBytes}B rx={rxBytes}B {details}");
+
+        FlushTrafficSummary(force: false);
+    }
+
+    private void TrackParseTraffic(int members, int remoteWithBase, int baseBytes, float parseMs, float applyMs)
+    {
+        if (!debugTrafficLogs) return;
+
+        _trafficParseMs += Mathf.Max(0f, parseMs);
+        _trafficApplyMs += Mathf.Max(0f, applyMs);
+
+        if (debugTrafficVerbose)
+            Debug.Log($"[LobbyTraffic] parse members={members} remoteWithBase={remoteWithBase} base={baseBytes / 1024f:0.00}KB parseMs={parseMs:0.00} applyMs={applyMs:0.00}");
+
+        FlushTrafficSummary(force: false);
+    }
+
+    private void FlushTrafficSummary(bool force)
+    {
+        if (!debugTrafficLogs)
+            return;
+
+        var now = Time.realtimeSinceStartup;
+        var interval = Mathf.Max(0.2f, debugTrafficSummaryIntervalSec);
+        if (_trafficSummaryAt <= 0f)
+            _trafficSummaryAt = now + interval;
+
+        if (!force && now < _trafficSummaryAt)
+            return;
+
+        if (_trafficReqCount > 0 || _trafficParseMs > 0f || _trafficApplyMs > 0f)
+        {
+            Debug.Log($"[LobbyTraffic] summary req={_trafficReqCount} tx={_trafficTxBytes / 1024f:0.00}KB rx={_trafficRxBytes / 1024f:0.00}KB httpMs={_trafficHttpMs:0.00} parseMs={_trafficParseMs:0.00} applyMs={_trafficApplyMs:0.00}");
+        }
+
+        _trafficReqCount = 0;
+        _trafficTxBytes = 0;
+        _trafficRxBytes = 0;
+        _trafficHttpMs = 0f;
+        _trafficParseMs = 0f;
+        _trafficApplyMs = 0f;
+        _trafficSummaryAt = now + interval;
+    }
 
     private string GetLocalPlayerId()
     {
-        if (G.Save == null) return null;
-        return G.Save.LoadBackendProfile().playerId;
+        try
+        {
+            if (G.Save == null)
+                return _cachedLocalPlayerId;
+
+            var id = G.Save.LoadBackendProfile().playerId;
+            if (!string.IsNullOrEmpty(id))
+                _cachedLocalPlayerId = id;
+        }
+        catch
+        {
+            // Keep the previous id during bootstrap races.
+        }
+
+        return _cachedLocalPlayerId;
     }
 
     private void SetPlayerHeader(UnityWebRequest req)
     {
         var pid = G.Save != null ? G.Save.LoadBackendProfile().playerId : null;
+        if (!string.IsNullOrEmpty(pid))
+            req.SetRequestHeader("X-Player-Id", pid);
+    }
+
+    private void SetPlayerHeader(UnityWebRequest req, string playerId)
+    {
+        var pid = string.IsNullOrWhiteSpace(playerId) ? null : playerId.Trim();
         if (!string.IsNullOrEmpty(pid))
             req.SetRequestHeader("X-Player-Id", pid);
     }
@@ -424,7 +641,7 @@ public class LobbyClient : MonoBehaviour
             if (slotIndex < 0)
             {
                 availableSlotsCache = obj["availableSlots"]?.ToObject<List<int>>() ?? new List<int>();
-                slotPick = PickRandomSlot(availableSlotsCache);
+                slotPick = PickPreferredOrRandomSlot(availableSlotsCache);
                 if (slotPick < 0) needAutoClaim = true;
             }
 
@@ -507,7 +724,7 @@ public class LobbyClient : MonoBehaviour
             if (slotIndex < 0)
             {
                 availableSlotsCache = obj["availableSlots"]?.ToObject<List<int>>() ?? new List<int>();
-                slotPick = PickRandomSlot(availableSlotsCache);
+                slotPick = PickPreferredOrRandomSlot(availableSlotsCache);
                 if (slotPick < 0) needAutoClaim = true;
             }
 
@@ -534,7 +751,7 @@ public class LobbyClient : MonoBehaviour
     }
 
 
-    private IEnumerator ClaimSlot(int slotIndex, Action<long> onDone = null)
+    private IEnumerator ClaimSlot(int slotIndex, Action<long> onDone = null, string playerIdOverride = null)
     {
         var url = $"{BaseUrl}/lobby/slot";
         var payload = new JObject { ["slotIndex"] = slotIndex };
@@ -544,7 +761,10 @@ public class LobbyClient : MonoBehaviour
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
-        SetPlayerHeader(req);
+        if (string.IsNullOrEmpty(playerIdOverride))
+            SetPlayerHeader(req);
+        else
+            SetPlayerHeader(req, playerIdOverride);
 
         yield return req.SendWebRequest();
         onDone?.Invoke(req.responseCode);
@@ -555,6 +775,14 @@ public class LobbyClient : MonoBehaviour
         if (slots == null || slots.Count == 0) return -1;
         var idx = UnityEngine.Random.Range(0, slots.Count);
         return slots[idx];
+    }
+
+    private int PickPreferredOrRandomSlot(List<int> slots)
+    {
+        if (slots == null || slots.Count == 0) return -1;
+        if (_preferredSlotIndex >= 0 && slots.Contains(_preferredSlotIndex))
+            return _preferredSlotIndex;
+        return PickRandomSlot(slots);
     }
 
 
@@ -595,6 +823,155 @@ public class LobbyClient : MonoBehaviour
         // fallback: let server assign slot
         yield return ClaimSlotAuto();
         onDone?.Invoke(true);
+    }
+
+    private bool TryGetDebugMirrorPlayerId(out string playerId)
+    {
+        playerId = null;
+        if (string.IsNullOrWhiteSpace(debugMirrorBotPlayerId))
+            return false;
+        if (!Guid.TryParse(debugMirrorBotPlayerId, out var pid))
+            return false;
+        playerId = pid.ToString();
+        return true;
+    }
+
+    private IEnumerator JoinLobbyAs(string playerId, Action<bool, List<int>, int> onDone = null)
+    {
+        var url = $"{BaseUrl}/lobby/join";
+        using var req = new UnityWebRequest(url, "POST");
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req, playerId);
+
+        yield return req.SendWebRequest();
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onDone?.Invoke(false, new List<int>(), -1);
+            yield break;
+        }
+
+        try
+        {
+            var obj = JObject.Parse(req.downloadHandler.text);
+            var membersArr = obj["members"] as JArray;
+            var slotIndex = -1;
+            if (membersArr != null)
+            {
+                foreach (var token in membersArr)
+                {
+                    if (token?["playerId"]?.ToString() == playerId)
+                    {
+                        slotIndex = token["slotIndex"]?.Value<int>() ?? -1;
+                        break;
+                    }
+                }
+            }
+
+            var available = obj["availableSlots"]?.ToObject<List<int>>() ?? new List<int>();
+            onDone?.Invoke(true, available, slotIndex);
+        }
+        catch
+        {
+            onDone?.Invoke(false, new List<int>(), -1);
+        }
+    }
+
+    private IEnumerator ClaimSlotAutoAs(string playerId, Action<bool> onDone = null)
+    {
+        var url = $"{BaseUrl}/lobby/slot/auto";
+        using var req = new UnityWebRequest(url, "POST");
+        req.downloadHandler = new DownloadHandlerBuffer();
+        SetPlayerHeader(req, playerId);
+
+        yield return req.SendWebRequest();
+        onDone?.Invoke(req.result == UnityWebRequest.Result.Success);
+    }
+
+    private IEnumerator UpdateLobbyAs(string playerId, JObject payload, Action<bool> onDone = null)
+    {
+        var url = $"{BaseUrl}/lobby/update";
+        var json = payload.ToString(Formatting.None);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        SetPlayerHeader(req, playerId);
+
+        yield return req.SendWebRequest();
+        onDone?.Invoke(req.result == UnityWebRequest.Result.Success);
+    }
+
+    private IEnumerator DebugMirrorBotLoop()
+    {
+        if (!TryGetDebugMirrorPlayerId(out var mirrorPlayerId))
+            yield break;
+
+        var mirrorJoined = false;
+        while (IsOnline && debugMirrorBotEnabled)
+        {
+            if (!mirrorJoined)
+            {
+                var joined = false;
+                var slotIndex = -1;
+                var available = new List<int>();
+                yield return JoinLobbyAs(mirrorPlayerId, (ok, slots, slot) =>
+                {
+                    joined = ok;
+                    available = slots ?? new List<int>();
+                    slotIndex = slot;
+                });
+
+                if (!joined)
+                {
+                    yield return new WaitForSeconds(updateIntervalSec);
+                    continue;
+                }
+
+                if (slotIndex < 0)
+                {
+                    if (available.Count > 0)
+                    {
+                        var pick = PickRandomSlot(available);
+                        if (pick >= 0)
+                            yield return ClaimSlot(pick, _ => { }, mirrorPlayerId);
+                    }
+                    else
+                    {
+                        yield return ClaimSlotAutoAs(mirrorPlayerId, _ => { });
+                    }
+                }
+
+                mirrorJoined = true;
+            }
+
+            var payload = new JObject();
+            var snapshotJson = snapshotSync != null ? snapshotSync.BuildSnapshotJson() : null;
+            if (!string.IsNullOrEmpty(snapshotJson))
+            {
+                try { payload["baseData"] = JToken.Parse(snapshotJson); } catch { }
+            }
+
+            var hand = BuildHand();
+            if (hand != null)
+                payload["hand"] = JToken.FromObject(hand);
+
+            var mirrorSamples = BuildPositionSamplesForSend(Time.realtimeSinceStartup, mirror: true);
+            if (mirrorSamples != null)
+                payload["positions"] = JToken.FromObject(mirrorSamples);
+
+            if (payload.Count > 0)
+            {
+                var updateOk = false;
+                yield return UpdateLobbyAs(mirrorPlayerId, payload, ok => updateOk = ok);
+                if (!updateOk)
+                    mirrorJoined = false;
+            }
+
+            yield return new WaitForSeconds(updateIntervalSec);
+        }
+
+        _debugMirrorLoop = null;
     }
 
     public IEnumerator SendGift(string toPlayerId, string itemType, string itemId, Action<bool> onDone = null)
@@ -708,38 +1085,27 @@ public class LobbyClient : MonoBehaviour
         }
 
         var hand = BuildHand();
-        if (hand != null)
-            payload["hand"] = JToken.FromObject(hand);
+        if (HasHandChanged(hand))
+            payload["hand"] = hand != null ? JToken.FromObject(hand) : JValue.CreateNull();
 
-        List<LobbyPosSampleDto> samplesToSend = null;
-        if (_pendingSamples.Count > 0)
-        {
-            if (maxSamplesPerUpdate > 0 && _pendingSamples.Count > maxSamplesPerUpdate)
-            {
-                var skip = _pendingSamples.Count - maxSamplesPerUpdate;
-                samplesToSend = _pendingSamples.GetRange(skip, maxSamplesPerUpdate);
-                var baseDt = samplesToSend[0].dt;
-                if (baseDt > 0.001f)
-                {
-                    for (var i = 0; i < samplesToSend.Count; i++)
-                        samplesToSend[i].dt -= baseDt;
-                }
-            }
-            else
-            {
-                samplesToSend = new List<LobbyPosSampleDto>(_pendingSamples);
-            }
-            _pendingSamples.Clear();
-            _batchStartTime = Time.realtimeSinceStartup;
-        }
+        // No reason to stream positions while alone in lobby.
+        var samplesToSend = _lastMembers.Count > 1
+            ? BuildPositionSamplesForSend(Time.realtimeSinceStartup, mirror: false)
+            : null;
 
         if (samplesToSend != null)
             payload["positions"] = JToken.FromObject(samplesToSend);
 
         if (payload.Count == 0)
+        {
+            if (debugTrafficLogs && debugTrafficVerbose)
+                Debug.Log("[LobbyTraffic] POST /lobby/update skipped (empty payload)");
             yield break;
+        }
 
         var json = payload.ToString(Formatting.None);
+        var txBytes = System.Text.Encoding.UTF8.GetByteCount(json);
+        var startedAt = Time.realtimeSinceStartup;
 
         using var req = new UnityWebRequest(url, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
@@ -748,6 +1114,12 @@ public class LobbyClient : MonoBehaviour
         SetPlayerHeader(req);
 
         yield return req.SendWebRequest();
+        TrackHttpTraffic(
+            "POST /lobby/update",
+            req,
+            txBytes,
+            startedAt,
+            $"fields={payload.Count} samples={(samplesToSend != null ? samplesToSend.Count : 0)}");
 
         if (req.result != UnityWebRequest.Result.Success)
         {
@@ -760,12 +1132,15 @@ public class LobbyClient : MonoBehaviour
 
     private IEnumerator FetchState()
     {
-        var url = $"{BaseUrl}/lobby/state?since={_lastVersion}";
+        var sinceVersion = _lastVersion;
+        var url = $"{BaseUrl}/lobby/state?since={sinceVersion}";
         using var req = UnityWebRequest.Get(url);
         req.downloadHandler = new DownloadHandlerBuffer();
         SetPlayerHeader(req);
 
+        var startedAt = Time.realtimeSinceStartup;
         yield return req.SendWebRequest();
+        TrackHttpTraffic("GET /lobby/state", req, 0, startedAt, $"since={sinceVersion}");
 
         if (req.responseCode == 204)
             yield break;
@@ -791,30 +1166,140 @@ public class LobbyClient : MonoBehaviour
 
     private void ParseMembers(JArray arr)
     {
+        var collectTraffic = debugTrafficLogs;
+        var parseStartedAt = collectTraffic ? Time.realtimeSinceStartup : 0f;
+        var remoteWithBase = 0;
+        var remoteBaseBytes = 0;
+
         _lastMembers.Clear();
+        var localId = GetLocalPlayerId();
+        var seenRemoteIds = new HashSet<string>();
         if (arr != null)
         {
             foreach (var token in arr)
             {
-                var item = token.ToObject<LobbyMemberStateDto>() ?? new LobbyMemberStateDto();
-                var baseToken = token["baseData"];
-                if (baseToken != null && baseToken.Type != JTokenType.Null)
+                var obj = token as JObject;
+                if (obj == null)
+                    continue;
+
+                var item = ParseMemberFast(obj);
+                var isLocalMember = !string.IsNullOrEmpty(localId) && item.playerId == localId;
+                var baseToken = obj["baseData"];
+                if (!isLocalMember && baseToken != null && baseToken.Type != JTokenType.Null)
                 {
                     item.baseDataRaw = baseToken.ToString(Formatting.None);
-                    try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
-                    catch { item.baseData = null; }
+                    if (collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
+                    {
+                        remoteWithBase++;
+                        remoteBaseBytes += System.Text.Encoding.UTF8.GetByteCount(item.baseDataRaw);
+                    }
+
+                    if (!string.IsNullOrEmpty(item.playerId) &&
+                        _remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw) &&
+                        cachedRaw == item.baseDataRaw &&
+                        _remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
+                    {
+                        item.baseData = cachedSnapshot;
+                    }
+                    else
+                    {
+                        try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
+                        catch { item.baseData = null; }
+
+                        if (!string.IsNullOrEmpty(item.playerId))
+                        {
+                            _remoteBaseRawCache[item.playerId] = item.baseDataRaw;
+                            _remoteBaseSnapshotCache[item.playerId] = item.baseData;
+                        }
+                    }
                 }
+                else if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
+                {
+                    _remoteBaseRawCache.Remove(item.playerId);
+                    _remoteBaseSnapshotCache.Remove(item.playerId);
+                }
+
+                if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
+                    seenRemoteIds.Add(item.playerId);
+
+                if (!string.IsNullOrEmpty(localId) && item.playerId == localId && item.slotIndex >= 0)
+                    _preferredSlotIndex = item.slotIndex;
 
                 _lastMembers.Add(item);
             }
         }
 
+        if (_remoteBaseRawCache.Count > 0)
+        {
+            var remove = new List<string>();
+            foreach (var kv in _remoteBaseRawCache)
+            {
+                if (!seenRemoteIds.Contains(kv.Key))
+                    remove.Add(kv.Key);
+            }
+
+            for (int i = 0; i < remove.Count; i++)
+            {
+                _remoteBaseRawCache.Remove(remove[i]);
+                _remoteBaseSnapshotCache.Remove(remove[i]);
+            }
+        }
+
         LobbyStateUpdated?.Invoke(_lastMembers);
+        var parseMs = collectTraffic ? (Time.realtimeSinceStartup - parseStartedAt) * 1000f : 0f;
 
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        var applyStartedAt = collectTraffic ? Time.realtimeSinceStartup : 0f;
         if (_remoteBases != null)
             _remoteBases.ApplyLobbyMembers(_lastMembers);
+        var applyMs = collectTraffic ? (Time.realtimeSinceStartup - applyStartedAt) * 1000f : 0f;
+
+        if (collectTraffic)
+            TrackParseTraffic(_lastMembers.Count, remoteWithBase, remoteBaseBytes, parseMs, applyMs);
+    }
+
+    private LobbyMemberStateDto ParseMemberFast(JObject obj)
+    {
+        var item = new LobbyMemberStateDto
+        {
+            playerId = obj["playerId"]?.ToString(),
+            friendCode = obj["friendCode"]?.ToString(),
+            displayName = obj["displayName"]?.ToString(),
+            isFriend = obj["isFriend"]?.Value<bool>() ?? false,
+            isOnline = obj["isOnline"]?.Value<bool>() ?? false,
+            updatedAt = obj["updatedAt"]?.ToString(),
+            slotIndex = obj["slotIndex"]?.Value<int>() ?? -1
+        };
+
+        if (obj["hand"] is JObject handObj)
+        {
+            item.hand = new LobbyHandItemDto
+            {
+                type = handObj["type"]?.ToString(),
+                id = handObj["id"]?.ToString()
+            };
+        }
+
+        if (obj["positions"] is JArray posArr && posArr.Count > 0)
+        {
+            var positions = new List<LobbyPosSampleDto>(posArr.Count);
+            foreach (var p in posArr)
+            {
+                var posObj = p as JObject;
+                if (posObj == null) continue;
+                positions.Add(new LobbyPosSampleDto
+                {
+                    dt = posObj["dt"]?.Value<float>() ?? 0f,
+                    x = posObj["x"]?.Value<float>() ?? 0f,
+                    y = posObj["y"]?.Value<float>() ?? 0f,
+                    z = posObj["z"]?.Value<float>() ?? 0f
+                });
+            }
+            item.positions = positions;
+        }
+
+        return item;
     }
 
     private void RegisterError()
@@ -838,6 +1323,26 @@ public class LobbyClient : MonoBehaviour
             type = type,
             id = active.Name
         };
+    }
+
+    private bool HasHandChanged(LobbyHandItemDto hand)
+    {
+        var type = hand != null ? hand.type : null;
+        var id = hand != null ? hand.id : null;
+        if (!_hasLastSentHand)
+        {
+            _hasLastSentHand = true;
+            _lastSentHandType = type;
+            _lastSentHandId = id;
+            return hand != null;
+        }
+
+        if (_lastSentHandType == type && _lastSentHandId == id)
+            return false;
+
+        _lastSentHandType = type;
+        _lastSentHandId = id;
+        return true;
     }
 
     private string MapHandType(Item item)
