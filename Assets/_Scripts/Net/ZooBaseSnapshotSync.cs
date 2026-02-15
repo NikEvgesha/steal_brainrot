@@ -3,6 +3,54 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[Serializable]
+public class PlayerPublicStatsDto
+{
+    public int totalHatched;
+    public double petsIncomePerSec;
+    public double bestPetIncomePerSec;
+    public double bigPetIncomePerSec;
+}
+
+public static class LocalPlayerStatsStore
+{
+    private const string HatchedKeyPrefix = "net.stats.total_hatched";
+
+    public static int GetTotalHatched()
+    {
+        return Mathf.Max(0, PlayerPrefs.GetInt(BuildScopedKey(HatchedKeyPrefix), 0));
+    }
+
+    public static void IncrementHatched(int amount = 1)
+    {
+        if (amount <= 0)
+            return;
+
+        var key = BuildScopedKey(HatchedKeyPrefix);
+        var next = Mathf.Max(0, PlayerPrefs.GetInt(key, 0)) + amount;
+        PlayerPrefs.SetInt(key, next);
+        PlayerPrefs.Save();
+    }
+
+    private static string BuildScopedKey(string baseKey)
+    {
+        var playerId = string.Empty;
+        try
+        {
+            if (G.Save != null)
+                playerId = G.Save.LoadBackendProfile().playerId;
+        }
+        catch
+        {
+            // Save bootstrap race: fallback to global key for this session.
+        }
+
+        return string.IsNullOrWhiteSpace(playerId)
+            ? baseKey
+            : $"{baseKey}.{playerId}";
+    }
+}
+
 [Serializable] public class BigPetDto { public int id; public int lvl; public int xp; public float income; }
 [Serializable] public class ConveyorDto { public int lvl; }
 [Serializable] public class LandDto { public List<int> boughtCells = new(); }
@@ -27,6 +75,7 @@ public class BaseSnapshotDto
     public LandDto land;
     public List<CellSnapshotDto> cells = new();
     public List<AnimalOnCellDto> animalsOnCells = new();
+    public PlayerPublicStatsDto playerStats;
 }
 
 public class ZooBaseSnapshotSync : MonoBehaviour
@@ -99,6 +148,9 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     public BaseSnapshotDto BuildSnapshotDto()
     {
+        var cells = LoadCells_SOMEHOW();
+        var bigPetIncomePerSec = LoadBigPetIncomePerSecond();
+
         return new BaseSnapshotDto
         {
             updatedAt = DateTime.UtcNow.ToString("o"),
@@ -107,7 +159,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
                 id = save.LoadBigPetId(),
                 lvl = save.LoadBigPetLvl(),
                 xp = save.LoadBigPetXP(),
-                //income = save.LoadBigPetIncome()
+                income = (float)bigPetIncomePerSec
             },
             conveyor = new ConveyorDto
             {
@@ -117,9 +169,51 @@ public class ZooBaseSnapshotSync : MonoBehaviour
             {
                 boughtCells = LoadBoughtCells_SOMEHOW()
             },
-            cells = LoadCells_SOMEHOW(),
-            animalsOnCells = LoadAnimalsOnCells_SOMEHOW()
+            cells = cells,
+            animalsOnCells = LoadAnimalsOnCells_SOMEHOW(),
+            playerStats = BuildPublicStats(cells, bigPetIncomePerSec)
         };
+    }
+
+    private PlayerPublicStatsDto BuildPublicStats(List<CellSnapshotDto> cells, double bigPetIncomePerSec)
+    {
+        var totalPetsIncome = 0d;
+        var bestPetIncome = 0d;
+        if (cells != null)
+        {
+            for (int i = 0; i < cells.Count; i++)
+            {
+                var cell = cells[i];
+                if (cell == null || cell.kind != "brainrot")
+                    continue;
+
+                var income = Math.Max(0d, cell.dinamic.ResultIncome);
+                totalPetsIncome += income;
+                if (income > bestPetIncome)
+                    bestPetIncome = income;
+            }
+        }
+
+        return new PlayerPublicStatsDto
+        {
+            totalHatched = LocalPlayerStatsStore.GetTotalHatched(),
+            petsIncomePerSec = totalPetsIncome,
+            bestPetIncomePerSec = bestPetIncome,
+            bigPetIncomePerSec = Math.Max(0d, bigPetIncomePerSec)
+        };
+    }
+
+    private double LoadBigPetIncomePerSecond()
+    {
+        var root = GetSnapshotRoot();
+        BigPetPoint bigPet = null;
+        if (root != null)
+            bigPet = root.GetComponentInChildren<BigPetPoint>(true);
+        if (bigPet == null)
+            bigPet = FindAnyObjectByType<BigPetPoint>();
+        if (bigPet == null)
+            return 0d;
+        return Math.Max(0d, bigPet.CurrentIncomePerSecond);
     }
 
     // ====== РўРЈРў РўР« вЂњР’РЎРўР РђРР’РђР•РЁР¬РЎРЇвЂќ Р’ РЎР’РћР® РР“Р РЈ ======

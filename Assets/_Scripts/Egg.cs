@@ -321,6 +321,7 @@ public class Egg : InventoryItem
         Brainrot brainrot = Instantiate(brainrotPrefab, _currentCell.transform);
         brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         brainrot.Init(_data.DinamicData, _currentCell);
+        LocalPlayerStatsStore.IncrementHatched();
         _currentCell.UpdateFieldItem(Item.Brainrot);
         Destroy(gameObject);
         _currentCell.LockCell(false);

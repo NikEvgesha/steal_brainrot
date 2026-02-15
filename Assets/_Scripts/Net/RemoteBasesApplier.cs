@@ -624,7 +624,7 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
         }
 
-        board.SetRemoteWithId(loc.playerId, loc.friendCode, loc.displayName, loc.isFriend, loc.isOnline);
+        board.SetRemoteWithId(loc.playerId, loc.friendCode, loc.displayName, loc.isFriend, loc.isOnline, ExtractStats(loc.baseData));
     }
 
     private void UpdateFriendBoardLobby(RemoteBaseSlot slot, LobbyMemberStateDto member)
@@ -638,7 +638,12 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
         }
 
-        board.SetRemoteWithId(member.playerId, member.friendCode, member.displayName, member.isFriend, member.isOnline);
+        board.SetRemoteWithId(member.playerId, member.friendCode, member.displayName, member.isFriend, member.isOnline, ExtractStats(member.baseData));
+    }
+
+    private static PlayerPublicStatsDto ExtractStats(BaseSnapshotDto snapshot)
+    {
+        return snapshot != null ? snapshot.playerStats : null;
     }
 
     private void QueueSnapshotApply(int slotIndex, RemoteBaseSlot slot, BaseSnapshotDto snapshot)

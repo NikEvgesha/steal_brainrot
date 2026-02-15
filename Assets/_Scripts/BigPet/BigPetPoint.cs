@@ -40,6 +40,8 @@ public class BigPetPoint : MonoBehaviour
     private DateTime _lastIncomeCollectTimestamp;
     private bool _initializedLocal;
 
+    public double CurrentIncomePerSecond => _currentIncome;
+
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
 

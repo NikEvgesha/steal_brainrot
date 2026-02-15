@@ -8,10 +8,20 @@ public class InteractionRaycastListener : MonoBehaviour
 
     [SerializeField] public float MaxDistance;
 
+    private void Awake()
+    {
+        EnsureEvents();
+    }
+
+    private void OnValidate()
+    {
+        EnsureEvents();
+    }
+
     private void OnDestroy()
     {
-        _hitEvent.RemoveAllListeners();
-        _noHitEvent.RemoveAllListeners();
+        _hitEvent?.RemoveAllListeners();
+        _noHitEvent?.RemoveAllListeners();
     }
 
     public void onRaycastHit()
@@ -22,5 +32,11 @@ public class InteractionRaycastListener : MonoBehaviour
     public void onRaycastFail()
     {
         _noHitEvent?.Invoke();
+    }
+
+    private void EnsureEvents()
+    {
+        _hitEvent ??= new UnityEvent();
+        _noHitEvent ??= new UnityEvent();
     }
 }

@@ -26,6 +26,7 @@ public class Conveyor : MonoBehaviour
     private Coroutine _spawnRoutine;
 
     public float IncomeMultiplier => _level != null ? _level.IncomeMultiplier : 1f;
+    public IReadOnlyList<ConveyorLevel> Levels => _levels;
 
     private void Awake()
     {
