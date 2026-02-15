@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1072045365951572778}
   - component: {fileID: 7497840348940009046}
   - component: {fileID: 9088061103436095358}
+  - component: {fileID: 6319627566183321651}
   m_Layer: 0
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -95,6 +96,21 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
+--- !u!114 &6319627566183321651
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 108980583571271212}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: Inventory
+  currentLanguage: Ru
 --- !u!1 &754885128642717796
 GameObject:
   m_ObjectHideFlags: 0
@@ -271,6 +287,7 @@ GameObject:
   - component: {fileID: 421802519813530806}
   - component: {fileID: 2783199105239949431}
   - component: {fileID: 5102976902018009612}
+  - component: {fileID: 3262306419763939260}
   m_Layer: 0
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -339,6 +356,21 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u0411\u0440\u0435\u0439\u043D\u0440\u043E\u0442\u044B\n"
+--- !u!114 &3262306419763939260
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1671943482218246418}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Inventory/BrainrotsTab
+  currentLanguage: Ru
 --- !u!1 &2027068017387278449
 GameObject:
   m_ObjectHideFlags: 0
@@ -350,6 +382,7 @@ GameObject:
   - component: {fileID: 857866987329030905}
   - component: {fileID: 4955616006924504433}
   - component: {fileID: 2495102932306606986}
+  - component: {fileID: 7429767107214121002}
   m_Layer: 0
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -418,6 +451,21 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u042F\u0439\u0446\u0430\n"
+--- !u!114 &7429767107214121002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2027068017387278449}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Inventory/EggsTab
+  currentLanguage: Ru
 --- !u!1 &2031070218130273095
 GameObject:
   m_ObjectHideFlags: 0
@@ -1459,6 +1507,7 @@ GameObject:
   - component: {fileID: 342522897767098300}
   - component: {fileID: 1528549244120543892}
   - component: {fileID: 6821296520253175013}
+  - component: {fileID: 8880516101904717115}
   m_Layer: 0
   m_Name: Title
   m_TagString: Untagged
@@ -1527,6 +1576,21 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u0418\u043D\u0432\u0435\u043D\u0442\u0430\u0440\u044C"
+--- !u!114 &8880516101904717115
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8639131057619283468}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: Inventory
+  currentLanguage: Ru
 --- !u!1 &8828455269690033646
 GameObject:
   m_ObjectHideFlags: 0
@@ -1664,7 +1728,7 @@ MonoBehaviour:
         m_CallState: 2
 --- !u!95 &2312850731962247383
 Animator:
-  serializedVersion: 5
+  serializedVersion: 7
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1678,6 +1742,7 @@ Animator:
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
   m_WarningMessage: 
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1

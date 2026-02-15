@@ -36,10 +36,33 @@ public class InteractionRaycastSource : MonoBehaviour
             //Debug.Log($"Occluder: {occHit.transform.name}, dist: {occHit.distance:0.###}");
         }
         if (Physics.Raycast(origin, _direction, out var intHit, _raycastDistance, _interactableMask, QueryTriggerInteraction.Collide)
-            && intHit.distance <= maxVisibleDist
-            && intHit.transform.TryGetComponent(out InteractionRaycastListener listener)
-            && (_raycastType == RaycastType.Down || listener.MaxDistance > Vector3.Distance(transform.position, listener.transform.position)))
+            && intHit.distance <= maxVisibleDist)
         {
+            var listener = intHit.transform.GetComponent<InteractionRaycastListener>();
+            if (listener == null)
+                listener = intHit.transform.GetComponentInParent<InteractionRaycastListener>();
+
+            if (listener == null)
+            {
+                if (_lastHit != null)
+                {
+                    _lastHit.onRaycastFail();
+                    _lastHit = null;
+                }
+                return false;
+            }
+
+            if (_raycastType != RaycastType.Down &&
+                listener.MaxDistance <= Vector3.Distance(transform.position, listener.transform.position))
+            {
+                if (_lastHit != null)
+                {
+                    _lastHit.onRaycastFail();
+                    _lastHit = null;
+                }
+                return false;
+            }
+
             //Debug.Log(intHit.transform.gameObject.name+": " + intHit.distance);
             if (_lastHit != listener)
             {

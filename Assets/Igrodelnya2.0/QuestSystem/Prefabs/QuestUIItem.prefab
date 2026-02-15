@@ -361,6 +361,7 @@ GameObject:
   - component: {fileID: 2180278052723124121}
   - component: {fileID: 8922044814088888181}
   - component: {fileID: 6055208206466012799}
+  - component: {fileID: 5868911404635569017}
   m_Layer: 5
   m_Name: TitleText
   m_TagString: Untagged
@@ -429,6 +430,21 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u0424\u0438\u043D\u0430\u043B\u044C\u043D\u044B\u0439 \u0411\u043E\u0441\u0441"
+--- !u!114 &5868911404635569017
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1740639777002296790}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: Quest/Quest_KillBoss_Title
+  currentLanguage: Ru
 --- !u!1 &2892959278897989139
 GameObject:
   m_ObjectHideFlags: 0
@@ -718,6 +734,7 @@ GameObject:
   - component: {fileID: 1946347161160196447}
   - component: {fileID: 9185236102813465599}
   - component: {fileID: 7189442620975760134}
+  - component: {fileID: 752151866202389523}
   m_Layer: 5
   m_Name: DescriptionText
   m_TagString: Untagged
@@ -787,6 +804,21 @@ MonoBehaviour:
     m_LineSpacing: 1
   m_Text: "\u0423\u0431\u0435\u0439 \u0444\u0438\u043D\u0430\u043B\u044C\u043D\u043E\u0433\u043E
     \u0431\u043E\u0441\u0441\u0430 \u044D\u0442\u043E\u0439 \u043B\u043E\u043A\u0430\u0446\u0438\u0438"
+--- !u!114 &752151866202389523
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6597027942470233093}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: Quest/Quest_KillBoss_Description
+  currentLanguage: Ru
 --- !u!1 &6990742476619140705
 GameObject:
   m_ObjectHideFlags: 0

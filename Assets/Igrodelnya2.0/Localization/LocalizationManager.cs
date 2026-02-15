@@ -1,15 +1,19 @@
-using UnityEngine;
 using System;
+using UnityEngine;
 
 public class LocalizationManager : MonoBehaviour
 {
+    private const string DefaultLanguage = "En";
+
     public static LocalizationManager Instance { get; private set; }
+    public static event Action<LocalizationManager> OnInstanceReady;
 
     [SerializeField] private LocalizationData localizationData;
     [SerializeField] private string currentLanguage;
-    public LocalizationProvider LocalizationProvider { get; private set; } // Назначаем нужный провайдер в инспекторе
 
+    public LocalizationProvider LocalizationProvider { get; private set; }
     public event Action<string> OnLanguageChanged;
+
     public LocalizationData LocalizationData => localizationData;
     public string CurrentLanguage => currentLanguage;
 
@@ -18,87 +22,146 @@ public class LocalizationManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
+            OnInstanceReady?.Invoke(this);
         }
         else
         {
-            Debug.LogWarning("LocalizationManager уже существует! Удаляем дубликат.");
+            Debug.LogWarning("LocalizationManager already exists. Destroy duplicate.");
             Destroy(gameObject);
+            return;
         }
+
         LocalizationProvider = GetComponent<LocalizationProvider>();
     }
 
     private void OnEnable()
     {
-        if (LocalizationProvider != null)
+        if (LocalizationProvider == null)
         {
-            LocalizationProvider.OnSwitchLang += OnSwitchLanguage;
+            Debug.LogWarning("LocalizationProvider is not assigned.");
+            ApplyFallbackLanguage();
+            return;
+        }
 
-            // Если провайдер вернул язык, используем его
-            string providerLang = LocalizationProvider.GetCurrentLanguage();
-            if (!string.IsNullOrEmpty(providerLang))
-            {
-                OnSwitchLanguage(providerLang);
-            }
-            else if (!string.IsNullOrEmpty(currentLanguage))
-            {
-                ChangeLanguage(currentLanguage);
-            }
-            else if (localizationData != null && localizationData.Languages.Count > 0)
-            {
-                ChangeLanguage(localizationData.Languages[0]); // Язык по умолчанию
-            }
-        }
-        else
+        LocalizationProvider.OnSwitchLang += OnSwitchLanguage;
+
+        var providerLang = LocalizationProvider.GetCurrentLanguage();
+        if (!string.IsNullOrEmpty(providerLang))
         {
-            Debug.LogWarning("LocalizationProvider не назначен!");
+            OnSwitchLanguage(providerLang);
+            return;
         }
+
+        ApplyFallbackLanguage();
     }
 
     private void OnDisable()
     {
         if (LocalizationProvider != null)
-        {
             LocalizationProvider.OnSwitchLang -= OnSwitchLanguage;
-        }
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
     }
 
     public void ChangeLanguage(string newLanguage)
     {
-        //Debug.Log($"Язык начал изменяться на: {newLanguage}");
-        if (localizationData == null || newLanguage == currentLanguage)
-        {
+        if (localizationData == null)
             return;
-        }
 
-        if (!localizationData.Languages.Contains(newLanguage))
-        {
-            newLanguage = "En";
-        }
+        var resolvedLanguage = ResolveLanguageName(newLanguage);
+        if (string.IsNullOrEmpty(resolvedLanguage))
+            resolvedLanguage = ResolveFallbackLanguage();
 
-        currentLanguage = newLanguage;
+        if (string.IsNullOrEmpty(resolvedLanguage) || string.Equals(resolvedLanguage, currentLanguage, StringComparison.Ordinal))
+            return;
 
-        // Оповещаем подписчиков об изменении языка
-        OnLanguageChanged?.Invoke(newLanguage);
-
-        // Обновляем все объекты с локализованным текстом
-        foreach (LocalizedText text in FindObjectsByType<LocalizedText>(FindObjectsSortMode.None))
-        {
-            text.SetLanguage(newLanguage);
-        }
-
-        //Debug.Log($"Язык изменен на: {newLanguage}");
+        currentLanguage = resolvedLanguage;
+        OnLanguageChanged?.Invoke(resolvedLanguage);
     }
 
     private void OnSwitchLanguage(string langCode)
     {
-        if (string.IsNullOrEmpty(langCode))
+        ChangeLanguage(langCode);
+    }
+
+    private void ApplyFallbackLanguage()
+    {
+        ChangeLanguage(currentLanguage);
+    }
+
+    private string ResolveFallbackLanguage()
+    {
+        if (localizationData == null || localizationData.Languages == null || localizationData.Languages.Count == 0)
+            return string.Empty;
+
+        var byDefault = ResolveLanguageName(DefaultLanguage);
+        if (!string.IsNullOrEmpty(byDefault))
+            return byDefault;
+
+        return localizationData.Languages[0];
+    }
+
+    private string ResolveLanguageName(string candidate)
+    {
+        if (localizationData == null || localizationData.Languages == null || localizationData.Languages.Count == 0)
+            return string.Empty;
+
+        if (string.IsNullOrWhiteSpace(candidate))
+            return string.Empty;
+
+        var normalized = NormalizeLanguageCode(candidate);
+        if (string.IsNullOrEmpty(normalized))
+            return string.Empty;
+
+        var languages = localizationData.Languages;
+        for (var i = 0; i < languages.Count; i++)
         {
-            Debug.LogWarning("Получен пустой код языка!");
-            return;
+            var lang = languages[i];
+            if (string.Equals(lang, normalized, StringComparison.OrdinalIgnoreCase))
+                return lang;
         }
-        //Debug.LogWarning("Получен код языка!" + langCode);
-        // Приводим код к нужному формату (например, первая буква в верхнем регистре)
-        string formattedLang = char.ToUpper(langCode[0]) + langCode.Substring(1);
-        ChangeLanguage(formattedLang);
+
+        var normalizedBase = ExtractLanguageBase(normalized);
+        if (string.IsNullOrEmpty(normalizedBase))
+            return string.Empty;
+
+        for (var i = 0; i < languages.Count; i++)
+        {
+            var lang = languages[i];
+            if (string.Equals(ExtractLanguageBase(lang), normalizedBase, StringComparison.OrdinalIgnoreCase))
+                return lang;
+        }
+
+        return string.Empty;
+    }
+
+    private static string NormalizeLanguageCode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var trimmed = value.Trim().Replace('_', '-');
+        if (trimmed.Length == 2)
+            return char.ToUpperInvariant(trimmed[0]) + trimmed.Substring(1).ToLowerInvariant();
+
+        return trimmed;
+    }
+
+    private static string ExtractLanguageBase(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var normalized = value.Trim().Replace('_', '-');
+        var split = normalized.Split('-', StringSplitOptions.RemoveEmptyEntries);
+        var token = split.Length > 0 ? split[0] : normalized;
+        if (token.Length >= 2 && char.IsLetter(token[0]) && char.IsLetter(token[1]))
+            return token.Substring(0, 2).ToLowerInvariant();
+
+        return token.ToLowerInvariant();
     }
 }

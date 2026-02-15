@@ -1856,10 +1856,20 @@ public class RemoteBasesApplier : MonoBehaviour
 
         var interactableLayer = LayerMask.NameToLayer("Interactable");
         if (interactableLayer >= 0)
-            remotePlayer.layer = interactableLayer;
+            SetLayerRecursively(remotePlayer.transform, interactableLayer);
 
         listener.MaxDistance = Mathf.Max(0.1f, remoteInteractionDistance);
         return listener;
+    }
+
+    private static void SetLayerRecursively(Transform root, int layer)
+    {
+        if (root == null || layer < 0)
+            return;
+
+        root.gameObject.layer = layer;
+        for (int i = 0; i < root.childCount; i++)
+            SetLayerRecursively(root.GetChild(i), layer);
     }
 
     private void DisableRemotePlayer(int slotIndex)

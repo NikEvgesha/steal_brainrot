@@ -86,6 +86,7 @@ GameObject:
   - component: {fileID: 6601715116183926980}
   - component: {fileID: 6169970825247905603}
   - component: {fileID: 4241833249537111386}
+  - component: {fileID: 2136189100403660166}
   m_Layer: 0
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -154,6 +155,21 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0437\u0430"
+--- !u!114 &2136189100403660166
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 719618489936957127}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Food/RefreshFor
+  currentLanguage: Ru
 --- !u!1 &1064638409440895116
 GameObject:
   m_ObjectHideFlags: 0
@@ -625,6 +641,7 @@ GameObject:
   - component: {fileID: 56663385446998014}
   - component: {fileID: 2350775843307920847}
   - component: {fileID: 7245049568441998450}
+  - component: {fileID: 250876459869279925}
   m_Layer: 0
   m_Name: Text
   m_TagString: Untagged
@@ -693,6 +710,21 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u0414\u043E \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u044F: "
+--- !u!114 &250876459869279925
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4216334062181161530}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Food/UntilRefresh
+  currentLanguage: Ru
 --- !u!1 &4218758283265687542
 GameObject:
   m_ObjectHideFlags: 0
