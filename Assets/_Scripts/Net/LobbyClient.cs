@@ -671,6 +671,8 @@ public class LobbyClient : MonoBehaviour
             var id = G.Save.LoadBackendProfile().playerId;
             if (!string.IsNullOrEmpty(id))
                 _cachedLocalPlayerId = id;
+            else
+                _cachedLocalPlayerId = null;
         }
         catch
         {

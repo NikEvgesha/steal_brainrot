@@ -295,7 +295,18 @@ public class RemoteBasesApplier : MonoBehaviour
         EnsureSlotState();
         _lobbyModeActive = members != null && members.Count > 0;
 
+        var previousKnownLocalId = _lastLocalPlayerId;
         var localId = GetLocalPlayerId();
+        if (!string.IsNullOrEmpty(localId) &&
+            !string.IsNullOrEmpty(previousKnownLocalId) &&
+            !string.Equals(localId, previousKnownLocalId, StringComparison.Ordinal))
+        {
+            // Local profile changed (e.g. after progress reset) - drop stale slot/teleport state.
+            _serverLocalSlotIndex = -1;
+            _lastPreparedLocalSlotIndex = -1;
+            _lastTeleportedSlotIndex = -2;
+            _lastTeleportedPlayerId = null;
+        }
         var previousServerLocalSlotIndex = _serverLocalSlotIndex;
         var resolvedServerLocalSlotIndex = -1;
         LobbyMemberStateDto localMember = null;
@@ -329,7 +340,10 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (resolvedServerLocalSlotIndex >= 0)
             _serverLocalSlotIndex = resolvedServerLocalSlotIndex;
-        else if (previousServerLocalSlotIndex >= 0 && previousServerLocalSlotIndex < slots.Count)
+        else if (previousServerLocalSlotIndex >= 0 &&
+                 previousServerLocalSlotIndex < slots.Count &&
+                 !string.IsNullOrEmpty(localId) &&
+                 string.Equals(localId, previousKnownLocalId, StringComparison.Ordinal))
             _serverLocalSlotIndex = previousServerLocalSlotIndex;
         else
             _serverLocalSlotIndex = -1;
@@ -1914,6 +1928,8 @@ public class RemoteBasesApplier : MonoBehaviour
             var id = G.Save.LoadBackendProfile().playerId;
             if (!string.IsNullOrEmpty(id))
                 _lastLocalPlayerId = id;
+            else
+                _lastLocalPlayerId = null;
         }
         catch
         {
