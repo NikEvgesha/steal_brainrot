@@ -351,6 +351,17 @@ public class BigPetPoint : MonoBehaviour
         if (_foodTimeBar != null) _foodTimeBar.gameObject.SetActive(false);
     }
 
+    public void ApplyRemoteDefaultState(int petId = 0, int lvl = 1, int xp = 0)
+    {
+        _remoteMode = true;
+        HideRemoteUI();
+
+        if (_pets == null || _pets.Count == 0)
+            return;
+
+        ApplyRemoteState(petId, lvl, xp);
+    }
+
     public void SetRemoteMode(bool remote)
     {
         _remoteMode = remote;
