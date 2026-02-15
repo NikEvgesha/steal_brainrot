@@ -8,6 +8,7 @@ using UnityEngine.UI;
 public class BigPetPoint : MonoBehaviour
 {
     [SerializeField] private bool _remoteMode;
+    [SerializeField] private double _unlockPrice;
     [SerializeField] private List<Brainrot> _pets;
     [SerializeField] private GameObject _feedButton;
     [SerializeField] private Transform _foodPoint;
@@ -23,7 +24,9 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private int _lvlsPerPet = 5; // через сколько уровней открывается новый пет
     [SerializeField] private BrainrotInfoUI _petInfoUI;
     [SerializeField] private AudioSource _audio;
+    [SerializeField] private InteractionPanel _buyPanel;
 
+    private bool _purchased;
     private bool _playerInArea;
     private int _currentXp;
     private int _currentLvl;
@@ -56,12 +59,6 @@ public class BigPetPoint : MonoBehaviour
         if (_initializedLocal) return;
         if (_remoteMode) return;
         _initializedLocal = true;
-        // TODO load current xp
-        // load current pet
-        // load food
-        // set xp slider
-        // set pet scale
-        // load income
         _setPetUI = GetComponentInChildren<BigPetSetUI>();
         if (_setPetUI == null)
         {
@@ -76,50 +73,78 @@ public class BigPetPoint : MonoBehaviour
         }
         _setPetUI.PetSlotClicked.AddListener(ChangeActivePet);
         _setPetUI.InitUI(_pets);
-        _currentLvl = G.Save.LoadBigPetLvl();
-        _currentXp = G.Save.LoadBigPetXP(); ;
-        _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
-        _currentPetIdx = G.Save.LoadBigPetId();
-        _maxAvailablePetIdx = _currentLvl / _lvlsPerPet;
-        _maxAvailablePetIdx = _maxAvailablePetIdx > (_pets.Count - 1) ? _pets.Count - 1 : _maxAvailablePetIdx;
-        _maxLvl = _pets.Count * _lvlsPerPet;
-        _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
-        SetPet(_currentPetIdx);
-        CheckLvl();
-        _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome; // TODO;
-        _petInfoUI.SetInfo(_currentIncome);
-        _foodTimeBar.gameObject.SetActive(false);
 
-        long incomeAccumulateTime;
-        string timestamp = G.Save.LoadBigPetIncomeTime();
-        if (timestamp.Length == 0)
+        _purchased = G.Save.LoadBigPetStatus();
+        if (_purchased)
         {
-            incomeAccumulateTime = 0;
-            _lastIncomeCollectTimestamp = DateTime.UtcNow;
-            G.Save.SaveBigPetIncomeTime(_lastIncomeCollectTimestamp.ToString());
+            _currentLvl = G.Save.LoadBigPetLvl();
+            _currentXp = G.Save.LoadBigPetXP(); ;
+            _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
+            _currentPetIdx = G.Save.LoadBigPetId();
+            _maxAvailablePetIdx = _currentLvl / _lvlsPerPet;
+            _maxAvailablePetIdx = _maxAvailablePetIdx > (_pets.Count - 1) ? _pets.Count - 1 : _maxAvailablePetIdx;
+
+            _maxLvl = _pets.Count * _lvlsPerPet;
+            _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
+            SetPet(_currentPetIdx);
+            CheckLvl();
+            _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome; // TODO;
+            _petInfoUI.SetInfo(_currentIncome);
+            _foodTimeBar.gameObject.SetActive(false);
+
+            long incomeAccumulateTime;
+            string timestamp = G.Save.LoadBigPetIncomeTime();
+            if (timestamp.Length == 0)
+            {
+                incomeAccumulateTime = 0;
+                _lastIncomeCollectTimestamp = DateTime.UtcNow;
+                G.Save.SaveBigPetIncomeTime(_lastIncomeCollectTimestamp.ToString());
+            }
+            else
+            {
+
+                _lastIncomeCollectTimestamp = DateTime.Parse(timestamp);
+                incomeAccumulateTime = (long)(DateTime.UtcNow - _lastIncomeCollectTimestamp).TotalSeconds;
+            }
+            _accumulatedIncome = incomeAccumulateTime * _currentIncome;
+            StartCoroutine(ProduceIncome());
         } else
         {
-            _lastIncomeCollectTimestamp = DateTime.Parse(timestamp);
-            incomeAccumulateTime = (long)(DateTime.UtcNow - _lastIncomeCollectTimestamp).TotalSeconds;
-        }  
-        _accumulatedIncome = incomeAccumulateTime * _currentIncome;
-        StartCoroutine(ProduceIncome());
+            _petInfoUI.gameObject.SetActive(false);
+            _buyPanel.SetInfo(_unlockPrice.ToString());
+        }
     }
 
     public void _OnPlayerEnter()
     {
         if (_remoteMode) return;
-        G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
+
         _playerInArea = true;
-        CheckPlayer(G.QuickAccess.CurrentActive);
-        PlayerEnter?.Invoke();
-        GetIncome();
+        if (_purchased)
+        {
+            G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
+            CheckPlayer(G.QuickAccess.CurrentActive);
+            GetIncome();
+        } else
+        {
+            _buyPanel.gameObject.SetActive(true);
+        }
+            PlayerEnter?.Invoke();
+        
     }
 
     public void _OnPlayerExit() {
         if (_remoteMode) return;
-        G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
-        _feedButton.SetActive(false);
+
+        if (_purchased)
+        {
+            G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
+            _feedButton.SetActive(false);
+        } else
+        {
+            _buyPanel.gameObject.SetActive(false);
+        }
+
         _playerInArea = false;
         PlayerExit?.Invoke();
     }
@@ -299,7 +324,7 @@ public class BigPetPoint : MonoBehaviour
         while (true)
         {
             yield return new WaitForSecondsRealtime(1);
-            _accumulatedIncome +=  _currentIncome; // TODO: Income math
+            _accumulatedIncome += _currentIncome; // TODO: Income math
             _accumulatedIncome = (double.IsInfinity(_accumulatedIncome)) ? float.MaxValue : _accumulatedIncome;
             _accumulatedIncome = Math.Round(_accumulatedIncome);
             _petInfoUI.UpdateIncome(_accumulatedIncome);
@@ -309,13 +334,13 @@ public class BigPetPoint : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (_remoteMode) return;
+        if (_remoteMode || !_purchased) return;
         _petInfoUI.gameObject.SetActive(true);
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (_remoteMode) return;
+        if (_remoteMode || !_purchased) return;
         _petInfoUI.gameObject.SetActive(false);
     }
 
@@ -376,6 +401,19 @@ public class BigPetPoint : MonoBehaviour
         {
             ShowLocalUI();
             InitLocal();
+        }
+    }
+
+
+    public void _TryBuy()
+    {
+        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _unlockPrice))
+        {
+            _purchased = true;
+            G.Save.SaveBigPetStatus(_purchased);
+            SetPet(0);
+            StartCoroutine(ProduceIncome());
+            Destroy(_buyPanel);
         }
     }
 

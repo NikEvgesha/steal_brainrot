@@ -423,6 +423,27 @@ public class MirraSDKSaveProvider : SaveProvider
     }
 
 
+    public override void SaveBigPetStatus(bool purchased)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetBool("BigPetStatus", purchased);
+    }
+
+    public override bool LoadBigPetStatus()
+    {
+        if (!isInitialize) return false;
+
+        bool res = MirraSDK.Data.GetBool("BigPetStatus", false);
+        return res;
+    }
+
+
+
+    /// <summary>
+    /// Conveyor data
+    /// </summary>
+    /// <param name="id"></param>
     public override void SaveConveyorCurrentLevel(int id)
     {
         if (!isInitialize) return;

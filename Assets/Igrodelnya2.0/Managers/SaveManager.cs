@@ -226,6 +226,15 @@ public class SaveManager : MonoBehaviour
         return saveProvider.LoadRouletteDate();
     }
 
+    public void SaveBigPetStatus(bool purchased)
+    {
+        saveProvider.SaveBigPetStatus(purchased);
+    }
+
+    public bool LoadBigPetStatus()
+    {
+        return saveProvider.LoadBigPetStatus();
+    }
 
     public void SaveBigPetXP(int xp)
     {
