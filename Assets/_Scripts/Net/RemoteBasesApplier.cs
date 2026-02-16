@@ -13,6 +13,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private const int BaselineBigPetId = 0;
     private const int BaselineBigPetLevel = 1;
     private const int BaselineBigPetXp = 0;
+    private const bool BaselineBigPetPurchased = false;
 
     private class SlotSnapshotCache
     {
@@ -20,6 +21,7 @@ public class RemoteBasesApplier : MonoBehaviour
         public int bigPetId = int.MinValue;
         public int bigPetLvl = int.MinValue;
         public int bigPetXp = int.MinValue;
+        public bool bigPetPurchased;
         public HashSet<int> land = new();
         public Dictionary<string, string> cells = new();
     }
@@ -295,7 +297,18 @@ public class RemoteBasesApplier : MonoBehaviour
         EnsureSlotState();
         _lobbyModeActive = members != null && members.Count > 0;
 
+        var previousKnownLocalId = _lastLocalPlayerId;
         var localId = GetLocalPlayerId();
+        if (!string.IsNullOrEmpty(localId) &&
+            !string.IsNullOrEmpty(previousKnownLocalId) &&
+            !string.Equals(localId, previousKnownLocalId, StringComparison.Ordinal))
+        {
+            // Local profile changed (e.g. after progress reset) - drop stale slot/teleport state.
+            _serverLocalSlotIndex = -1;
+            _lastPreparedLocalSlotIndex = -1;
+            _lastTeleportedSlotIndex = -2;
+            _lastTeleportedPlayerId = null;
+        }
         var previousServerLocalSlotIndex = _serverLocalSlotIndex;
         var resolvedServerLocalSlotIndex = -1;
         LobbyMemberStateDto localMember = null;
@@ -329,7 +342,10 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (resolvedServerLocalSlotIndex >= 0)
             _serverLocalSlotIndex = resolvedServerLocalSlotIndex;
-        else if (previousServerLocalSlotIndex >= 0 && previousServerLocalSlotIndex < slots.Count)
+        else if (previousServerLocalSlotIndex >= 0 &&
+                 previousServerLocalSlotIndex < slots.Count &&
+                 !string.IsNullOrEmpty(localId) &&
+                 string.Equals(localId, previousKnownLocalId, StringComparison.Ordinal))
             _serverLocalSlotIndex = previousServerLocalSlotIndex;
         else
             _serverLocalSlotIndex = -1;
@@ -601,7 +617,7 @@ public class RemoteBasesApplier : MonoBehaviour
         }
 
         foreach (var bigPet in slot.root.GetComponentsInChildren<BigPetPoint>(true))
-            bigPet.ApplyRemoteDefaultState(BaselineBigPetId, BaselineBigPetLevel, BaselineBigPetXp);
+            bigPet.ApplyRemoteDefaultState(BaselineBigPetId, BaselineBigPetLevel, BaselineBigPetXp, BaselineBigPetPurchased);
 
         foreach (var field in GetFields(slot))
             field.SetUnblockedVisual(false);
@@ -1089,13 +1105,15 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (cache.bigPetId == snapshot.bigPet.id &&
             cache.bigPetLvl == snapshot.bigPet.lvl &&
-            cache.bigPetXp == snapshot.bigPet.xp)
+            cache.bigPetXp == snapshot.bigPet.xp &&
+            cache.bigPetPurchased == snapshot.bigPet.purchased)
             return;
 
         ApplyBigPet(slot, snapshot);
         cache.bigPetId = snapshot.bigPet.id;
         cache.bigPetLvl = snapshot.bigPet.lvl;
         cache.bigPetXp = snapshot.bigPet.xp;
+        cache.bigPetPurchased = snapshot.bigPet.purchased;
     }
 
     private Dictionary<string, CellSnapshotDto> BuildSnapshotCells(BaseSnapshotDto snapshot)
@@ -1210,6 +1228,7 @@ public class RemoteBasesApplier : MonoBehaviour
             cache.bigPetId = snapshot.bigPet.id;
             cache.bigPetLvl = snapshot.bigPet.lvl;
             cache.bigPetXp = snapshot.bigPet.xp;
+            cache.bigPetPurchased = snapshot.bigPet.purchased;
         }
 
         if (snapshot.land != null && snapshot.land.boughtCells != null)
@@ -1465,7 +1484,7 @@ public class RemoteBasesApplier : MonoBehaviour
         if (snapshot.bigPet == null) return;
         var bigPet = slot.root.GetComponentInChildren<BigPetPoint>(true);
         if (bigPet == null) return;
-        bigPet.ApplyRemoteState(snapshot.bigPet.id, snapshot.bigPet.lvl, snapshot.bigPet.xp);
+        bigPet.ApplyRemoteState(snapshot.bigPet.id, snapshot.bigPet.lvl, snapshot.bigPet.xp, snapshot.bigPet.purchased);
     }
 
     private void SpawnEgg(FieldCell cell, string id, BrainrotDinamicData dinamic)
@@ -1856,10 +1875,20 @@ public class RemoteBasesApplier : MonoBehaviour
 
         var interactableLayer = LayerMask.NameToLayer("Interactable");
         if (interactableLayer >= 0)
-            remotePlayer.layer = interactableLayer;
+            SetLayerRecursively(remotePlayer.transform, interactableLayer);
 
         listener.MaxDistance = Mathf.Max(0.1f, remoteInteractionDistance);
         return listener;
+    }
+
+    private static void SetLayerRecursively(Transform root, int layer)
+    {
+        if (root == null || layer < 0)
+            return;
+
+        root.gameObject.layer = layer;
+        for (int i = 0; i < root.childCount; i++)
+            SetLayerRecursively(root.GetChild(i), layer);
     }
 
     private void DisableRemotePlayer(int slotIndex)
@@ -1904,6 +1933,8 @@ public class RemoteBasesApplier : MonoBehaviour
             var id = G.Save.LoadBackendProfile().playerId;
             if (!string.IsNullOrEmpty(id))
                 _lastLocalPlayerId = id;
+            else
+                _lastLocalPlayerId = null;
         }
         catch
         {

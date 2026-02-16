@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 140347843}
   - component: {fileID: 140347842}
   - component: {fileID: 140347841}
+  - component: {fileID: 140347844}
   m_Layer: 5
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -214,6 +215,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 140347839}
   m_CullTransparentMesh: 1
+--- !u!114 &140347844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 140347839}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Home/Title
+  currentLanguage: Ru
 --- !u!4 &142443677 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6248208750218364527, guid: ae78c44f30d6c2747acdfb5e6995216e, type: 3}
@@ -783,6 +799,7 @@ GameObject:
   - component: {fileID: 261919545}
   - component: {fileID: 261919544}
   - component: {fileID: 261919543}
+  - component: {fileID: 261919546}
   m_Layer: 5
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -866,6 +883,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 261919541}
   m_CullTransparentMesh: 1
+--- !u!114 &261919546
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 261919541}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Inventory/FoodTab
+  currentLanguage: Ru
 --- !u!4 &285526103 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6090488651099458816, guid: a3d1ff7e08b2fc740a644f6c5be6b238, type: 3}
@@ -2370,6 +2402,7 @@ GameObject:
   - component: {fileID: 1214408113}
   - component: {fileID: 1214408112}
   - component: {fileID: 1214408111}
+  - component: {fileID: 1214408114}
   m_Layer: 5
   m_Name: Text (Legacy)
   m_TagString: Untagged
@@ -2453,6 +2486,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1214408109}
   m_CullTransparentMesh: 1
+--- !u!114 &1214408114
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1214408109}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Sell/Sell
+  currentLanguage: Ru
 --- !u!1 &1263416268
 GameObject:
   m_ObjectHideFlags: 0

@@ -211,6 +211,15 @@ public class DummySaveProvider : SaveProvider
         return "";
     }
 
+    public override void SaveBigPetStatus(bool purchased)
+    {
+    }
+
+    public override bool LoadBigPetStatus()
+    {
+        return false;
+    }
+
 
     public override void SaveConveyorCurrentLevel(int id)
     {

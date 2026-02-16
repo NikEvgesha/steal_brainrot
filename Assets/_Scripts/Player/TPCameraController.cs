@@ -44,7 +44,7 @@ public class TPCameraController : MonoBehaviour
 
     [SerializeField] private float minDistance = 1.6f;
 
-    [SerializeField] private float maxDistance = 6.0f;
+    [SerializeField] private float maxDistance = 18.0f;
 
     [SerializeField] private float zoomSpeed = 3.0f;    // Чем больше, тем быстрее реакция на колесо
 
@@ -296,4 +296,5 @@ public class TPCameraController : MonoBehaviour
 #endif
 
 }
+
 

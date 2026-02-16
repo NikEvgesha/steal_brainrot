@@ -406,6 +406,7 @@ GameObject:
   - component: {fileID: 5333667800383056198}
   - component: {fileID: 109342594869857691}
   - component: {fileID: 2582816093596358478}
+  - component: {fileID: 5565196092837535132}
   m_Layer: 0
   m_Name: Text
   m_TagString: Untagged
@@ -489,6 +490,21 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 0.5}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
+--- !u!114 &5565196092837535132
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7366674829692586726}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/Sell/Sell
+  currentLanguage: Ru
 --- !u!1 &8325820358245993175
 GameObject:
   m_ObjectHideFlags: 0

@@ -51,7 +51,7 @@ public static class LocalPlayerStatsStore
     }
 }
 
-[Serializable] public class BigPetDto { public int id; public int lvl; public int xp; public float income; }
+[Serializable] public class BigPetDto { public int id; public int lvl; public int xp; public float income; public bool purchased; }
 [Serializable] public class ConveyorDto { public int lvl; }
 [Serializable] public class LandDto { public List<int> boughtCells = new(); }
 [Serializable] public class AnimalOnCellDto { public string cell; public string animalId; public int lvl; }
@@ -149,6 +149,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     public BaseSnapshotDto BuildSnapshotDto()
     {
         var cells = LoadCells_SOMEHOW();
+        var bigPetPurchased = save.LoadBigPetStatus();
         var bigPetIncomePerSec = LoadBigPetIncomePerSecond();
 
         return new BaseSnapshotDto
@@ -159,7 +160,8 @@ public class ZooBaseSnapshotSync : MonoBehaviour
                 id = save.LoadBigPetId(),
                 lvl = save.LoadBigPetLvl(),
                 xp = save.LoadBigPetXP(),
-                income = (float)bigPetIncomePerSec
+                income = (float)bigPetIncomePerSec,
+                purchased = bigPetPurchased
             },
             conveyor = new ConveyorDto
             {
@@ -205,6 +207,9 @@ public class ZooBaseSnapshotSync : MonoBehaviour
 
     private double LoadBigPetIncomePerSecond()
     {
+        if (save != null && !save.LoadBigPetStatus())
+            return 0d;
+
         var root = GetSnapshotRoot();
         BigPetPoint bigPet = null;
         if (root != null)

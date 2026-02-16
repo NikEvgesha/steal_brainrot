@@ -154,6 +154,7 @@ public class LobbyClient : MonoBehaviour
     private float _trafficApplyMs;
     private bool _isAppPaused;
     private bool _hasAppFocus = true;
+    private bool _forceSnapshotUpload;
 
     private void Awake()
     {
@@ -215,6 +216,7 @@ public class LobbyClient : MonoBehaviour
 
         IsOnline = true;
         _errors = 0;
+        _forceSnapshotUpload = true;
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
         if (_remoteBases != null)
@@ -269,6 +271,7 @@ public class LobbyClient : MonoBehaviour
 
         IsOnline = true;
         _errors = 0;
+        _forceSnapshotUpload = true;
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
         if (_remoteBases != null)
@@ -345,6 +348,7 @@ public class LobbyClient : MonoBehaviour
         _lastSentHandElement = null;
         _lastSentHandWeight = null;
         _lastSentHandIncome = null;
+        _forceSnapshotUpload = false;
         _remoteBaseRawCache.Clear();
         _remoteBaseSnapshotCache.Clear();
         _lastMembers.Clear();
@@ -667,6 +671,8 @@ public class LobbyClient : MonoBehaviour
             var id = G.Save.LoadBackendProfile().playerId;
             if (!string.IsNullOrEmpty(id))
                 _cachedLocalPlayerId = id;
+            else
+                _cachedLocalPlayerId = null;
         }
         catch
         {
@@ -1166,11 +1172,16 @@ public class LobbyClient : MonoBehaviour
 
         var payload = new JObject();
 
-        var snapshotJson = snapshotSync != null ? snapshotSync.ConsumeDirtySnapshot() : null;
+        var forceSnapshot = _forceSnapshotUpload;
+        var snapshotJson = snapshotSync == null
+            ? null
+            : (forceSnapshot ? snapshotSync.BuildSnapshotJson() : snapshotSync.ConsumeDirtySnapshot());
+        var sentBaseData = false;
         if (!string.IsNullOrEmpty(snapshotJson))
         {
             try { payload["baseData"] = JToken.Parse(snapshotJson); }
-            catch { }
+            catch { payload.Remove("baseData"); }
+            sentBaseData = payload["baseData"] != null;
         }
 
         var hand = BuildHand();
@@ -1217,6 +1228,8 @@ public class LobbyClient : MonoBehaviour
         }
 
         _errors = 0;
+        if (forceSnapshot && sentBaseData)
+            _forceSnapshotUpload = false;
     }
 
     private IEnumerator FetchState()
@@ -1304,8 +1317,12 @@ public class LobbyClient : MonoBehaviour
                 }
                 else if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
                 {
-                    _remoteBaseRawCache.Remove(item.playerId);
-                    _remoteBaseSnapshotCache.Remove(item.playerId);
+                    // Some state updates may omit baseData; keep last known snapshot
+                    // so remote bases do not appear empty until the next full update.
+                    if (_remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw))
+                        item.baseDataRaw = cachedRaw;
+                    if (_remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
+                        item.baseData = cachedSnapshot;
                 }
 
                 if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))

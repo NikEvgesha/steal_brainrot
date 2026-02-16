@@ -114,7 +114,7 @@ MonoBehaviour:
   pitchSpeed: 120
   rotateOnRightMouse: 1
   minDistance: 1.6
-  maxDistance: 6
+  maxDistance: 18
   zoomSpeed: 3
   backReturnSpeed: 8
   collisionRadius: 0.25
@@ -122,6 +122,8 @@ MonoBehaviour:
   collisionMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  freezeOnSpike: 1
+  spikeThreshold: 0.05
 --- !u!114 &-3156012631656649037
 MonoBehaviour:
   m_ObjectHideFlags: 0

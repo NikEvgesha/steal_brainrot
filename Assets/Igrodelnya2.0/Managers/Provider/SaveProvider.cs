@@ -91,6 +91,10 @@ public abstract class SaveProvider : MonoBehaviour
     public abstract int LoadBigPetId();
     public abstract string LoadBigPetIncomeTime();
 
+    public abstract void SaveBigPetStatus(bool purchased);
+
+    public abstract bool LoadBigPetStatus();
+
     // Conveyor Data
 
     public abstract void SaveConveyorCurrentLevel(int id);

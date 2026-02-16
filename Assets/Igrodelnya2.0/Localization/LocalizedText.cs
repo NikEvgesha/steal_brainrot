@@ -1,8 +1,8 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-[RequireComponent(typeof(Text))]
+[DisallowMultipleComponent]
 public class LocalizedText : MonoBehaviour
 {
     [SerializeField] private LocalizationData localizationData;
@@ -10,7 +10,8 @@ public class LocalizedText : MonoBehaviour
     [SerializeField] private string currentLanguage;
 
     private Text uiText;
-    private TextMeshProUGUI tmpText;
+    private TMP_Text tmpText;
+    private LocalizationManager subscribedManager;
 
     public LocalizationData LocalizationData => localizationData;
     public string SelectedKey { get => selectedKey; set => selectedKey = value; }
@@ -21,21 +22,27 @@ public class LocalizedText : MonoBehaviour
         TryGetComponent(out uiText);
         TryGetComponent(out tmpText);
     }
+
     private void OnEnable()
     {
-        if (LocalizationManager.Instance != null)
-        {
-            LocalizationManager.Instance.OnLanguageChanged += SetLanguage;
-            SetLanguage(LocalizationManager.Instance.CurrentLanguage);
-        }
+        LocalizationManager.OnInstanceReady += HandleManagerReady;
+        SubscribeToManager(LocalizationManager.Instance);
+
+        UpdateText();
     }
 
     private void OnDisable()
     {
-        if (LocalizationManager.Instance != null)
-        {
-            LocalizationManager.Instance.OnLanguageChanged -= SetLanguage;
-        }
+        LocalizationManager.OnInstanceReady -= HandleManagerReady;
+        UnsubscribeFromManager();
+    }
+
+    public void Configure(LocalizationData data, string key, string language)
+    {
+        localizationData = data;
+        selectedKey = key;
+        currentLanguage = language;
+        UpdateText();
     }
 
     public void SetLanguage(string language)
@@ -46,27 +53,78 @@ public class LocalizedText : MonoBehaviour
 
     private void UpdateText()
     {
-        if (localizationData == null || string.IsNullOrEmpty(selectedKey)) return;
+        if (localizationData == null || string.IsNullOrEmpty(selectedKey))
+            return;
 
-        string translatedText = localizationData.GetTranslation(selectedKey, currentLanguage);
+        if (string.IsNullOrEmpty(currentLanguage))
+        {
+            var manager = LocalizationManager.Instance;
+            if (manager != null && !string.IsNullOrEmpty(manager.CurrentLanguage))
+                currentLanguage = manager.CurrentLanguage;
+            else if (localizationData.Languages.Count > 0)
+                currentLanguage = localizationData.Languages[0];
+        }
 
-        if (uiText != null) uiText.text = translatedText;
-        if (tmpText != null) tmpText.text = translatedText;
+        var translatedText = localizationData.GetTranslation(selectedKey, currentLanguage);
+        if (string.IsNullOrEmpty(translatedText))
+            translatedText = selectedKey;
+
+        if (uiText != null)
+            uiText.text = translatedText;
+        if (tmpText != null)
+            tmpText.text = translatedText;
     }
 
     private void OnValidate()
     {
-        if (localizationData != null)
-        {
-            if (!localizationData.Languages.Contains(currentLanguage))
-            {
-                currentLanguage = localizationData.Languages.Count > 0 ? localizationData.Languages[0] : "";
-            }
-            if (!string.IsNullOrEmpty(currentLanguage))
-            {
-                UpdateText();
-            }
-        }
+        if (localizationData == null)
+            return;
+
+        if (!ContainsLanguage(localizationData, currentLanguage))
+            currentLanguage = localizationData.Languages.Count > 0 ? localizationData.Languages[0] : string.Empty;
+
+        if (!string.IsNullOrEmpty(currentLanguage))
+            UpdateText();
     }
 
+    private void HandleManagerReady(LocalizationManager manager)
+    {
+        SubscribeToManager(manager);
+    }
+
+    private void SubscribeToManager(LocalizationManager manager)
+    {
+        if (manager == null || subscribedManager == manager)
+            return;
+
+        UnsubscribeFromManager();
+        subscribedManager = manager;
+        subscribedManager.OnLanguageChanged += SetLanguage;
+
+        if (!string.IsNullOrEmpty(subscribedManager.CurrentLanguage))
+            SetLanguage(subscribedManager.CurrentLanguage);
+    }
+
+    private void UnsubscribeFromManager()
+    {
+        if (subscribedManager == null)
+            return;
+
+        subscribedManager.OnLanguageChanged -= SetLanguage;
+        subscribedManager = null;
+    }
+
+    private static bool ContainsLanguage(LocalizationData data, string language)
+    {
+        if (data == null || data.Languages == null || data.Languages.Count == 0 || string.IsNullOrWhiteSpace(language))
+            return false;
+
+        for (var i = 0; i < data.Languages.Count; i++)
+        {
+            if (string.Equals(data.Languages[i], language, System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
 }
