@@ -10,6 +10,7 @@ public class InteractionRaycastSource : MonoBehaviour
     [Header("Layers")]
     [SerializeField] private LayerMask _interactableMask; // objects with InteractionRaycastListener
     [SerializeField] private LayerMask _occluderMask;     // walls/floor/obstacles
+    [SerializeField] private float _forwardRayOriginHeight = 1.3f;
 
     private InteractionRaycastListener _lastHit;
 
@@ -60,6 +61,8 @@ public class InteractionRaycastSource : MonoBehaviour
             return false;
 
         var origin = transform.position;
+        if (raycastType == RaycastType.Forward && _forwardRayOriginHeight > 0f)
+            origin += Vector3.up * _forwardRayOriginHeight;
         var maxVisibleDistance = raycastDistance;
 
         if (Physics.Raycast(origin, direction, out var occHit, raycastDistance, _occluderMask, QueryTriggerInteraction.Ignore))

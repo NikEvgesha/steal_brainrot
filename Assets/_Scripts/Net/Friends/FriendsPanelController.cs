@@ -146,15 +146,41 @@ public class FriendsPanelController : MonoBehaviour
             
 
         if (list == null) yield break;
+        var lobbyOnlineCodes = CollectLobbyOnlineCodes();
 
         foreach (var f in list)
         {
+            if (!string.IsNullOrEmpty(f.friendCode) && lobbyOnlineCodes.Contains(f.friendCode))
+                f.isOnline = true;
+
             var row = Instantiate(rowPrefab, listContent);
             row.Bind(f,
                 onRemove: () => StartCoroutine(RemoveFriendFlow(f.friendCode)),
                 onView: () => StartCoroutine(ViewFriendBaseStub(f.friendCode))
             );
         }
+    }
+
+    private HashSet<string> CollectLobbyOnlineCodes()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (LobbyClient.Instance == null)
+            return result;
+
+        var members = LobbyClient.Instance.LastMembers;
+        if (members == null)
+            return result;
+
+        for (int i = 0; i < members.Count; i++)
+        {
+            var m = members[i];
+            if (m == null || string.IsNullOrWhiteSpace(m.friendCode))
+                continue;
+            if (!string.IsNullOrWhiteSpace(m.playerId))
+                result.Add(m.friendCode);
+        }
+
+        return result;
     }
 
     IEnumerator RefreshRequests()

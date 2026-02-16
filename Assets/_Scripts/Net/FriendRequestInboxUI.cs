@@ -20,7 +20,7 @@ public class FriendRequestInboxUI : MonoBehaviour
     private void Awake()
     {
         DontDestroyOnLoad(gameObject);
-        StartCoroutine(InitNextFrame());
+        StartCoroutine(InitWhenReady());
     }
 
     private void Start()
@@ -28,23 +28,29 @@ public class FriendRequestInboxUI : MonoBehaviour
         StartCoroutine(PollLoop());
     }
 
-    private IEnumerator InitNextFrame()
+    private IEnumerator InitWhenReady()
     {
-        yield return null;
-        if (UnityEngine.EventSystems.EventSystem.current == null)
+        while (_canvas == null)
         {
-            Debug.LogWarning("[FriendRequestInboxUI] No EventSystem found. UI disabled.");
-            yield break;
-        }
+            yield return null;
+            if (UnityEngine.EventSystems.EventSystem.current == null)
+                continue;
 
-        CreateUI();
-        Hide();
+            CreateUI();
+            Hide();
+        }
     }
 
     private IEnumerator PollLoop()
     {
         while (true)
         {
+            if (_canvas == null && UnityEngine.EventSystems.EventSystem.current != null)
+            {
+                CreateUI();
+                Hide();
+            }
+
             if (TryResolveApi(out var api) && !_inFlight)
             {
                 _inFlight = true;

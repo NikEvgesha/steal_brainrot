@@ -720,7 +720,9 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
         }
 
-        board.SetRemoteWithId(member.playerId, member.friendCode, member.displayName, member.isFriend, member.isOnline, ExtractStats(member.baseData));
+        // If member is present in lobby state, treat as online even when backend flag is stale.
+        var effectiveOnline = member.isOnline || !string.IsNullOrEmpty(member.playerId);
+        board.SetRemoteWithId(member.playerId, member.friendCode, member.displayName, member.isFriend, effectiveOnline, ExtractStats(member.baseData));
     }
 
     private static PlayerPublicStatsDto ExtractStats(BaseSnapshotDto snapshot)

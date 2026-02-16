@@ -18,7 +18,8 @@ public class GiftInboxUI : MonoBehaviour
 
     private void Awake()
     {
-        StartCoroutine(InitNextFrame());
+        DontDestroyOnLoad(gameObject);
+        StartCoroutine(InitWhenReady());
     }
 
     private void Start()
@@ -26,22 +27,29 @@ public class GiftInboxUI : MonoBehaviour
         StartCoroutine(PollLoop());
     }
 
-    private IEnumerator InitNextFrame()
+    private IEnumerator InitWhenReady()
     {
-        yield return null;
-        if (UnityEngine.EventSystems.EventSystem.current == null)
+        while (_canvas == null)
         {
-            Debug.LogWarning("[GiftInboxUI] No EventSystem found. UI disabled.");
-            yield break;
+            yield return null;
+            if (UnityEngine.EventSystems.EventSystem.current == null)
+                continue;
+
+            CreateUI();
+            Hide();
         }
-        CreateUI();
-        Hide();
     }
 
     private IEnumerator PollLoop()
     {
         while (true)
         {
+            if (_canvas == null && UnityEngine.EventSystems.EventSystem.current != null)
+            {
+                CreateUI();
+                Hide();
+            }
+
             if (LobbyClient.Instance != null && LobbyClient.Instance.IsOnline && !_inFlight)
             {
                 _inFlight = true;
