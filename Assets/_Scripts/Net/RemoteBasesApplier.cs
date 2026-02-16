@@ -91,6 +91,8 @@ public class RemoteBasesApplier : MonoBehaviour
     private void Awake()
     {
         syncDistanceMeters = Mathf.Max(MinSyncDistanceMeters, syncDistanceMeters);
+        if (!Application.isEditor)
+            testCloneLocalToRandomSlot = false;
         if (backend == null) backend = G.Backend;
         EnsureSlotState();
         MarkRemoteComponents();
@@ -626,6 +628,7 @@ public class RemoteBasesApplier : MonoBehaviour
 
     private void ApplyTestClone(LobbyMemberStateDto localMember)
     {
+        if (!Application.isEditor) return;
         if (!testCloneLocalToRandomSlot || localMember == null) return;
         var baseData = localMember.baseData;
         if (baseData == null)
