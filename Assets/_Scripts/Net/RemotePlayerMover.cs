@@ -34,6 +34,8 @@ public class RemotePlayerMover : MonoBehaviour
     private int? _heldElement;
     private float? _heldWeight;
     private double? _heldIncome;
+    private int _lastSamplesHash;
+    private int _lastSamplesCount;
 
     public void SetDelay(float delay)
     {
@@ -95,6 +97,11 @@ public class RemotePlayerMover : MonoBehaviour
     public void PushSamples(List<LobbyPosSampleDto> samples)
     {
         if (samples == null || samples.Count == 0) return;
+        var currentHash = ComputeSamplesHash(samples);
+        if (_lastSamplesCount == samples.Count && _lastSamplesHash == currentHash)
+            return;
+        _lastSamplesCount = samples.Count;
+        _lastSamplesHash = currentHash;
 
         var now = Time.time;
         var lastDtMs = Mathf.Max(0f, samples[samples.Count - 1].dt);
@@ -236,6 +243,23 @@ public class RemotePlayerMover : MonoBehaviour
         {
             _samples.RemoveRange(0, overflow);
             _head = Mathf.Max(0, _head - overflow);
+        }
+    }
+
+    private static int ComputeSamplesHash(List<LobbyPosSampleDto> samples)
+    {
+        unchecked
+        {
+            var hash = 17;
+            for (var i = 0; i < samples.Count; i++)
+            {
+                var s = samples[i];
+                hash = hash * 31 + Mathf.RoundToInt(s.dt);
+                hash = hash * 31 + Mathf.RoundToInt(s.x * 100f);
+                hash = hash * 31 + Mathf.RoundToInt(s.y * 100f);
+                hash = hash * 31 + Mathf.RoundToInt(s.z * 100f);
+            }
+            return hash;
         }
     }
 

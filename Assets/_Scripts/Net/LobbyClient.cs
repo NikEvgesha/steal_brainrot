@@ -1433,17 +1433,29 @@ public class LobbyClient : MonoBehaviour
             id = active.Name
         };
 
-        if (active.Type == Item.Brainrot && active is Brainrot brainrot)
+        if (active.Type == Item.Brainrot)
         {
-            dto.element = (int)brainrot.DinamicData.ElementType;
-            dto.weight = brainrot.DinamicData.WeightMultiplier;
-            dto.income = brainrot.DinamicData.ResultIncome;
+            var brainrot = active as Brainrot;
+            if (brainrot == null)
+                brainrot = active.GetComponent<Brainrot>();
+            if (brainrot != null)
+            {
+                dto.element = (int)brainrot.DinamicData.ElementType;
+                dto.weight = brainrot.DinamicData.WeightMultiplier;
+                dto.income = brainrot.DinamicData.ResultIncome;
+            }
         }
-        else if (active.Type == Item.Egg && active is Egg egg)
+        else if (active.Type == Item.Egg)
         {
-            dto.element = (int)egg.Data.DinamicData.ElementType;
-            dto.weight = egg.Data.DinamicData.WeightMultiplier;
-            dto.income = egg.Data.DinamicData.ResultIncome;
+            var egg = active as Egg;
+            if (egg == null)
+                egg = active.GetComponent<Egg>();
+            if (egg != null)
+            {
+                dto.element = (int)egg.Data.DinamicData.ElementType;
+                dto.weight = egg.Data.DinamicData.WeightMultiplier;
+                dto.income = egg.Data.DinamicData.ResultIncome;
+            }
         }
 
         return dto;

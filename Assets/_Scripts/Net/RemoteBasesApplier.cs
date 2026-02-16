@@ -405,6 +405,7 @@ public class RemoteBasesApplier : MonoBehaviour
                 if (slots[i].root != null)
                     slots[i].root.gameObject.SetActive(true);
 
+                DisableRemotePlayer(i);
                 ApplySlotMode(i, false);
                 if (_lastPreparedLocalSlotIndex != i)
                 {

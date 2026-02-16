@@ -112,8 +112,8 @@ public class FriendsPanelController : MonoBehaviour
         yield return api.EnsureGuest();
 
         var p = api.LocalProfile();
-        myNameText.text = $"РќРёРє: {p.displayName}";
-        myCodeText.text = $"РљРѕРґ: {p.friendCode}";
+        myNameText.text = $"Nickname: {p.displayName}";
+        myCodeText.text = $"ID: {p.friendCode}";
 
         // вЂњРѕРЅР»Р°Р№РЅвЂќ вЂ” РїРёРЅРіСѓРµРј РїСЂРё РѕС‚РєСЂС‹С‚РёРё Рё РїРѕС‚РѕРј РјРѕР¶РЅРѕ СЂР°Р· РІ 20 СЃРµРє РІ РѕС‚РґРµР»СЊРЅРѕРј РјРµСЃС‚Рµ
         yield return api.PresencePing();
@@ -131,13 +131,13 @@ public class FriendsPanelController : MonoBehaviour
         switch (code)
         {
             case 400:
-                addStatusText.text = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РґСЂСѓР·РµР№";
+                addStatusText.text = "Failed to load friends list";
                 break;
             case 404:
-                addStatusText.text = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РґСЂСѓР·РµР№";
+                addStatusText.text = "Failed to load friends list";
                 break;
             default:
-                addStatusText.text = "РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РґСЂСѓР·РµР№";
+                addStatusText.text = "Failed to load friends list";
                 break;
         }
     });
@@ -193,7 +193,7 @@ public class FriendsPanelController : MonoBehaviour
         yield return api.GetFriendRequests(items => list = items, (code, err) =>
         {
             if (requestsStatusText != null)
-                requestsStatusText.text = "Ошибка загрузки заявок";
+                requestsStatusText.text = "Failed to load requests";
         });
 
         if (list == null) yield break;
@@ -222,7 +222,7 @@ public class FriendsPanelController : MonoBehaviour
 
         if (!ok)
         {
-            addStatusText.text = "РќРµ СѓРґР°Р»РѕСЃСЊ РґРѕР±Р°РІРёС‚СЊ (РїСЂРѕРІРµСЂСЊ РєРѕРґ).";
+            addStatusText.text = "Failed to add friend (check ID)";
             yield break;
         }
 
@@ -262,7 +262,7 @@ public class FriendsPanelController : MonoBehaviour
     {
         renameStatusText.text = "";
         var name = (renameInput.text ?? "").Trim();
-        if (name.Length < 3) { renameStatusText.text = "РњРёРЅРёРјСѓРј 3 СЃРёРјРІРѕР»Р°"; yield break; }
+        if (name.Length < 3) { renameStatusText.text = "Minimum 3 characters"; yield break; }
 
         bool ok = false;
         string fail = null;
@@ -272,14 +272,14 @@ public class FriendsPanelController : MonoBehaviour
 
         if (!ok)
         {
-            renameStatusText.text = fail ?? "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРјРµРЅРёС‚СЊ РЅРёРє";
+            renameStatusText.text = fail ?? "Failed to rename";
             yield break;
         }
 
         renameInput.text = "";
         var p = api.LocalProfile();
-        myNameText.text = $"РќРёРє: {p.displayName}";
-        renameStatusText.text = "РќРёРє РёР·РјРµРЅС‘РЅ!";
+        myNameText.text = $"Nickname: {p.displayName}";
+        renameStatusText.text = "Nickname updated";
     }
 
     IEnumerator ViewFriendBaseStub(string friendCode)
@@ -289,7 +289,7 @@ public class FriendsPanelController : MonoBehaviour
         FriendBaseResponse resp = null;
         yield return backend.GetFriendBase(friendCode,
             ok => resp = ok,
-            (code, err) => addStatusText.text = "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р±Р°Р·Сѓ РґСЂСѓРіР°");
+            (code, err) => addStatusText.text = "Failed to load friend's base");
 
         if (resp == null)
             yield break;

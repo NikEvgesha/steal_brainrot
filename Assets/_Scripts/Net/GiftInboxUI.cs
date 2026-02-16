@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -125,19 +126,86 @@ public class GiftInboxUI : MonoBehaviour
     private void SpawnGiftItem(string itemType, string itemId)
     {
         if (G.Storage == null || G.Inventory == null) return;
+        var dyn = TryParseDynamicItemId(itemId);
+        var lookupId = dyn != null && !string.IsNullOrWhiteSpace(dyn.id) ? dyn.id : itemId;
 
         InventoryItem prefab = null;
         if (itemType == "egg")
-            prefab = G.Storage.GetEgg(itemId);
+            prefab = G.Storage.GetEgg(lookupId);
         else if (itemType == "brainrot")
-            prefab = G.Storage.GetPet(itemId);
+            prefab = G.Storage.GetPet(lookupId);
         else if (itemType == "food")
-            prefab = G.Storage.GetFood(itemId);
+            prefab = G.Storage.GetFood(lookupId);
 
         if (prefab == null) return;
 
         var item = Instantiate(prefab);
+        ApplyDynamicData(item, itemType, dyn);
         G.Inventory.Add(item);
+    }
+
+    private static void ApplyDynamicData(InventoryItem item, string itemType, GiftDynamicPayload dyn)
+    {
+        if (item == null || dyn == null) return;
+
+        if (itemType == "egg")
+        {
+            var egg = item as Egg ?? item.GetComponent<Egg>();
+            if (egg != null && dyn.element.HasValue && dyn.weight.HasValue)
+            {
+                var data = new BrainrotDinamicData
+                {
+                    ElementType = (ElementType)dyn.element.Value,
+                    WeightMultiplier = dyn.weight.Value,
+                    ResultIncome = dyn.income ?? 0d
+                };
+                egg.SetData(data);
+            }
+            return;
+        }
+
+        if (itemType == "brainrot")
+        {
+            var brainrot = item as Brainrot ?? item.GetComponent<Brainrot>();
+            if (brainrot != null && dyn.element.HasValue && dyn.weight.HasValue)
+            {
+                var data = new BrainrotDinamicData
+                {
+                    ElementType = (ElementType)dyn.element.Value,
+                    WeightMultiplier = dyn.weight.Value,
+                    ResultIncome = dyn.income ?? 0d
+                };
+                brainrot.Init(data);
+            }
+        }
+    }
+
+    private static GiftDynamicPayload TryParseDynamicItemId(string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(itemId) || !itemId.StartsWith("dyn:"))
+            return null;
+
+        var json = itemId.Substring(4);
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            return JsonConvert.DeserializeObject<GiftDynamicPayload>(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    [System.Serializable]
+    private class GiftDynamicPayload
+    {
+        public string id;
+        public int? element;
+        public float? weight;
+        public double? income;
     }
 
     private void CreateUI()

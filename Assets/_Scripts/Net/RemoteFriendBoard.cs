@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using Newtonsoft.Json;
 
 public class RemoteFriendBoard : MonoBehaviour
 {
@@ -330,7 +331,8 @@ public class RemoteFriendBoard : MonoBehaviour
             yield break;
         }
 
-        yield return LobbyClient.Instance.SendGift(playerId, itemType, current.Name, success => ok = success);
+        var payloadId = BuildGiftItemPayload(current, itemType);
+        yield return LobbyClient.Instance.SendGift(playerId, itemType, payloadId, success => ok = success);
         if (ok)
         {
             G.Inventory?.Remove(current);
@@ -348,6 +350,70 @@ public class RemoteFriendBoard : MonoBehaviour
         var current = G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
         if (current == null) return false;
         return current.Type == Item.Egg || current.Type == Item.Brainrot || current.Type == Item.Food;
+    }
+
+    private static string BuildGiftItemPayload(InventoryItem item, string itemType)
+    {
+        if (item == null)
+            return string.Empty;
+
+        var id = item.Name;
+        if (string.IsNullOrWhiteSpace(id))
+            return string.Empty;
+
+        if (itemType == "brainrot")
+        {
+            var brainrot = item as Brainrot ?? item.GetComponent<Brainrot>();
+            if (brainrot != null)
+            {
+                var payload = new GiftDynamicPayload
+                {
+                    id = id,
+                    element = (int)brainrot.DinamicData.ElementType,
+                    weight = brainrot.DinamicData.WeightMultiplier,
+                    income = brainrot.DinamicData.ResultIncome
+                };
+                return EncodePayload(payload);
+            }
+        }
+        else if (itemType == "egg")
+        {
+            var egg = item as Egg ?? item.GetComponent<Egg>();
+            if (egg != null)
+            {
+                var payload = new GiftDynamicPayload
+                {
+                    id = id,
+                    element = (int)egg.Data.DinamicData.ElementType,
+                    weight = egg.Data.DinamicData.WeightMultiplier,
+                    income = egg.Data.DinamicData.ResultIncome
+                };
+                return EncodePayload(payload);
+            }
+        }
+
+        return id;
+    }
+
+    private static string EncodePayload(GiftDynamicPayload payload)
+    {
+        try
+        {
+            return "dyn:" + JsonConvert.SerializeObject(payload);
+        }
+        catch
+        {
+            return payload != null ? payload.id : string.Empty;
+        }
+    }
+
+    [Serializable]
+    private class GiftDynamicPayload
+    {
+        public string id;
+        public int? element;
+        public float? weight;
+        public double? income;
     }
 
     private bool HasFocus()

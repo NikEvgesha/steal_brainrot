@@ -21,20 +21,31 @@ public class InteractionRaycastSource : MonoBehaviour
 
     private bool TryHit()
     {
-        if (TryHitByType(_raycastType, _raycastDistance, out var primary))
-        {
-            SetCurrentHit(primary);
-            return true;
-        }
-
+        var hasPrimary = TryHitByType(_raycastType, _raycastDistance, out var primary);
+        var hasSecondary = false;
+        InteractionRaycastListener secondary = null;
         if (_useSecondaryRaycast)
         {
             var secondaryType = _raycastType == RaycastType.Down ? RaycastType.Forward : RaycastType.Down;
-            if (TryHitByType(secondaryType, _secondaryRaycastDistance, out var secondary))
+            hasSecondary = TryHitByType(secondaryType, _secondaryRaycastDistance, out secondary);
+        }
+
+        if (hasPrimary)
+        {
+            if (hasSecondary && IsRemoteInteractionTarget(secondary))
             {
                 SetCurrentHit(secondary);
                 return true;
             }
+
+            SetCurrentHit(primary);
+            return true;
+        }
+
+        if (hasSecondary)
+        {
+            SetCurrentHit(secondary);
+            return true;
         }
 
         if (_lastHit != null)
@@ -44,6 +55,13 @@ public class InteractionRaycastSource : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool IsRemoteInteractionTarget(InteractionRaycastListener listener)
+    {
+        if (listener == null)
+            return false;
+        return listener.GetComponentInParent<RemoteFriendBoard>() != null;
     }
 
     private bool TryHitByType(RaycastType raycastType, float raycastDistance, out InteractionRaycastListener listener)
