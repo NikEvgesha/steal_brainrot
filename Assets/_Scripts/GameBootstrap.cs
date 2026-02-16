@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class GameBootstrap : MonoBehaviour
@@ -41,9 +42,23 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_lobby);
 
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
+        TryCreateRuntimeUi("FriendRequestInboxUI", "FriendRequestInboxUI");
         new GameObject("LobbyDebugPanel").AddComponent<LobbyDebugPanel>();
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
+    }
+
+    private static void TryCreateRuntimeUi(string objectName, string typeName)
+    {
+        var type = Type.GetType(typeName + ", Assembly-CSharp");
+        if (type == null)
+        {
+            Debug.LogWarning($"[GameBootstrap] Runtime UI type not found: {typeName}");
+            return;
+        }
+
+        var go = new GameObject(objectName);
+        go.AddComponent(type);
     }
 
 }

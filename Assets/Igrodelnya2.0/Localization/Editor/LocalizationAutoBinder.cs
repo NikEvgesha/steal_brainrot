@@ -310,6 +310,14 @@ public static class LocalizationAutoBinder
         if (string.IsNullOrEmpty(hierarchyPath))
             return false;
 
+        var normalizedPath = hierarchyPath.Replace('\\', '/');
+        var hasRuntimeBuyCanvas = normalizedPath.IndexOf("/interactioncanvas/", StringComparison.OrdinalIgnoreCase) >= 0
+                                  || normalizedPath.IndexOf("/buycanvas/", StringComparison.OrdinalIgnoreCase) >= 0;
+        var isDynamicBuyLabel = normalizedPath.EndsWith("/buytext", StringComparison.OrdinalIgnoreCase)
+                                || normalizedPath.EndsWith("/price", StringComparison.OrdinalIgnoreCase);
+        if (hasRuntimeBuyCanvas && isDynamicBuyLabel)
+            return true;
+
         if (hierarchyPath.IndexOf("/BuyHintDesctop", StringComparison.OrdinalIgnoreCase) >= 0)
             return true;
 

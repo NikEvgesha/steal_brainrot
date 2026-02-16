@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class GiftInboxUI : MonoBehaviour
+public class FriendRequestInboxUI : MonoBehaviour
 {
     [SerializeField] private float pollIntervalSec = 2f;
 
@@ -13,11 +13,13 @@ public class GiftInboxUI : MonoBehaviour
     private Button _acceptBtn;
     private Button _declineBtn;
 
-    private GiftItemDto _current;
+    private FriendsApi _api;
+    private FriendsApi.FriendRequestItem _current;
     private bool _inFlight;
 
     private void Awake()
     {
+        DontDestroyOnLoad(gameObject);
         StartCoroutine(InitNextFrame());
     }
 
@@ -31,9 +33,10 @@ public class GiftInboxUI : MonoBehaviour
         yield return null;
         if (UnityEngine.EventSystems.EventSystem.current == null)
         {
-            Debug.LogWarning("[GiftInboxUI] No EventSystem found. UI disabled.");
+            Debug.LogWarning("[FriendRequestInboxUI] No EventSystem found. UI disabled.");
             yield break;
         }
+
         CreateUI();
         Hide();
     }
@@ -42,39 +45,44 @@ public class GiftInboxUI : MonoBehaviour
     {
         while (true)
         {
-            if (LobbyClient.Instance != null && LobbyClient.Instance.IsOnline && !_inFlight)
+            if (TryResolveApi(out var api) && !_inFlight)
             {
                 _inFlight = true;
-                List<GiftItemDto> list = null;
-                yield return LobbyClient.Instance.GetPendingGifts(r => list = r, (_, __) => list = null);
+                List<FriendsApi.FriendRequestItem> list = null;
+                yield return api.GetFriendRequests(items => list = items, (_, __) => list = null);
                 _inFlight = false;
 
                 if (list != null && list.Count > 0)
-                {
-                    ShowGift(list[0]);
-                }
+                    ShowRequest(list[0]);
                 else
-                {
                     Hide();
-                }
             }
             else
             {
                 Hide();
             }
 
-            yield return new WaitForSeconds(pollIntervalSec);
+            yield return new WaitForSecondsRealtime(pollIntervalSec);
         }
     }
 
-    private void ShowGift(GiftItemDto gift)
+    private bool TryResolveApi(out FriendsApi api)
     {
-        _current = gift;
+        if (_api == null && G.Backend != null)
+            _api = G.Backend.FriendsApi;
+        api = _api;
+        return api != null;
+    }
+
+    private void ShowRequest(FriendsApi.FriendRequestItem request)
+    {
+        _current = request;
         if (_panel != null) _panel.SetActive(true);
         if (_text != null)
         {
-            var name = string.IsNullOrEmpty(gift.fromDisplayName) ? "Player" : gift.fromDisplayName;
-            _text.text = $"Подарок от {name}: {gift.itemType} ({gift.itemId})";
+            var name = string.IsNullOrWhiteSpace(request.displayName) ? "Player" : request.displayName;
+            var code = string.IsNullOrWhiteSpace(request.friendCode) ? "-" : request.friendCode;
+            _text.text = $"Запрос в друзья от {name} ({code})";
         }
     }
 
@@ -86,55 +94,35 @@ public class GiftInboxUI : MonoBehaviour
 
     private void OnAccept()
     {
-        if (_current == null) return;
-        StartCoroutine(AcceptFlow(_current));
+        if (_current == null || _inFlight || _api == null) return;
+        StartCoroutine(AcceptFlow(_current.requestId));
     }
 
     private void OnDecline()
     {
-        if (_current == null) return;
-        StartCoroutine(DeclineFlow(_current));
+        if (_current == null || _inFlight || _api == null) return;
+        StartCoroutine(DeclineFlow(_current.requestId));
     }
 
-    private IEnumerator AcceptFlow(GiftItemDto gift)
+    private IEnumerator AcceptFlow(string requestId)
     {
-        GiftAcceptResponseDto resp = null;
-        yield return LobbyClient.Instance.AcceptGift(gift.giftId, r => resp = r);
-        if (resp != null && resp.ok)
-        {
-            SpawnGiftItem(resp.itemType, resp.itemId);
-        }
+        _inFlight = true;
+        yield return _api.AcceptFriendRequest(requestId, _ => { });
+        _inFlight = false;
         Hide();
     }
 
-    private IEnumerator DeclineFlow(GiftItemDto gift)
+    private IEnumerator DeclineFlow(string requestId)
     {
-        bool ok = false;
-        yield return LobbyClient.Instance.DeclineGift(gift.giftId, v => ok = v);
+        _inFlight = true;
+        yield return _api.DeclineFriendRequest(requestId, _ => { });
+        _inFlight = false;
         Hide();
-    }
-
-    private void SpawnGiftItem(string itemType, string itemId)
-    {
-        if (G.Storage == null || G.Inventory == null) return;
-
-        InventoryItem prefab = null;
-        if (itemType == "egg")
-            prefab = G.Storage.GetEgg(itemId);
-        else if (itemType == "brainrot")
-            prefab = G.Storage.GetPet(itemId);
-        else if (itemType == "food")
-            prefab = G.Storage.GetFood(itemId);
-
-        if (prefab == null) return;
-
-        var item = Instantiate(prefab);
-        G.Inventory.Add(item);
     }
 
     private void CreateUI()
     {
-        var go = new GameObject("GiftInboxCanvas");
+        var go = new GameObject("FriendRequestInboxCanvas");
         DontDestroyOnLoad(go);
         _canvas = go.AddComponent<Canvas>();
         _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -146,17 +134,17 @@ public class GiftInboxUI : MonoBehaviour
         _panel = new GameObject("Panel");
         _panel.transform.SetParent(go.transform, false);
         var img = _panel.AddComponent<Image>();
-        img.color = new Color(0f, 0f, 0f, 0.7f);
+        img.color = new Color(0f, 0f, 0f, 0.72f);
 
         var rect = _panel.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.3f, 0.75f);
-        rect.anchorMax = new Vector2(0.7f, 0.9f);
+        rect.anchorMin = new Vector2(0.25f, 0.07f);
+        rect.anchorMax = new Vector2(0.75f, 0.22f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        _text = CreateText("GiftText", _panel.transform, new Vector2(0.05f, 0.5f), new Vector2(0.95f, 0.95f));
-        _acceptBtn = CreateButton("AcceptButton", _panel.transform, "Принять", new Vector2(0.1f, 0.1f), new Vector2(0.45f, 0.45f));
-        _declineBtn = CreateButton("DeclineButton", _panel.transform, "Отказать", new Vector2(0.55f, 0.1f), new Vector2(0.9f, 0.45f));
+        _text = CreateText("RequestText", _panel.transform, new Vector2(0.04f, 0.48f), new Vector2(0.96f, 0.94f));
+        _acceptBtn = CreateButton("AcceptButton", _panel.transform, "Принять", new Vector2(0.08f, 0.10f), new Vector2(0.45f, 0.42f));
+        _declineBtn = CreateButton("DeclineButton", _panel.transform, "Отклонить", new Vector2(0.55f, 0.10f), new Vector2(0.92f, 0.42f));
 
         _acceptBtn.onClick.AddListener(OnAccept);
         _declineBtn.onClick.AddListener(OnDecline);
@@ -170,6 +158,9 @@ public class GiftInboxUI : MonoBehaviour
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
+        text.resizeTextForBestFit = true;
+        text.resizeTextMinSize = 16;
+        text.resizeTextMaxSize = 44;
         var rect = text.GetComponent<RectTransform>();
         rect.anchorMin = min;
         rect.anchorMax = max;
@@ -183,7 +174,7 @@ public class GiftInboxUI : MonoBehaviour
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
         var img = go.AddComponent<Image>();
-        img.color = new Color(1f, 1f, 1f, 0.9f);
+        img.color = new Color(1f, 1f, 1f, 0.92f);
         var btn = go.AddComponent<Button>();
 
         var rect = go.GetComponent<RectTransform>();
@@ -192,11 +183,11 @@ public class GiftInboxUI : MonoBehaviour
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        var text = CreateText("Label", go.transform, new Vector2(0f, 0f), new Vector2(1f, 1f));
+        var text = CreateText("Label", go.transform, Vector2.zero, Vector2.one);
         text.text = label;
         text.color = Color.black;
+        text.resizeTextMaxSize = 34;
 
         return btn;
     }
-
 }

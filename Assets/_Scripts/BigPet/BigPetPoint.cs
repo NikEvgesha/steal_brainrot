@@ -122,7 +122,7 @@ public class BigPetPoint : MonoBehaviour
             if (_feedButton != null)
                 _feedButton.SetActive(false);
             if (_petInfoUI != null)
-                _petInfoUI.gameObject.SetActive(false);
+                _petInfoUI.gameObject.SetActive(true);
         }
         else
         {
@@ -155,7 +155,7 @@ public class BigPetPoint : MonoBehaviour
         if (_foodTimeBarText != null) _foodTimeBarText.gameObject.SetActive(false);
         if (_xpProgressText != null) _xpProgressText.gameObject.SetActive(true);
         if (_setPetUI != null) _setPetUI.gameObject.SetActive(_purchased);
-        if (_petInfoUI != null) _petInfoUI.gameObject.SetActive(false);
+        if (_petInfoUI != null) _petInfoUI.gameObject.SetActive(_purchased);
         if (_changePetArea != null) _changePetArea.SetActive(_purchased);
         if (_buyPanel != null) _buyPanel.gameObject.SetActive(false);
     }
@@ -362,7 +362,7 @@ public class BigPetPoint : MonoBehaviour
     {
         if (_remoteMode || !_purchased) return;
         if (_petInfoUI != null)
-            _petInfoUI.gameObject.SetActive(false);
+            _petInfoUI.gameObject.SetActive(true);
     }
 
     public void ApplyRemoteState(int petId, int lvl, int xp, bool purchased = true)
@@ -523,7 +523,7 @@ public class BigPetPoint : MonoBehaviour
         if (_petInfoUI != null)
         {
             _petInfoUI.SetInfo(_currentIncome);
-            _petInfoUI.gameObject.SetActive(false);
+            _petInfoUI.gameObject.SetActive(true);
         }
 
         if (_foodTimeBar != null)

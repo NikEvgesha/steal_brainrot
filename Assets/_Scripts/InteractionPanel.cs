@@ -17,13 +17,33 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private float _progress;
     private bool _interactionInProgress;
     private bool _interactionHold;
+    private LocalizedText _actionLocalizedText;
+    private LocalizedText _priceLocalizedText;
 
     
+    private void Awake()
+    {
+        if (_actionText != null)
+        {
+            _actionLocalizedText = _actionText.GetComponent<LocalizedText>();
+            if (_actionLocalizedText != null)
+                _actionLocalizedText.enabled = false;
+        }
+
+        if (_priceText != null)
+        {
+            _priceLocalizedText = _priceText.GetComponent<LocalizedText>();
+            if (_priceLocalizedText != null)
+                _priceLocalizedText.enabled = false;
+        }
+    }
 
     private void Start()
     {
-        _hintTouch.SetActive(G.Control.UseTouchControl);
-        _hintDesctop.SetActive(!G.Control.UseTouchControl);
+        if (_hintTouch != null)
+            _hintTouch.SetActive(G.Control.UseTouchControl);
+        if (_hintDesctop != null)
+            _hintDesctop.SetActive(!G.Control.UseTouchControl);
     }
 
     private void OnDisable()
@@ -67,7 +87,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         while (_interactionHold && _progress < 1f)
         {
             _progress += Time.deltaTime * _speed;
-            _fillImg.fillAmount = _progress;
+            if (_fillImg != null)
+                _fillImg.fillAmount = _progress;
             yield return null;
         }
 
@@ -80,17 +101,26 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private void ResetProgress()
     {
         _progress = 0;
-        _fillImg.fillAmount = 0;
+        if (_fillImg != null)
+            _fillImg.fillAmount = 0;
         _interactionInProgress = false;
     }
 
     public void SetInfo(string actionText, string price = null)
     {
-        _actionText.text = actionText;
-        _priceText.gameObject.SetActive(price != null);
-        if (price != null)
+        if (_actionLocalizedText != null && _actionLocalizedText.enabled)
+            _actionLocalizedText.enabled = false;
+        if (_priceLocalizedText != null && _priceLocalizedText.enabled)
+            _priceLocalizedText.enabled = false;
+
+        if (_actionText != null)
+            _actionText.text = actionText;
+
+        if (_priceText != null)
         {
-            _priceText.text = "$" + price;
+            _priceText.gameObject.SetActive(price != null);
+            if (price != null)
+                _priceText.text = "$" + price;
         }
     }
 }

@@ -321,7 +321,8 @@ public class RemoteFriendBoard : MonoBehaviour
         }
 
         var itemType = current.Type == Item.Egg ? "egg" :
-            current.Type == Item.Brainrot ? "brainrot" : null;
+            current.Type == Item.Brainrot ? "brainrot" :
+            current.Type == Item.Food ? "food" : null;
         if (string.IsNullOrEmpty(itemType))
         {
             requestInFlight = false;
@@ -346,7 +347,7 @@ public class RemoteFriendBoard : MonoBehaviour
     {
         var current = G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
         if (current == null) return false;
-        return current.Type == Item.Egg || current.Type == Item.Brainrot;
+        return current.Type == Item.Egg || current.Type == Item.Brainrot || current.Type == Item.Food;
     }
 
     private bool HasFocus()

@@ -1,16 +1,17 @@
-using UnityEngine;
+п»їusing UnityEngine;
 
 public class InteractionRaycastSource : MonoBehaviour
 {
     [SerializeField] private RaycastType _raycastType;
     [SerializeField] private float _raycastDistance = 3f;
+    [SerializeField] private bool _useSecondaryRaycast;
+    [SerializeField] private float _secondaryRaycastDistance = 3f;
 
     [Header("Layers")]
-    [SerializeField] private LayerMask _interactableMask; // объекты с InteractionRaycastListener
-    [SerializeField] private LayerMask _occluderMask;     // стены/пол/препятствия
+    [SerializeField] private LayerMask _interactableMask; // objects with InteractionRaycastListener
+    [SerializeField] private LayerMask _occluderMask;     // walls/floor/obstacles
 
     private InteractionRaycastListener _lastHit;
-    private Vector3 _direction;
 
     private void FixedUpdate()
     {
@@ -19,58 +20,20 @@ public class InteractionRaycastSource : MonoBehaviour
 
     private bool TryHit()
     {
-        _direction = _raycastType switch
+        if (TryHitByType(_raycastType, _raycastDistance, out var primary))
         {
-            RaycastType.Down => Vector3.down,
-            RaycastType.Forward => transform.forward,
-            _ => Vector3.zero
-        };
-        if (_direction == Vector3.zero) return false;
-
-        var origin = transform.position;
-
-        float maxVisibleDist = _raycastDistance;
-        if (Physics.Raycast(origin, _direction, out var occHit, _raycastDistance, _occluderMask, QueryTriggerInteraction.Ignore))
-        {
-            maxVisibleDist = occHit.distance; // дальше – стена
-            //Debug.Log($"Occluder: {occHit.transform.name}, dist: {occHit.distance:0.###}");
-        }
-        if (Physics.Raycast(origin, _direction, out var intHit, _raycastDistance, _interactableMask, QueryTriggerInteraction.Collide)
-            && intHit.distance <= maxVisibleDist)
-        {
-            var listener = intHit.transform.GetComponent<InteractionRaycastListener>();
-            if (listener == null)
-                listener = intHit.transform.GetComponentInParent<InteractionRaycastListener>();
-
-            if (listener == null)
-            {
-                if (_lastHit != null)
-                {
-                    _lastHit.onRaycastFail();
-                    _lastHit = null;
-                }
-                return false;
-            }
-
-            if (_raycastType != RaycastType.Down &&
-                listener.MaxDistance <= Vector3.Distance(transform.position, listener.transform.position))
-            {
-                if (_lastHit != null)
-                {
-                    _lastHit.onRaycastFail();
-                    _lastHit = null;
-                }
-                return false;
-            }
-
-            //Debug.Log(intHit.transform.gameObject.name+": " + intHit.distance);
-            if (_lastHit != listener)
-            {
-                _lastHit?.onRaycastFail();
-                _lastHit = listener;
-                _lastHit.onRaycastHit();
-            }
+            SetCurrentHit(primary);
             return true;
+        }
+
+        if (_useSecondaryRaycast)
+        {
+            var secondaryType = _raycastType == RaycastType.Down ? RaycastType.Forward : RaycastType.Down;
+            if (TryHitByType(secondaryType, _secondaryRaycastDistance, out var secondary))
+            {
+                SetCurrentHit(secondary);
+                return true;
+            }
         }
 
         if (_lastHit != null)
@@ -78,7 +41,60 @@ public class InteractionRaycastSource : MonoBehaviour
             _lastHit.onRaycastFail();
             _lastHit = null;
         }
+
         return false;
     }
 
+    private bool TryHitByType(RaycastType raycastType, float raycastDistance, out InteractionRaycastListener listener)
+    {
+        listener = null;
+
+        var direction = raycastType switch
+        {
+            RaycastType.Down => Vector3.down,
+            RaycastType.Forward => transform.forward,
+            _ => Vector3.zero
+        };
+
+        if (direction == Vector3.zero || raycastDistance <= 0f)
+            return false;
+
+        var origin = transform.position;
+        var maxVisibleDistance = raycastDistance;
+
+        if (Physics.Raycast(origin, direction, out var occHit, raycastDistance, _occluderMask, QueryTriggerInteraction.Ignore))
+            maxVisibleDistance = occHit.distance;
+
+        if (!Physics.Raycast(origin, direction, out var intHit, raycastDistance, _interactableMask, QueryTriggerInteraction.Collide))
+            return false;
+
+        if (intHit.distance > maxVisibleDistance)
+            return false;
+
+        listener = intHit.transform.GetComponent<InteractionRaycastListener>();
+        if (listener == null)
+            listener = intHit.transform.GetComponentInParent<InteractionRaycastListener>();
+
+        if (listener == null)
+            return false;
+
+        if (raycastType != RaycastType.Down &&
+            listener.MaxDistance <= Vector3.Distance(transform.position, listener.transform.position))
+            return false;
+
+        return true;
+    }
+
+    private void SetCurrentHit(InteractionRaycastListener listener)
+    {
+        if (listener == null)
+            return;
+
+        if (_lastHit == listener)
+            return;
+
+        _lastHit?.onRaycastFail();
+        _lastHit = listener;
+        _lastHit.onRaycastHit();
+    }
 }

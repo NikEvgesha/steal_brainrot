@@ -256,7 +256,6 @@ GameObject:
   - component: {fileID: 7335872997800112316}
   - component: {fileID: 4915730697522484698}
   - component: {fileID: 8697329808662788968}
-  - component: {fileID: 3785022924760826312}
   - component: {fileID: 8198326352299381664}
   m_Layer: 0
   m_Name: BuyText
@@ -326,21 +325,6 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u041A\u0443\u043F\u0438\u0442\u044C"
---- !u!114 &3785022924760826312
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3134592346787538341}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
-  selectedKey: Buy
-  currentLanguage: Ru
 --- !u!114 &8198326352299381664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -538,7 +522,7 @@ MonoBehaviour:
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
   m_DynamicPixelsPerUnit: 1
-  m_PresetInfoIsWorld: 0
+  m_PresetInfoIsWorld: 1
 --- !u!114 &6895989025546264776
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -706,7 +690,6 @@ GameObject:
   - component: {fileID: 1616276020131332627}
   - component: {fileID: 8160417778137869413}
   - component: {fileID: 2018324870377045316}
-  - component: {fileID: 2303132402486677539}
   - component: {fileID: 230708422728184296}
   m_Layer: 0
   m_Name: Price
@@ -776,21 +759,6 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: $100
---- !u!114 &2303132402486677539
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8211507372318841139}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
-  selectedKey: Buy
-  currentLanguage: Ru
 --- !u!114 &230708422728184296
 MonoBehaviour:
   m_ObjectHideFlags: 0

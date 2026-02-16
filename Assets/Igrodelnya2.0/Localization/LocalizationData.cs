@@ -47,10 +47,14 @@ public class LocalizationData : ScriptableObject
         }
 
         EnsureCache();
+        key = NormalizeCell(key);
         if (string.IsNullOrEmpty(key))
             return string.Empty;
 
         if (!entryDictionary.TryGetValue(key, out var entry) || entry == null)
+            entry = FindEntryByKeySlow(key);
+
+        if (entry == null)
         {
             if (missingKeyWarnings.Add(key))
                 Debug.LogWarning($"LocalizationData: key '{key}' not found.");
@@ -87,10 +91,14 @@ public class LocalizationData : ScriptableObject
         value = null;
         EnsureCache();
 
+        key = NormalizeCell(key);
         if (string.IsNullOrEmpty(key))
             return false;
 
         if (!entryDictionary.TryGetValue(key, out var entry) || entry == null)
+            entry = FindEntryByKeySlow(key);
+
+        if (entry == null)
             return false;
 
         var langIndex = FindLanguageIndex(language);
@@ -196,7 +204,9 @@ public class LocalizationData : ScriptableObject
 
     private void EnsureCache()
     {
-        if (!cacheDirty)
+        // Domain-reload/editor timing can leave non-serialized caches empty while cacheDirty is false.
+        // Rebuild when dictionary is empty to avoid false "key not found" warnings.
+        if (!cacheDirty && entryDictionary.Count > 0)
             return;
 
         entryDictionary.Clear();
@@ -307,6 +317,27 @@ public class LocalizationData : ScriptableObject
             return string.Empty;
 
         return value.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+    }
+
+    private LocalizationEntry FindEntryByKeySlow(string key)
+    {
+        if (entries == null || string.IsNullOrEmpty(key))
+            return null;
+
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (entry == null)
+                continue;
+
+            if (!string.Equals(NormalizeCell(entry.Key), key, StringComparison.Ordinal))
+                continue;
+
+            entryDictionary[key] = entry;
+            return entry;
+        }
+
+        return null;
     }
 
     private int FindLanguageIndex(string language)
