@@ -93,7 +93,8 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float updateIntervalSec = 1f;
     [SerializeField] private float stateIntervalSec = 1f;
     [SerializeField] private float soloStateIntervalSec = 2.5f;
-    [SerializeField] private int maxConsecutiveErrors = 3;
+    [SerializeField] private int maxConsecutiveErrors = 8;
+    [SerializeField] private float errorWindowSec = 25f;
     [SerializeField] private float reconnectIntervalSec = 60f;
     [SerializeField] private float reconnectFirstDelaySec = 5f;
     [SerializeField] private float positionSampleRate = 30f;
@@ -131,6 +132,7 @@ public class LobbyClient : MonoBehaviour
     private Coroutine _reconnectLoop;
     private Coroutine _debugMirrorLoop;
     private int _errors;
+    private readonly Queue<float> _errorTimes = new();
     private RemoteBasesApplier _remoteBases;
     private long _lastVersion;
     private readonly List<PositionHistorySample> _positionHistory = new();
@@ -215,7 +217,7 @@ public class LobbyClient : MonoBehaviour
         }
 
         IsOnline = true;
-        _errors = 0;
+        ResetErrors();
         _forceSnapshotUpload = true;
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
@@ -264,13 +266,13 @@ public class LobbyClient : MonoBehaviour
         yield return JoinLobbyWith(friendCode, v => ok = v);
         if (!ok)
         {
-            RegisterError();
+            RegisterError("JoinWithFriend failed");
             onDone?.Invoke(false);
             yield break;
         }
 
         IsOnline = true;
-        _errors = 0;
+        ResetErrors();
         _forceSnapshotUpload = true;
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
@@ -326,7 +328,7 @@ public class LobbyClient : MonoBehaviour
     {
         IsOnline = false;
         LobbyId = null;
-        _errors = 0;
+        ResetErrors();
         _lastVersion = 0;
         if (snapshotSync != null)
             snapshotSync.SetAutoPublish(true);
@@ -1223,11 +1225,11 @@ public class LobbyClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            RegisterError();
+            RegisterError(req, "POST /lobby/update");
             yield break;
         }
 
-        _errors = 0;
+        ResetErrors();
         if (forceSnapshot && sentBaseData)
             _forceSnapshotUpload = false;
     }
@@ -1249,7 +1251,7 @@ public class LobbyClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            RegisterError();
+            RegisterError(req, "GET /lobby/state");
             yield break;
         }
 
@@ -1260,9 +1262,9 @@ public class LobbyClient : MonoBehaviour
             _lastVersion = obj["version"]?.Value<long>() ?? _lastVersion;
             ParseMembers(obj["members"] as JArray);
         }
-        catch
+        catch (Exception ex)
         {
-            RegisterError();
+            RegisterError($"GET /lobby/state parse: {ex.GetType().Name}");
         }
     }
 
@@ -1408,12 +1410,35 @@ public class LobbyClient : MonoBehaviour
         return item;
     }
 
-    private void RegisterError()
+    private void ResetErrors()
+    {
+        _errors = 0;
+        _errorTimes.Clear();
+    }
+
+    private void RegisterError(UnityWebRequest req, string context)
+    {
+        var code = req != null ? req.responseCode : 0;
+        var reqError = req != null ? req.error : "unknown";
+        RegisterError($"{context}: code={code} err={reqError}");
+    }
+
+    private void RegisterError(string details = null)
     {
         if (IsAppBackgrounded())
             return;
 
-        _errors++;
+        var now = Time.realtimeSinceStartup;
+        _errorTimes.Enqueue(now);
+
+        var keepSince = now - Mathf.Max(1f, errorWindowSec);
+        while (_errorTimes.Count > 0 && _errorTimes.Peek() < keepSince)
+            _errorTimes.Dequeue();
+
+        _errors = _errorTimes.Count;
+        if (!string.IsNullOrEmpty(details))
+            Debug.LogWarning($"[Lobby] Request failed ({_errors}/{maxConsecutiveErrors} in {errorWindowSec:0.#}s): {details}");
+
         if (_errors >= maxConsecutiveErrors)
             DisableOnline("server_unreachable");
     }
