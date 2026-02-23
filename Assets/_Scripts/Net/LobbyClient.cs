@@ -102,8 +102,11 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float soloStateIntervalSec = 2.5f;
     [SerializeField] private int maxConsecutiveErrors = 8;
     [SerializeField] private float errorWindowSec = 25f;
+    [SerializeField] private int maxState404BeforeRecover = 3;
+    [SerializeField] private float state404RecoverCooldownSec = 5f;
     [SerializeField] private float reconnectIntervalSec = 60f;
     [SerializeField] private float reconnectFirstDelaySec = 5f;
+    [SerializeField] private float heartbeatIntervalSec = 3f;
     [SerializeField] private float positionSampleRate = 30f;
     [SerializeField] private float positionMinDistance = 0.05f;
     [SerializeField] private float positionSendWindowSec = 1.5f;
@@ -188,6 +191,11 @@ public class LobbyClient : MonoBehaviour
 #else
     private bool _wsConnected;
 #endif
+    private int _state404Count;
+    private bool _stateRecoverInProgress;
+    private float _lastStateRecoverAt;
+    private float _stateBackoffUntil;
+    private float _lastHeartbeatSentAt;
 
     private void Awake()
     {
@@ -205,6 +213,29 @@ public class LobbyClient : MonoBehaviour
         if (backend == null) backend = G.Backend;
         if (snapshotSync == null) snapshotSync = FindAnyObjectByType<ZooBaseSnapshotSync>();
         _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        NormalizeErrorTuning();
+    }
+
+    private void NormalizeErrorTuning()
+    {
+        if (maxConsecutiveErrors < 8)
+        {
+            Debug.LogWarning($"[Lobby] maxConsecutiveErrors={maxConsecutiveErrors} is too low, forcing 8");
+            maxConsecutiveErrors = 8;
+        }
+
+        if (errorWindowSec < 10f)
+            errorWindowSec = 10f;
+
+        if (maxState404BeforeRecover < 2)
+            maxState404BeforeRecover = 2;
+
+        // Keep recovery responsive even if old serialized values (e.g. 6) remain in scene/prefab.
+        if (maxState404BeforeRecover > 3)
+        {
+            Debug.LogWarning($"[Lobby] maxState404BeforeRecover={maxState404BeforeRecover} is too high, forcing 3");
+            maxState404BeforeRecover = 3;
+        }
     }
 
     private void Start()
@@ -759,6 +790,9 @@ public class LobbyClient : MonoBehaviour
             var pollDelay = stateIntervalSec;
             if (_lastMembers.Count <= 1)
                 pollDelay = Mathf.Max(stateIntervalSec, soloStateIntervalSec);
+            var now = Time.realtimeSinceStartup;
+            if (now < _stateBackoffUntil)
+                pollDelay = Mathf.Max(pollDelay, _stateBackoffUntil - now);
             yield return new WaitForSeconds(pollDelay);
         }
     }
@@ -790,6 +824,11 @@ public class LobbyClient : MonoBehaviour
         _lastSentHandWeight = null;
         _lastSentHandIncome = null;
         _forceSnapshotUpload = false;
+        _state404Count = 0;
+        _stateRecoverInProgress = false;
+        _lastStateRecoverAt = 0f;
+        _stateBackoffUntil = 0f;
+        _lastHeartbeatSentAt = 0f;
         _remoteBaseRawCache.Clear();
         _remoteBaseSnapshotCache.Clear();
         _lastMembers.Clear();
@@ -1684,16 +1723,25 @@ public class LobbyClient : MonoBehaviour
     {
         var url = $"{BaseUrl}/lobby/update";
         var payload = BuildLobbyUpdatePayload(out var forceSnapshot, out var sentBaseData, out var sampleCount);
+        var sendHeartbeatOnly = false;
+        var now = Time.realtimeSinceStartup;
         if (payload.Count == 0)
         {
-            if (debugTrafficLogs && debugTrafficVerbose)
-                Debug.Log("[LobbyTraffic] POST /lobby/update skipped (empty payload)");
-            yield break;
+            if (now - _lastHeartbeatSentAt < Mathf.Max(0.5f, heartbeatIntervalSec))
+            {
+                if (debugTrafficLogs && debugTrafficVerbose)
+                    Debug.Log("[LobbyTraffic] POST /lobby/update skipped (empty payload)");
+                yield break;
+            }
+
+            // Keep lobby membership alive even when nothing changed.
+            sendHeartbeatOnly = true;
+            _lastHeartbeatSentAt = now;
         }
 
-        var json = payload.ToString(Formatting.None);
+        var json = payload.Count == 0 ? "{}" : payload.ToString(Formatting.None);
         var txBytes = System.Text.Encoding.UTF8.GetByteCount(json);
-        var startedAt = Time.realtimeSinceStartup;
+        var startedAt = now;
 
         using var req = new UnityWebRequest(url, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
@@ -1707,7 +1755,7 @@ public class LobbyClient : MonoBehaviour
             req,
             txBytes,
             startedAt,
-            $"fields={payload.Count} samples={sampleCount}");
+            $"fields={payload.Count} samples={sampleCount} heartbeatOnly={sendHeartbeatOnly}");
 
         if (req.result != UnityWebRequest.Result.Success)
         {
@@ -1737,10 +1785,16 @@ public class LobbyClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            if (req.responseCode == 404)
+            {
+                HandleStateNotFound();
+                yield break;
+            }
             RegisterError(req, "GET /lobby/state");
             yield break;
         }
 
+        _state404Count = 0;
         try
         {
             var obj = JObject.Parse(req.downloadHandler.text);
@@ -1752,6 +1806,50 @@ public class LobbyClient : MonoBehaviour
         {
             RegisterError($"GET /lobby/state parse: {ex.GetType().Name}");
         }
+    }
+
+    private void HandleStateNotFound()
+    {
+        if (IsAppBackgrounded())
+            return;
+
+        _state404Count++;
+        var backoffSec = Mathf.Min(2f, 0.5f + _state404Count * 0.25f);
+        _stateBackoffUntil = Time.realtimeSinceStartup + backoffSec;
+        Debug.LogWarning($"[Lobby] State 404 ({_state404Count}/{maxState404BeforeRecover}), waiting before recover");
+
+        if (_state404Count < maxState404BeforeRecover)
+            return;
+        if (_stateRecoverInProgress)
+            return;
+
+        var now = Time.realtimeSinceStartup;
+        if (now - _lastStateRecoverAt < state404RecoverCooldownSec)
+            return;
+
+        _lastStateRecoverAt = now;
+        StartCoroutine(RecoverAfterStateNotFound());
+    }
+
+    private IEnumerator RecoverAfterStateNotFound()
+    {
+        _stateRecoverInProgress = true;
+        bool ok = false;
+        yield return JoinLobby(v => ok = v);
+
+        if (ok)
+        {
+            _state404Count = 0;
+            _stateBackoffUntil = 0f;
+            ResetErrors();
+            Debug.Log("[Lobby] Recovered after state 404 via rejoin");
+        }
+        else
+        {
+            RegisterError("state_recover_join_failed");
+        }
+
+        _stateRecoverInProgress = false;
     }
 
     private void ParseMembers(JArray arr)
