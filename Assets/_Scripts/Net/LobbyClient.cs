@@ -1,6 +1,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+#if !UNITY_WEBGL || UNITY_EDITOR
+using System.IO;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+#endif
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -114,6 +121,12 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private bool debugTrafficLogs = false;
     [SerializeField] private bool debugTrafficVerbose = false;
     [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
+    [Header("WebSocket (pilot)")]
+    [SerializeField] private bool useWebSocketLobby = true;
+    [SerializeField] private float webSocketReconnectDelaySec = 3f;
+    [SerializeField] private float webSocketPingIntervalSec = 10f;
+    [SerializeField] private float webSocketSyncRequestIntervalSec = 8f;
+    [SerializeField] private bool webSocketDebugLogs = false;
 
     [Header("Deps (optional)")]
     [SerializeField] private ZooBackendClient backend;
@@ -157,6 +170,24 @@ public class LobbyClient : MonoBehaviour
     private bool _isAppPaused;
     private bool _hasAppFocus = true;
     private bool _forceSnapshotUpload;
+    private bool _wsReady;
+    private float _nextWsPingAt;
+    private float _nextWsSyncRequestAt;
+    private bool _wsSupportLogged;
+#if !UNITY_WEBGL || UNITY_EDITOR
+    private ClientWebSocket _ws;
+    private CancellationTokenSource _wsCts;
+    private Task _wsReceiveTask;
+    private Coroutine _wsConnectLoop;
+    private readonly Queue<string> _wsInbox = new();
+    private readonly object _wsInboxLock = new();
+    private readonly SemaphoreSlim _wsSendLock = new(1, 1);
+    private bool _wsConnected;
+    private bool _wsConnecting;
+    private int _wsGeneration;
+#else
+    private bool _wsConnected;
+#endif
 
     private void Awake()
     {
@@ -180,6 +211,403 @@ public class LobbyClient : MonoBehaviour
     {
         if (autoJoinOnStart)
             StartCoroutine(JoinLobbyFlow());
+    }
+
+    private void Update()
+    {
+        ProcessWebSocketInbox();
+        TickWebSocketHeartbeat();
+    }
+
+    private bool IsWebSocketRuntimeSupported()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return false;
+#else
+        return true;
+#endif
+    }
+
+    private bool IsWebSocketDesired()
+    {
+        if (!useWebSocketLobby)
+            return false;
+
+        if (!IsWebSocketRuntimeSupported())
+        {
+            if (!_wsSupportLogged && webSocketDebugLogs)
+            {
+                Debug.Log("[LobbyWS] Disabled: runtime platform does not support ClientWebSocket (WebGL build).");
+                _wsSupportLogged = true;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool IsWebSocketActive()
+    {
+        return _wsConnected && _wsReady;
+    }
+
+    private void StartWebSocketLoopIfNeeded()
+    {
+        if (!IsOnline || !IsWebSocketDesired())
+            return;
+
+#if !UNITY_WEBGL || UNITY_EDITOR
+        if (_wsConnectLoop == null)
+            _wsConnectLoop = StartCoroutine(WebSocketLoop());
+#endif
+    }
+
+    private void StopWebSocketTransport()
+    {
+#if !UNITY_WEBGL || UNITY_EDITOR
+        if (_wsConnectLoop != null)
+        {
+            StopCoroutine(_wsConnectLoop);
+            _wsConnectLoop = null;
+        }
+
+        TeardownWebSocketClient();
+#endif
+        _wsReady = false;
+        _wsConnected = false;
+    }
+
+#if !UNITY_WEBGL || UNITY_EDITOR
+    private IEnumerator WebSocketLoop()
+    {
+        while (IsOnline && IsWebSocketDesired())
+        {
+            ProcessWebSocketInbox();
+
+            if (!_wsConnected && !_wsConnecting)
+                yield return ConnectWebSocket();
+
+            if (_wsConnected)
+            {
+                yield return null;
+                continue;
+            }
+
+            var retryDelay = Mathf.Max(0.5f, webSocketReconnectDelaySec);
+            yield return new WaitForSeconds(retryDelay);
+        }
+
+        _wsConnectLoop = null;
+    }
+
+    private IEnumerator ConnectWebSocket()
+    {
+        if (_wsConnecting || _wsConnected)
+            yield break;
+
+        if (!TryBuildWebSocketUrl(out var wsUrl))
+            yield break;
+
+        TeardownWebSocketClient();
+        _wsConnecting = true;
+        _wsReady = false;
+
+        _wsCts = new CancellationTokenSource();
+        _ws = new ClientWebSocket();
+        _ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(Mathf.Max(5f, webSocketPingIntervalSec));
+
+        Task connectTask;
+        try
+        {
+            connectTask = _ws.ConnectAsync(new Uri(wsUrl), _wsCts.Token);
+        }
+        catch (Exception ex)
+        {
+            _wsConnecting = false;
+            TeardownWebSocketClient();
+            if (webSocketDebugLogs)
+                Debug.LogWarning($"[LobbyWS] Connect setup failed: {ex.GetType().Name}");
+            yield break;
+        }
+
+        while (!connectTask.IsCompleted)
+            yield return null;
+
+        _wsConnecting = false;
+        if (connectTask.IsFaulted || _ws == null || _ws.State != WebSocketState.Open)
+        {
+            if (webSocketDebugLogs)
+                Debug.LogWarning("[LobbyWS] Connect failed.");
+            TeardownWebSocketClient();
+            yield break;
+        }
+
+        _wsConnected = true;
+        _wsReady = false;
+        _nextWsPingAt = Time.unscaledTime + Mathf.Max(3f, webSocketPingIntervalSec);
+        _nextWsSyncRequestAt = Time.unscaledTime + 1f;
+        var gen = ++_wsGeneration;
+        _wsReceiveTask = ReceiveWebSocketLoop(gen, _ws, _wsCts.Token);
+
+        if (webSocketDebugLogs)
+            Debug.Log($"[LobbyWS] Connected: {wsUrl}");
+    }
+
+    private async Task ReceiveWebSocketLoop(int generation, ClientWebSocket socket, CancellationToken token)
+    {
+        var buffer = new byte[8192];
+        using var stream = new MemoryStream();
+
+        try
+        {
+            while (!token.IsCancellationRequested && socket.State == WebSocketState.Open)
+            {
+                stream.SetLength(0);
+                WebSocketReceiveResult result;
+                do
+                {
+                    result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                        return;
+                    if (result.MessageType != WebSocketMessageType.Text)
+                        continue;
+                    if (result.Count > 0)
+                        stream.Write(buffer, 0, result.Count);
+                    if (stream.Length > 128 * 1024)
+                        return;
+                }
+                while (!result.EndOfMessage);
+
+                if (stream.Length == 0)
+                    continue;
+
+                var msg = Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
+                lock (_wsInboxLock)
+                    _wsInbox.Enqueue(msg);
+            }
+        }
+        catch
+        {
+            // Swallow here; fallback transport stays active.
+        }
+        finally
+        {
+            if (_wsGeneration == generation)
+            {
+                _wsConnected = false;
+                _wsReady = false;
+            }
+        }
+    }
+
+    private void TeardownWebSocketClient()
+    {
+        _wsReady = false;
+        _wsConnected = false;
+        _wsConnecting = false;
+
+        try
+        {
+            _wsCts?.Cancel();
+        }
+        catch
+        {
+        }
+
+        if (_ws != null)
+        {
+            try
+            {
+                _ws.Abort();
+            }
+            catch
+            {
+            }
+
+            _ws.Dispose();
+            _ws = null;
+        }
+
+        _wsCts?.Dispose();
+        _wsCts = null;
+
+        lock (_wsInboxLock)
+            _wsInbox.Clear();
+    }
+
+    private bool TryBuildWebSocketUrl(out string wsUrl)
+    {
+        wsUrl = null;
+        var playerId = GetLocalPlayerId();
+        if (string.IsNullOrWhiteSpace(playerId))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(BaseUrl) || !Uri.TryCreate(BaseUrl, UriKind.Absolute, out var baseUri))
+            return false;
+
+        string scheme;
+        if (string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            scheme = "wss";
+        else if (string.Equals(baseUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            scheme = "ws";
+        else
+            return false;
+
+        var builder = new UriBuilder(baseUri)
+        {
+            Scheme = scheme,
+            Port = baseUri.IsDefaultPort ? -1 : baseUri.Port
+        };
+
+        var path = (builder.Path ?? string.Empty).TrimEnd('/');
+        builder.Path = string.IsNullOrEmpty(path) ? "/ws/lobby" : $"{path}/ws/lobby";
+        builder.Query = $"playerId={UnityWebRequest.EscapeURL(playerId)}";
+        wsUrl = builder.Uri.ToString();
+        return true;
+    }
+
+    private IEnumerator SendWebSocketMessage(JObject message, Action<bool> onDone = null)
+    {
+        if (!_wsConnected || _ws == null || _ws.State != WebSocketState.Open || _wsCts == null)
+        {
+            onDone?.Invoke(false);
+            yield break;
+        }
+
+        var json = message.ToString(Formatting.None);
+        var task = SendWebSocketTextAsync(json, _wsCts.Token);
+        while (!task.IsCompleted)
+            yield return null;
+
+        var ok = task.Status == TaskStatus.RanToCompletion && task.Result;
+        if (!ok)
+        {
+            _wsConnected = false;
+            _wsReady = false;
+        }
+
+        onDone?.Invoke(ok);
+    }
+
+    private async Task<bool> SendWebSocketTextAsync(string text, CancellationToken token)
+    {
+        if (_ws == null || _ws.State != WebSocketState.Open)
+            return false;
+
+        await _wsSendLock.WaitAsync(token);
+        try
+        {
+            if (_ws == null || _ws.State != WebSocketState.Open)
+                return false;
+
+            var bytes = Encoding.UTF8.GetBytes(text);
+            await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            _wsSendLock.Release();
+        }
+    }
+#endif
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    private IEnumerator SendWebSocketMessage(JObject message, Action<bool> onDone = null)
+    {
+        onDone?.Invoke(false);
+        yield break;
+    }
+#endif
+
+    private void ProcessWebSocketInbox()
+    {
+#if !UNITY_WEBGL || UNITY_EDITOR
+        while (true)
+        {
+            string msg = null;
+            lock (_wsInboxLock)
+            {
+                if (_wsInbox.Count > 0)
+                    msg = _wsInbox.Dequeue();
+            }
+
+            if (string.IsNullOrEmpty(msg))
+                break;
+
+            HandleWebSocketMessage(msg);
+        }
+#endif
+    }
+
+    private void HandleWebSocketMessage(string msg)
+    {
+        try
+        {
+            var obj = JObject.Parse(msg);
+            var type = obj["type"]?.ToString();
+            switch (type)
+            {
+                case "ws_ready":
+                    _wsReady = true;
+                    LobbyId = obj["lobbyId"]?.ToString() ?? LobbyId;
+                    if (webSocketDebugLogs)
+                        Debug.Log($"[LobbyWS] Ready lobbyId={LobbyId}");
+                    break;
+
+                case "lobby_state":
+                    LobbyId = obj["lobbyId"]?.ToString() ?? LobbyId;
+                    _lastVersion = obj["version"]?.Value<long>() ?? _lastVersion;
+                    ParseMembers(obj["members"] as JArray);
+                    ResetErrors();
+                    _nextWsSyncRequestAt = Time.unscaledTime + Mathf.Max(3f, webSocketSyncRequestIntervalSec);
+                    break;
+
+                case "pong":
+                    break;
+
+                case "ack":
+                    break;
+
+                case "error":
+                    if (webSocketDebugLogs)
+                        Debug.LogWarning($"[LobbyWS] server error: {obj["code"]} {obj["message"]}");
+                    break;
+
+                case "left":
+                    _wsReady = false;
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (webSocketDebugLogs)
+                Debug.LogWarning($"[LobbyWS] Parse failed: {ex.GetType().Name}");
+        }
+    }
+
+    private void TickWebSocketHeartbeat()
+    {
+        if (!IsOnline || !IsWebSocketActive())
+            return;
+
+        var now = Time.unscaledTime;
+        if (now >= _nextWsPingAt)
+        {
+            _nextWsPingAt = now + Mathf.Max(3f, webSocketPingIntervalSec);
+            StartCoroutine(SendWebSocketMessage(new JObject { ["type"] = "ping" }));
+        }
+
+        if (now >= _nextWsSyncRequestAt)
+        {
+            _nextWsSyncRequestAt = now + Mathf.Max(3f, webSocketSyncRequestIntervalSec);
+            StartCoroutine(SendWebSocketMessage(new JObject { ["type"] = "sync_request" }));
+        }
     }
 
     public IEnumerator JoinLobbyFlow()
@@ -233,6 +661,7 @@ public class LobbyClient : MonoBehaviour
             _stateLoop = StartCoroutine(StateLoop());
         if (_sampleLoop == null)
             _sampleLoop = StartCoroutine(SampleLoop());
+        StartWebSocketLoopIfNeeded();
         EnsureDebugMirrorLoopState();
     }
 
@@ -286,6 +715,7 @@ public class LobbyClient : MonoBehaviour
             _stateLoop = StartCoroutine(StateLoop());
         if (_sampleLoop == null)
             _sampleLoop = StartCoroutine(SampleLoop());
+        StartWebSocketLoopIfNeeded();
         EnsureDebugMirrorLoopState();
 
         onDone?.Invoke(true);
@@ -301,7 +731,10 @@ public class LobbyClient : MonoBehaviour
                 continue;
             }
 
-            yield return UpdateLobby();
+            if (IsWebSocketActive())
+                yield return UpdateLobbyViaWebSocket();
+            else
+                yield return UpdateLobby();
             yield return new WaitForSeconds(updateIntervalSec);
         }
     }
@@ -313,6 +746,12 @@ public class LobbyClient : MonoBehaviour
             if (IsAppBackgrounded())
             {
                 yield return new WaitForSeconds(0.25f);
+                continue;
+            }
+
+            if (IsWebSocketActive())
+            {
+                yield return new WaitForSeconds(Mathf.Max(0.2f, stateIntervalSec));
                 continue;
             }
 
@@ -355,6 +794,7 @@ public class LobbyClient : MonoBehaviour
         _remoteBaseSnapshotCache.Clear();
         _lastMembers.Clear();
         FlushTrafficSummary(force: true);
+        StopWebSocketTransport();
 
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
@@ -420,9 +860,17 @@ public class LobbyClient : MonoBehaviour
 
     private void OnApplicationQuit()
     {
+        StopWebSocketTransport();
         if (IsOnline)
             StartCoroutine(LeaveLobby());
         StartCoroutine(FlushSnapshotOnce());
+    }
+
+    private void OnDestroy()
+    {
+        StopWebSocketTransport();
+        if (Instance == this)
+            Instance = null;
     }
 
     private void OnApplicationPause(bool pause)
@@ -1168,17 +1616,16 @@ public class LobbyClient : MonoBehaviour
         onOk?.Invoke(req.result == UnityWebRequest.Result.Success);
     }
 
-    private IEnumerator UpdateLobby()
+    private JObject BuildLobbyUpdatePayload(out bool forceSnapshot, out bool sentBaseData, out int sampleCount)
     {
-        var url = $"{BaseUrl}/lobby/update";
-
         var payload = new JObject();
+        forceSnapshot = _forceSnapshotUpload;
+        sentBaseData = false;
+        sampleCount = 0;
 
-        var forceSnapshot = _forceSnapshotUpload;
         var snapshotJson = snapshotSync == null
             ? null
             : (forceSnapshot ? snapshotSync.BuildSnapshotJson() : snapshotSync.ConsumeDirtySnapshot());
-        var sentBaseData = false;
         if (!string.IsNullOrEmpty(snapshotJson))
         {
             try { payload["baseData"] = JToken.Parse(snapshotJson); }
@@ -1196,8 +1643,46 @@ public class LobbyClient : MonoBehaviour
             : null;
 
         if (samplesToSend != null)
+        {
             payload["positions"] = JToken.FromObject(samplesToSend);
+            sampleCount = samplesToSend.Count;
+        }
 
+        return payload;
+    }
+
+    private IEnumerator UpdateLobbyViaWebSocket()
+    {
+        var payload = BuildLobbyUpdatePayload(out var forceSnapshot, out var sentBaseData, out var sampleCount);
+        if (payload.Count == 0)
+            yield break;
+
+        var wsMsg = new JObject
+        {
+            ["type"] = "lobby_update",
+            ["payload"] = payload
+        };
+
+        var ok = false;
+        yield return SendWebSocketMessage(wsMsg, v => ok = v);
+        if (!ok)
+        {
+            RegisterError("WS /lobby_update send_failed");
+            yield break;
+        }
+
+        if (webSocketDebugLogs && debugTrafficLogs && debugTrafficVerbose)
+            Debug.Log($"[LobbyWS] sent fields={payload.Count} samples={sampleCount}");
+
+        ResetErrors();
+        if (forceSnapshot && sentBaseData)
+            _forceSnapshotUpload = false;
+    }
+
+    private IEnumerator UpdateLobby()
+    {
+        var url = $"{BaseUrl}/lobby/update";
+        var payload = BuildLobbyUpdatePayload(out var forceSnapshot, out var sentBaseData, out var sampleCount);
         if (payload.Count == 0)
         {
             if (debugTrafficLogs && debugTrafficVerbose)
@@ -1221,7 +1706,7 @@ public class LobbyClient : MonoBehaviour
             req,
             txBytes,
             startedAt,
-            $"fields={payload.Count} samples={(samplesToSend != null ? samplesToSend.Count : 0)}");
+            $"fields={payload.Count} samples={sampleCount}");
 
         if (req.result != UnityWebRequest.Result.Success)
         {
