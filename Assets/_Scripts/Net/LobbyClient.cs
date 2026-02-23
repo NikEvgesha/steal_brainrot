@@ -793,6 +793,7 @@ public class LobbyClient : MonoBehaviour
         _remoteBaseRawCache.Clear();
         _remoteBaseSnapshotCache.Clear();
         _lastMembers.Clear();
+        LobbyStateUpdated?.Invoke(_lastMembers);
         FlushTrafficSummary(force: true);
         StopWebSocketTransport();
 

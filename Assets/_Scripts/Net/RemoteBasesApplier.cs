@@ -137,9 +137,18 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         EnsureSlotState();
-        EnsureLocalSlot();
+        if (_teleportRoutine != null)
+        {
+            StopCoroutine(_teleportRoutine);
+            _teleportRoutine = null;
+        }
+
+        _lastTeleportedSlotIndex = -2;
+        _lastTeleportedPlayerId = null;
+        _playerToSlot.Clear();
         _lobbyModeActive = true;
         _didInitialFullLobbySync = false;
+        var localSlotIndex = GetLocalSlotIndex();
 
         for (int i = 0; i < slots.Count; i++)
         {
@@ -147,28 +156,69 @@ public class RemoteBasesApplier : MonoBehaviour
             if (slot == null || slot.root == null)
                 continue;
 
-            if (IsLocalSlotIndex(i))
+            ResetSlotRuntimeState(i);
+
+            if (i == localSlotIndex)
             {
                 slot.root.gameObject.SetActive(true);
                 ApplySlotMode(i, false);
+                UnlockCellsForSlot(slot);
                 if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
                     _slotWithinSyncRange[i] = true;
                 continue;
             }
 
-            if (!string.IsNullOrEmpty(_slotPlayerIds[i]))
-            {
-                _playerToSlot.Remove(_slotPlayerIds[i]);
-                _slotPlayerIds[i] = null;
-            }
-
-            _slotUpdatedAt[i] = EmptySlotMarker;
+            _slotPlayerIds[i] = null;
             if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
                 _slotWithinSyncRange[i] = false;
             UpdateChestLobby(slot, null);
             UpdateFriendBoardLobby(slot, null);
-            ShowSlotBaselineVisual(i, forceSnapshotRefresh: false);
+            ForceResetSlotToBaseline(i);
         }
+
+        EnsureLocalSlot();
+    }
+
+    private void ResetSlotRuntimeState(int slotIndex)
+    {
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return;
+
+        if (_slotSnapshotApplyRoutines != null && slotIndex < _slotSnapshotApplyRoutines.Length)
+        {
+            if (_slotSnapshotApplyRoutines[slotIndex] != null)
+                StopCoroutine(_slotSnapshotApplyRoutines[slotIndex]);
+            _slotSnapshotApplyRoutines[slotIndex] = null;
+        }
+
+        if (_slotSnapshotApplyPending != null && slotIndex < _slotSnapshotApplyPending.Length)
+            _slotSnapshotApplyPending[slotIndex] = null;
+        if (_slotHadSnapshot != null && slotIndex < _slotHadSnapshot.Length)
+            _slotHadSnapshot[slotIndex] = false;
+        if (_slotUpdatedAt != null && slotIndex < _slotUpdatedAt.Length)
+            _slotUpdatedAt[slotIndex] = EmptySlotMarker;
+
+        ResetSlotSnapshotCache(slotIndex);
+        DisableRemotePlayer(slotIndex);
+    }
+
+    private void ForceResetSlotToBaseline(int slotIndex)
+    {
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return;
+
+        var slot = slots[slotIndex];
+        if (slot == null || slot.root == null || IsLocalSlotIndex(slotIndex))
+            return;
+
+        slot.root.gameObject.SetActive(true);
+        ApplySlotMode(slotIndex, true);
+        DisableRemotePlayer(slotIndex);
+        ClearSlot(slot, disableRoot: false);
+        ApplySlotBaselineState(slot);
+
+        if (_slotIsBaselineVisual != null && slotIndex < _slotIsBaselineVisual.Length)
+            _slotIsBaselineVisual[slotIndex] = true;
     }
 
     private void MarkRemoteComponents()
@@ -1904,8 +1954,15 @@ public class RemoteBasesApplier : MonoBehaviour
         {
             var mover = _slotRemotePlayers[slotIndex].GetComponent<RemotePlayerMover>();
             if (mover != null)
-                mover.SetHand(null);
+                mover.ResetTransientState();
             _slotRemotePlayers[slotIndex].SetActive(false);
+        }
+
+        if (_slotRemoteBoards != null && slotIndex >= 0 && slotIndex < _slotRemoteBoards.Length)
+        {
+            if (_slotRemoteBoards[slotIndex] != null)
+                _slotRemoteBoards[slotIndex].SetRemote(null, null, false, false);
+            _slotRemoteBoards[slotIndex] = null;
         }
     }
 

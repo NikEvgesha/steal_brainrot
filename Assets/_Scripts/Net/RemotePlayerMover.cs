@@ -42,6 +42,26 @@ public class RemotePlayerMover : MonoBehaviour
         delaySec = Mathf.Max(0f, delay);
     }
 
+    public void ResetTransientState()
+    {
+        _samples.Clear();
+        _head = 0;
+        _lastSamplesHash = 0;
+        _lastSamplesCount = 0;
+        _lastTime = 0f;
+        _lastPos = transform.position;
+        SetHolding(false);
+        ClearHeldVisual();
+
+        if (_animator == null)
+            _animator = GetComponentInChildren<Animator>();
+        if (_animator != null)
+        {
+            _animator.SetFloat(speedParam, 0f);
+            _animator.SetBool(holdingParam, false);
+        }
+    }
+
     public void SetHolding(bool holding)
     {
         _isHolding = holding;
