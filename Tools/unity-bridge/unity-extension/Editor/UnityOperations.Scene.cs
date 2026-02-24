@@ -56,7 +56,7 @@ namespace UnityBridge
         private static string FormatSceneHierarchy(UnityEngine.SceneManagement.Scene scene, GameObject[] rootObjects, bool detailed)
         {
             var sb = new System.Text.StringBuilder();
-            var totalObjects = UnityEngine.Object.FindObjectsOfType<GameObject>().Length;
+            var totalObjects = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None).Length;
             
             sb.AppendLine($"🏞️  Scene: {scene.name}");
             sb.AppendLine($"📊 Stats: {rootObjects.Length} root objects, {totalObjects} total objects");
@@ -1214,8 +1214,6 @@ namespace UnityBridge
             result = null;
             if (comp == null) return false;
 
-            Dictionary<string, object> Make(string type) => new Dictionary<string, object> { { "type", type }, { "data", new Dictionary<string, object>() } };
-
             switch (comp)
             {
                 case Camera cam:
@@ -1543,7 +1541,7 @@ namespace UnityBridge
                 Vector3 center;
                 if (!string.IsNullOrEmpty(centerObjName))
                 {
-                    var candidates = UnityEngine.Object.FindObjectsOfType<GameObject>();
+                    var candidates = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
                     var found = candidates.FirstOrDefault(go => go != null && string.Equals(go.name, centerObjName, caseInsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
                     if (found == null)
                         return OperationResult.Fail($"Center object '{centerObjName}' not found");
@@ -1567,7 +1565,7 @@ namespace UnityBridge
                 var compAll = (componentsAll ?? new List<string>()).Select(s => s.ToLowerInvariant()).ToList();
 
                 // Поиск кандидатов — безопасный и быстрый: сначала фильтруем по расстоянию, затем по критериям
-                var allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+                var allObjects = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
                 var collected = new List<Dictionary<string, object>>();
 
                 foreach (var go in allObjects)

@@ -24,7 +24,6 @@ namespace UnityBridge
         private bool stylesReady;
         private bool showTests = true;
         private bool showConfig = true;
-        private bool showServerInfo = true;
         
         [MenuItem("Window/Unity Bridge")]
         public static void ShowWindow()
@@ -515,6 +514,5 @@ namespace UnityBridge
         }
     }
 } 
-
 
 

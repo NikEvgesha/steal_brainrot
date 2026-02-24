@@ -88,7 +88,7 @@ namespace UnityBridge
                 }
 
                 var originalCanvasSettings = new List<(Canvas canvas, RenderMode mode, Camera camera)>();
-                var canvases = UnityEngine.Object.FindObjectsOfType<Canvas>();
+                var canvases = UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None);
                 
                 try
                 {
@@ -191,7 +191,7 @@ namespace UnityBridge
         {
             try
             {
-                var allRenderers = UnityEngine.Object.FindObjectsOfType<Renderer>()
+                var allRenderers = UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None)
                     .Where(r => r != null && r.enabled && r.gameObject.activeInHierarchy)
                     .ToList();
 
