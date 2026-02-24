@@ -786,8 +786,6 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.Favorites.Window
 
                   if (_currentList.items.Contains(newItem))
                   {
-                        Debug.LogWarning($"L'objet '{obj.name}' est déjà dans cette liste de favoris.");
-
                         return;
                   }
 

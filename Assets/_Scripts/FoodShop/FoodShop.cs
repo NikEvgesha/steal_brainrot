@@ -32,10 +32,12 @@ public class FoodShop : MonoBehaviour
 
     private void Start()
     {
-        Resupply();
         _ui.InitUI(_foodList, _priceResupply);
         _ui.BuyButtonClicked.AddListener(TryBuy);
         _ui.ResupplyButtonClicked.AddListener(TryBuyResupply); //TODO : buy for gems
+
+        Resupply();
+        _ui.UpdateUI(_foodAmount);
     }
 
 

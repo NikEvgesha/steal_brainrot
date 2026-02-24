@@ -38,7 +38,18 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.Favorites.Data
                   else if (obj is GameObject go)
                   {
                         itemType = FavoriteItemType.GameObject;
+
+                        // ! InstanceID is obsolete
+                        // This is a quick fix for now just to disable warnings in 6.4 that could be annoying
+                        // No problem for now as InstanceID is still working but should not work on 6.5 and newer so...
+                        // TODO: Convert to EntityID
+#if UNITY_6000_3_OR_NEWER
+                        #pragma warning disable CS0618
                         instanceID = go.GetInstanceID();
+                        #pragma warning restore CS0618
+#else
+                        instanceID = go.GetInstanceID();
+#endif
                         scenePath = go.scene.path;
                   }
             }
@@ -50,7 +61,14 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.Favorites.Data
                         case FavoriteItemType.Asset:
                               return AssetDatabase.LoadAssetAtPath<Object>(AssetDatabase.GUIDToAssetPath(guid));
                         case FavoriteItemType.GameObject:
+                              // TODO: Convert to EntityID
+#if UNITY_6000_3_OR_NEWER
+                              #pragma warning disable CS0618
+                              return !IsSceneLoaded() ? null : EditorUtility.EntityIdToObject(instanceID);
+                              #pragma warning restore CS0618
+#else
                               return !IsSceneLoaded() ? null : EditorUtility.InstanceIDToObject(instanceID);
+#endif
 
                         default:
                               return null;
@@ -89,9 +107,9 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.Favorites.Data
 
                   return itemType switch
                   {
-                              FavoriteItemType.Asset => guid == other.guid,
-                              FavoriteItemType.GameObject => instanceID == other.instanceID && scenePath == other.scenePath,
-                              _ => false
+                        FavoriteItemType.Asset => guid == other.guid,
+                        FavoriteItemType.GameObject => instanceID == other.instanceID && scenePath == other.scenePath,
+                        _ => false
                   };
             }
 
@@ -99,9 +117,9 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.Favorites.Data
             {
                   return itemType switch
                   {
-                              FavoriteItemType.Asset => HashCode.Combine(itemType, guid),
-                              FavoriteItemType.GameObject => HashCode.Combine(itemType, instanceID, scenePath),
-                              _ => base.GetHashCode()
+                        FavoriteItemType.Asset => HashCode.Combine(itemType, guid),
+                        FavoriteItemType.GameObject => HashCode.Combine(itemType, instanceID, scenePath),
+                        _ => base.GetHashCode()
                   };
             }
       }

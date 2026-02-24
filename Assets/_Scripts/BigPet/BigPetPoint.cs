@@ -242,11 +242,14 @@ public class BigPetPoint : MonoBehaviour
 
         if (_currentXp >= _xpForNextLvl)
         {
-            _currentLvl++;
+           while (_currentXp >= _xpForNextLvl)
+            {
+                _currentLvl++;
+                _currentXp -= _xpForNextLvl;
+                _xpForNextLvl += _xpAddintPerLvl;
+            }       
             G.Save.SaveBigPetLvl(_currentLvl);
             BaseDirtyTracker.MarkDirty();
-            _currentXp -= _xpForNextLvl;
-            _xpForNextLvl += _xpAddintPerLvl;
 
             if (_currentLvl % _lvlsPerPet == 1 && _maxAvailablePetIdx < _pets.Count - 1)
             {

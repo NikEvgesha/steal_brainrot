@@ -71,9 +71,7 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                   int missingScripts = _results.Values.Sum(static list => list.Count(static info => info.IsScriptMissing));
                   int nullRefs = totalProblems - missingScripts;
 
-                  string headerText = totalProblems > 0
-                              ? $"{totalProblems} Issue(s) Found • {missingScripts} Missing Scripts • {nullRefs} Null References"
-                              : "🎉 No Missing References!";
+                  string headerText = totalProblems > 0 ? $"{totalProblems} Issue(s) Found • {missingScripts} Missing Scripts • {nullRefs} Null References" : "🎉 No Missing References!";
 
                   EditorGUILayout.LabelField(headerText, EditorStyles.boldLabel);
                   EditorGUILayout.EndVertical();
@@ -191,8 +189,7 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                   {
                         EditorGUI.indentLevel++;
 
-                        IEnumerable<IGrouping<string, MissingReferenceInfo>> groupedByComponent =
-                                    infos.GroupBy(static info => info.IsScriptMissing ? "Missing Script" : info.ComponentName);
+                        IEnumerable<IGrouping<string, MissingReferenceInfo>> groupedByComponent = infos.GroupBy(static info => info.IsScriptMissing ? "Missing Script" : info.ComponentName);
 
                         foreach (IGrouping<string, MissingReferenceInfo> group in groupedByComponent)
                         {
@@ -214,7 +211,13 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
             {
                   EditorGUILayout.BeginHorizontal();
 
+#if UNITY_6000_3_OR_NEWER
+                  #pragma warning disable CS0618
                   string itemKey = $"{go.GetInstanceID()}_missing_script";
+                  #pragma warning restore CS0618
+#else
+                  string itemKey = $"{go.GetInstanceID()}_missing_script";
+#endif
                   bool isSelected = _selectedItems.Contains(itemKey);
 
                   isSelected = EditorGUILayout.Toggle(isSelected, GUILayout.Width(16));
@@ -240,7 +243,13 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                   {
                         EditorGUILayout.BeginHorizontal();
 
+#if UNITY_6000_3_OR_NEWER
+                        #pragma warning disable CS0618
                         string itemKey = $"{go.GetInstanceID()}_{info.ComponentName}_{info.FieldName}";
+                        #pragma warning restore CS0618
+#else
+                        string itemKey = $"{go.GetInstanceID()}_{info.ComponentName}_{info.FieldName}";
+#endif
                         bool isSelected = _selectedItems.Contains(itemKey);
 
                         EditorGUI.indentLevel++;
@@ -297,14 +306,26 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
 
                         if (hasMissingScript)
                         {
+#if UNITY_6000_3_OR_NEWER
+                              #pragma warning disable CS0618
                               _selectedItems.Add($"{go.GetInstanceID()}_missing_script");
+                              #pragma warning restore CS0618
+#else
+                              _selectedItems.Add($"{go.GetInstanceID()}_missing_script");
+#endif
                         }
 
                         foreach (MissingReferenceInfo info in infos)
                         {
                               if (!info.IsScriptMissing)
                               {
+#if UNITY_6000_3_OR_NEWER
+                                    #pragma warning disable CS0618
                                     _selectedItems.Add($"{go.GetInstanceID()}_{info.ComponentName}_{info.FieldName}");
+                                    #pragma warning restore CS0618
+#else
+                                    _selectedItems.Add($"{go.GetInstanceID()}_{info.ComponentName}_{info.FieldName}");
+#endif
                               }
                         }
                   }
@@ -334,7 +355,13 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                               if (parts.Length >= 3)
                               {
                                     int instanceId = int.Parse(parts[0]);
+#if UNITY_6000_3_OR_NEWER
+                                    #pragma warning disable CS0618
+                                    var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
+                                    #pragma warning restore CS0618
+#else
                                     var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+#endif
 
                                     if (go)
                                     {
@@ -389,7 +416,13 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                         {
                               string[] parts = itemKey.Split('_');
                               int instanceId = int.Parse(parts[0]);
+#if UNITY_6000_3_OR_NEWER
+                              #pragma warning disable CS0618
+                              var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
+                              #pragma warning restore CS0618
+#else
                               var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+#endif
 
                               if (go && RemoveMissingScriptFromObject(go))
                               {
@@ -474,8 +507,8 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                         {
                               if (component && component.GetType().Name == info.ComponentName)
                               {
-                                    if (EditorUtility.DisplayDialog("Remove Component",
-                                                    $"Remove component '{info.ComponentName}' from '{go.name}'?\n\nThis action cannot be undone.", "Remove", "Cancel"))
+                                    if (EditorUtility.DisplayDialog("Remove Component", $"Remove component '{info.ComponentName}' from '{go.name}'?\n\nThis action cannot be undone.", "Remove",
+                                                    "Cancel"))
                                     {
                                           DestroyImmediate(component);
                                           EditorUtility.SetDirty(go);
