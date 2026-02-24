@@ -58,6 +58,7 @@ public class GiftItemDto
     public string itemType;
     public string itemId;
     public string createdAt;
+    public bool isReturned;
 }
 
 [Serializable]
@@ -124,6 +125,8 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private bool debugTrafficLogs = false;
     [SerializeField] private bool debugTrafficVerbose = false;
     [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
+    [Header("Debug Network")]
+    [SerializeField] private bool debugSimulateOffline = false;
     [Header("WebSocket (pilot)")]
     [SerializeField] private bool useWebSocketLobby = true;
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
@@ -136,6 +139,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private ZooBaseSnapshotSync snapshotSync;
 
     public bool IsOnline { get; private set; }
+    public bool DebugSimulateOffline => debugSimulateOffline;
     public string LobbyId { get; private set; }
     public IReadOnlyList<LobbyMemberStateDto> LastMembers => _lastMembers;
 
@@ -648,8 +652,28 @@ public class LobbyClient : MonoBehaviour
         }
     }
 
+    public void SetDebugSimulateOffline(bool enabled)
+    {
+        if (debugSimulateOffline == enabled)
+            return;
+
+        debugSimulateOffline = enabled;
+        if (debugSimulateOffline)
+        {
+            if (IsOnline)
+                DisableOnline("debug_simulated_offline");
+            return;
+        }
+
+        if (!IsOnline && _reconnectLoop == null)
+            _reconnectLoop = StartCoroutine(ReconnectLoop());
+    }
+
     public IEnumerator JoinLobbyFlow()
     {
+        if (debugSimulateOffline)
+            yield break;
+
         if (IsOnline) yield break;
         if (backend == null)
         {
@@ -705,6 +729,12 @@ public class LobbyClient : MonoBehaviour
 
     public IEnumerator JoinWithFriend(string friendCode, Action<bool> onDone = null)
     {
+        if (debugSimulateOffline)
+        {
+            onDone?.Invoke(false);
+            yield break;
+        }
+
         if (backend == null)
         {
             var tries = 0;
@@ -848,7 +878,7 @@ public class LobbyClient : MonoBehaviour
         if (_remoteBases != null)
             _remoteBases.ApplyOfflineLocalOnly();
 
-        if (_reconnectLoop == null)
+        if (_reconnectLoop == null && !debugSimulateOffline)
             _reconnectLoop = StartCoroutine(ReconnectLoop());
     }
 
@@ -884,6 +914,13 @@ public class LobbyClient : MonoBehaviour
         var firstAttempt = true;
         while (!IsOnline)
         {
+            if (debugSimulateOffline)
+            {
+                firstAttempt = true;
+                yield return new WaitForSeconds(0.5f);
+                continue;
+            }
+
             var delay = firstAttempt
                 ? Mathf.Max(1f, Mathf.Min(reconnectFirstDelaySec, reconnectIntervalSec))
                 : Mathf.Max(1f, reconnectIntervalSec);
@@ -1566,15 +1603,26 @@ public class LobbyClient : MonoBehaviour
         _debugMirrorLoop = null;
     }
 
-    public IEnumerator SendGift(string toPlayerId, string itemType, string itemId, Action<bool> onDone = null)
+    public IEnumerator SendGift(string toPlayerId, string itemType, string itemId, Action<bool> onDone = null, string toFriendCode = null)
     {
+        var cleanPlayerId = string.IsNullOrWhiteSpace(toPlayerId) ? null : toPlayerId.Trim();
+        var cleanFriendCode = string.IsNullOrWhiteSpace(toFriendCode) ? null : toFriendCode.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(cleanPlayerId) && string.IsNullOrEmpty(cleanFriendCode))
+        {
+            onDone?.Invoke(false);
+            yield break;
+        }
+
         var url = $"{BaseUrl}/gifts/send";
         var payload = new JObject
         {
-            ["toPlayerId"] = toPlayerId,
             ["itemType"] = itemType,
             ["itemId"] = itemId
         };
+        if (!string.IsNullOrEmpty(cleanPlayerId))
+            payload["toPlayerId"] = cleanPlayerId;
+        if (!string.IsNullOrEmpty(cleanFriendCode))
+            payload["toFriendCode"] = cleanFriendCode;
         var json = payload.ToString(Formatting.None);
 
         using var req = new UnityWebRequest(url, "POST");

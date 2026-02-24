@@ -29,6 +29,7 @@ public class RemoteFriendBoard : MonoBehaviour
     [SerializeField] private string addLabel = "Add Friend";
     [SerializeField] private string sentLabel = "Request Sent";
     [SerializeField] private string giftLabel = "Gift";
+    [SerializeField] private string giftLocalizationKey = "UI/Friends/Gift";
     [SerializeField] private string statsLabel = "Stats";
     [SerializeField] private string offlineLabel = "Offline";
     [SerializeField] private string playerLabel = "Player";
@@ -261,7 +262,7 @@ public class RemoteFriendBoard : MonoBehaviour
         {
             case BoardAction.Gift:
                 if (!isOnline) return;
-                if (string.IsNullOrWhiteSpace(playerId)) return;
+                if (string.IsNullOrWhiteSpace(playerId) && string.IsNullOrWhiteSpace(friendCode)) return;
                 if (LobbyClient.Instance == null) return;
                 StartCoroutine(SendGift(capturedGiftItem));
                 break;
@@ -282,11 +283,11 @@ public class RemoteFriendBoard : MonoBehaviour
         if (requestInFlight)
             return BoardAction.None;
 
-        if (CanGiftFromHand())
-            return isOnline ? BoardAction.Gift : BoardAction.None;
+        if (CanGiftFromHand() && HasGiftTarget())
+            return BoardAction.Gift;
 
-        if (!isFriend)
-            return isOnline ? BoardAction.AddFriend : BoardAction.None;
+        if (!isFriend && isOnline && !string.IsNullOrWhiteSpace(friendCode))
+            return BoardAction.AddFriend;
 
         if (showStatsForFriends)
             return BoardAction.ShowStats;
@@ -299,7 +300,7 @@ public class RemoteFriendBoard : MonoBehaviour
         return action switch
         {
             BoardAction.AddFriend => addLabel,
-            BoardAction.Gift => giftLabel,
+            BoardAction.Gift => L(giftLocalizationKey, giftLabel),
             BoardAction.ShowStats => statsLabel,
             _ => friendLabel
         };
@@ -315,6 +316,7 @@ public class RemoteFriendBoard : MonoBehaviour
         if (ok)
         {
             if (statusText != null) statusText.text = sentLabel;
+            FriendsPanelController.RequestLiveRefresh();
             HidePanel();
         }
 
@@ -344,8 +346,17 @@ public class RemoteFriendBoard : MonoBehaviour
             yield break;
         }
 
+        var targetPlayerId = string.IsNullOrWhiteSpace(playerId) ? null : playerId;
+        var targetFriendCode = string.IsNullOrWhiteSpace(friendCode) ? null : friendCode;
+        if (string.IsNullOrEmpty(targetPlayerId) && string.IsNullOrEmpty(targetFriendCode))
+        {
+            requestInFlight = false;
+            UpdatePanel();
+            yield break;
+        }
+
         var payloadId = BuildGiftItemPayload(current, itemType);
-        yield return LobbyClient.Instance.SendGift(playerId, itemType, payloadId, success => ok = success);
+        yield return LobbyClient.Instance.SendGift(targetPlayerId, itemType, payloadId, success => ok = success, targetFriendCode);
         if (ok)
         {
             G.Inventory?.Remove(current);
@@ -356,6 +367,14 @@ public class RemoteFriendBoard : MonoBehaviour
 
         requestInFlight = false;
         UpdatePanel();
+    }
+
+    private bool HasGiftTarget()
+    {
+        if (!isOnline)
+            return false;
+
+        return !string.IsNullOrWhiteSpace(playerId) || !string.IsNullOrWhiteSpace(friendCode);
     }
 
     private bool CanGiftFromHand()
@@ -529,6 +548,18 @@ public class RemoteFriendBoard : MonoBehaviour
     {
         if (interactionPanel != null)
             interactionPanel.gameObject.SetActive(false);
+    }
+
+    private static string L(string key, string fallback)
+    {
+        if (LocalizationManager.Instance != null && LocalizationManager.Instance.LocalizationData != null)
+        {
+            var translated = LocalizationManager.Instance.LocalizationData.GetTranslation(key);
+            if (!string.IsNullOrWhiteSpace(translated) && !string.Equals(translated, key, StringComparison.Ordinal))
+                return translated;
+        }
+
+        return fallback;
     }
 }
 

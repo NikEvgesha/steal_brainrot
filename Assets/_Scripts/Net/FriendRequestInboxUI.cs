@@ -113,17 +113,23 @@ public class FriendRequestInboxUI : MonoBehaviour
     private IEnumerator AcceptFlow(string requestId)
     {
         _inFlight = true;
-        yield return _api.AcceptFriendRequest(requestId, _ => { });
+        var ok = false;
+        yield return _api.AcceptFriendRequest(requestId, success => ok = success);
         _inFlight = false;
         Hide();
+        if (ok)
+            FriendsPanelController.RequestLiveRefresh();
     }
 
     private IEnumerator DeclineFlow(string requestId)
     {
         _inFlight = true;
-        yield return _api.DeclineFriendRequest(requestId, _ => { });
+        var ok = false;
+        yield return _api.DeclineFriendRequest(requestId, success => ok = success);
         _inFlight = false;
         Hide();
+        if (ok)
+            FriendsPanelController.RequestLiveRefresh();
     }
 
     private void CreateUI()

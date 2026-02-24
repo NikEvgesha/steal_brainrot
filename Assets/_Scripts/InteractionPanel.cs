@@ -97,18 +97,31 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private IEnumerator InteractionProcess()
     {
+        var completed = false;
         while (_interactionHold && _progress < 1f)
         {
             _progress += Time.deltaTime * _speed;
+            if (_progress > 1f)
+                _progress = 1f;
+
             if (_fillImg != null)
                 _fillImg.fillAmount = _progress;
+
+            if (_progress >= 1f)
+            {
+                InteractionComplete?.Invoke();
+                completed = true;
+                break;
+            }
+
             yield return null;
         }
 
-        if (_progress >= 1f)
+        if (!completed && _progress >= 1f)
         {
-            InteractionComplete.Invoke();
+            InteractionComplete?.Invoke();
         }
+
         ResetProgress();
     }
     private void ResetProgress()

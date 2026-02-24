@@ -17,6 +17,8 @@ public class LobbyDebugPanel : MonoBehaviour
     private Text _text;
     private Button _toggleButton;
     private Text _toggleText;
+    private Button _offlineToggleButton;
+    private Text _offlineToggleText;
     private LobbyClient _lobby;
     private bool _collapsed;
 
@@ -56,6 +58,11 @@ public class LobbyDebugPanel : MonoBehaviour
     {
         if (toggleKey != KeyCode.None && Input.GetKeyDown(toggleKey))
             ToggleCollapsed();
+
+        if (_lobby == null)
+            _lobby = LobbyClient.Instance;
+
+        ApplyOfflineToggleState();
     }
 
     private IEnumerator InitNextFrame()
@@ -73,6 +80,7 @@ public class LobbyDebugPanel : MonoBehaviour
         ApplyCollapsedState();
         _lobby = LobbyClient.Instance;
         Debug.Log("[LobbyDebugPanel] Created");
+        ApplyOfflineToggleState();
         StartCoroutine(RefreshLoop());
     }
 
@@ -104,6 +112,7 @@ public class LobbyDebugPanel : MonoBehaviour
             $"Lobby: {(_lobby.IsOnline ? _lobby.LobbyId : "offline")}",
             $"PlayerId: {pid}",
             $"FriendCode: {code}",
+            $"SimOffline: {(_lobby.DebugSimulateOffline ? "ON" : "OFF")}",
             $"Members: {_lobby.LastMembers.Count} (online: {CountOnlineMembers(_lobby.LastMembers)})"
         };
 
@@ -165,6 +174,12 @@ public class LobbyDebugPanel : MonoBehaviour
         _toggleText.color = Color.white;
         _toggleText.text = "DBG";
         _toggleButton.onClick.AddListener(ToggleCollapsed);
+
+        _offlineToggleButton = CreateButton("OfflineToggleButton", go.transform, new Vector2(0.85f, 0.95f), new Vector2(0.95f, 0.99f));
+        _offlineToggleText = CreateText("OfflineToggleText", _offlineToggleButton.transform, Vector2.zero, Vector2.one);
+        _offlineToggleText.alignment = TextAnchor.MiddleCenter;
+        _offlineToggleText.color = Color.white;
+        _offlineToggleButton.onClick.AddListener(ToggleSimulatedOffline);
     }
 
     private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
@@ -215,5 +230,25 @@ public class LobbyDebugPanel : MonoBehaviour
 
         if (_toggleText != null)
             _toggleText.text = _collapsed ? "DBG" : "X";
+    }
+
+    private void ToggleSimulatedOffline()
+    {
+        if (_lobby == null)
+            _lobby = LobbyClient.Instance;
+        if (_lobby == null)
+            return;
+
+        _lobby.SetDebugSimulateOffline(!_lobby.DebugSimulateOffline);
+        ApplyOfflineToggleState();
+    }
+
+    private void ApplyOfflineToggleState()
+    {
+        if (_offlineToggleText == null)
+            return;
+
+        var enabled = _lobby != null && _lobby.DebugSimulateOffline;
+        _offlineToggleText.text = enabled ? "[x] NET OFF" : "[ ] NET OFF";
     }
 }

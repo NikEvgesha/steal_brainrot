@@ -16,6 +16,7 @@ public class GiftInboxUI : MonoBehaviour
 
     private GiftItemDto _current;
     private bool _inFlight;
+    private bool _autoAcceptInFlight;
 
     private void Awake()
     {
@@ -51,7 +52,7 @@ public class GiftInboxUI : MonoBehaviour
                 Hide();
             }
 
-            if (LobbyClient.Instance != null && LobbyClient.Instance.IsOnline && !_inFlight)
+            if (LobbyClient.Instance != null && LobbyClient.Instance.IsOnline && !_inFlight && !_autoAcceptInFlight)
             {
                 _inFlight = true;
                 List<GiftItemDto> list = null;
@@ -60,7 +61,16 @@ public class GiftInboxUI : MonoBehaviour
 
                 if (list != null && list.Count > 0)
                 {
-                    ShowGift(list[0]);
+                    var returnedGift = list.Find(g => g != null && g.isReturned);
+                    if (returnedGift != null)
+                    {
+                        Hide();
+                        StartCoroutine(AcceptReturnedGift(returnedGift));
+                    }
+                    else
+                    {
+                        ShowGift(list[0]);
+                    }
                 }
                 else
                 {
@@ -95,12 +105,14 @@ public class GiftInboxUI : MonoBehaviour
 
     private void OnAccept()
     {
+        if (_autoAcceptInFlight) return;
         if (_current == null) return;
         StartCoroutine(AcceptFlow(_current));
     }
 
     private void OnDecline()
     {
+        if (_autoAcceptInFlight) return;
         if (_current == null) return;
         StartCoroutine(DeclineFlow(_current));
     }
@@ -120,6 +132,21 @@ public class GiftInboxUI : MonoBehaviour
     {
         bool ok = false;
         yield return LobbyClient.Instance.DeclineGift(gift.giftId, v => ok = v);
+        Hide();
+    }
+
+    private IEnumerator AcceptReturnedGift(GiftItemDto gift)
+    {
+        if (LobbyClient.Instance == null || gift == null || string.IsNullOrWhiteSpace(gift.giftId))
+            yield break;
+
+        _autoAcceptInFlight = true;
+        GiftAcceptResponseDto resp = null;
+        yield return LobbyClient.Instance.AcceptGift(gift.giftId, r => resp = r);
+        if (resp != null && resp.ok)
+            SpawnGiftItem(resp.itemType, resp.itemId);
+
+        _autoAcceptInFlight = false;
         Hide();
     }
 

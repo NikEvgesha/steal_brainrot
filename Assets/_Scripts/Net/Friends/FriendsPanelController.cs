@@ -7,6 +7,8 @@ using UnityEngine.UI;
 
 public class FriendsPanelController : MonoBehaviour
 {
+    private static FriendsPanelController _instance;
+
     [Header("Refs")]
     private ZooBackendClient backend;
     private SaveManager save;
@@ -48,9 +50,18 @@ public class FriendsPanelController : MonoBehaviour
     [SerializeField] private Button _closeButton;
     [SerializeField] private Button _toggleButton;
     private Coroutine _openFlow;
+    private Coroutine _externalRefreshFlow;
     private bool _isOpen;
+
+    public static void RequestLiveRefresh()
+    {
+        if (_instance != null)
+            _instance.TryScheduleExternalRefresh();
+    }
+
     private void Awake()
     {
+        _instance = this;
         if (backend == null) backend = G.Backend;
         if (save == null) save = G.Save;
         if (api == null) api = G.Backend.FriendsApi;
@@ -73,6 +84,8 @@ public class FriendsPanelController : MonoBehaviour
         {
             if (_openFlow != null) StopCoroutine(_openFlow);
             _openFlow = null;
+            if (_externalRefreshFlow != null) StopCoroutine(_externalRefreshFlow);
+            _externalRefreshFlow = null;
         }
         else
         {
@@ -93,6 +106,17 @@ public class FriendsPanelController : MonoBehaviour
         G.Input.AFriends -= ToggleOpen;
         //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
         G.Input.AOpenWindow -= Close;
+        if (_externalRefreshFlow != null)
+        {
+            StopCoroutine(_externalRefreshFlow);
+            _externalRefreshFlow = null;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (_instance == this)
+            _instance = null;
     }
     private void OnGameInitialized()
     {
@@ -228,6 +252,7 @@ public class FriendsPanelController : MonoBehaviour
 
         addCodeInput.text = "";
         yield return RefreshFriends();
+        yield return RefreshRequests();
     }
 
     IEnumerator RemoveFriendFlow(string friendCode)
@@ -337,5 +362,31 @@ public class FriendsPanelController : MonoBehaviour
         for (int i = requestsContent.childCount - 1; i >= 0; i--)
             Destroy(requestsContent.GetChild(i).gameObject);
     }
-}
 
+    private void TryScheduleExternalRefresh()
+    {
+        if (!_isOpen || !isActiveAndEnabled || api == null)
+            return;
+
+        if (_externalRefreshFlow != null)
+            return;
+
+        _externalRefreshFlow = StartCoroutine(ExternalRefreshFlow());
+    }
+
+    private IEnumerator ExternalRefreshFlow()
+    {
+        yield return null;
+
+        if (!_isOpen || !isActiveAndEnabled || api == null)
+        {
+            _externalRefreshFlow = null;
+            yield break;
+        }
+
+        yield return api.PresencePing();
+        yield return RefreshFriends();
+        yield return RefreshRequests();
+        _externalRefreshFlow = null;
+    }
+}
