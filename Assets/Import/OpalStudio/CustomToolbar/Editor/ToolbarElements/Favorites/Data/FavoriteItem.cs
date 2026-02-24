@@ -67,7 +67,7 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.Favorites.Data
                               return !IsSceneLoaded() ? null : EditorUtility.EntityIdToObject(instanceID);
                               #pragma warning restore CS0618
 #else
-                              return !IsSceneLoaded() ? null : EditorUtility.InstanceIDToObject(instanceID);
+                              return !IsSceneLoaded() ? null : EditorUtility.EntityIdToObject(instanceID);
 #endif
 
                         default:

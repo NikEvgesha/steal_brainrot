@@ -330,8 +330,9 @@ public class BigPetPoint : MonoBehaviour
         if (_petInfoUI != null)
             _petInfoUI.UpdateIncome(_accumulatedIncome);
 
-        _lastIncomeCollectTimestamp = DateTime.UtcNow;
-        G.Save.SaveBigPetIncomeTime(_lastIncomeCollectTimestamp.ToString());
+        var nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        _lastIncomeCollectTimestamp = DateTimeOffset.FromUnixTimeSeconds(nowTs).UtcDateTime;
+        G.Save.SaveBigPetIncomeTime(nowTs.ToString(CultureInfo.InvariantCulture));
         if (_audio)
             _audio.Play();
     }
@@ -537,23 +538,58 @@ public class BigPetPoint : MonoBehaviour
 
         long incomeAccumulateTime;
         string timestamp = G.Save.LoadBigPetIncomeTime();
-        if (string.IsNullOrEmpty(timestamp))
+        var nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (!TryParseIncomeTimestamp(timestamp, out var lastCollectTs))
         {
-            incomeAccumulateTime = 0;
-            _lastIncomeCollectTimestamp = DateTime.UtcNow;
-            G.Save.SaveBigPetIncomeTime(_lastIncomeCollectTimestamp.ToString());
+            lastCollectTs = nowTs;
+            G.Save.SaveBigPetIncomeTime(lastCollectTs.ToString(CultureInfo.InvariantCulture));
         }
-        else
-        {
-            _lastIncomeCollectTimestamp = DateTime.Parse(timestamp);
-            incomeAccumulateTime = (long)(DateTime.UtcNow - _lastIncomeCollectTimestamp).TotalSeconds;
-        }
+
+        if (lastCollectTs > nowTs)
+            lastCollectTs = nowTs;
+
+        _lastIncomeCollectTimestamp = DateTimeOffset.FromUnixTimeSeconds(lastCollectTs).UtcDateTime;
+        incomeAccumulateTime = Math.Max(0L, nowTs - lastCollectTs);
 
         _accumulatedIncome = Math.Max(0d, incomeAccumulateTime * _currentIncome);
         if (_petInfoUI != null)
+        {
             _petInfoUI.UpdateIncome(_accumulatedIncome);
+            if (incomeAccumulateTime > 0)
+                _petInfoUI.UpdateOfflineIncome(_accumulatedIncome);
+        }
 
         EnsureIncomeRoutine();
+    }
+
+    private static bool TryParseIncomeTimestamp(string raw, out long timestamp)
+    {
+        timestamp = 0;
+        if (string.IsNullOrWhiteSpace(raw))
+            return false;
+
+        if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out timestamp))
+            return true;
+
+        if (DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dto))
+        {
+            timestamp = dto.ToUnixTimeSeconds();
+            return true;
+        }
+
+        if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dtInvariant))
+        {
+            timestamp = new DateTimeOffset(dtInvariant.ToUniversalTime()).ToUnixTimeSeconds();
+            return true;
+        }
+
+        if (DateTime.TryParse(raw, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out var dtCurrent))
+        {
+            timestamp = new DateTimeOffset(dtCurrent.ToUniversalTime()).ToUnixTimeSeconds();
+            return true;
+        }
+
+        return false;
     }
 
     private void PrepareLockedState()
@@ -635,4 +671,3 @@ public class BigPetPoint : MonoBehaviour
         _quickAccessBound = false;
     }
 }
-

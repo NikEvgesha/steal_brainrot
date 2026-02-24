@@ -65,21 +65,19 @@ public class Brainrot : InventoryItem
         _canvas.transform.localScale = scale;
 
         _dinamicData.ResultIncome = Math.Round(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
-        long incomeAccumulationTime;
-        if (lastCollectTimestamp == -1)
-        {
-            _lastIncomeTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            incomeAccumulationTime = 0;
-        }
-        else
-        {
-            _lastIncomeTime = lastCollectTimestamp;
-            incomeAccumulationTime = (long)(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(lastCollectTimestamp)).TotalSeconds;
-        }
-        _currentIncome = Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome);
+        var nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var effectiveLastIncomeTs = lastCollectTimestamp > 0 ? lastCollectTimestamp : nowTs;
+        if (effectiveLastIncomeTs > nowTs)
+            effectiveLastIncomeTs = nowTs;
+
+        _lastIncomeTime = effectiveLastIncomeTs;
+        var incomeAccumulationTime = Math.Max(0L, nowTs - effectiveLastIncomeTs);
+        _currentIncome = Math.Max(0d, Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome));
         if (floor != null)
             NewPlace(floor);
         _canvas.SetInfo(_data, _dinamicData);
+        if (incomeAccumulationTime > 0)
+            _canvas.UpdateOfflineIncome(_currentIncome);
         SetTypeVisual();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
     }
@@ -133,7 +131,8 @@ public class Brainrot : InventoryItem
         _floorListener.PlayerEnter.RemoveListener(PlayerInPlace);
         _floorListener.TakeBrainrot.RemoveListener(TakeBrainrot);
         _floorListener.UpdateFieldItem(Item.Free);
-        StopCoroutine(_incomeCorutine);
+        if (_incomeCorutine != null)
+            StopCoroutine(_incomeCorutine);
         _incomeCorutine = null;
         G.Inventory.Add(this);
         //TestBackpackBrainrot.Instance.TakeBrainrot(this);

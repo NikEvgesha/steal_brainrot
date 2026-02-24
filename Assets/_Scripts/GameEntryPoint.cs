@@ -29,7 +29,7 @@ public class GameEntryPoint : MonoBehaviour
 
         if (G.Backend == null && _backend != null)
             Instantiate(_backend);
-        new GameObject("LobbyDebugPanel").AddComponent<LobbyDebugPanel>();
+        LobbyDebugPanel.EnsureExists();
 
         G.Initialized?.Invoke();
         //_scene.SetActive(true);

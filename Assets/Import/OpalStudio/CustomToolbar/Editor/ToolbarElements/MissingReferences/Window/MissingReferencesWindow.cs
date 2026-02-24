@@ -360,7 +360,7 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                                     var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
                                     #pragma warning restore CS0618
 #else
-                                    var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+                                    var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
 #endif
 
                                     if (go)
@@ -421,7 +421,7 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements.MissingReferences.Wind
                               var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
                               #pragma warning restore CS0618
 #else
-                              var go = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+                              var go = EditorUtility.EntityIdToObject(instanceId) as GameObject;
 #endif
 
                               if (go && RemoveMissingScriptFromObject(go))

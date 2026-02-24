@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -135,17 +136,31 @@ public class CurrencyManager : MonoBehaviour
 
     public String ToString(double amount)
     {
-        double res = amount;
-        int abbrId = 0;
-        while (res >= 1000)
+        if (double.IsNaN(amount) || double.IsInfinity(amount))
+            return "0";
+
+        var negative = amount < 0d;
+        var value = Math.Abs(amount);
+
+        if (_amountAbbreviation == null || _amountAbbreviation.Count == 0)
         {
-            res = res / 1000;
+            var fallback = value.ToString("0.##", CultureInfo.InvariantCulture);
+            return negative && fallback != "0" ? "-" + fallback : fallback;
+        }
+
+        var abbrId = 0;
+        while (value >= 1000d && abbrId < _amountAbbreviation.Count - 1)
+        {
+            value /= 1000d;
             abbrId++;
         }
 
-        string s = $"{res:F2}".Substring(0, 4).TrimEnd('0').TrimEnd(',') + _amountAbbreviation[abbrId];
-        return s;
+        var format = value >= 100d ? "0" : value >= 10d ? "0.#" : "0.##";
+        var numeric = value.ToString(format, CultureInfo.InvariantCulture);
+        if (negative && numeric != "0")
+            numeric = "-" + numeric;
 
+        return numeric + _amountAbbreviation[abbrId];
     }
     
 }
