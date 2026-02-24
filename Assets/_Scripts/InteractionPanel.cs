@@ -12,17 +12,24 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [SerializeField] private Text _priceText;
     [SerializeField] private Text _actionText;
     [SerializeField] private float _speed = 1f;
+    [SerializeField] public UnityEvent InteractionStarted;
     [SerializeField] public UnityEvent InteractionComplete;
 
     private float _progress;
     private bool _interactionInProgress;
     private bool _interactionHold;
+    private bool _pointerHold;
     private LocalizedText _actionLocalizedText;
     private LocalizedText _priceLocalizedText;
+
+    public bool IsInteracting => _interactionInProgress;
 
     
     private void Awake()
     {
+        InteractionStarted ??= new UnityEvent();
+        InteractionComplete ??= new UnityEvent();
+
         if (_actionText != null)
         {
             _actionLocalizedText = _actionText.GetComponent<LocalizedText>();
@@ -50,24 +57,26 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     {
         ResetProgress();
         _interactionHold = false;
+        _pointerHold = false;
         StopAllCoroutines();
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        _pointerHold = true;
         _interactionHold = true;
         StartInteraction();
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        _interactionHold = false;
+        _pointerHold = false;
     }
 
 
     private void Update()
     {
-        _interactionHold = G.Input.InteractionHold;
+        _interactionHold = _pointerHold || G.Input.InteractionHold;
         if (_interactionInProgress) return;
 
         if (G.Input.Interaction)
@@ -77,8 +86,12 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     }
     private void StartInteraction()
     {
+        if (_interactionInProgress)
+            return;
+
         _interactionInProgress = true;
         _progress = 0;
+        InteractionStarted?.Invoke();
         StartCoroutine(InteractionProcess());
     }
 

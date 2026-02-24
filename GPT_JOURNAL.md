@@ -88,3 +88,15 @@
   - Серверный `LobbyHandItem` расширен до `type,id,element,weight,income`, чтобы удаленно отображалось качество животного/яйца в руках игрока.
   - Выдача спавн-слота при новом входе в лобби переведена с hash-based на random preferred slot.
   - Проверено на проде: `hand` с метаданными читается вторым игроком, slot на последовательных join/leave меняется.
+
+### 2026-02-24
+- Закрыт дефект "сбрасывается нажатие" в gift-interaction:
+  - `InteractionPanel` получил `InteractionStarted` + `IsInteracting`.
+  - Добавлен lock действия/предмета в `RemoteFriendBoard` на старте удержания, чтобы дрожание raycast/смена `CurrentActive` не отменяли отправку.
+  - Для touch/pointer удержание больше не перетирается каждым кадром `G.Input.InteractionHold` (введен `_pointerHold`).
+- Закрыт дефект "при отказе подарок не возвращается":
+  - Сервер `/gifts/decline` теперь создает новый `PendingGift` обратно отправителю.
+  - Ответ `GiftDeclineResponse` расширен полями `returnedGiftId` и `returnedToPlayerId`.
+- Что осталось:
+  - Обязательный smoke 2 игрока: `send -> pending -> decline -> sender pending -> accept` для `egg/brainrot/food`.
+  - Проверить UX-обратную связь при неуспешной отправке (сейчас клиент возвращает только bool без детализации ошибки).

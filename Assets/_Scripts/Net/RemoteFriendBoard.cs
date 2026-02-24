@@ -46,6 +46,8 @@ public class RemoteFriendBoard : MonoBehaviour
     private string playerId;
     private PlayerPublicStatsDto stats = new();
     private bool requestInFlight;
+    private BoardAction _lockedAction = BoardAction.None;
+    private InventoryItem _lockedGiftItem;
 
     public InteractionPanel InteractionPanel => interactionPanel;
 
@@ -69,6 +71,7 @@ public class RemoteFriendBoard : MonoBehaviour
         UnsubscribeInteraction();
         UnsubscribeHand();
         BindRaycastListener(null);
+        ClearInteractionLock();
         HidePanel();
     }
 
@@ -166,6 +169,9 @@ public class RemoteFriendBoard : MonoBehaviour
     public void OnRaycastFail()
     {
         _isFocused = false;
+        if (IsPanelInteracting())
+            return;
+
         if (_isInTriggerArea)
         {
             UpdatePanel();
@@ -200,12 +206,15 @@ public class RemoteFriendBoard : MonoBehaviour
         if (!allowTriggerFallback) return;
         if (!other.CompareTag("Player")) return;
         _isInTriggerArea = false;
-        if (!_isFocused)
+        if (!_isFocused && !IsPanelInteracting())
             HidePanel();
     }
 
     private void OnHandChanged(InventoryItem _)
     {
+        if (IsPanelInteracting())
+            return;
+
         UpdatePanel();
     }
 
@@ -214,13 +223,16 @@ public class RemoteFriendBoard : MonoBehaviour
         if (interactionPanel == null)
             return;
 
-        if (!_hasRemoteData || !HasFocus())
+        var panelInteracting = IsPanelInteracting();
+        if (!_hasRemoteData || (!HasFocus() && !panelInteracting))
         {
             HidePanel();
             return;
         }
 
-        var action = ResolveAction();
+        var action = panelInteracting && _lockedAction != BoardAction.None
+            ? _lockedAction
+            : ResolveAction();
         var canInteract = action != BoardAction.None;
         var actionLabel = GetActionLabel(action);
 
@@ -240,14 +252,18 @@ public class RemoteFriendBoard : MonoBehaviour
     private void OnInteract()
     {
         if (requestInFlight) return;
-        var action = ResolveAction();
+
+        var action = ConsumeLockedAction(out var capturedGiftItem);
+        if (action == BoardAction.None)
+            action = ResolveAction();
+
         switch (action)
         {
             case BoardAction.Gift:
                 if (!isOnline) return;
                 if (string.IsNullOrWhiteSpace(playerId)) return;
                 if (LobbyClient.Instance == null) return;
-                StartCoroutine(SendGift());
+                StartCoroutine(SendGift(capturedGiftItem));
                 break;
             case BoardAction.AddFriend:
                 if (!isOnline) return;
@@ -306,14 +322,14 @@ public class RemoteFriendBoard : MonoBehaviour
         UpdatePanel();
     }
 
-    private IEnumerator SendGift()
+    private IEnumerator SendGift(InventoryItem capturedItem)
     {
         requestInFlight = true;
         UpdatePanel();
 
         bool ok = false;
 
-        var current = G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
+        var current = capturedItem != null ? capturedItem : GetCurrentGiftCandidate();
         if (current == null)
         {
             requestInFlight = false;
@@ -321,10 +337,7 @@ public class RemoteFriendBoard : MonoBehaviour
             yield break;
         }
 
-        var itemType = current.Type == Item.Egg ? "egg" :
-            current.Type == Item.Brainrot ? "brainrot" :
-            current.Type == Item.Food ? "food" : null;
-        if (string.IsNullOrEmpty(itemType))
+        if (!TryResolveGiftItemType(current, out var itemType))
         {
             requestInFlight = false;
             UpdatePanel();
@@ -347,9 +360,39 @@ public class RemoteFriendBoard : MonoBehaviour
 
     private bool CanGiftFromHand()
     {
-        var current = G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
-        if (current == null) return false;
-        return current.Type == Item.Egg || current.Type == Item.Brainrot || current.Type == Item.Food;
+        return TryResolveGiftItemType(GetCurrentGiftCandidate(), out _);
+    }
+
+    private static bool TryResolveGiftItemType(InventoryItem item, out string itemType)
+    {
+        itemType = null;
+        if (item == null)
+            return false;
+
+        if (item.Type == Item.Egg)
+        {
+            itemType = "egg";
+            return true;
+        }
+
+        if (item.Type == Item.Brainrot)
+        {
+            itemType = "brainrot";
+            return true;
+        }
+
+        if (item.Type == Item.Food)
+        {
+            itemType = "food";
+            return true;
+        }
+
+        return false;
+    }
+
+    private InventoryItem GetCurrentGiftCandidate()
+    {
+        return G.QuickAccess != null ? G.QuickAccess.CurrentActive : null;
     }
 
     private static string BuildGiftItemPayload(InventoryItem item, string itemType)
@@ -421,11 +464,43 @@ public class RemoteFriendBoard : MonoBehaviour
         return _isFocused || _isInTriggerArea;
     }
 
+    private bool IsPanelInteracting()
+    {
+        return interactionPanel != null && interactionPanel.IsInteracting;
+    }
+
+    private void OnInteractionStarted()
+    {
+        if (requestInFlight)
+        {
+            ClearInteractionLock();
+            return;
+        }
+
+        _lockedAction = ResolveAction();
+        _lockedGiftItem = _lockedAction == BoardAction.Gift ? GetCurrentGiftCandidate() : null;
+    }
+
+    private BoardAction ConsumeLockedAction(out InventoryItem capturedGiftItem)
+    {
+        capturedGiftItem = _lockedGiftItem;
+        var action = _lockedAction;
+        ClearInteractionLock();
+        return action;
+    }
+
+    private void ClearInteractionLock()
+    {
+        _lockedAction = BoardAction.None;
+        _lockedGiftItem = null;
+    }
+
     private void SubscribeInteraction()
     {
         if (interactionPanel == null)
             return;
 
+        interactionPanel.InteractionStarted.AddListener(OnInteractionStarted);
         interactionPanel.InteractionComplete.AddListener(OnInteract);
     }
 
@@ -434,6 +509,7 @@ public class RemoteFriendBoard : MonoBehaviour
         if (interactionPanel == null)
             return;
 
+        interactionPanel.InteractionStarted.RemoveListener(OnInteractionStarted);
         interactionPanel.InteractionComplete.RemoveListener(OnInteract);
     }
 
@@ -620,4 +696,3 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         return fallback;
     }
 }
-
