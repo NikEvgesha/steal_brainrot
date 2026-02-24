@@ -61,7 +61,7 @@ public class LobbyDebugPanel : MonoBehaviour
             $"Lobby: {(_lobby.IsOnline ? _lobby.LobbyId : "offline")}",
             $"PlayerId: {pid}",
             $"FriendCode: {code}",
-            $"Members: {_lobby.LastMembers.Count}"
+            $"Members: {_lobby.LastMembers.Count} (online: {CountOnlineMembers(_lobby.LastMembers)})"
         };
 
         foreach (var m in _lobby.LastMembers)
@@ -73,6 +73,21 @@ public class LobbyDebugPanel : MonoBehaviour
         }
 
         _text.text = string.Join("\n", lines);
+    }
+
+    private static int CountOnlineMembers(IReadOnlyList<LobbyMemberStateDto> members)
+    {
+        if (members == null)
+            return 0;
+
+        var count = 0;
+        for (int i = 0; i < members.Count; i++)
+        {
+            if (members[i] != null && members[i].isOnline)
+                count++;
+        }
+
+        return count;
     }
 
     private void CreateUI()

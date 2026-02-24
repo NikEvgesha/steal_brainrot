@@ -606,8 +606,15 @@ public class LobbyClient : MonoBehaviour
                     break;
 
                 case "error":
+                    var code = obj["code"]?.ToString();
+                    if (code == "not_in_lobby")
+                    {
+                        HandleWsNotInLobby();
+                        break;
+                    }
+
                     if (webSocketDebugLogs)
-                        Debug.LogWarning($"[LobbyWS] server error: {obj["code"]} {obj["message"]}");
+                        Debug.LogWarning($"[LobbyWS] server error: {code} {obj["message"]}");
                     break;
 
                 case "left":
@@ -1852,6 +1859,15 @@ public class LobbyClient : MonoBehaviour
         _stateRecoverInProgress = false;
     }
 
+    private void HandleWsNotInLobby()
+    {
+        if (!IsOnline)
+            return;
+
+        Debug.LogWarning("[Lobby] WS reported not_in_lobby. Switching offline to trigger rejoin.");
+        DisableOnline("ws_not_in_lobby");
+    }
+
     private void ParseMembers(JArray arr)
     {
         var collectTraffic = debugTrafficLogs;
@@ -1861,6 +1877,7 @@ public class LobbyClient : MonoBehaviour
 
         _lastMembers.Clear();
         var localId = GetLocalPlayerId();
+        var seenMemberIds = new HashSet<string>();
         var seenRemoteIds = new HashSet<string>();
         if (arr != null)
         {
@@ -1871,6 +1888,8 @@ public class LobbyClient : MonoBehaviour
                     continue;
 
                 var item = ParseMemberFast(obj);
+                if (!string.IsNullOrEmpty(item.playerId) && !seenMemberIds.Add(item.playerId))
+                    continue;
                 var isLocalMember = !string.IsNullOrEmpty(localId) && item.playerId == localId;
                 var baseToken = obj["baseData"];
                 if (!isLocalMember && baseToken != null && baseToken.Type != JTokenType.Null)
@@ -1911,7 +1930,7 @@ public class LobbyClient : MonoBehaviour
                         item.baseData = cachedSnapshot;
                 }
 
-                if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
+                if (!isLocalMember && item.isOnline && !string.IsNullOrEmpty(item.playerId))
                     seenRemoteIds.Add(item.playerId);
 
                 _lastMembers.Add(item);

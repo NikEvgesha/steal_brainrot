@@ -61,6 +61,7 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool syncOnlyNearSlots = true;
     [SerializeField] private float syncDistanceMeters = 100f;
     [SerializeField] private float syncDistanceHysteresisMeters = 2f;
+    [SerializeField] private bool renderRemotePlayersOutsideBaseSyncRange = true;
     [Header("Debug")]
     [SerializeField] private bool debugLogs = false;
     [SerializeField] private bool testCloneLocalToRandomSlot = false;
@@ -424,6 +425,7 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
                 if (localMember != null && m.playerId == localMember.playerId) continue;
+                if (!m.isOnline) continue;
                 remoteMembersCount++;
             }
         }
@@ -435,6 +437,8 @@ public class RemoteBasesApplier : MonoBehaviour
             foreach (var m in members)
             {
                 if (m == null || string.IsNullOrEmpty(m.playerId)) continue;
+                if (!string.Equals(m.playerId, localId, StringComparison.Ordinal) && !m.isOnline)
+                    continue;
                 var slotIndex = m.slotIndex;
                 if (slotIndex < 0 || slotIndex >= slots.Count)
                     slotIndex = FindSlotForPlayer(m.playerId);
@@ -490,8 +494,9 @@ public class RemoteBasesApplier : MonoBehaviour
                 if (!inSyncRange)
                 {
                     UpdateChestLobby(slots[i], null);
-                    UpdateFriendBoardLobby(slots[i], null);
-                    ShowSlotBaselineVisual(i, forceSnapshotRefresh: true);
+                    if (!renderRemotePlayersOutsideBaseSyncRange)
+                        UpdateFriendBoardLobby(slots[i], null);
+                    ShowSlotBaselineVisual(i, forceSnapshotRefresh: true, keepRemotePlayer: renderRemotePlayersOutsideBaseSyncRange);
                     continue;
                 }
 
@@ -614,7 +619,7 @@ public class RemoteBasesApplier : MonoBehaviour
         return near;
     }
 
-    private void ShowSlotBaselineVisual(int slotIndex, bool forceSnapshotRefresh)
+    private void ShowSlotBaselineVisual(int slotIndex, bool forceSnapshotRefresh, bool keepRemotePlayer = false)
     {
         if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
             return;
@@ -629,7 +634,8 @@ public class RemoteBasesApplier : MonoBehaviour
             slot.root.gameObject.SetActive(true);
 
         ApplySlotMode(slotIndex, true);
-        DisableRemotePlayer(slotIndex);
+        if (!keepRemotePlayer)
+            DisableRemotePlayer(slotIndex);
 
         if (_slotWithinSyncRange != null && slotIndex < _slotWithinSyncRange.Length)
             _slotWithinSyncRange[slotIndex] = false;
