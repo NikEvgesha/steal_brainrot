@@ -92,6 +92,8 @@ public class RemoteBasesApplier : MonoBehaviour
     private bool _suppressNextAutoTeleport;
     private Coroutine _waitForSaveReadyRoutine;
     private int _pendingLocalRestoreSlotIndex = -1;
+    private bool _hasServerResolvedLocalSlot;
+    private bool _forceLocalRestoreOnNextResolve = true;
 
     private void Awake()
     {
@@ -159,6 +161,8 @@ public class RemoteBasesApplier : MonoBehaviour
         _playerToSlot.Clear();
         _lobbyModeActive = true;
         _didInitialFullLobbySync = false;
+        _hasServerResolvedLocalSlot = false;
+        _forceLocalRestoreOnNextResolve = true;
         var localSlotIndex = GetLocalSlotIndex();
 
         for (int i = 0; i < slots.Count; i++)
@@ -374,6 +378,8 @@ public class RemoteBasesApplier : MonoBehaviour
             _lastPreparedLocalSlotIndex = -1;
             _lastTeleportedSlotIndex = -2;
             _lastTeleportedPlayerId = null;
+            _hasServerResolvedLocalSlot = false;
+            _forceLocalRestoreOnNextResolve = true;
         }
         var previousServerLocalSlotIndex = _serverLocalSlotIndex;
         var resolvedServerLocalSlotIndex = -1;
@@ -423,10 +429,12 @@ public class RemoteBasesApplier : MonoBehaviour
         if (!hasResolvedLocalSlot)
         {
             // Avoid switching every slot into remote mode when local player id is still bootstrapping.
+            _hasServerResolvedLocalSlot = false;
             if (debugLogs)
                 Debug.LogWarning("[Lobby] local slot unresolved, skip apply.");
             return;
         }
+        _hasServerResolvedLocalSlot = true;
 
         if (debugLogs && localMember != null)
             Debug.Log($"[Lobby] local slotIndex={_serverLocalSlotIndex}");
@@ -474,14 +482,20 @@ public class RemoteBasesApplier : MonoBehaviour
 
                 DisableRemotePlayer(i);
                 ApplySlotMode(i, false);
-                var needsRestore = _lastPreparedLocalSlotIndex != i;
+                var needsRestore = _forceLocalRestoreOnNextResolve || _lastPreparedLocalSlotIndex != i;
 
                 if (needsRestore)
                 {
                     if (RestoreLocalSlotFromSave(i))
+                    {
                         _lastPreparedLocalSlotIndex = i;
+                        _forceLocalRestoreOnNextResolve = false;
+                    }
                     else
+                    {
                         _lastPreparedLocalSlotIndex = -1;
+                        _forceLocalRestoreOnNextResolve = true;
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(localId))
@@ -654,7 +668,15 @@ public class RemoteBasesApplier : MonoBehaviour
             yield break;
 
         if (RestoreLocalSlotFromSave(slotIndex))
+        {
             _lastPreparedLocalSlotIndex = slotIndex;
+            _forceLocalRestoreOnNextResolve = false;
+        }
+        else
+        {
+            _lastPreparedLocalSlotIndex = -1;
+            _forceLocalRestoreOnNextResolve = true;
+        }
     }
 
     private bool IsSlotInSyncRange(int slotIndex)
@@ -1807,9 +1829,13 @@ public class RemoteBasesApplier : MonoBehaviour
         root = null;
         if (slots == null || slots.Count == 0)
             return false;
+        if (!_hasServerResolvedLocalSlot)
+            return false;
 
         var idx = _serverLocalSlotIndex;
         if (idx < 0 || idx >= slots.Count)
+            return false;
+        if (_lastPreparedLocalSlotIndex != idx)
             return false;
 
         var slot = slots[idx];
