@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 #if !UNITY_WEBGL || UNITY_EDITOR
 using System.IO;
 using System.Net.WebSockets;
@@ -127,6 +128,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
     [Header("Debug Network")]
     [SerializeField] private bool debugSimulateOffline = false;
+    [SerializeField] private float remoteMemberStaleOfflineSec = 7f;
     [Header("WebSocket (pilot)")]
     [SerializeField] private bool useWebSocketLobby = true;
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
@@ -1939,6 +1941,10 @@ public class LobbyClient : MonoBehaviour
                 if (!string.IsNullOrEmpty(item.playerId) && !seenMemberIds.Add(item.playerId))
                     continue;
                 var isLocalMember = !string.IsNullOrEmpty(localId) && item.playerId == localId;
+
+                if (!isLocalMember && item.isOnline && IsRemoteMemberStale(item.updatedAt))
+                    item.isOnline = false;
+
                 var baseToken = obj["baseData"];
                 if (!isLocalMember && baseToken != null && baseToken.Type != JTokenType.Null)
                 {
@@ -2059,6 +2065,47 @@ public class LobbyClient : MonoBehaviour
         }
 
         return item;
+    }
+
+    private bool IsRemoteMemberStale(string updatedAt)
+    {
+        if (remoteMemberStaleOfflineSec <= 0f)
+            return false;
+
+        if (!TryParseServerUtc(updatedAt, out var updatedUtc))
+            return false;
+
+        var ageSec = (DateTime.UtcNow - updatedUtc).TotalSeconds;
+        return ageSec > remoteMemberStaleOfflineSec;
+    }
+
+    private static bool TryParseServerUtc(string value, out DateTime utc)
+    {
+        utc = default;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        if (DateTimeOffset.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var dto))
+        {
+            utc = dto.UtcDateTime;
+            return true;
+        }
+
+        if (DateTime.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var dt))
+        {
+            utc = dt.ToUniversalTime();
+            return true;
+        }
+
+        return false;
     }
 
     private void ResetErrors()

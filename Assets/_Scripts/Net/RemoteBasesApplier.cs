@@ -145,8 +145,8 @@ public class RemoteBasesApplier : MonoBehaviour
             _teleportRoutine = null;
         }
 
-        _lastTeleportedSlotIndex = -2;
-        _lastTeleportedPlayerId = null;
+        // Keep last teleport markers across temporary offline/reconnect.
+        // This prevents unnecessary snap-back to base when the same player rejoins the same slot.
         _playerToSlot.Clear();
         _lobbyModeActive = true;
         _didInitialFullLobbySync = false;

@@ -159,3 +159,12 @@
 - Unity Bridge проверен на реальных операциях иерархии:
   - `execute` починен под macOS/Unity 6000 (поиск компилятора в `Contents/Resources/Scripting/...`, поддержка `mono + csc.exe` и `dotnet + csc.dll`),
   - подтверждены read/write операции через bridge (scene-hierarchy smoke и prefab-check на `GameCanvas/YenOrNot`).
+
+### 2026-02-25 (по результатам smoke 1/2/3/4 от пользователя)
+- От пользователя: сценарии 1/2 прошли; в 3/4 остались два дефекта:
+  - у второго клиента оффлайн-игрок продолжает отображаться как online,
+  - при возврате сети оффлайн-клиента иногда телепортирует к базе.
+- Внесены доработки:
+  - `LobbyClient.ParseMembers(...)`: добавлен stale-offline фильтр для remote members по `updatedAt` (`remoteMemberStaleOfflineSec`, default 7s). Если timestamp старее порога, member локально переводится в offline, что очищает remote-slot/remote-player на клиенте наблюдателя.
+  - `RemoteBasesApplier.ApplyOfflineLocalOnly()`: сохранены маркеры последнего телепорта (не сбрасываются на каждый offline), чтобы reconnect в тот же слот не делал лишний snap-back к базе.
+- Статус: требуется повторный smoke на сценарии 3/4 (`NET OFF` 20-30s + возврат) для подтверждения.
