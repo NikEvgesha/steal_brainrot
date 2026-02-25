@@ -162,8 +162,14 @@ public class RemoteBasesApplier : MonoBehaviour
         _lobbyModeActive = true;
         _didInitialFullLobbySync = false;
         _hasServerResolvedLocalSlot = false;
-        _forceLocalRestoreOnNextResolve = true;
         var localSlotIndex = GetLocalSlotIndex();
+        var keepPreparedLocalVisual =
+            localSlotIndex >= 0 &&
+            localSlotIndex == _lastPreparedLocalSlotIndex &&
+            _slotModeState != null &&
+            localSlotIndex < _slotModeState.Length &&
+            _slotModeState[localSlotIndex] == 0;
+        _forceLocalRestoreOnNextResolve = !keepPreparedLocalVisual;
 
         for (int i = 0; i < slots.Count; i++)
         {
@@ -177,10 +183,13 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 slot.root.gameObject.SetActive(true);
                 ApplySlotMode(i, false);
-                if (RestoreLocalSlotFromSave(i))
-                    _lastPreparedLocalSlotIndex = i;
-                else
-                    _lastPreparedLocalSlotIndex = -1;
+                if (!keepPreparedLocalVisual)
+                {
+                    if (RestoreLocalSlotFromSave(i))
+                        _lastPreparedLocalSlotIndex = i;
+                    else
+                        _lastPreparedLocalSlotIndex = -1;
+                }
                 if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
                     _slotWithinSyncRange[i] = true;
                 continue;
