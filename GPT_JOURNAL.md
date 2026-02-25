@@ -264,3 +264,17 @@
 - Цель:
   - убрать состояние «всё не покупается» из-за ошибочного remote-режима локального слота;
   - убрать частичную загрузку зон из-за рассинхрона field-id.
+
+### 2026-02-25 (rollback hotfix после регрессии)
+- По живому логу пользователя с ошибкой:
+  - `Coroutine couldn't be started because the game object ... is inactive`
+  - стек: `FieldManager.ReloadFromSave -> Field.ReloadFromSaveState -> FieldCell.SetLoadedData -> Brainrot.NewPlace`.
+- Исправление:
+  - `FieldManager` теперь загружает `CellSaveData` только для **разблокированных** полей;
+  - для заблокированных полей выполняется только очистка runtime-актеров (`Field.ClearLoadedActors`), без `SetLoadedData`;
+  - в `InitFields` убран автозапуск загрузки для заблокированных полей.
+- Сопутствующее:
+  - откатан fallback-local-slot из `RemoteBasesApplier` (возвращен безопасный `skip apply` до резолва local slot), чтобы не загонять локальный слот в ошибочный режим.
+- Ожидаемый эффект:
+  - исчезают исключения/ошибки на загрузке питомцев в неактивных полях;
+  - возвращается обычная работа молотка и локальных интеракций.

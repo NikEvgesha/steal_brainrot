@@ -113,6 +113,17 @@ public class Field : MonoBehaviour
         }
     }
 
+    public void ClearLoadedActors()
+    {
+        EnsureCells();
+        foreach (var cell in _cells)
+        {
+            if (cell == null)
+                continue;
+            cell.ClearLoadedActors();
+        }
+    }
+
     public void AssignIdsForRemote(int id)
     {
         _id = id;

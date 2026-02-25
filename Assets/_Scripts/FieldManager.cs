@@ -42,8 +42,12 @@ public class FieldManager : MonoBehaviour
 
                 field.SetID(fieldId);
                 field.SetRemoteMode(false);
-                field.SetUnblockedVisual(G.Save.LoadFieldUnblockStatus(fieldId));
-                field.ReloadFromSaveState();
+                var isUnblocked = G.Save.LoadFieldUnblockStatus(fieldId);
+                field.SetUnblockedVisual(isUnblocked);
+                if (isUnblocked)
+                    field.ReloadFromSaveState();
+                else
+                    field.ClearLoadedActors();
                 fieldId++;
             }
         }
@@ -63,12 +67,12 @@ public class FieldManager : MonoBehaviour
                 if (x == null) { fieldId++; return; }
                 x.SetID(fieldId);
                 x.Init();
-                if (G.Save.LoadFieldUnblockStatus(fieldId))
-                {
-                    x.Unblock();
-                    
-                }
-                x.LoadData();
+                var isUnblocked = G.Save.LoadFieldUnblockStatus(fieldId);
+                x.SetUnblockedVisual(isUnblocked);
+                if (isUnblocked)
+                    x.LoadData();
+                else
+                    x.ClearLoadedActors();
                 fieldId++;
             });
         }

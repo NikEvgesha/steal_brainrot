@@ -422,10 +422,10 @@ public class RemoteBasesApplier : MonoBehaviour
         var hasResolvedLocalSlot = _serverLocalSlotIndex >= 0 && _serverLocalSlotIndex < slots.Count;
         if (!hasResolvedLocalSlot)
         {
-            // Keep a deterministic local fallback slot while profile id is still bootstrapping.
-            _serverLocalSlotIndex = Mathf.Clamp(GetLocalSlotIndex(), 0, slots.Count - 1);
+            // Avoid switching every slot into remote mode when local player id is still bootstrapping.
             if (debugLogs)
-                Debug.LogWarning($"[Lobby] local slot unresolved, fallback={_serverLocalSlotIndex}");
+                Debug.LogWarning("[Lobby] local slot unresolved, skip apply.");
+            return;
         }
 
         if (debugLogs && localMember != null)
@@ -1747,10 +1747,8 @@ public class RemoteBasesApplier : MonoBehaviour
             if (slots[i].isLocalSlot) return i;
         }
         var localId = GetLocalPlayerId();
-        if (!string.IsNullOrEmpty(localId))
-            return PreferredSlotIndex(localId);
-
-        return slots.Count > 0 ? 0 : -1;
+        if (string.IsNullOrEmpty(localId)) return -1;
+        return PreferredSlotIndex(localId);
     }
 
     private bool IsLocalSlotIndex(int index)
