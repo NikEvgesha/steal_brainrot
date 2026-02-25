@@ -128,7 +128,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
     [Header("Debug Network")]
     [SerializeField] private bool debugSimulateOffline = false;
-    [SerializeField] private float remoteMemberStaleOfflineSec = 15f;
+    [SerializeField] private float remoteMemberStaleOfflineSec = 30f;
     [Header("WebSocket (pilot)")]
     [SerializeField] private bool useWebSocketLobby = true;
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
@@ -247,6 +247,12 @@ public class LobbyClient : MonoBehaviour
         {
             Debug.LogWarning($"[Lobby] maxState404BeforeRecover={maxState404BeforeRecover} is too high, forcing 3");
             maxState404BeforeRecover = 3;
+        }
+
+        if (remoteMemberStaleOfflineSec < 30f)
+        {
+            Debug.LogWarning($"[Lobby] remoteMemberStaleOfflineSec={remoteMemberStaleOfflineSec} is too low, forcing 30");
+            remoteMemberStaleOfflineSec = 30f;
         }
     }
 
