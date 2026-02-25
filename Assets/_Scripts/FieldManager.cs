@@ -42,7 +42,7 @@ public class FieldManager : MonoBehaviour
 
                 field.SetID(fieldId);
                 field.SetRemoteMode(false);
-                var isUnblocked = G.Save.LoadFieldUnblockStatus(fieldId);
+                var isUnblocked = field.DefaultUnblocked || G.Save.LoadFieldUnblockStatus(fieldId);
                 field.SetUnblockedVisual(isUnblocked);
                 if (isUnblocked)
                     field.ReloadFromSaveState();
@@ -67,7 +67,7 @@ public class FieldManager : MonoBehaviour
                 if (x == null) { fieldId++; return; }
                 x.SetID(fieldId);
                 x.Init();
-                var isUnblocked = G.Save.LoadFieldUnblockStatus(fieldId);
+                var isUnblocked = x.DefaultUnblocked || G.Save.LoadFieldUnblockStatus(fieldId);
                 x.SetUnblockedVisual(isUnblocked);
                 if (isUnblocked)
                     x.LoadData();

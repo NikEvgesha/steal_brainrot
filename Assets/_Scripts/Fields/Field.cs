@@ -16,6 +16,8 @@ public class Field : MonoBehaviour
     private BuyTouchHandler _touchHandler;
     private int _id;
     private bool _initialized;
+    private bool _defaultCaptured;
+    private bool _defaultUnblocked;
 
     public int ID => _id;
     
@@ -24,6 +26,7 @@ public class Field : MonoBehaviour
     public void Init()
     {
         if (_initialized) return;
+        CaptureDefaultStateIfNeeded();
         G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
         _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
@@ -38,6 +41,15 @@ public class Field : MonoBehaviour
             ApplyUnblockedVisual(false);
         }
         _initialized = true;
+    }
+
+    public bool DefaultUnblocked
+    {
+        get
+        {
+            CaptureDefaultStateIfNeeded();
+            return _defaultUnblocked;
+        }
     }
 
     public void _OnPlayerEnter()
@@ -146,6 +158,14 @@ public class Field : MonoBehaviour
         {
             _cells = _cellsParent.GetComponentsInChildren<FieldCell>(true).ToList();
         }
+    }
+
+    private void CaptureDefaultStateIfNeeded()
+    {
+        if (_defaultCaptured)
+            return;
+        _defaultUnblocked = _unblocked;
+        _defaultCaptured = true;
     }
 
     private void ApplyUnblockedVisual(bool unblocked)
