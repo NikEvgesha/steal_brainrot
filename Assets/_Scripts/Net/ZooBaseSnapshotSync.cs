@@ -117,7 +117,10 @@ public class ZooBaseSnapshotSync : MonoBehaviour
             if (BaseDirtyTracker.Consume())
             {
                 var json = BuildSnapshotJson();
-                yield return backend.SaveZoo(json); // PUT /zoo/me
+                if (!string.IsNullOrEmpty(json) && backend != null)
+                    yield return backend.SaveZoo(json); // PUT /zoo/me
+                else
+                    BaseDirtyTracker.MarkDirty();
             }
             yield return new WaitForSeconds(publishIntervalSec);
         }
@@ -138,16 +141,27 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     public string ConsumeDirtySnapshot()
     {
         if (!BaseDirtyTracker.Consume()) return null;
-        return BuildSnapshotJson();
+        var json = BuildSnapshotJson();
+        if (string.IsNullOrEmpty(json))
+        {
+            BaseDirtyTracker.MarkDirty();
+            return null;
+        }
+
+        return json;
     }
 
     public string BuildSnapshotJson()
     {
-        return JsonUtility.ToJson(BuildSnapshotDto());
+        var dto = BuildSnapshotDto();
+        return dto != null ? JsonUtility.ToJson(dto) : null;
     }
 
     public BaseSnapshotDto BuildSnapshotDto()
     {
+        if (!CanBuildSnapshot())
+            return null;
+
         var cells = LoadCells_SOMEHOW();
         var bigPetPurchased = save.LoadBigPetStatus();
         var bigPetIncomePerSec = LoadBigPetIncomePerSecond();
@@ -229,7 +243,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         // Р’Р°СЂРёР°РЅС‚С‹:
         // - РёР· SaveManager (РµСЃР»Рё РµСЃС‚СЊ СЃРѕС…СЂР°РЅРµРЅРёРµ/РєР»СЋС‡)
         // - РёР· ConveyorManager.CurrentLevel
-        return save.LoadConveyorCurrentLevel();
+        return save != null ? save.LoadConveyorCurrentLevel() : 0;
     }
 
     private List<int> LoadBoughtCells_SOMEHOW()
@@ -241,7 +255,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         {
             if (field == null) continue;
             if (!seen.Add(field.ID)) continue;
-            if (save.LoadFieldUnblockStatus(field.ID))
+            if (field.DefaultUnblocked || (save != null && save.LoadFieldUnblockStatus(field.ID)))
                 list.Add(field.ID);
         }
         list.Sort();
@@ -323,7 +337,7 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         var root = GetSnapshotRoot();
         return root != null
             ? root.GetComponentsInChildren<Field>(true)
-            : FindObjectsByType<Field>(FindObjectsSortMode.None);
+            : Array.Empty<Field>();
     }
 
     private FieldCell[] GetSnapshotCells()
@@ -331,13 +345,37 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         var root = GetSnapshotRoot();
         return root != null
             ? root.GetComponentsInChildren<FieldCell>(true)
-            : FindObjectsByType<FieldCell>(FindObjectsSortMode.None);
+            : Array.Empty<FieldCell>();
     }
 
     private Transform GetSnapshotRoot()
     {
         if (remoteBases == null)
             remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
-        return remoteBases != null ? remoteBases.GetLocalSlotRoot() : null;
+
+        if (remoteBases != null && remoteBases.TryGetResolvedLocalSlotRoot(out var root))
+            return root;
+
+        return null;
+    }
+
+    private bool CanBuildSnapshot()
+    {
+        if (save == null) save = G.Save;
+        if (save == null || !save.IsReady)
+            return false;
+
+        try
+        {
+            var profile = save.LoadBackendProfile();
+            if (string.IsNullOrWhiteSpace(profile.playerId))
+                return false;
+        }
+        catch
+        {
+            return false;
+        }
+
+        return GetSnapshotRoot() != null;
     }
 }

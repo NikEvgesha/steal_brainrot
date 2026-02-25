@@ -278,3 +278,17 @@
 - Ожидаемый эффект:
   - исчезают исключения/ошибки на загрузке питомцев в неактивных полях;
   - возвращается обычная работа молотка и локальных интеракций.
+
+### 2026-02-25 (фикс репликации: default-open land + snapshot readiness gate)
+- По повторному репорту (`у другого игрока неверно отображается моя база`, `после OFF/ON сеть показывает урезанную локацию`) найдено:
+  - в `ZooBaseSnapshotSync.LoadBoughtCells_SOMEHOW()` в `land.boughtCells` попадали только флаги из save;
+  - поля, открытые по умолчанию в сцене (`default-open`), в snapshot не попадали;
+  - ранний force-snapshot мог отправляться до готовности `save/local-slot`.
+- Исправлено:
+  - `land.boughtCells` теперь включает `field.DefaultUnblocked || save.LoadFieldUnblockStatus(field.ID)`;
+  - snapshot не строится/не отправляется, пока нет `SaveManager.IsReady`, `playerId` и resolved local-slot (`RemoteBasesApplier.TryGetResolvedLocalSlotRoot`);
+  - убран fallback на `FindObjectsByType` при сборке snapshot-полей/ячеек (чтобы не захватывать не тот слот);
+  - если snapshot временно нельзя собрать, dirty-state сохраняется (requeue через `BaseDirtyTracker.MarkDirty()`).
+- Ожидаемый эффект:
+  - удаленным игрокам показывается корректная геометрия твоей базы (включая default-open поля);
+  - после OFF/ON при восстановлении сети сервер получает полный актуальный snapshot, а не урезанный baseline.

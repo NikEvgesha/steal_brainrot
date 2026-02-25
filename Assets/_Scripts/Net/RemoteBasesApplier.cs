@@ -1802,6 +1802,24 @@ public class RemoteBasesApplier : MonoBehaviour
         return null;
     }
 
+    public bool TryGetResolvedLocalSlotRoot(out Transform root)
+    {
+        root = null;
+        if (slots == null || slots.Count == 0)
+            return false;
+
+        var idx = _serverLocalSlotIndex;
+        if (idx < 0 || idx >= slots.Count)
+            return false;
+
+        var slot = slots[idx];
+        if (slot == null || slot.root == null)
+            return false;
+
+        root = slot.root;
+        return true;
+    }
+
     public Transform GetLocalSlotEntryPoint()
     {
         if (slots == null || slots.Count == 0)

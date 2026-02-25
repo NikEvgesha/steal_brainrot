@@ -21,6 +21,10 @@ public class Field : MonoBehaviour
 
     public int ID => _id;
     
+    private void Awake()
+    {
+        CaptureDefaultStateIfNeeded();
+    }
    
 
     public void Init()
