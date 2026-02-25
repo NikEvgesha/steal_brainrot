@@ -10,6 +10,7 @@ public class YG2SaveProvider : SaveProvider
 {
     // ћожно добавить какие-либо локальные флаги дл€ отслеживани€ изменений
     private bool _isChanged;
+    public override bool IsInitialized => YG2.isSDKEnabled;
 
     public override void Initialize()
     {

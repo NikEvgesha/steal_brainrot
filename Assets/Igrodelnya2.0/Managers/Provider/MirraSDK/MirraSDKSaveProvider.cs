@@ -25,6 +25,7 @@ public class SavedItems
 }
 public class MirraSDKSaveProvider : SaveProvider
 {
+    public override bool IsInitialized => isInitialize;
     private bool isInitialize;
     public override void Initialize()
     {

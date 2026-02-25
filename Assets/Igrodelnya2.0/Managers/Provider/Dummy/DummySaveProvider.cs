@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class DummySaveProvider : SaveProvider
 {
+    public override bool IsInitialized => true;
     public override void Initialize() { Debug.Log("DummySaveProvider initialized"); }
     public override float[] LoadVolume() {
         float[] volumes = new float[] { 0.5f, 0.5f };

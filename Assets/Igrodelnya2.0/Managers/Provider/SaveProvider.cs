@@ -5,6 +5,7 @@ using UnityEngine;
 public abstract class SaveProvider : MonoBehaviour
 {
     public bool Changed;
+    public abstract bool IsInitialized { get; }
     public abstract void Initialize();
 
     // Методы для работы с громкостью

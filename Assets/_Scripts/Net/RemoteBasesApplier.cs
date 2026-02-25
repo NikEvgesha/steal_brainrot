@@ -90,6 +90,8 @@ public class RemoteBasesApplier : MonoBehaviour
     private bool[] _slotIsBaselineVisual;
     private bool _didInitialFullLobbySync;
     private bool _suppressNextAutoTeleport;
+    private Coroutine _waitForSaveReadyRoutine;
+    private int _pendingLocalRestoreSlotIndex = -1;
 
     private void Awake()
     {
@@ -111,6 +113,12 @@ public class RemoteBasesApplier : MonoBehaviour
     {
         if (backend != null)
             backend.LocationsUpdated -= ApplyLocations;
+        if (_waitForSaveReadyRoutine != null)
+        {
+            StopCoroutine(_waitForSaveReadyRoutine);
+            _waitForSaveReadyRoutine = null;
+        }
+        _pendingLocalRestoreSlotIndex = -1;
     }
 
     private void Start()
@@ -165,7 +173,10 @@ public class RemoteBasesApplier : MonoBehaviour
             {
                 slot.root.gameObject.SetActive(true);
                 ApplySlotMode(i, false);
-                RestoreLocalSlotFromSave(i);
+                if (RestoreLocalSlotFromSave(i))
+                    _lastPreparedLocalSlotIndex = i;
+                else
+                    _lastPreparedLocalSlotIndex = -1;
                 if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
                     _slotWithinSyncRange[i] = true;
                 continue;
@@ -467,8 +478,10 @@ public class RemoteBasesApplier : MonoBehaviour
 
                 if (needsRestore)
                 {
-                    RestoreLocalSlotFromSave(i);
-                    _lastPreparedLocalSlotIndex = i;
+                    if (RestoreLocalSlotFromSave(i))
+                        _lastPreparedLocalSlotIndex = i;
+                    else
+                        _lastPreparedLocalSlotIndex = -1;
                 }
 
                 if (!string.IsNullOrEmpty(localId))
@@ -590,14 +603,20 @@ public class RemoteBasesApplier : MonoBehaviour
             cell.LockCell(false);
     }
 
-    private void RestoreLocalSlotFromSave(int slotIndex)
+    private bool RestoreLocalSlotFromSave(int slotIndex)
     {
         if (slots == null || slotIndex < 0 || slotIndex >= slots.Count || G.Save == null)
-            return;
+            return false;
+
+        if (!G.Save.IsReady)
+        {
+            QueueLocalRestoreWhenSaveReady(slotIndex);
+            return false;
+        }
 
         var slot = slots[slotIndex];
         if (slot == null || slot.root == null)
-            return;
+            return false;
 
         UnlockCellsForSlot(slot);
 
@@ -611,6 +630,31 @@ public class RemoteBasesApplier : MonoBehaviour
 
         foreach (var bigPet in slot.root.GetComponentsInChildren<BigPetPoint>(true))
             bigPet.SetRemoteMode(false);
+
+        return true;
+    }
+
+    private void QueueLocalRestoreWhenSaveReady(int slotIndex)
+    {
+        _pendingLocalRestoreSlotIndex = slotIndex;
+        if (_waitForSaveReadyRoutine == null)
+            _waitForSaveReadyRoutine = StartCoroutine(WaitForSaveReadyAndRestore());
+    }
+
+    private IEnumerator WaitForSaveReadyAndRestore()
+    {
+        while (G.Save == null || !G.Save.IsReady)
+            yield return null;
+
+        _waitForSaveReadyRoutine = null;
+        var slotIndex = _pendingLocalRestoreSlotIndex;
+        _pendingLocalRestoreSlotIndex = -1;
+
+        if (slotIndex < 0 || slots == null || slotIndex >= slots.Count)
+            yield break;
+
+        if (RestoreLocalSlotFromSave(slotIndex))
+            _lastPreparedLocalSlotIndex = slotIndex;
     }
 
     private bool IsSlotInSyncRange(int slotIndex)

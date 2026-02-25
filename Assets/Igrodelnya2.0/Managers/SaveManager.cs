@@ -10,6 +10,7 @@ public class SaveManager : MonoBehaviour
     [SerializeField] private SaveProvider saveProvider; // Ќазначаем в инспекторе нужный провайдер (YG2SaveProvider, DebugSaveProvider и т.д.)
     [SerializeField] private bool _newPlayer;
     public bool IsNewPlayer => saveProvider.CheckProgress() == false;
+    public bool IsReady => saveProvider != null && saveProvider.IsInitialized;
 
     private void Awake()
     {
