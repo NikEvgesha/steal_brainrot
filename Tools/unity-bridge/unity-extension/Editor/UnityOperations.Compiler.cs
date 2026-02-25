@@ -174,25 +174,39 @@ namespace UnityBridge
 
         private static string FindRoslynCompiler()
         {
-            var root = EditorApplication.applicationContentsPath;
-            var candidates = new[] {
-                "MonoBleedingEdge/lib/mono/msbuild/Current/bin/Roslyn/csc.exe",
-                "Tools/Roslyn/csc.exe",
-                "DotNetSdkRoslyn/csc.exe"
+            var contentsRoot = EditorApplication.applicationContentsPath;
+            var scriptingRoot = Path.Combine(contentsRoot, "Resources", "Scripting");
+            var candidates = new[]
+            {
+                // Unity 6/macOS reliable path.
+                Path.Combine(scriptingRoot, "MonoBleedingEdge", "lib", "mono", "4.5", "csc.exe"),
+                // Legacy Unity paths.
+                Path.Combine(scriptingRoot, "MonoBleedingEdge", "lib", "mono", "msbuild", "Current", "bin", "Roslyn", "csc.exe"),
+                Path.Combine(scriptingRoot, "DotNetSdkRoslyn", "csc.dll"),
+                Path.Combine(scriptingRoot, "DotNetSdkRoslyn", "csc.exe"),
+                Path.Combine(contentsRoot, "Tools", "Roslyn", "csc.exe")
             };
 
-            foreach (var relPath in candidates)
+            foreach (var candidate in candidates)
             {
-                var path = Path.Combine(root, relPath);
-                if (File.Exists(path)) return path;
+                if (File.Exists(candidate))
+                    return candidate;
             }
-            
+
             try
             {
-                var files = Directory.GetFiles(root, "csc.exe", SearchOption.AllDirectories);
-                return files.FirstOrDefault(f => f.Contains("Roslyn"));
+                var exeFiles = Directory.GetFiles(contentsRoot, "csc.exe", SearchOption.AllDirectories);
+                var exe = exeFiles.FirstOrDefault();
+                if (!string.IsNullOrEmpty(exe))
+                    return exe;
+
+                var dllFiles = Directory.GetFiles(contentsRoot, "csc.dll", SearchOption.AllDirectories);
+                return dllFiles.FirstOrDefault();
             }
-            catch { return null; }
+            catch
+            {
+                return null;
+            }
         }
 
         private static (bool Success, string ErrorMessage) CompileWithRoslyn(string compilerPath, string sourcePath, string outputDll, HashSet<string> references)
@@ -208,15 +222,28 @@ namespace UnityBridge
             var fileName = compilerPath;
             var arguments = args.ToString();
 
-            if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXEditor || 
+            if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXEditor ||
                 UnityEngine.Application.platform == UnityEngine.RuntimePlatform.LinuxEditor)
             {
-                var root = EditorApplication.applicationContentsPath;
-                var monoPath = Path.Combine(root, "MonoBleedingEdge/bin/mono");
-                if (File.Exists(monoPath))
+                var contentsRoot = EditorApplication.applicationContentsPath;
+
+                if (compilerPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                 {
-                    fileName = monoPath;
+                    var dotnetPath = Path.Combine(contentsRoot, "Resources", "Scripting", "NetCoreRuntime", "dotnet");
+                    if (!File.Exists(dotnetPath))
+                        return (false, $"Dotnet runtime not found at '{dotnetPath}' for compiler '{compilerPath}'.");
+
+                    fileName = dotnetPath;
                     arguments = $"\"{compilerPath}\" {arguments}";
+                }
+                else if (compilerPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    var monoPath = Path.Combine(contentsRoot, "Resources", "Scripting", "MonoBleedingEdge", "bin", "mono");
+                    if (File.Exists(monoPath))
+                    {
+                        fileName = monoPath;
+                        arguments = $"\"{compilerPath}\" {arguments}";
+                    }
                 }
             }
 
