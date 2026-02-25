@@ -72,6 +72,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private string[] _slotPlayerIds;
     private string[] _slotUpdatedAt;
     private GameObject[] _slotRemotePlayers;
+    private string[] _slotRemotePlayerOwnerIds;
     private RemoteFriendBoard[] _slotRemoteBoards;
     private Coroutine[] _slotSnapshotApplyRoutines;
     private BaseSnapshotDto[] _slotSnapshotApplyPending;
@@ -277,7 +278,7 @@ public class RemoteBasesApplier : MonoBehaviour
                     if (slots[i].root != null)
                         slots[i].root.gameObject.SetActive(true);
                     MarkSlotAsLiveVisual(i);
-                    EnsureRemotePlayer(i);
+                    EnsureRemotePlayer(i, loc.playerId);
                     UpdateChestLocation(slots[i], loc);
                     UpdateFriendBoardLocation(slots[i], loc);
                     ApplyIfChanged(i, slots[i], loc);
@@ -316,7 +317,7 @@ public class RemoteBasesApplier : MonoBehaviour
                 if (slots[slotIndex].root != null)
                     slots[slotIndex].root.gameObject.SetActive(true);
                 MarkSlotAsLiveVisual(slotIndex);
-                EnsureRemotePlayer(slotIndex);
+                EnsureRemotePlayer(slotIndex, pick.playerId);
                 UpdateChestLocation(slots[slotIndex], pick);
                 UpdateFriendBoardLocation(slots[slotIndex], pick);
                 ApplyIfChanged(slotIndex, slots[slotIndex], pick, force: true);
@@ -483,9 +484,16 @@ public class RemoteBasesApplier : MonoBehaviour
 
             if (desiredBySlot.TryGetValue(i, out var member))
             {
+                var previousPlayerId = _slotPlayerIds[i];
+                if (!string.IsNullOrEmpty(previousPlayerId) &&
+                    !string.Equals(previousPlayerId, member.playerId, StringComparison.Ordinal))
+                {
+                    _playerToSlot.Remove(previousPlayerId);
+                }
+
                 _slotPlayerIds[i] = member.playerId;
                 _playerToSlot[member.playerId] = i;
-                EnsureRemotePlayer(i);
+                EnsureRemotePlayer(i, member.playerId);
                 ApplyRemotePositions(i, member.positions);
                 ApplyRemoteHolding(i, member.hand);
                 UpdateFriendBoardLobby(slots[i], member);
@@ -1406,6 +1414,8 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotUpdatedAt = new string[slots.Count];
         if (_slotRemotePlayers == null || _slotRemotePlayers.Length != slots.Count)
             _slotRemotePlayers = new GameObject[slots.Count];
+        if (_slotRemotePlayerOwnerIds == null || _slotRemotePlayerOwnerIds.Length != slots.Count)
+            _slotRemotePlayerOwnerIds = new string[slots.Count];
         if (_slotRemoteBoards == null || _slotRemoteBoards.Length != slots.Count)
             _slotRemoteBoards = new RemoteFriendBoard[slots.Count];
         if (_slotSnapshotApplyRoutines == null || _slotSnapshotApplyRoutines.Length != slots.Count)
@@ -1847,16 +1857,19 @@ public class RemoteBasesApplier : MonoBehaviour
         return slot.friendBoard;
     }
 
-    private void EnsureRemotePlayer(int slotIndex)
+    private void EnsureRemotePlayer(int slotIndex, string ownerPlayerId = null)
     {
         if (!spawnRemotePlayers) return;
         if (remotePlayerPrefab == null) return;
         if (slots == null || slotIndex < 0 || slotIndex >= slots.Count) return;
 
+        var slot = slots[slotIndex];
+        var spawn = slot != null
+            ? (slot.teleportTarget != null ? slot.teleportTarget : slot.root)
+            : null;
+
         if (_slotRemotePlayers[slotIndex] == null)
         {
-            var slot = slots[slotIndex];
-            var spawn = slot.teleportTarget != null ? slot.teleportTarget : slot.root;
             if (spawn == null) return;
 
             var go = Instantiate(remotePlayerPrefab, spawn.position, spawn.rotation);
@@ -1881,6 +1894,41 @@ public class RemoteBasesApplier : MonoBehaviour
         var remotePlayer = _slotRemotePlayers[slotIndex];
         if (remotePlayer == null)
             return;
+
+        var ownerChanged = !string.IsNullOrEmpty(ownerPlayerId) &&
+                           _slotRemotePlayerOwnerIds != null &&
+                           slotIndex >= 0 &&
+                           slotIndex < _slotRemotePlayerOwnerIds.Length &&
+                           !string.Equals(_slotRemotePlayerOwnerIds[slotIndex], ownerPlayerId, StringComparison.Ordinal);
+
+        if (ownerChanged)
+        {
+            var mover = remotePlayer.GetComponent<RemotePlayerMover>();
+            if (mover != null)
+                mover.ResetTransientState();
+
+            if (spawn != null)
+            {
+                remotePlayer.transform.position = spawn.position;
+                remotePlayer.transform.rotation = spawn.rotation;
+            }
+
+            if (_slotRemoteBoards != null &&
+                slotIndex >= 0 &&
+                slotIndex < _slotRemoteBoards.Length &&
+                _slotRemoteBoards[slotIndex] != null)
+            {
+                _slotRemoteBoards[slotIndex].SetRemote(null, null, false, false);
+            }
+        }
+
+        if (_slotRemotePlayerOwnerIds != null &&
+            slotIndex >= 0 &&
+            slotIndex < _slotRemotePlayerOwnerIds.Length)
+        {
+            _slotRemotePlayerOwnerIds[slotIndex] = ownerPlayerId;
+        }
+
         _slotRemoteBoards[slotIndex] = EnsureRemoteBoard(slotIndex, remotePlayer);
         remotePlayer.SetActive(true);
     }
@@ -1963,6 +2011,9 @@ public class RemoteBasesApplier : MonoBehaviour
                 mover.ResetTransientState();
             _slotRemotePlayers[slotIndex].SetActive(false);
         }
+
+        if (_slotRemotePlayerOwnerIds != null && slotIndex >= 0 && slotIndex < _slotRemotePlayerOwnerIds.Length)
+            _slotRemotePlayerOwnerIds[slotIndex] = null;
 
         if (_slotRemoteBoards != null && slotIndex >= 0 && slotIndex < _slotRemoteBoards.Length)
         {

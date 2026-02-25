@@ -148,3 +148,14 @@
   - все `selectedKey` в prefab/scene резолвятся в `LocalizationData.asset` (пропусков не найдено),
   - дубли ключей `Item/Dragon` и `Item/Potion` удалены,
   - по новым popup-ключам есть пары `Ru/En`.
+
+### 2026-02-25 (возврат к P0: анти-фантом + bridge)
+- Усилен anti-ghost слой для удаленных игроков в `RemoteBasesApplier`:
+  - добавлено отслеживание владельца `remote-player` по `playerId` (`_slotRemotePlayerOwnerIds`),
+  - при смене владельца слота выполняется hard-reset `RemotePlayerMover`, очистка `RemoteFriendBoard` и репозиционирование к spawn-анкеры слота,
+  - при назначении нового `member` в слот удаляется старый `playerId -> slot` mapping, чтобы не тянуть stale-привязки после rejoin.
+- Обновлены вызовы `EnsureRemotePlayer(...)` для lobby/location потоков с явной передачей `playerId`, чтобы reset происходил детерминированно.
+- TODO обновлен: пункт про фантома переведен в частично закрытый (`[~]`) до повторного smoke 2 клиента (`join/rejoin/disconnect`).
+- Unity Bridge проверен на реальных операциях иерархии:
+  - `execute` починен под macOS/Unity 6000 (поиск компилятора в `Contents/Resources/Scripting/...`, поддержка `mono + csc.exe` и `dotnet + csc.dll`),
+  - подтверждены read/write операции через bridge (scene-hierarchy smoke и prefab-check на `GameCanvas/YenOrNot`).
