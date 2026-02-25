@@ -1857,8 +1857,7 @@ public class RemoteBasesApplier : MonoBehaviour
 
     private void TryTeleportLocalPlayer()
     {
-        if (G.Save == null) return;
-        var pid = G.Save.LoadBackendProfile().playerId;
+        var pid = GetLocalPlayerId();
         if (string.IsNullOrEmpty(pid)) return;
 
         var idx = GetLocalSlotIndex();
@@ -2129,11 +2128,12 @@ public class RemoteBasesApplier : MonoBehaviour
             if (G.Save == null)
                 return _lastLocalPlayerId;
 
+            if (!G.Save.IsReady)
+                return _lastLocalPlayerId;
+
             var id = G.Save.LoadBackendProfile().playerId;
             if (!string.IsNullOrEmpty(id))
                 _lastLocalPlayerId = id;
-            else
-                _lastLocalPlayerId = null;
         }
         catch
         {

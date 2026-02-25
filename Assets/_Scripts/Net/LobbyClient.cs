@@ -1230,11 +1230,12 @@ public class LobbyClient : MonoBehaviour
             if (G.Save == null)
                 return _cachedLocalPlayerId;
 
+            if (!G.Save.IsReady)
+                return _cachedLocalPlayerId;
+
             var id = G.Save.LoadBackendProfile().playerId;
             if (!string.IsNullOrEmpty(id))
                 _cachedLocalPlayerId = id;
-            else
-                _cachedLocalPlayerId = null;
         }
         catch
         {
@@ -1246,7 +1247,7 @@ public class LobbyClient : MonoBehaviour
 
     private void SetPlayerHeader(UnityWebRequest req)
     {
-        var pid = G.Save != null ? G.Save.LoadBackendProfile().playerId : null;
+        var pid = GetLocalPlayerId();
         if (!string.IsNullOrEmpty(pid))
             req.SetRequestHeader("X-Player-Id", pid);
     }

@@ -12,6 +12,14 @@ public class SaveManager : MonoBehaviour
     public bool IsNewPlayer => saveProvider.CheckProgress() == false;
     public bool IsReady => saveProvider != null && saveProvider.IsInitialized;
 
+    private bool _pendingSaveFlagSet;
+    private bool _pendingSaveFlagValue;
+    private bool _hasCachedBackendProfile;
+    private bool _pendingBackendProfilePersist;
+    private string _cachedBackendPlayerId;
+    private string _cachedBackendFriendCode;
+    private string _cachedBackendDisplayName;
+
     private void Awake()
     {
 
@@ -39,13 +47,37 @@ public class SaveManager : MonoBehaviour
         while (true)
         {
             yield return new WaitForSeconds(1);
+
+            if (saveProvider != null && saveProvider.IsInitialized)
+            {
+                if (_pendingSaveFlagSet)
+                {
+                    saveProvider.SetSave(_pendingSaveFlagValue);
+                    _pendingSaveFlagSet = false;
+                }
+
+                if (_pendingBackendProfilePersist && _hasCachedBackendProfile)
+                {
+                    saveProvider.SaveBackendProfile(_cachedBackendPlayerId, _cachedBackendFriendCode, _cachedBackendDisplayName);
+                    _pendingBackendProfilePersist = false;
+                }
+            }
+
             saveProvider.SaveProgress();
         }
     }
 
     public void SetSave(bool haveSave)
     {
-        saveProvider.SetSave(haveSave);
+        if (saveProvider != null && saveProvider.IsInitialized)
+        {
+            saveProvider.SetSave(haveSave);
+            _pendingSaveFlagSet = false;
+            return;
+        }
+
+        _pendingSaveFlagSet = true;
+        _pendingSaveFlagValue = haveSave;
     }
 
     // Пример методов, которые делегируют работу провайдеру:
@@ -322,12 +354,52 @@ public class SaveManager : MonoBehaviour
     }
     public void SaveBackendProfile(string playerId, string friendCode, string displayName)
     {
-        saveProvider.SaveBackendProfile(playerId, friendCode, displayName);
+        _cachedBackendPlayerId = playerId ?? "";
+        _cachedBackendFriendCode = friendCode ?? "";
+        _cachedBackendDisplayName = displayName ?? "";
+        _hasCachedBackendProfile = !string.IsNullOrEmpty(_cachedBackendPlayerId) ||
+                                  !string.IsNullOrEmpty(_cachedBackendFriendCode) ||
+                                  !string.IsNullOrEmpty(_cachedBackendDisplayName);
+
+        if (saveProvider != null && saveProvider.IsInitialized)
+        {
+            saveProvider.SaveBackendProfile(_cachedBackendPlayerId, _cachedBackendFriendCode, _cachedBackendDisplayName);
+            _pendingBackendProfilePersist = false;
+            return;
+        }
+
+        _pendingBackendProfilePersist = _hasCachedBackendProfile;
     }
 
     public (string playerId, string friendCode, string displayName) LoadBackendProfile()
     {
-        return saveProvider.LoadBackendProfile();
+        if (saveProvider != null && saveProvider.IsInitialized)
+        {
+            var profile = saveProvider.LoadBackendProfile();
+            var hasProviderData = !string.IsNullOrEmpty(profile.playerId) ||
+                                  !string.IsNullOrEmpty(profile.friendCode) ||
+                                  !string.IsNullOrEmpty(profile.displayName);
+
+            if (hasProviderData)
+            {
+                _cachedBackendPlayerId = profile.playerId ?? "";
+                _cachedBackendFriendCode = profile.friendCode ?? "";
+                _cachedBackendDisplayName = profile.displayName ?? "";
+                _hasCachedBackendProfile = true;
+                _pendingBackendProfilePersist = false;
+                return profile;
+            }
+
+            if (_hasCachedBackendProfile)
+                return (_cachedBackendPlayerId, _cachedBackendFriendCode, _cachedBackendDisplayName);
+
+            return profile;
+        }
+
+        if (_hasCachedBackendProfile)
+            return (_cachedBackendPlayerId, _cachedBackendFriendCode, _cachedBackendDisplayName);
+
+        return ("", "", "");
     }
 
 

@@ -241,3 +241,16 @@
   - `_lastPreparedLocalSlotIndex` больше не фиксируется до успешного restore.
 - Цель:
   - убрать сценарий, когда локальная база и зоны выглядят пустыми из-за того, что `Load*` был вызван до инициализации Mirra save.
+
+### 2026-02-25 (фикс: не терять local player id во время bootstrap)
+- По обратной связи пользователя («загрузилась часть сейва», «нельзя купить землю молотком») доработан профильный bootstrap:
+  - `LobbyClient.GetLocalPlayerId()` и `RemoteBasesApplier.GetLocalPlayerId()` больше не очищают кеш id при временно пустом `LoadBackendProfile`;
+  - чтение id теперь привязано к `SaveManager.IsReady`, чтобы не ломать local-slot resolve на раннем кадре;
+  - `LobbyClient.SetPlayerHeader(...)` переведен на кешированный `GetLocalPlayerId()`.
+- В `SaveManager` добавлен runtime-cache backend-профиля и отложенная запись в провайдер:
+  - `SaveBackendProfile(...)` сохраняет профиль в память даже до готовности провайдера;
+  - pending-профиль и pending-флаг `SetSave(true)` автоматически флашатся в `ProgressSavingRoutine()` после `IsInitialized`.
+- Ожидаемый эффект:
+  - локальный слот не должен «проваливаться» в remote/unresolved;
+  - интерактивы локальной базы (включая покупку земли молотком) остаются активными;
+  - пропадает частичная загрузка, вызванная race на пустом `playerId`.
