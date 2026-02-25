@@ -225,7 +225,16 @@ public class RemoteFriendBoard : MonoBehaviour
             return;
 
         var panelInteracting = IsPanelInteracting();
-        if (!_hasRemoteData || (!HasFocus() && !panelInteracting))
+        if (!_hasRemoteData)
+        {
+            if (!panelInteracting)
+            {
+                HidePanel();
+                return;
+            }
+        }
+
+        if (!HasFocus() && !panelInteracting)
         {
             HidePanel();
             return;
@@ -546,6 +555,9 @@ public class RemoteFriendBoard : MonoBehaviour
 
     private void HidePanel()
     {
+        if (IsPanelInteracting())
+            return;
+
         if (interactionPanel != null)
             interactionPanel.gameObject.SetActive(false);
     }

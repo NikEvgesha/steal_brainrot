@@ -14,6 +14,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [SerializeField] private float _speed = 1f;
     [SerializeField] private float _inputDropGraceSec = 0.08f;
     [SerializeField] private float _nearCompleteThreshold = 0.99f;
+    [SerializeField] private float _resumeAfterDisableWindowSec = 0.35f;
     [SerializeField] public UnityEvent InteractionStarted;
     [SerializeField] public UnityEvent InteractionComplete;
 
@@ -23,6 +24,9 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private bool _pointerHold;
     private LocalizedText _actionLocalizedText;
     private LocalizedText _priceLocalizedText;
+    private bool _hasResumeProgress;
+    private float _resumeProgress;
+    private float _resumeUntilUnscaledTime;
 
     public bool IsInteracting => _interactionInProgress;
 
@@ -57,9 +61,42 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             _hintDesctop.SetActive(!G.Control.UseTouchControl);
     }
 
+    private void OnEnable()
+    {
+        if (_hasResumeProgress &&
+            Time.unscaledTime <= _resumeUntilUnscaledTime &&
+            (IsHoldPressed() || _pointerHold))
+        {
+            _progress = Mathf.Clamp01(_resumeProgress);
+            if (_fillImg != null)
+                _fillImg.fillAmount = _progress;
+
+            _interactionHold = true;
+            _interactionInProgress = true;
+            _hasResumeProgress = false;
+            StartCoroutine(InteractionProcess());
+            return;
+        }
+
+        _hasResumeProgress = false;
+        ResetProgress();
+    }
+
     private void OnDisable()
     {
-        ResetProgress();
+        if (_interactionInProgress && _progress > 0f)
+        {
+            _hasResumeProgress = true;
+            _resumeProgress = _progress;
+            _resumeUntilUnscaledTime = Time.unscaledTime + Mathf.Max(0f, _resumeAfterDisableWindowSec);
+        }
+        else
+        {
+            _hasResumeProgress = false;
+            ResetProgress();
+        }
+
+        _interactionInProgress = false;
         _interactionHold = false;
         _pointerHold = false;
         StopAllCoroutines();
@@ -80,10 +117,10 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void Update()
     {
-        _interactionHold = _pointerHold || G.Input.InteractionHold;
+        _interactionHold = _pointerHold || IsHoldPressed();
         if (_interactionInProgress) return;
 
-        if (G.Input.Interaction)
+        if (IsInteractTriggered())
         {
             StartInteraction();
         }
@@ -97,6 +134,16 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         _progress = 0;
         InteractionStarted?.Invoke();
         StartCoroutine(InteractionProcess());
+    }
+
+    private static bool IsInteractTriggered()
+    {
+        return G.Input != null && G.Input.Interaction;
+    }
+
+    private static bool IsHoldPressed()
+    {
+        return G.Input != null && G.Input.InteractionHold;
     }
 
     private IEnumerator InteractionProcess()

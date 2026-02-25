@@ -311,3 +311,12 @@
 - `_forceLocalRestoreOnNextResolve` выставляется условно (`!keepPreparedLocalVisual`), чтобы не навязывать лишний save-reload на ближайшем reconnect.
 - Цель:
   - убрать сценарий, когда `NET OFF/ON` сам по себе откатывает локальную базу к «старой/урезанной» версии.
+
+### 2026-02-25 (фикс hold-взаимодействия с remote player)
+- По репорту: при подходе к игроку первый hold-сценарий срывался на середине, после повтора работал.
+- Доработки:
+  - `InteractionPanel`: добавлен `resumeAfterDisableWindow` (0.35s) и восстановление прогресса после краткого `OnDisable/OnEnable` вместо жесткого обнуления;
+  - `RemoteFriendBoard.UpdatePanel`: не скрывает панель при временно пустом remote-state, если hold уже идет;
+  - `RemoteFriendBoard.HidePanel`: не деактивирует панель во время активного interaction.
+- Цель:
+  - убрать срыв “первого нажатия” из-за кратких UI/сетевых дерганий панели.
