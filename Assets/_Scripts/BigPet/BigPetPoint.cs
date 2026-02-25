@@ -83,11 +83,7 @@ public class BigPetPoint : MonoBehaviour
 
         CacheSceneRefs();
 
-        _purchased = ResolvePurchaseState();
-        if (_purchased)
-            InitPurchasedState();
-        else
-            PrepareLockedState();
+        ReloadLocalStateFromSave();
     }
 
     public void _OnPlayerEnter()
@@ -442,12 +438,33 @@ public class BigPetPoint : MonoBehaviour
         }
         else
         {
-            InitLocal();
+            if (!_initializedLocal)
+            {
+                InitLocal();
+            }
+            else
+            {
+                ReloadLocalStateFromSave();
+            }
+
             if (_purchased)
                 ShowLocalUI();
-            else
-                PrepareLockedState();
         }
+    }
+
+    private void ReloadLocalStateFromSave()
+    {
+        if (_setPetUI == null)
+            _setPetUI = GetComponentInChildren<BigPetSetUI>(true);
+        if (_setPetUI != null)
+            _setPetUI.SetRemoteMode(false);
+
+        CacheSceneRefs();
+        _purchased = ResolvePurchaseState();
+        if (_purchased)
+            InitPurchasedState();
+        else
+            PrepareLockedState();
     }
 
     public void _TryBuy()

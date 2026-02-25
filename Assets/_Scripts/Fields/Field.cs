@@ -31,10 +31,11 @@ public class Field : MonoBehaviour
 
         if (_unblocked)
         {
-            Unblock();
-        } else
+            ApplyUnblockedVisual(true);
+        }
+        else
         {
-            G.Save.SaveFieldUnblockStatus(_id, false);
+            ApplyUnblockedVisual(false);
         }
         _initialized = true;
     }
@@ -93,6 +94,23 @@ public class Field : MonoBehaviour
     {
         int id = 0;
         _cells.ForEach(cell => cell.SetLoadedData(SaveKey.Field.ToString() + _id + " " + id++));
+    }
+
+    public void ReloadFromSaveState()
+    {
+        EnsureCells();
+        int id = 0;
+        foreach (var cell in _cells)
+        {
+            if (cell == null)
+            {
+                id++;
+                continue;
+            }
+
+            cell.ClearLoadedActors();
+            cell.SetLoadedData(SaveKey.Field.ToString() + _id + " " + id++);
+        }
     }
 
     public void AssignIdsForRemote(int id)

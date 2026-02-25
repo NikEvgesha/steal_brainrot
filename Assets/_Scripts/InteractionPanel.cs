@@ -12,6 +12,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [SerializeField] private Text _priceText;
     [SerializeField] private Text _actionText;
     [SerializeField] private float _speed = 1f;
+    [SerializeField] private float _inputDropGraceSec = 0.08f;
+    [SerializeField] private float _nearCompleteThreshold = 0.99f;
     [SerializeField] public UnityEvent InteractionStarted;
     [SerializeField] public UnityEvent InteractionComplete;
 
@@ -29,6 +31,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     {
         InteractionStarted ??= new UnityEvent();
         InteractionComplete ??= new UnityEvent();
+        _inputDropGraceSec = Mathf.Max(0f, _inputDropGraceSec);
+        _nearCompleteThreshold = Mathf.Clamp(_nearCompleteThreshold, 0.9f, 1f);
 
         if (_actionText != null)
         {
@@ -98,8 +102,30 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private IEnumerator InteractionProcess()
     {
         var completed = false;
-        while (_interactionHold && _progress < 1f)
+        var lostHoldSec = 0f;
+        while (_progress < 1f)
         {
+            if (!_interactionHold)
+            {
+                if (_progress >= _nearCompleteThreshold)
+                {
+                    _progress = 1f;
+                    if (_fillImg != null)
+                        _fillImg.fillAmount = 1f;
+                    InteractionComplete?.Invoke();
+                    completed = true;
+                    break;
+                }
+
+                lostHoldSec += Time.deltaTime;
+                if (lostHoldSec > _inputDropGraceSec)
+                    break;
+
+                yield return null;
+                continue;
+            }
+
+            lostHoldSec = 0f;
             _progress += Time.deltaTime * _speed;
             if (_progress > 1f)
                 _progress = 1f;

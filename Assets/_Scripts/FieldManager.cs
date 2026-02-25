@@ -20,6 +20,35 @@ public class FieldManager : MonoBehaviour
         InitFields();
     }
 
+    public void ReloadFromSave()
+    {
+        if (_fieldParent == null || G.Save == null)
+            return;
+
+        EnsureInitialized();
+
+        int fieldId = 0;
+        for (int i = 0; i < _fieldParent.childCount; i++)
+        {
+            var row = _fieldParent.GetChild(i);
+            var rowFields = row.GetComponentsInChildren<Field>(true).ToList();
+            foreach (var field in rowFields)
+            {
+                if (field == null)
+                {
+                    fieldId++;
+                    continue;
+                }
+
+                field.SetID(fieldId);
+                field.SetRemoteMode(false);
+                field.SetUnblockedVisual(G.Save.LoadFieldUnblockStatus(fieldId));
+                field.ReloadFromSaveState();
+                fieldId++;
+            }
+        }
+    }
+
     private void InitFields()
     {
         if (_initialized) return;

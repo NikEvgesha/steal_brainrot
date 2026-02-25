@@ -68,18 +68,15 @@ public class Conveyor : MonoBehaviour
 
         EnsureEggStorage();
 
+        _currentLevel = Mathf.Clamp(G.Save.LoadConveyorCurrentLevel(), 0, _levels.Count - 1);
+        _lastUnlockedLevel = Mathf.Clamp(G.Save.LoadConveyorUnlockedLevel(), 0, _levels.Count - 1);
+
         if (!_localConfigured)
         {
-            _currentLevel = Mathf.Clamp(G.Save.LoadConveyorCurrentLevel(), 0, _levels.Count - 1);
-            _lastUnlockedLevel = Mathf.Clamp(G.Save.LoadConveyorUnlockedLevel(), 0, _levels.Count - 1);
-
-            for (int i = 0; i <= _lastUnlockedLevel; i++)
-                _levels[i].SetPurchased(true);
-
-            for (int i = _lastUnlockedLevel + 1; i < _levels.Count; i++)
+            for (int i = 0; i < _levels.Count; i++)
             {
-                _levels[i].LevelPurchased.AddListener(OnLevelPurchase);
-                _levels[i].SetPurchasingAvailable(i == _lastUnlockedLevel + 1);
+                if (i > _lastUnlockedLevel)
+                    _levels[i].LevelPurchased.AddListener(OnLevelPurchase);
             }
 
             _ui = _ui != null ? _ui : GetComponentInChildren<ConveyorUI>(true);
@@ -92,6 +89,14 @@ public class Conveyor : MonoBehaviour
             _ui.Init(_levels);
             _ui.LevelActivated.AddListener(SetLevel);
             _localConfigured = true;
+        }
+
+        for (int i = 0; i < _levels.Count; i++)
+        {
+            var purchased = i <= _lastUnlockedLevel;
+            _levels[i].SetPurchased(purchased);
+            if (!purchased)
+                _levels[i].SetPurchasingAvailable(i == _lastUnlockedLevel + 1);
         }
 
         SetLevel(_levels[_currentLevel]);

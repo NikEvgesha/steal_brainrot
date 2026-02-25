@@ -1969,16 +1969,17 @@ public class LobbyClient : MonoBehaviour
                 item.isOnline = false;
 
             var baseToken = obj["baseData"];
-            if (!isLocalMember && baseToken != null && baseToken.Type != JTokenType.Null)
+            if (baseToken != null && baseToken.Type != JTokenType.Null)
             {
                 item.baseDataRaw = baseToken.ToString(Formatting.None);
-                if (collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
+                if (!isLocalMember && collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
                 {
                     remoteWithBase++;
                     remoteBaseBytes += System.Text.Encoding.UTF8.GetByteCount(item.baseDataRaw);
                 }
 
-                if (!string.IsNullOrEmpty(item.playerId) &&
+                if (!isLocalMember &&
+                    !string.IsNullOrEmpty(item.playerId) &&
                     _remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw) &&
                     cachedRaw == item.baseDataRaw &&
                     _remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
@@ -1990,7 +1991,7 @@ public class LobbyClient : MonoBehaviour
                     try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
                     catch { item.baseData = null; }
 
-                    if (!string.IsNullOrEmpty(item.playerId))
+                    if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
                     {
                         _remoteBaseRawCache[item.playerId] = item.baseDataRaw;
                         _remoteBaseSnapshotCache[item.playerId] = item.baseData;

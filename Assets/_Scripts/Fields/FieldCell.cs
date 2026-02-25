@@ -227,4 +227,31 @@ public class FieldCell : MonoBehaviour
     {
         _id = id;
     }
+
+    public void ClearLoadedActors()
+    {
+        var eggs = GetComponentsInChildren<Egg>(true);
+        foreach (var egg in eggs)
+        {
+            if (egg != null)
+            {
+                egg.gameObject.SetActive(false);
+                Destroy(egg.gameObject);
+            }
+        }
+
+        var pets = GetComponentsInChildren<Brainrot>(true);
+        foreach (var pet in pets)
+        {
+            if (pet != null)
+            {
+                pet.gameObject.SetActive(false);
+                Destroy(pet.gameObject);
+            }
+        }
+
+        _currentEgg = null;
+        _currentPet = null;
+        _inField = Item.Free;
+    }
 }
