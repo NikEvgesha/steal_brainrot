@@ -608,10 +608,9 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         if (localSnapshot != null &&
-            LocalSaveLooksEmpty(slotIndex) &&
-            SnapshotLooksPopulated(localSnapshot))
+            ShouldMergeSnapshotIntoLocalSave(slotIndex, localSnapshot))
         {
-            MirrorSnapshotToLocalSave(slotIndex, localSnapshot);
+            MergeSnapshotIntoLocalSave(slotIndex, localSnapshot);
         }
 
         UnlockCellsForSlot(slot);
@@ -699,7 +698,92 @@ public class RemoteBasesApplier : MonoBehaviour
         return false;
     }
 
-    private void MirrorSnapshotToLocalSave(int slotIndex, BaseSnapshotDto snapshot)
+    private bool ShouldMergeSnapshotIntoLocalSave(int slotIndex, BaseSnapshotDto snapshot)
+    {
+        if (snapshot == null || G.Save == null || slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return false;
+
+        if (!SnapshotLooksPopulated(snapshot))
+            return false;
+
+        if (LocalSaveLooksEmpty(slotIndex))
+            return true;
+
+        var slot = slots[slotIndex];
+        if (slot == null || slot.root == null)
+            return false;
+
+        EnsureFieldIds(slot);
+
+        if (snapshot.land != null && snapshot.land.boughtCells != null)
+        {
+            var localUnlocked = 0;
+            var fields = GetFields(slot);
+            for (int i = 0; i < fields.Count; i++)
+            {
+                var field = fields[i];
+                if (field != null && G.Save.LoadFieldUnblockStatus(field.ID))
+                    localUnlocked++;
+            }
+
+            var snapshotUnlocked = new HashSet<int>(snapshot.land.boughtCells).Count;
+            if (snapshotUnlocked > localUnlocked)
+                return true;
+        }
+
+        if (snapshot.conveyor != null && snapshot.conveyor.lvl > G.Save.LoadConveyorCurrentLevel())
+            return true;
+
+        if (snapshot.bigPet != null)
+        {
+            var snapshotBigPetUnlocked = snapshot.bigPet.purchased ||
+                                         snapshot.bigPet.lvl > 1 ||
+                                         snapshot.bigPet.xp > 0 ||
+                                         snapshot.bigPet.id > 0;
+            if (snapshotBigPetUnlocked && !G.Save.LoadBigPetStatus())
+                return true;
+            if (snapshot.bigPet.lvl > G.Save.LoadBigPetLvl())
+                return true;
+            if (snapshot.bigPet.xp > G.Save.LoadBigPetXP())
+                return true;
+        }
+
+        if (snapshot.cells != null && snapshot.cells.Count > 0)
+        {
+            var localFilled = 0;
+            var cells = GetCells(slot);
+            for (int i = 0; i < cells.Count; i++)
+            {
+                var cell = cells[i];
+                if (cell == null || string.IsNullOrEmpty(cell.Id))
+                    continue;
+
+                var localData = G.Save.LoadCellData(cell.Id);
+                if (localData != null && localData.Status != Item.Free)
+                    localFilled++;
+            }
+
+            var snapshotFilled = 0;
+            for (int i = 0; i < snapshot.cells.Count; i++)
+            {
+                var src = snapshot.cells[i];
+                if (src == null)
+                    continue;
+                if (string.Equals(src.kind, "egg", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(src.kind, "brainrot", StringComparison.OrdinalIgnoreCase))
+                {
+                    snapshotFilled++;
+                }
+            }
+
+            if (snapshotFilled > localFilled)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void MergeSnapshotIntoLocalSave(int slotIndex, BaseSnapshotDto snapshot)
     {
         if (snapshot == null || G.Save == null || slots == null || slotIndex < 0 || slotIndex >= slots.Count)
             return;
@@ -719,59 +803,61 @@ public class RemoteBasesApplier : MonoBehaviour
                 var field = fields[i];
                 if (field == null)
                     continue;
-                G.Save.SaveFieldUnblockStatus(field.ID, unlocked.Contains(field.ID));
+                if (unlocked.Contains(field.ID))
+                    G.Save.SaveFieldUnblockStatus(field.ID, true);
             }
+        }
+
+        if (snapshot.conveyor != null)
+        {
+            var snapshotLevel = Mathf.Max(0, snapshot.conveyor.lvl);
+            var localCurrent = Mathf.Max(0, G.Save.LoadConveyorCurrentLevel());
+            var localUnlocked = Mathf.Max(localCurrent, G.Save.LoadConveyorUnlockedLevel());
+
+            if (snapshotLevel > localCurrent)
+                G.Save.SaveConveyorCurrentLevel(snapshotLevel);
+            if (snapshotLevel > localUnlocked)
+                G.Save.SaveConveyorUnlockedLevel(snapshotLevel);
+        }
+
+        if (snapshot.bigPet != null)
+        {
+            var snapshotBigPetUnlocked = snapshot.bigPet.purchased ||
+                                         snapshot.bigPet.lvl > 1 ||
+                                         snapshot.bigPet.xp > 0 ||
+                                         snapshot.bigPet.id > 0;
+            if (snapshotBigPetUnlocked && !G.Save.LoadBigPetStatus())
+                G.Save.SaveBigPetStatus(true);
+
+            if (snapshot.bigPet.lvl > G.Save.LoadBigPetLvl())
+                G.Save.SaveBigPetLvl(snapshot.bigPet.lvl);
+            if (snapshot.bigPet.xp > G.Save.LoadBigPetXP())
+                G.Save.SaveBigPetXP(snapshot.bigPet.xp);
+            if (snapshot.bigPet.id > G.Save.LoadBigPetId())
+                G.Save.SaveBigPetId(snapshot.bigPet.id);
         }
 
         var targetCells = GetCells(slot)
             .Where(c => c != null && !string.IsNullOrEmpty(c.Id))
-            .OrderBy(c => c.Id, StringComparer.Ordinal)
-            .ToList();
+            .ToDictionary(c => c.Id, c => c, StringComparer.Ordinal);
 
-        for (int i = 0; i < targetCells.Count; i++)
-            G.Save.SaveCellData(targetCells[i].Id, new CellSaveData { Status = Item.Free });
+        if (snapshot.cells == null)
+            return;
 
-        var sourceCells = snapshot.cells == null
-            ? new List<CellSnapshotDto>()
-            : snapshot.cells
-                .Where(c => c != null &&
-                            (string.Equals(c.kind, "egg", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(c.kind, "brainrot", StringComparison.OrdinalIgnoreCase)))
-                .OrderBy(c => c.cell ?? string.Empty, StringComparer.Ordinal)
-                .ToList();
-
-        var targetById = new Dictionary<string, string>(StringComparer.Ordinal);
-        for (int i = 0; i < targetCells.Count; i++)
+        for (int i = 0; i < snapshot.cells.Count; i++)
         {
-            var id = targetCells[i].Id;
-            if (!targetById.ContainsKey(id))
-                targetById[id] = id;
-        }
-
-        var usedTargets = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new List<CellSnapshotDto>();
-        for (int i = 0; i < sourceCells.Count; i++)
-        {
-            var src = sourceCells[i];
-            if (!string.IsNullOrEmpty(src.cell) &&
-                targetById.TryGetValue(src.cell, out var targetId) &&
-                usedTargets.Add(targetId))
-            {
-                SaveSnapshotCellToLocal(targetId, src);
+            var src = snapshot.cells[i];
+            if (src == null || string.IsNullOrEmpty(src.cell))
                 continue;
-            }
+            if (!targetCells.ContainsKey(src.cell))
+                continue;
 
-            pending.Add(src);
+            var localData = G.Save.LoadCellData(src.cell);
+            if (localData != null && localData.Status != Item.Free)
+                continue;
+
+            SaveSnapshotCellToLocal(src.cell, src);
         }
-
-        var freeTargets = targetCells
-            .Select(c => c.Id)
-            .Where(id => !usedTargets.Contains(id))
-            .ToList();
-
-        var fallbackCount = Mathf.Min(freeTargets.Count, pending.Count);
-        for (int i = 0; i < fallbackCount; i++)
-            SaveSnapshotCellToLocal(freeTargets[i], pending[i]);
     }
 
     private void SaveSnapshotCellToLocal(string targetCellId, CellSnapshotDto source)
