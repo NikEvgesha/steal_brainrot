@@ -165,7 +165,10 @@
   - у второго клиента оффлайн-игрок продолжает отображаться как online,
   - при возврате сети оффлайн-клиента иногда телепортирует к базе.
 - Внесены доработки:
-  - `LobbyClient.ParseMembers(...)`: добавлен stale-offline фильтр для remote members по `updatedAt` (`remoteMemberStaleOfflineSec`, default 7s). Если timestamp старее порога, member локально переводится в offline, что очищает remote-slot/remote-player на клиенте наблюдателя.
+  - `LobbyClient.ParseMembers(...)`: добавлен stale-offline фильтр для remote members по `updatedAt` (`remoteMemberStaleOfflineSec`, default 15s). Если timestamp старее порога, member локально переводится в offline, что очищает remote-slot/remote-player на клиенте наблюдателя.
   - `RemoteBasesApplier.ApplyOfflineLocalOnly()`: возвращен безопасный сброс телепорт-маркеров; добавлен явный флаг suppress-next-teleport.
   - `LobbyClient.DisableOnline(...)`: для временных сетевых причин (`debug_simulated_offline`, `ws_not_in_lobby`, `server_unreachable`) теперь вызывается `RemoteBasesApplier.SuppressNextAutoTeleport()`, чтобы первый тик после reconnect не делал snap-back к базе.
+- По новому баг-репорту пользователя ("после подарка животного пропадает игрок" / "периодически пропадает игрок"):
+  - `LobbyClient.ParseMembers(...)` переписан на устойчивый dedupe по `playerId`: вместо `first wins` выбирается лучший кандидат (приоритеты: local > online > более свежий `updatedAt` > наличие позиций > наличие hand-data).
+  - Это закрывает сценарий, когда в одном state-пакете приходят дубли одного `playerId` (например, старый offline и новый online), и клиент раньше случайно брал неактуальную запись.
 - Статус: требуется повторный smoke на сценарии 3/4 (`NET OFF` 20-30s + возврат) для подтверждения.

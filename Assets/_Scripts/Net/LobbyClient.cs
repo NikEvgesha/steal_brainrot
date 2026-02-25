@@ -128,7 +128,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
     [Header("Debug Network")]
     [SerializeField] private bool debugSimulateOffline = false;
-    [SerializeField] private float remoteMemberStaleOfflineSec = 7f;
+    [SerializeField] private float remoteMemberStaleOfflineSec = 15f;
     [Header("WebSocket (pilot)")]
     [SerializeField] private bool useWebSocketLobby = true;
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
@@ -202,6 +202,12 @@ public class LobbyClient : MonoBehaviour
     private float _lastStateRecoverAt;
     private float _stateBackoffUntil;
     private float _lastHeartbeatSentAt;
+
+    private sealed class MemberParseCandidate
+    {
+        public LobbyMemberStateDto item;
+        public JObject raw;
+    }
 
     private void Awake()
     {
@@ -1941,68 +1947,64 @@ public class LobbyClient : MonoBehaviour
 
         _lastMembers.Clear();
         var localId = GetLocalPlayerId();
-        var seenMemberIds = new HashSet<string>();
         var seenRemoteIds = new HashSet<string>();
-        if (arr != null)
+
+        var candidates = BuildMemberCandidates(arr, localId);
+        for (int i = 0; i < candidates.Count; i++)
         {
-            foreach (var token in arr)
+            var obj = candidates[i].raw;
+            var item = candidates[i].item;
+            if (obj == null || item == null)
+                continue;
+
+            var isLocalMember = !string.IsNullOrEmpty(localId) && item.playerId == localId;
+
+            if (!isLocalMember && item.isOnline && IsRemoteMemberStale(item.updatedAt))
+                item.isOnline = false;
+
+            var baseToken = obj["baseData"];
+            if (!isLocalMember && baseToken != null && baseToken.Type != JTokenType.Null)
             {
-                var obj = token as JObject;
-                if (obj == null)
-                    continue;
-
-                var item = ParseMemberFast(obj);
-                if (!string.IsNullOrEmpty(item.playerId) && !seenMemberIds.Add(item.playerId))
-                    continue;
-                var isLocalMember = !string.IsNullOrEmpty(localId) && item.playerId == localId;
-
-                if (!isLocalMember && item.isOnline && IsRemoteMemberStale(item.updatedAt))
-                    item.isOnline = false;
-
-                var baseToken = obj["baseData"];
-                if (!isLocalMember && baseToken != null && baseToken.Type != JTokenType.Null)
+                item.baseDataRaw = baseToken.ToString(Formatting.None);
+                if (collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
                 {
-                    item.baseDataRaw = baseToken.ToString(Formatting.None);
-                    if (collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
-                    {
-                        remoteWithBase++;
-                        remoteBaseBytes += System.Text.Encoding.UTF8.GetByteCount(item.baseDataRaw);
-                    }
-
-                    if (!string.IsNullOrEmpty(item.playerId) &&
-                        _remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw) &&
-                        cachedRaw == item.baseDataRaw &&
-                        _remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
-                    {
-                        item.baseData = cachedSnapshot;
-                    }
-                    else
-                    {
-                        try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
-                        catch { item.baseData = null; }
-
-                        if (!string.IsNullOrEmpty(item.playerId))
-                        {
-                            _remoteBaseRawCache[item.playerId] = item.baseDataRaw;
-                            _remoteBaseSnapshotCache[item.playerId] = item.baseData;
-                        }
-                    }
-                }
-                else if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
-                {
-                    // Some state updates may omit baseData; keep last known snapshot
-                    // so remote bases do not appear empty until the next full update.
-                    if (_remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw))
-                        item.baseDataRaw = cachedRaw;
-                    if (_remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
-                        item.baseData = cachedSnapshot;
+                    remoteWithBase++;
+                    remoteBaseBytes += System.Text.Encoding.UTF8.GetByteCount(item.baseDataRaw);
                 }
 
-                if (!isLocalMember && item.isOnline && !string.IsNullOrEmpty(item.playerId))
-                    seenRemoteIds.Add(item.playerId);
+                if (!string.IsNullOrEmpty(item.playerId) &&
+                    _remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw) &&
+                    cachedRaw == item.baseDataRaw &&
+                    _remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
+                {
+                    item.baseData = cachedSnapshot;
+                }
+                else
+                {
+                    try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
+                    catch { item.baseData = null; }
 
-                _lastMembers.Add(item);
+                    if (!string.IsNullOrEmpty(item.playerId))
+                    {
+                        _remoteBaseRawCache[item.playerId] = item.baseDataRaw;
+                        _remoteBaseSnapshotCache[item.playerId] = item.baseData;
+                    }
+                }
             }
+            else if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
+            {
+                // Some state updates may omit baseData; keep last known snapshot
+                // so remote bases do not appear empty until the next full update.
+                if (_remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw))
+                    item.baseDataRaw = cachedRaw;
+                if (_remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
+                    item.baseData = cachedSnapshot;
+            }
+
+            if (!isLocalMember && item.isOnline && !string.IsNullOrEmpty(item.playerId))
+                seenRemoteIds.Add(item.playerId);
+
+            _lastMembers.Add(item);
         }
 
         if (_remoteBaseRawCache.Count > 0)
@@ -2033,6 +2035,123 @@ public class LobbyClient : MonoBehaviour
 
         if (collectTraffic)
             TrackParseTraffic(_lastMembers.Count, remoteWithBase, remoteBaseBytes, parseMs, applyMs);
+    }
+
+    private List<MemberParseCandidate> BuildMemberCandidates(JArray arr, string localId)
+    {
+        var result = new List<MemberParseCandidate>();
+        if (arr == null)
+            return result;
+
+        var byPlayerId = new Dictionary<string, MemberParseCandidate>(StringComparer.Ordinal);
+        var playerOrder = new List<string>();
+        var anonymous = new List<MemberParseCandidate>();
+
+        foreach (var token in arr)
+        {
+            var obj = token as JObject;
+            if (obj == null)
+                continue;
+
+            var item = ParseMemberFast(obj);
+            if (item == null)
+                continue;
+
+            var candidate = new MemberParseCandidate
+            {
+                item = item,
+                raw = obj
+            };
+
+            if (string.IsNullOrEmpty(item.playerId))
+            {
+                anonymous.Add(candidate);
+                continue;
+            }
+
+            if (byPlayerId.TryGetValue(item.playerId, out var existing))
+            {
+                if (ShouldReplaceMemberCandidate(existing.item, item, localId))
+                    byPlayerId[item.playerId] = candidate;
+                continue;
+            }
+
+            byPlayerId.Add(item.playerId, candidate);
+            playerOrder.Add(item.playerId);
+        }
+
+        for (int i = 0; i < playerOrder.Count; i++)
+        {
+            var pid = playerOrder[i];
+            if (byPlayerId.TryGetValue(pid, out var candidate))
+                result.Add(candidate);
+        }
+
+        if (anonymous.Count > 0)
+            result.AddRange(anonymous);
+
+        return result;
+    }
+
+    private bool ShouldReplaceMemberCandidate(LobbyMemberStateDto current, LobbyMemberStateDto candidate, string localId)
+    {
+        if (current == null)
+            return true;
+        if (candidate == null)
+            return false;
+
+        var currentIsLocal = !string.IsNullOrEmpty(localId) &&
+                             string.Equals(current.playerId, localId, StringComparison.Ordinal);
+        var candidateIsLocal = !string.IsNullOrEmpty(localId) &&
+                               string.Equals(candidate.playerId, localId, StringComparison.Ordinal);
+        if (currentIsLocal != candidateIsLocal)
+            return candidateIsLocal;
+
+        if (current.isOnline != candidate.isOnline)
+            return candidate.isOnline;
+
+        var updatedAtCmp = CompareUpdatedAt(candidate.updatedAt, current.updatedAt);
+        if (updatedAtCmp != 0)
+            return updatedAtCmp > 0;
+
+        var currentPosCount = current.positions != null ? current.positions.Count : 0;
+        var candidatePosCount = candidate.positions != null ? candidate.positions.Count : 0;
+        if (currentPosCount != candidatePosCount)
+            return candidatePosCount > currentPosCount;
+
+        var currentHasHand = HasHandData(current.hand);
+        var candidateHasHand = HasHandData(candidate.hand);
+        if (currentHasHand != candidateHasHand)
+            return candidateHasHand;
+
+        return false;
+    }
+
+    private int CompareUpdatedAt(string lhs, string rhs)
+    {
+        var lhsOk = TryParseServerUtc(lhs, out var lhsUtc);
+        var rhsOk = TryParseServerUtc(rhs, out var rhsUtc);
+
+        if (lhsOk && rhsOk)
+            return lhsUtc.CompareTo(rhsUtc);
+        if (lhsOk)
+            return 1;
+        if (rhsOk)
+            return -1;
+
+        return 0;
+    }
+
+    private static bool HasHandData(LobbyHandItemDto hand)
+    {
+        if (hand == null)
+            return false;
+
+        return !string.IsNullOrWhiteSpace(hand.type) ||
+               !string.IsNullOrWhiteSpace(hand.id) ||
+               hand.element.HasValue ||
+               hand.weight.HasValue ||
+               hand.income.HasValue;
     }
 
     private LobbyMemberStateDto ParseMemberFast(JObject obj)
