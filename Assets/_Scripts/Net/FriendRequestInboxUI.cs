@@ -6,6 +6,7 @@ using UnityEngine.UI;
 public class FriendRequestInboxUI : MonoBehaviour
 {
     [SerializeField] private float pollIntervalSec = 2f;
+    [SerializeField] private bool useUniversalPopup = true;
 
     private Canvas _canvas;
     private GameObject _panel;
@@ -51,21 +52,36 @@ public class FriendRequestInboxUI : MonoBehaviour
                 Hide();
             }
 
+            var popupOpen = useUniversalPopup && FriendsPanelController.IsPopupOpen();
             if (TryResolveApi(out var api) && !_inFlight)
             {
+                if (popupOpen)
+                {
+                    yield return new WaitForSecondsRealtime(pollIntervalSec);
+                    continue;
+                }
+
                 _inFlight = true;
                 List<FriendsApi.FriendRequestItem> list = null;
                 yield return api.GetFriendRequests(items => list = items, (_, __) => list = null);
                 _inFlight = false;
 
                 if (list != null && list.Count > 0)
-                    ShowRequest(list[0]);
+                {
+                    var first = list[0];
+                    if (!TryShowRequestInUniversalPopup(first))
+                        ShowRequest(first);
+                }
                 else
-                    Hide();
+                {
+                    if (!popupOpen)
+                        Hide();
+                }
             }
             else
             {
-                Hide();
+                if (!popupOpen)
+                    Hide();
             }
 
             yield return new WaitForSecondsRealtime(pollIntervalSec);
@@ -130,6 +146,34 @@ public class FriendRequestInboxUI : MonoBehaviour
         Hide();
         if (ok)
             FriendsPanelController.RequestLiveRefresh();
+    }
+
+    private bool TryShowRequestInUniversalPopup(FriendsApi.FriendRequestItem request)
+    {
+        if (!useUniversalPopup || request == null || _api == null)
+            return false;
+
+        var name = string.IsNullOrWhiteSpace(request.displayName) ? "Player" : request.displayName;
+        var code = string.IsNullOrWhiteSpace(request.friendCode) ? "-" : request.friendCode;
+        var description = $"Запрос в друзья от {name} ({code})";
+
+        var shown = FriendsPanelController.TryShowPopup(new UniversalDecisionPopup.Request
+        {
+            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendRequestTitle", "Запрос в друзья"),
+            description = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, description),
+            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendAccept", "Принять"),
+            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendDecline", "Отклонить"),
+            onConfirm = () => StartCoroutine(AcceptFlow(request.requestId)),
+            onCancel = () => StartCoroutine(DeclineFlow(request.requestId)),
+            closeOnConfirm = true,
+            closeOnCancel = true,
+            closeButtonActsAsCancel = true
+        });
+
+        if (shown)
+            _current = request;
+
+        return shown;
     }
 
     private void CreateUI()

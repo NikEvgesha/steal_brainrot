@@ -15,6 +15,7 @@ public class FriendsPanelController : MonoBehaviour
 
     [Header("UI")]
     [SerializeField] private GameObject _ui;
+    [SerializeField] private UniversalDecisionPopup yenOrNotPopup;
 
     [Header("Deps")]
     private FriendsApi api;
@@ -59,6 +60,30 @@ public class FriendsPanelController : MonoBehaviour
             _instance.TryScheduleExternalRefresh();
     }
 
+    public static bool TryShowPopup(UniversalDecisionPopup.Request request)
+    {
+        if (_instance == null)
+            return false;
+
+        _instance.EnsureDecisionPopup();
+        if (_instance.yenOrNotPopup == null)
+            return false;
+        if (_instance.yenOrNotPopup.IsOpen)
+            return false;
+
+        _instance.yenOrNotPopup.Show(request);
+        return true;
+    }
+
+    public static bool IsPopupOpen()
+    {
+        if (_instance == null)
+            return false;
+
+        _instance.EnsureDecisionPopup();
+        return _instance.yenOrNotPopup != null && _instance.yenOrNotPopup.IsOpen;
+    }
+
     private void Awake()
     {
         _instance = this;
@@ -66,6 +91,7 @@ public class FriendsPanelController : MonoBehaviour
         if (save == null) save = G.Save;
         if (api == null) api = G.Backend.FriendsApi;
         EnsureRemoteBases();
+        EnsureDecisionPopup();
 
         renameButton.onClick.AddListener(() => StartCoroutine(RenameFlow()));
 
@@ -121,6 +147,7 @@ public class FriendsPanelController : MonoBehaviour
     private void OnGameInitialized()
     {
         EnsureRemoteBases();
+        EnsureDecisionPopup();
     }
     public void Close(MonoBehaviour ui)
     {
@@ -344,6 +371,43 @@ public class FriendsPanelController : MonoBehaviour
             remoteBases = found[0];
     }
 
+    private void EnsureDecisionPopup()
+    {
+        if (yenOrNotPopup != null)
+            return;
+
+        yenOrNotPopup = GetComponentInChildren<UniversalDecisionPopup>(true);
+        if (yenOrNotPopup != null)
+            return;
+
+        // Popup can be placed as a sibling under GameCanvas, not only inside FriendsPanel.
+        var canvas = GetComponentInParent<Canvas>(true);
+        if (canvas != null)
+            yenOrNotPopup = canvas.GetComponentInChildren<UniversalDecisionPopup>(true);
+
+        if (yenOrNotPopup != null)
+            return;
+
+        Transform popupRoot = null;
+        if (canvas != null)
+            popupRoot = FindChildByNameRecursive(canvas.transform, "YenOrNot");
+        if (popupRoot == null)
+            popupRoot = FindChildByNameRecursive(transform, "YenOrNot");
+        if (popupRoot == null)
+        {
+            var anyPopup = FindObjectsByType<UniversalDecisionPopup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (anyPopup != null && anyPopup.Length > 0)
+                yenOrNotPopup = anyPopup[0];
+        }
+
+        if (popupRoot == null || yenOrNotPopup != null)
+            return;
+
+        yenOrNotPopup = popupRoot.GetComponent<UniversalDecisionPopup>();
+        if (yenOrNotPopup == null)
+            yenOrNotPopup = popupRoot.gameObject.AddComponent<UniversalDecisionPopup>();
+    }
+
     void CopyMyCode()
     {
         var p = api.LocalProfile();
@@ -388,5 +452,23 @@ public class FriendsPanelController : MonoBehaviour
         yield return RefreshFriends();
         yield return RefreshRequests();
         _externalRefreshFlow = null;
+    }
+
+    private static Transform FindChildByNameRecursive(Transform parent, string targetName)
+    {
+        if (parent == null || string.IsNullOrWhiteSpace(targetName))
+            return null;
+
+        if (string.Equals(parent.name, targetName, StringComparison.Ordinal))
+            return parent;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            var found = FindChildByNameRecursive(parent.GetChild(i), targetName);
+            if (found != null)
+                return found;
+        }
+
+        return null;
     }
 }

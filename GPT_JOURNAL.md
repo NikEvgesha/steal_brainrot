@@ -129,3 +129,22 @@
   - `LobbyClient` поддерживает `SetDebugSimulateOffline(...)` и удерживает клиента в offline до отключения тумблера.
 - TODO расширен на multi-lobby soak:
   - добавлены сценарии 10-20 игроков (fill/dofill/создание нового лобби) и `join-with-friend` с требованием двух свободных слотов.
+
+### 2026-02-25 (универсальный popup + аудит локализации)
+- Добавлен универсальный контроллер `UniversalDecisionPopup` для экрана `YenOrNot`:
+  - умеет динамически менять title/description/тексты `Ok`/`Cancel`,
+  - принимает как localization keys, так и fallback raw-текст,
+  - поддерживает callbacks `onConfirm/onCancel`, `X` как cancel и hide-on-start.
+- `FriendsPanelController` теперь автоматически ищет `YenOrNot` и при необходимости добавляет на него `UniversalDecisionPopup` рантаймом (без обязательной ручной привязки в prefab).
+- Уточнена интеграция под текущую иерархию `GameCanvas`:
+  - `EnsureDecisionPopup()` теперь ищет popup не только внутри `FriendsPanel`, но и по всему `Canvas` (включая sibling-объект `YenOrNot`), плюс имеет scene-wide fallback на `FindObjectsByType<UniversalDecisionPopup>(IncludeInactive)`.
+  - Это устраняет сценарий, когда `TryShowPopup(...)` возвращал `false` при корректно добавленном `YenOrNot` в `GameCanvas`, но вне дочернего дерева `FriendsPanel`.
+- В `LocalizationData.asset` добавлены базовые ключи popup:
+  - `UI/Popup/ConfirmTitle`, `UI/Popup/ConfirmDescription`, `UI/Popup/Yes`, `UI/Popup/No`.
+- Для inbox-сценариев добавлены и используются ключи:
+  - `UI/Popup/GiftTitle`, `UI/Popup/GiftTake`, `UI/Popup/GiftDecline`,
+  - `UI/Popup/FriendRequestTitle`, `UI/Popup/FriendAccept`, `UI/Popup/FriendDecline`.
+- Быстрый аудит локализации:
+  - все `selectedKey` в prefab/scene резолвятся в `LocalizationData.asset` (пропусков не найдено),
+  - дубли ключей `Item/Dragon` и `Item/Potion` удалены,
+  - по новым popup-ключам есть пары `Ru/En`.

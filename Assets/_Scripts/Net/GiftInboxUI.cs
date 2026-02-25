@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class GiftInboxUI : MonoBehaviour
 {
     [SerializeField] private float pollIntervalSec = 2f;
+    [SerializeField] private bool useUniversalPopup = true;
 
     private Canvas _canvas;
     private GameObject _panel;
@@ -52,8 +53,15 @@ public class GiftInboxUI : MonoBehaviour
                 Hide();
             }
 
+            var popupOpen = useUniversalPopup && FriendsPanelController.IsPopupOpen();
             if (LobbyClient.Instance != null && LobbyClient.Instance.IsOnline && !_inFlight && !_autoAcceptInFlight)
             {
+                if (popupOpen)
+                {
+                    yield return new WaitForSeconds(pollIntervalSec);
+                    continue;
+                }
+
                 _inFlight = true;
                 List<GiftItemDto> list = null;
                 yield return LobbyClient.Instance.GetPendingGifts(r => list = r, (_, __) => list = null);
@@ -69,17 +77,21 @@ public class GiftInboxUI : MonoBehaviour
                     }
                     else
                     {
-                        ShowGift(list[0]);
+                        var first = list[0];
+                        if (!TryShowGiftInUniversalPopup(first))
+                            ShowGift(first);
                     }
                 }
                 else
                 {
-                    Hide();
+                    if (!popupOpen)
+                        Hide();
                 }
             }
             else
             {
-                Hide();
+                if (!popupOpen)
+                    Hide();
             }
 
             yield return new WaitForSeconds(pollIntervalSec);
@@ -148,6 +160,35 @@ public class GiftInboxUI : MonoBehaviour
 
         _autoAcceptInFlight = false;
         Hide();
+    }
+
+    private bool TryShowGiftInUniversalPopup(GiftItemDto gift)
+    {
+        if (!useUniversalPopup || gift == null)
+            return false;
+
+        var fromName = string.IsNullOrWhiteSpace(gift.fromDisplayName) ? "Player" : gift.fromDisplayName;
+        var itemType = string.IsNullOrWhiteSpace(gift.itemType) ? "-" : gift.itemType;
+        var itemId = string.IsNullOrWhiteSpace(gift.itemId) ? "-" : gift.itemId;
+        var description = $"Подарок от {fromName}: {itemType} ({itemId})";
+
+        var shown = FriendsPanelController.TryShowPopup(new UniversalDecisionPopup.Request
+        {
+            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftTitle", "Подарок"),
+            description = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, description),
+            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftTake", "Забрать"),
+            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftDecline", "Отказаться"),
+            onConfirm = () => StartCoroutine(AcceptFlow(gift)),
+            onCancel = () => StartCoroutine(DeclineFlow(gift)),
+            closeOnConfirm = true,
+            closeOnCancel = true,
+            closeButtonActsAsCancel = true
+        });
+
+        if (shown)
+            _current = gift;
+
+        return shown;
     }
 
     private void SpawnGiftItem(string itemType, string itemId)
