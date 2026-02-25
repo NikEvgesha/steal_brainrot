@@ -57,10 +57,10 @@ public class FieldManager : MonoBehaviour
         for (int i = 0; i < rowsCount; i++)
         {
             Transform row = _fieldParent.GetChild(i);
-            _fields.Add(row.GetComponentsInChildren<Field>().ToList());
+            _fields.Add(row.GetComponentsInChildren<Field>(true).ToList());
             _fields[i].ForEach(x =>
             {
-                if (!x.isActiveAndEnabled) { fieldId++; return; }
+                if (x == null) { fieldId++; return; }
                 x.SetID(fieldId);
                 x.Init();
                 if (G.Save.LoadFieldUnblockStatus(fieldId))

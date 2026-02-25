@@ -254,3 +254,13 @@
   - локальный слот не должен «проваливаться» в remote/unresolved;
   - интерактивы локальной базы (включая покупку земли молотком) остаются активными;
   - пропадает частичная загрузка, вызванная race на пустом `playerId`.
+
+### 2026-02-25 (доп. фикс: fallback local-slot + стабильные Field ID)
+- Добавлен fail-safe в `RemoteBasesApplier`:
+  - при unresolved local-slot (временный bootstrap без `playerId`) больше не делается `return`, а выбирается fallback-слот;
+  - `GetLocalSlotIndex()` теперь гарантирует fallback `0`, если id еще не доступен.
+- Для консистентной загрузки зон исправлена нумерация полей:
+  - `FieldManager.InitFields()` переведен на `GetComponentsInChildren<Field>(true)` (как и `ReloadFromSave`), чтобы не расходились `fieldId`/ключи между init и restore.
+- Цель:
+  - убрать состояние «всё не покупается» из-за ошибочного remote-режима локального слота;
+  - убрать частичную загрузку зон из-за рассинхрона field-id.
