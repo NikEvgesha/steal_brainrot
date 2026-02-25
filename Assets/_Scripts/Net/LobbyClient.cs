@@ -1968,44 +1968,46 @@ public class LobbyClient : MonoBehaviour
             if (!isLocalMember && item.isOnline && IsRemoteMemberStale(item.updatedAt))
                 item.isOnline = false;
 
-            var baseToken = obj["baseData"];
-            if (baseToken != null && baseToken.Type != JTokenType.Null)
+            if (!isLocalMember)
             {
-                item.baseDataRaw = baseToken.ToString(Formatting.None);
-                if (!isLocalMember && collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
+                var baseToken = obj["baseData"];
+                if (baseToken != null && baseToken.Type != JTokenType.Null)
                 {
-                    remoteWithBase++;
-                    remoteBaseBytes += System.Text.Encoding.UTF8.GetByteCount(item.baseDataRaw);
-                }
-
-                if (!isLocalMember &&
-                    !string.IsNullOrEmpty(item.playerId) &&
-                    _remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw) &&
-                    cachedRaw == item.baseDataRaw &&
-                    _remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
-                {
-                    item.baseData = cachedSnapshot;
-                }
-                else
-                {
-                    try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
-                    catch { item.baseData = null; }
-
-                    if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
+                    item.baseDataRaw = baseToken.ToString(Formatting.None);
+                    if (collectTraffic && !string.IsNullOrEmpty(item.baseDataRaw))
                     {
-                        _remoteBaseRawCache[item.playerId] = item.baseDataRaw;
-                        _remoteBaseSnapshotCache[item.playerId] = item.baseData;
+                        remoteWithBase++;
+                        remoteBaseBytes += System.Text.Encoding.UTF8.GetByteCount(item.baseDataRaw);
+                    }
+
+                    if (!string.IsNullOrEmpty(item.playerId) &&
+                        _remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw) &&
+                        cachedRaw == item.baseDataRaw &&
+                        _remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
+                    {
+                        item.baseData = cachedSnapshot;
+                    }
+                    else
+                    {
+                        try { item.baseData = JsonConvert.DeserializeObject<BaseSnapshotDto>(item.baseDataRaw); }
+                        catch { item.baseData = null; }
+
+                        if (!string.IsNullOrEmpty(item.playerId))
+                        {
+                            _remoteBaseRawCache[item.playerId] = item.baseDataRaw;
+                            _remoteBaseSnapshotCache[item.playerId] = item.baseData;
+                        }
                     }
                 }
-            }
-            else if (!isLocalMember && !string.IsNullOrEmpty(item.playerId))
-            {
-                // Some state updates may omit baseData; keep last known snapshot
-                // so remote bases do not appear empty until the next full update.
-                if (_remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw))
-                    item.baseDataRaw = cachedRaw;
-                if (_remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
-                    item.baseData = cachedSnapshot;
+                else if (!string.IsNullOrEmpty(item.playerId))
+                {
+                    // Some state updates may omit baseData; keep last known snapshot
+                    // so remote bases do not appear empty until the next full update.
+                    if (_remoteBaseRawCache.TryGetValue(item.playerId, out var cachedRaw))
+                        item.baseDataRaw = cachedRaw;
+                    if (_remoteBaseSnapshotCache.TryGetValue(item.playerId, out var cachedSnapshot))
+                        item.baseData = cachedSnapshot;
+                }
             }
 
             if (!isLocalMember && item.isOnline && !string.IsNullOrEmpty(item.playerId))
