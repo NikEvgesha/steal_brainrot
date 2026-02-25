@@ -166,5 +166,6 @@
   - при возврате сети оффлайн-клиента иногда телепортирует к базе.
 - Внесены доработки:
   - `LobbyClient.ParseMembers(...)`: добавлен stale-offline фильтр для remote members по `updatedAt` (`remoteMemberStaleOfflineSec`, default 7s). Если timestamp старее порога, member локально переводится в offline, что очищает remote-slot/remote-player на клиенте наблюдателя.
-  - `RemoteBasesApplier.ApplyOfflineLocalOnly()`: сохранены маркеры последнего телепорта (не сбрасываются на каждый offline), чтобы reconnect в тот же слот не делал лишний snap-back к базе.
+  - `RemoteBasesApplier.ApplyOfflineLocalOnly()`: возвращен безопасный сброс телепорт-маркеров; добавлен явный флаг suppress-next-teleport.
+  - `LobbyClient.DisableOnline(...)`: для временных сетевых причин (`debug_simulated_offline`, `ws_not_in_lobby`, `server_unreachable`) теперь вызывается `RemoteBasesApplier.SuppressNextAutoTeleport()`, чтобы первый тик после reconnect не делал snap-back к базе.
 - Статус: требуется повторный smoke на сценарии 3/4 (`NET OFF` 20-30s + возврат) для подтверждения.

@@ -878,10 +878,24 @@ public class LobbyClient : MonoBehaviour
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
         if (_remoteBases != null)
+        {
+            if (ShouldSuppressReconnectTeleport(reason))
+                _remoteBases.SuppressNextAutoTeleport();
             _remoteBases.ApplyOfflineLocalOnly();
+        }
 
         if (_reconnectLoop == null && !debugSimulateOffline)
             _reconnectLoop = StartCoroutine(ReconnectLoop());
+    }
+
+    private static bool ShouldSuppressReconnectTeleport(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            return false;
+
+        return string.Equals(reason, "debug_simulated_offline", StringComparison.Ordinal) ||
+               string.Equals(reason, "ws_not_in_lobby", StringComparison.Ordinal) ||
+               string.Equals(reason, "server_unreachable", StringComparison.Ordinal);
     }
 
     private bool IsAppBackgrounded()

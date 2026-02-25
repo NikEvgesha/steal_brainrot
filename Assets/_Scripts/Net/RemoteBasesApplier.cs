@@ -89,6 +89,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private bool[] _slotWithinSyncRange;
     private bool[] _slotIsBaselineVisual;
     private bool _didInitialFullLobbySync;
+    private bool _suppressNextAutoTeleport;
 
     private void Awake()
     {
@@ -145,8 +146,8 @@ public class RemoteBasesApplier : MonoBehaviour
             _teleportRoutine = null;
         }
 
-        // Keep last teleport markers across temporary offline/reconnect.
-        // This prevents unnecessary snap-back to base when the same player rejoins the same slot.
+        _lastTeleportedSlotIndex = -2;
+        _lastTeleportedPlayerId = null;
         _playerToSlot.Clear();
         _lobbyModeActive = true;
         _didInitialFullLobbySync = false;
@@ -1806,6 +1807,15 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
         }
 
+        if (_suppressNextAutoTeleport)
+        {
+            if (debugLogs) Debug.Log($"[Lobby] Auto-teleport suppressed for player {pid} at slot {idx}");
+            _lastTeleportedSlotIndex = idx;
+            _lastTeleportedPlayerId = pid;
+            _suppressNextAutoTeleport = false;
+            return;
+        }
+
         if (debugLogs) Debug.Log($"[Lobby] Teleport to slot {idx}");
         TeleportPlayerToSlot(idx);
         _lastTeleportedSlotIndex = idx;
@@ -2062,5 +2072,10 @@ public class RemoteBasesApplier : MonoBehaviour
         }
 
         return _lastLocalPlayerId;
+    }
+
+    public void SuppressNextAutoTeleport()
+    {
+        _suppressNextAutoTeleport = true;
     }
 }
