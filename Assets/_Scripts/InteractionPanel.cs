@@ -27,6 +27,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private bool _hasResumeProgress;
     private float _resumeProgress;
     private float _resumeUntilUnscaledTime;
+    private bool _awaitReleaseAfterComplete;
 
     public bool IsInteracting => _interactionInProgress;
 
@@ -84,7 +85,12 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void OnDisable()
     {
-        if (_interactionInProgress && _progress > 0f)
+        var canResumeAfterDisable =
+            _interactionInProgress &&
+            _progress > 0f &&
+            _progress < _nearCompleteThreshold;
+
+        if (canResumeAfterDisable)
         {
             _hasResumeProgress = true;
             _resumeProgress = _progress;
@@ -117,19 +123,31 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void Update()
     {
-        _interactionHold = _pointerHold || IsHoldPressed();
+        var holdPressed = _pointerHold || IsHoldPressed();
+        var interactPressed = IsInteractTriggered();
+
+        if (_awaitReleaseAfterComplete)
+        {
+            if (!holdPressed && !interactPressed)
+                _awaitReleaseAfterComplete = false;
+            else
+                return;
+        }
+
+        _interactionHold = holdPressed;
         if (_interactionInProgress) return;
 
-        if (IsInteractTriggered())
+        if (interactPressed)
         {
             StartInteraction();
         }
     }
     private void StartInteraction()
     {
-        if (_interactionInProgress)
+        if (_interactionInProgress || _awaitReleaseAfterComplete)
             return;
 
+        _awaitReleaseAfterComplete = false;
         _interactionInProgress = true;
         _progress = 0;
         InteractionStarted?.Invoke();
@@ -159,7 +177,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
                     _progress = 1f;
                     if (_fillImg != null)
                         _fillImg.fillAmount = 1f;
-                    InteractionComplete?.Invoke();
+                    NotifyInteractionCompleted();
                     completed = true;
                     break;
                 }
@@ -182,7 +200,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
             if (_progress >= 1f)
             {
-                InteractionComplete?.Invoke();
+                NotifyInteractionCompleted();
                 completed = true;
                 break;
             }
@@ -192,7 +210,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
         if (!completed && _progress >= 1f)
         {
-            InteractionComplete?.Invoke();
+            NotifyInteractionCompleted();
         }
 
         ResetProgress();
@@ -203,6 +221,12 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         if (_fillImg != null)
             _fillImg.fillAmount = 0;
         _interactionInProgress = false;
+    }
+
+    private void NotifyInteractionCompleted()
+    {
+        _awaitReleaseAfterComplete = true;
+        InteractionComplete?.Invoke();
     }
 
     public void SetInfo(string actionText, string price = null)
