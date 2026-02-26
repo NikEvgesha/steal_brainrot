@@ -362,3 +362,32 @@
   - `join-with` при свободном месте: игрок заходит в лобби друга;
   - `join-with` при полном лобби: пара переносится вместе в другое лобби.
 - По итогам пункт soak в `TODO_List.md` отмечен как закрытый (через синтетический прогон).
+
+### 2026-02-26 (server lobby allocation policy update under new target flow)
+- По уточненному целевому сценарию распределения (6/4/2 и дальнейшие friend-join переходы) в `zoogame-backend` обновлена серверная авто-алокация лобби:
+  - добавлен упорядоченный выбор лобби по `CreatedOrder`;
+  - добавлена reserve-проверка (сохранять минимум одно лобби с 2+ свободными слотами после авто-join);
+  - `join-with` при полном лобби переводится в best-fit лобби с нужным числом слотов (минимальный подходящий свободный остаток).
+- В тестовый скрипт добавлен точный сценарий пользователя: `--user-flow` (пошаговые ожидания 6/4/2 -> 5/4/3 -> 6/6/4/1 -> 5/5/6/1 и порядок следующих входов).
+- Серверный коммит: `f9ee753` (`zoogame-backend/main`).
+- Требуется деплой на прод и прогон:
+  - `python3 ops/lobby_soak_test.py --base-url https://api.igrodelnya-zoogame.ru --user-flow --capacity 6 --expect-empty`
+
+### 2026-02-26 (deploy + validation exact lobby flow on prod)
+- На `zoogame-backend` выполнен доп.фикс keepalive для polling-клиентов:
+  - `GET /lobby/state` теперь обновляет `LastUpdateUtc` для запрашивающего игрока.
+  - Причина: в длинном synthetic сценарии часть "тихих" игроков истекала по `LobbyTimeoutSec=30`, из-за чего появлялся `404 not_in_lobby` на шагах 5-7.
+- Тестовый скрипт `ops/lobby_soak_test.py` усилен:
+  - добавлен ранний fail с понятной заметкой, если на шаге 1 меньше 3 лобби (вместо `index out of range`).
+- Серверные коммиты:
+  - `f9ee753` — новая политика авто-распределения/`join-with` под целевой flow.
+  - `6b63ed9` — keepalive в `/lobby/state` + hardening `user-flow` скрипта.
+- Прод-деплой выполнен на `https://api.igrodelnya-zoogame.ru` (`/srv/farmgame`, `docker compose build api && up -d api`).
+- Результат прогона `--user-flow --expect-empty` на проде: **PASS**.
+  - `step1`: `6,4,2`
+  - `step2`: `5,4,3`
+  - `step3`: `6,6,4,1`
+  - `step4`: `5,5,6,1`
+  - `step5`: `6,5,6,1` (новый игрок -> lobby1)
+  - `step6`: `6,6,6,1` (новый игрок -> lobby2)
+  - `step7`: `6,6,6,2` (новый игрок -> lobby4)
