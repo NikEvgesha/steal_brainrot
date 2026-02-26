@@ -403,3 +403,20 @@
   - `UI/ClaimAll/CollectAd`
   - `UI/ClaimAll/NoAds`
 - `TODO_List.md` обновлен: пункт ClaimAll переведен в стадию "остался smoke в живой сцене" (без обязательной ручной привязки как блокера).
+
+### 2026-02-26 (ClaimAll: popup 3 действия + автосбор после покупки)
+- `ClaimAllCoinsZone` переведен на новый UX-сценарий:
+  - одно взаимодействие открывает popup с 3 действиями:
+    - `X` в `UniversalDecisionPopup` = закрыть без действия;
+    - `confirm` = `Забрать x2 (AD)`;
+    - `cancel` = `Купить навсегда` (кнопка не закрывает popup, если покупка не удалась).
+  - после покупки `навсегда` отключается interaction-кнопка в зоне и включается автосбор при входе в зону (`collectImmediatelyOnEnterAfterUnlock`) + периодический сбор, пока игрок стоит в зоне (`autoCollectIntervalSec`).
+- Сохранение unlock теперь scoped по зоне:
+  - ключ формируется как `ClaimAllNoAdsUnlocked.<zoneId>`;
+  - добавлен fallback-миграционный ридер со старого глобального ключа `ClaimAllNoAdsUnlocked`.
+- Добавлены локализационные ключи в `LocalizationData.asset`:
+  - `UI/ClaimAll/OpenPopup`
+  - `UI/ClaimAll/PopupTitle`
+  - `UI/ClaimAll/PopupDescription`
+  - `UI/ClaimAll/PopupCollectX2Ad`
+  - `UI/ClaimAll/PopupBuyForever`
