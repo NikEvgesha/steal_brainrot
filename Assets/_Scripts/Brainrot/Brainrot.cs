@@ -36,6 +36,7 @@ public class Brainrot : InventoryItem
     public GameObject Model => _modelPoint.gameObject;
     public double CurrentIncome => _currentIncome;
     public long LastIncomeCollectTime => _lastIncomeTime;
+    public bool HasCollectibleIncome => IsCollectibleLocal() && _currentIncome > 0d;
 
     private BrainrotInfoUI _canvas;
     private GameObject _model;
@@ -139,14 +140,39 @@ public class Brainrot : InventoryItem
     }
     private void GetIncome()
     {
-        G.Income.AddCoins(_currentIncome);
-        //G.Currency.AddCurrency(CurrencyType.Coins, _currentIncome);
-        _currentIncome = 0;
+        CollectIncome();
+    }
+
+    public double CollectIncome(bool playAudio = true)
+    {
+        if (!IsCollectibleLocal())
+            return 0d;
+
+        var collected = Math.Max(0d, _currentIncome);
+        if (collected <= 0d)
+            return 0d;
+
+        G.Income.AddCoins(collected);
+        _currentIncome = 0d;
         _lastIncomeTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        _floorListener.SaveData();
-        _canvas.UpdateIncome(_currentIncome);
-        if (_audio)
+
+        if (_floorListener != null)
+            _floorListener.SaveData();
+        if (_canvas != null)
+            _canvas.UpdateIncome(_currentIncome);
+        if (playAudio && _audio)
             _audio.Play();
+
+        return collected;
+    }
+
+    private bool IsCollectibleLocal()
+    {
+        if (_floorListener == null)
+            return false;
+
+        var field = _floorListener.GetComponentInParent<Field>();
+        return field != null && !field.IsRemoteMode;
     }
 
     private IEnumerator ProduceIncome()

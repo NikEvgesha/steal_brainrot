@@ -48,6 +48,8 @@ public class BigPetPoint : MonoBehaviour
     private bool _quickAccessBound;
 
     public double CurrentIncomePerSecond => _purchased ? _currentIncome : 0d;
+    public bool IsRemoteMode => _remoteMode;
+    public bool HasCollectibleIncome => !_remoteMode && _purchased && _accumulatedIncome > 0d;
 
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
@@ -318,10 +320,19 @@ public class BigPetPoint : MonoBehaviour
 
     private void GetIncome()
     {
-        if (_remoteMode) return;
-        if (!_purchased) return;
+        CollectIncome();
+    }
 
-        G.Income.AddCoins(_accumulatedIncome);
+    public double CollectIncome(bool playAudio = true)
+    {
+        if (_remoteMode) return 0d;
+        if (!_purchased) return 0d;
+
+        var collected = Math.Max(0d, _accumulatedIncome);
+        if (collected <= 0d)
+            return 0d;
+
+        G.Income.AddCoins(collected);
         _accumulatedIncome = 0;
         if (_petInfoUI != null)
             _petInfoUI.UpdateIncome(_accumulatedIncome);
@@ -329,8 +340,10 @@ public class BigPetPoint : MonoBehaviour
         var nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         _lastIncomeCollectTimestamp = DateTimeOffset.FromUnixTimeSeconds(nowTs).UtcDateTime;
         G.Save.SaveBigPetIncomeTime(nowTs.ToString(CultureInfo.InvariantCulture));
-        if (_audio)
+        if (playAudio && _audio)
             _audio.Play();
+
+        return collected;
     }
 
     private IEnumerator ProduceIncome()

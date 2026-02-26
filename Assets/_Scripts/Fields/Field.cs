@@ -20,6 +20,7 @@ public class Field : MonoBehaviour
     private bool _defaultUnblocked;
 
     public int ID => _id;
+    public bool IsRemoteMode => _remoteMode;
     
     private void Awake()
     {
