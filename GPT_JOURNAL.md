@@ -391,3 +391,15 @@
   - `step5`: `6,5,6,1` (новый игрок -> lobby1)
   - `step6`: `6,6,6,1` (новый игрок -> lobby2)
   - `step7`: `6,6,6,2` (новый игрок -> lobby4)
+
+### 2026-02-26 (next TODO: Claim all coins hardening)
+- В клиенте усилен `ClaimAllCoinsZone` для снижения ручной настройки в Unity:
+  - добавлена автопривязка `InteractionPanel` (claim/no-ads) по дочерним панелям и именам;
+  - добавлена автопривязка вспомогательных ссылок (`AudioSource`, `readyIndicator`);
+  - добавлено `ContextMenu` действие `ClaimAll/Auto Setup References` для ручной перепривязки в инспекторе.
+- В репозиторий добавлен отсутствующий `Assets/_Scripts/ClaimAllCoinsZone.cs.meta` (фикс GUID-стабильности скрипта между машинами).
+- В `LocalizationData.asset` добавлены ключи:
+  - `UI/ClaimAll/Collect`
+  - `UI/ClaimAll/CollectAd`
+  - `UI/ClaimAll/NoAds`
+- `TODO_List.md` обновлен: пункт ClaimAll переведен в стадию "остался smoke в живой сцене" (без обязательной ручной привязки как блокера).

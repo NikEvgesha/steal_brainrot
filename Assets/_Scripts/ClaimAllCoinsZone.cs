@@ -7,6 +7,10 @@ public class ClaimAllCoinsZone : MonoBehaviour
 {
     private const string NoAdsSaveKey = "ClaimAllNoAdsUnlocked";
 
+    [Header("Auto Setup")]
+    [SerializeField] private bool autoDiscoverPanels = true;
+    [SerializeField] private bool autoDiscoverAuxComponents = true;
+
     [Header("Panels")]
     [SerializeField] private InteractionPanel claimPanel;
     [SerializeField] private InteractionPanel noAdsUpgradePanel;
@@ -42,8 +46,15 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private void Awake()
     {
-        if (claimPanel == null)
-            claimPanel = GetComponentInChildren<InteractionPanel>(true);
+        AutoSetupReferences();
+    }
+
+    private void OnValidate()
+    {
+        if (Application.isPlaying)
+            return;
+
+        AutoSetupReferences();
     }
 
     private void Start()
@@ -116,6 +127,134 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
         StopCoroutine(_stateRoutine);
         _stateRoutine = null;
+    }
+
+    [ContextMenu("ClaimAll/Auto Setup References")]
+    private void AutoSetupReferences()
+    {
+        if (autoDiscoverPanels)
+            AutoAssignPanels();
+        if (autoDiscoverAuxComponents)
+            AutoAssignAuxComponents();
+    }
+
+    private void AutoAssignPanels()
+    {
+        var panels = GetComponentsInChildren<InteractionPanel>(true);
+        if (panels == null || panels.Length == 0)
+            return;
+
+        InteractionPanel fallbackClaim = null;
+        InteractionPanel fallbackNoAds = null;
+
+        for (var i = 0; i < panels.Length; i++)
+        {
+            var panel = panels[i];
+            if (panel == null)
+                continue;
+
+            if (IsLikelyNoAdsPanel(panel))
+            {
+                if (fallbackNoAds == null)
+                    fallbackNoAds = panel;
+                continue;
+            }
+
+            if (fallbackClaim == null)
+                fallbackClaim = panel;
+        }
+
+        if (claimPanel == null)
+            claimPanel = fallbackClaim ?? panels[0];
+
+        if (noAdsUpgradePanel == null)
+        {
+            if (fallbackNoAds != null && fallbackNoAds != claimPanel)
+            {
+                noAdsUpgradePanel = fallbackNoAds;
+            }
+            else
+            {
+                for (var i = 0; i < panels.Length; i++)
+                {
+                    if (panels[i] != null && panels[i] != claimPanel)
+                    {
+                        noAdsUpgradePanel = panels[i];
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (claimPanel == noAdsUpgradePanel)
+            noAdsUpgradePanel = null;
+    }
+
+    private void AutoAssignAuxComponents()
+    {
+        if (collectAudio == null)
+        {
+            collectAudio = GetComponent<AudioSource>();
+            if (collectAudio == null)
+                collectAudio = GetComponentInChildren<AudioSource>(true);
+        }
+
+        if (readyIndicator == null)
+        {
+            var marker = FindChildByNameToken(transform, "ready", "income", "indicator");
+            if (marker != null)
+                readyIndicator = marker.gameObject;
+        }
+    }
+
+    private static bool IsLikelyNoAdsPanel(InteractionPanel panel)
+    {
+        if (panel == null)
+            return false;
+
+        var name = panel.gameObject.name;
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        name = name.ToLowerInvariant();
+        return name.Contains("noads") ||
+               name.Contains("no_ads") ||
+               name.Contains("upgrade") ||
+               name.Contains("ads_off") ||
+               name.Contains("disable_ads");
+    }
+
+    private static Transform FindChildByNameToken(Transform root, params string[] tokens)
+    {
+        if (root == null || tokens == null || tokens.Length == 0)
+            return null;
+
+        var stack = new System.Collections.Generic.Stack<Transform>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            var lowerName = current.name != null ? current.name.ToLowerInvariant() : string.Empty;
+            var hit = false;
+            for (var i = 0; i < tokens.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(tokens[i]))
+                    continue;
+                if (lowerName.Contains(tokens[i].ToLowerInvariant()))
+                {
+                    hit = true;
+                    break;
+                }
+            }
+
+            if (hit && current != root)
+                return current;
+
+            for (var i = 0; i < current.childCount; i++)
+                stack.Push(current.GetChild(i));
+        }
+
+        return null;
     }
 
     private IEnumerator StateRefreshRoutine()
