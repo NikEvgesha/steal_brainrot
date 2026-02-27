@@ -19,6 +19,11 @@ public class ConveyorUI : MonoBehaviour
     [SerializeField] private GameObject _activeText;
     [SerializeField] private GameObject _notAvailableText;
     [SerializeField] private Text _dropChancesText;
+    [SerializeField] private bool _showLuckComparison = true;
+    [SerializeField] private string _chancesBaseLocalizationKey = "UI/Conveyor/ChancesBase";
+    [SerializeField] private string _chancesBaseText = "Without luck bonus";
+    [SerializeField] private string _chancesWithLuckLocalizationKey = "UI/Conveyor/ChancesWithLuck";
+    [SerializeField] private string _chancesWithLuckText = "With luck bonus";
     [SerializeField] private ConveyorLevelTab _tabPrefab;
     [SerializeField] private Transform _tansParent;
 
@@ -28,6 +33,7 @@ public class ConveyorUI : MonoBehaviour
     private int _currentActiveIdx;
     private List<ConveyorLevelTab> _tabs;
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChances = new();
+    private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChancesWithLuck = new();
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
@@ -138,37 +144,87 @@ public class ConveyorUI : MonoBehaviour
         return _cachedDropChances;
     }
 
+    public IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> GetCurrentDropChancesWithLuck()
+    {
+        return _cachedDropChancesWithLuck;
+    }
+
     private void UpdateDropChances(ConveyorLevel level)
     {
         _cachedDropChances.Clear();
+        _cachedDropChancesWithLuck.Clear();
         if (level == null)
             return;
 
-        var list = ConveyorDropChanceCalculator.BuildBrainrotChances(level);
-        if (list != null && list.Count > 0)
-            _cachedDropChances.AddRange(list);
+        var baseList = ConveyorDropChanceCalculator.BuildBrainrotChances(level, applyLuckBonus: false);
+        if (baseList != null && baseList.Count > 0)
+            _cachedDropChances.AddRange(baseList);
+
+        var luckList = ConveyorDropChanceCalculator.BuildBrainrotChances(level, applyLuckBonus: true);
+        if (luckList != null && luckList.Count > 0)
+            _cachedDropChancesWithLuck.AddRange(luckList);
 
         if (_dropChancesText == null)
             return;
 
-        if (_cachedDropChances.Count == 0)
+        if (_cachedDropChances.Count == 0 && _cachedDropChancesWithLuck.Count == 0)
         {
             _dropChancesText.text = string.Empty;
             return;
         }
 
         var sb = new StringBuilder();
-        for (int i = 0; i < _cachedDropChances.Count; i++)
+        if (_showLuckComparison)
         {
-            var row = _cachedDropChances[i];
-            if (i > 0) sb.Append('\n');
+            AppendSection(sb, L(_chancesBaseLocalizationKey, _chancesBaseText), _cachedDropChances);
+            if (_cachedDropChancesWithLuck.Count > 0)
+            {
+                if (sb.Length > 0)
+                    sb.Append('\n').Append('\n');
+                AppendSection(sb, L(_chancesWithLuckLocalizationKey, _chancesWithLuckText), _cachedDropChancesWithLuck);
+            }
+        }
+        else
+        {
+            AppendSection(sb, string.Empty, _cachedDropChancesWithLuck.Count > 0 ? _cachedDropChancesWithLuck : _cachedDropChances);
+        }
+
+        _dropChancesText.text = sb.ToString();
+    }
+
+    private static void AppendSection(StringBuilder sb, string title, IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> rows)
+    {
+        if (rows == null || rows.Count == 0)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            sb.Append(title);
+            sb.Append('\n');
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (i > 0)
+                sb.Append('\n');
             sb.Append(row.name);
             sb.Append(": ");
             sb.Append((row.chance * 100d).ToString("0.00"));
             sb.Append('%');
         }
+    }
 
-        _dropChancesText.text = sb.ToString();
+    private static string L(string key, string fallback)
+    {
+        if (LocalizationManager.Instance != null && LocalizationManager.Instance.LocalizationData != null)
+        {
+            var translated = LocalizationManager.Instance.LocalizationData.GetTranslation(key);
+            if (!string.IsNullOrWhiteSpace(translated) && !string.Equals(translated, key, StringComparison.Ordinal))
+                return translated;
+        }
+
+        return fallback;
     }
 
 }
@@ -215,6 +271,11 @@ public static class ConveyorDropChanceCalculator
 
     public static List<ChanceEntry> BuildBrainrotChances(ConveyorLevel level)
     {
+        return BuildBrainrotChances(level, applyLuckBonus: false);
+    }
+
+    public static List<ChanceEntry> BuildBrainrotChances(ConveyorLevel level, bool applyLuckBonus)
+    {
         var result = new List<ChanceEntry>();
         if (level == null || level.Eggs == null || level.Eggs.Count == 0)
             return result;
@@ -236,16 +297,40 @@ public static class ConveyorDropChanceCalculator
                 continue;
 
             var eggChance = Math.Max(0d, source.weight) / totalEggWeight;
-            var perBrainrot = eggChance / egg.Data.Brainrots.Count;
+
+            if (!applyLuckBonus)
+            {
+                var perBrainrot = eggChance / egg.Data.Brainrots.Count;
+                for (int j = 0; j < egg.Data.Brainrots.Count; j++)
+                {
+                    var brainrot = egg.Data.Brainrots[j];
+                    if (brainrot == null)
+                        continue;
+
+                    var id = GetId(brainrot.name, brainrot.Name);
+                    var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+                    AddOrAccumulate(aggregate, id, name, perBrainrot);
+                }
+                continue;
+            }
+
+            var weightSum = 0d;
+            for (int j = 0; j < egg.Data.Brainrots.Count; j++)
+                weightSum += GetLuckAdjustedWeight(egg.Data.Brainrots[j], egg.Data.Luck, applyLuckBonus);
+            if (weightSum <= 0d)
+                continue;
+
             for (int j = 0; j < egg.Data.Brainrots.Count; j++)
             {
                 var brainrot = egg.Data.Brainrots[j];
-                if (brainrot == null)
+                var itemWeight = GetLuckAdjustedWeight(brainrot, egg.Data.Luck, applyLuckBonus);
+                if (brainrot == null || itemWeight <= 0d)
                     continue;
 
+                var brainrotChance = eggChance * (itemWeight / weightSum);
                 var id = GetId(brainrot.name, brainrot.Name);
                 var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
-                AddOrAccumulate(aggregate, id, name, perBrainrot);
+                AddOrAccumulate(aggregate, id, name, brainrotChance);
             }
         }
 
@@ -256,26 +341,91 @@ public static class ConveyorDropChanceCalculator
 
     public static List<ChanceEntry> BuildBrainrotChances(Egg egg)
     {
+        return BuildBrainrotChances(egg, applyLuckBonus: false);
+    }
+
+    public static List<ChanceEntry> BuildBrainrotChances(Egg egg, bool applyLuckBonus)
+    {
         var result = new List<ChanceEntry>();
         if (egg == null || egg.Data.Brainrots == null || egg.Data.Brainrots.Count == 0)
             return result;
 
-        var chance = 1d / egg.Data.Brainrots.Count;
         var aggregate = new Dictionary<string, ChanceEntry>(StringComparer.Ordinal);
-        for (int i = 0; i < egg.Data.Brainrots.Count; i++)
-        {
-            var brainrot = egg.Data.Brainrots[i];
-            if (brainrot == null)
-                continue;
 
-            var id = GetId(brainrot.name, brainrot.Name);
-            var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
-            AddOrAccumulate(aggregate, id, name, chance);
+        if (!applyLuckBonus)
+        {
+            var chance = 1d / egg.Data.Brainrots.Count;
+            for (int i = 0; i < egg.Data.Brainrots.Count; i++)
+            {
+                var brainrot = egg.Data.Brainrots[i];
+                if (brainrot == null)
+                    continue;
+
+                var id = GetId(brainrot.name, brainrot.Name);
+                var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+                AddOrAccumulate(aggregate, id, name, chance);
+            }
+        }
+        else
+        {
+            var totalWeight = 0d;
+            for (int i = 0; i < egg.Data.Brainrots.Count; i++)
+                totalWeight += GetLuckAdjustedWeight(egg.Data.Brainrots[i], egg.Data.Luck, applyLuckBonus);
+            if (totalWeight <= 0d)
+                return result;
+
+            for (int i = 0; i < egg.Data.Brainrots.Count; i++)
+            {
+                var brainrot = egg.Data.Brainrots[i];
+                var weight = GetLuckAdjustedWeight(brainrot, egg.Data.Luck, applyLuckBonus);
+                if (brainrot == null || weight <= 0d)
+                    continue;
+
+                var id = GetId(brainrot.name, brainrot.Name);
+                var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+                AddOrAccumulate(aggregate, id, name, weight / totalWeight);
+            }
         }
 
         result.AddRange(aggregate.Values);
         result.Sort((a, b) => b.chance.CompareTo(a.chance));
         return result;
+    }
+
+    public static Brainrot PickRandomBrainrot(Egg egg, bool applyLuckBonus = true)
+    {
+        if (egg == null || egg.Data.Brainrots == null || egg.Data.Brainrots.Count == 0)
+            return null;
+
+        return PickRandomBrainrot(egg.Data.Brainrots, egg.Data.Luck, applyLuckBonus);
+    }
+
+    public static Brainrot PickRandomBrainrot(IReadOnlyList<Brainrot> brainrots, int luckMultiplier, bool applyLuckBonus = true)
+    {
+        if (brainrots == null || brainrots.Count == 0)
+            return null;
+
+        double totalWeight = 0d;
+        for (int i = 0; i < brainrots.Count; i++)
+            totalWeight += GetLuckAdjustedWeight(brainrots[i], luckMultiplier, applyLuckBonus);
+        if (totalWeight <= 0d)
+            return brainrots[UnityEngine.Random.Range(0, brainrots.Count)];
+
+        var roll = UnityEngine.Random.value * totalWeight;
+        var cursor = 0d;
+        for (int i = 0; i < brainrots.Count; i++)
+        {
+            var candidate = brainrots[i];
+            var w = GetLuckAdjustedWeight(candidate, luckMultiplier, applyLuckBonus);
+            if (w <= 0d)
+                continue;
+
+            cursor += w;
+            if (roll <= cursor)
+                return candidate;
+        }
+
+        return brainrots[brainrots.Count - 1];
     }
 
     private static void AddOrAccumulate(IDictionary<string, ChanceEntry> map, string id, string name, double deltaChance)
@@ -304,5 +454,36 @@ public static class ConveyorDropChanceCalculator
         if (!string.IsNullOrWhiteSpace(prefabName))
             return prefabName.Trim();
         return "unknown";
+    }
+
+    private static double GetLuckAdjustedWeight(Brainrot brainrot, int luckMultiplier, bool applyLuckBonus)
+    {
+        if (brainrot == null)
+            return 0d;
+        if (!applyLuckBonus)
+            return 1d;
+
+        var sanitizedLuck = Mathf.Clamp(luckMultiplier, 1, 10);
+        if (sanitizedLuck <= 1)
+            return 1d;
+
+        var tier = GetRarityTier(brainrot.RareType);
+        const double tierStep = 0.25d;
+        var extra = sanitizedLuck - 1;
+        return Math.Max(0.0001d, 1d + extra * tier * tierStep);
+    }
+
+    private static int GetRarityTier(RareType rareType)
+    {
+        return rareType switch
+        {
+            RareType.Common => 1,
+            RareType.Uncommon => 2,
+            RareType.Rare => 3,
+            RareType.Epic => 4,
+            RareType.Legendary => 5,
+            RareType.Mythic => 6,
+            _ => 1
+        };
     }
 }

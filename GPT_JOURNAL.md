@@ -420,3 +420,17 @@
   - `UI/ClaimAll/PopupDescription`
   - `UI/ClaimAll/PopupCollectX2Ad`
   - `UI/ClaimAll/PopupBuyForever`
+
+### 2026-02-26 (next TODO: экран шансов выпадения с/без бонусов удачи)
+- В `ConveyorUI` добавлен сравнительный вывод шансов:
+  - секция `без удачи`;
+  - секция `с удачей`.
+- `ConveyorDropChanceCalculator` расширен:
+  - перегрузки `BuildBrainrotChances(..., applyLuckBonus)`;
+  - единая функция lucky-weight по `RareType` и `Egg.Data.Luck`;
+  - метод `PickRandomBrainrot(...)` для реального ролла с той же формулой.
+- `Egg.GetRandomBrainrot()` переведен на калькулятор lucky-roll (`applyLuckBonus=true`), чтобы UI и фактический дроп использовали одинаковую математику.
+- В локализацию добавлены ключи:
+  - `UI/Conveyor/ChancesBase`
+  - `UI/Conveyor/ChancesWithLuck`
+- `TODO_List.md`: пункт экрана шансов переведен в `~` (остались smoke-тест и проверка баланса формулы удачи).

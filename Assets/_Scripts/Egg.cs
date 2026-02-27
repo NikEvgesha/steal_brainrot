@@ -317,6 +317,14 @@ public class Egg : InventoryItem
     private void SpawnBrainrot()
     {
         Brainrot brainrotPrefab = GetRandomBrainrot();
+        if (brainrotPrefab == null)
+        {
+            Debug.LogWarning("[Egg] Brainrot prefab is missing in roll, hatch aborted.");
+            _currentCell.LockCell(false);
+            Destroy(gameObject);
+            return;
+        }
+
         _data.DinamicData.WeightMultiplier = UnityEngine.Random.Range(1, brainrotPrefab.Data.MaxWeightMult);
         Brainrot brainrot = Instantiate(brainrotPrefab, _currentCell.transform);
         brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
@@ -328,6 +336,13 @@ public class Egg : InventoryItem
     }
     private Brainrot GetRandomBrainrot()
     {
+        if (_data.Brainrots == null || _data.Brainrots.Count == 0)
+            return null;
+
+        var picked = ConveyorDropChanceCalculator.PickRandomBrainrot(_data.Brainrots, _data.Luck, applyLuckBonus: true);
+        if (picked != null)
+            return picked;
+
         int rand = UnityEngine.Random.Range(0, _data.Brainrots.Count);
         return _data.Brainrots[rand];
     }
@@ -356,5 +371,3 @@ public class Egg : InventoryItem
     }
 
 }
-
-
