@@ -9,6 +9,7 @@ This document describes how to configure and test remote player likes in Unity c
 - Like button in remote profile popup (`RemoteProfilePopup`).
 - Likes counter for target player.
 - Limit: one like per target player per day (server-side rule).
+- Self-like is blocked on both client and server.
 - If player tries to like again on same day:
   - temporary popup notice appears,
   - repeated presses do not stack notices; timer is refreshed.

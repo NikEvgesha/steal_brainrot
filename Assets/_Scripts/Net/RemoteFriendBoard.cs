@@ -807,7 +807,34 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
     private bool HasLikeTarget()
     {
-        return !string.IsNullOrWhiteSpace(_targetPlayerId) || !string.IsNullOrWhiteSpace(_targetFriendCode);
+        var hasTarget = !string.IsNullOrWhiteSpace(_targetPlayerId) || !string.IsNullOrWhiteSpace(_targetFriendCode);
+        if (!hasTarget)
+            return false;
+
+        return !IsTargetLocalPlayer();
+    }
+
+    private bool IsTargetLocalPlayer()
+    {
+        if (G.Save == null)
+            return false;
+
+        var profile = G.Save.LoadBackendProfile();
+        if (!string.IsNullOrWhiteSpace(_targetPlayerId) &&
+            !string.IsNullOrWhiteSpace(profile.playerId) &&
+            string.Equals(_targetPlayerId, profile.playerId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_targetFriendCode) &&
+            !string.IsNullOrWhiteSpace(profile.friendCode) &&
+            string.Equals(_targetFriendCode, profile.friendCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private FriendsApi ResolveApi()
