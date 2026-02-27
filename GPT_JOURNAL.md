@@ -434,3 +434,17 @@
   - `UI/Conveyor/ChancesBase`
   - `UI/Conveyor/ChancesWithLuck`
 - `TODO_List.md`: пункт экрана шансов переведен в `~` (остались smoke-тест и проверка баланса формулы удачи).
+
+### 2026-02-27 (ClaimAll: remove global FindObjects from income scan)
+- `ClaimAllCoinsZone` refactored to cache income sources from local root instead of global runtime search each refresh.
+  - Added inspector-driven source config:
+    - `Income Sources Root`
+    - `Manual Income Cells`
+    - `Manual Big Pet Points`
+  - Added context action: `ClaimAll/Rebuild Income Sources Cache`.
+  - `CollectAllIncomeRaw()` and `HasCollectibleIncome()` now iterate cached local references.
+- `FieldCell` now exposes `CurrentBrainrot` for safe direct access from claim zone.
+- Popup resolve path improved:
+  - local root search first (`Popup Search Root`),
+  - optional global fallback preserved for compatibility.
+- Added setup doc: `Docs/CLAIM_ALL_COINS_ZONE_SETUP.md`.

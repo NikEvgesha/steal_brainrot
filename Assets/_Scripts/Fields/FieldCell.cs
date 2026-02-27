@@ -33,6 +33,8 @@ public class FieldCell : MonoBehaviour
 
     private bool _playerOnCell;
     public string Id { get { return _id; } }
+    public Brainrot CurrentBrainrot => _currentPet;
+
     private void Awake()
     {
         // Если id ещё не назначен — генерируем новый

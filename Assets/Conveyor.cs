@@ -5,6 +5,7 @@ using UnityEngine;
 public class Conveyor : MonoBehaviour
 {
     [SerializeField] private bool _remoteMode;
+    [SerializeField] private bool _openUiOnConveyorTrigger = true;
     [SerializeField] private float _spawnInterval;
     [SerializeField] private Material _mt;
     [SerializeField] private float _speed;
@@ -27,6 +28,8 @@ public class Conveyor : MonoBehaviour
 
     public float IncomeMultiplier => _level != null ? _level.IncomeMultiplier : 1f;
     public IReadOnlyList<ConveyorLevel> Levels => _levels;
+    public ConveyorUI Ui => _ui;
+    public bool IsRemoteMode => _remoteMode;
 
     private void Awake()
     {
@@ -249,12 +252,14 @@ public class Conveyor : MonoBehaviour
     public void _OnPlayerEnter()
     {
         if (_remoteMode) return;
+        if (!_openUiOnConveyorTrigger) return;
         _ui?.ToggleOpen(true);
     }
 
     public void _OnPlayerExit()
     {
         if (_remoteMode) return;
+        if (!_openUiOnConveyorTrigger) return;
         _ui?.ToggleOpen(false);
     }
 

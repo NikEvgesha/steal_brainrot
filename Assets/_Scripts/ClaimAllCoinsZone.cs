@@ -23,6 +23,16 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [SerializeField] private GameObject readyIndicator;
     [SerializeField] private AudioSource collectAudio;
 
+    [Header("Income Sources")]
+    [SerializeField] private bool autoDiscoverIncomeSources = true;
+    [SerializeField] private Transform incomeSourcesRoot;
+    [SerializeField] private List<FieldCell> manualIncomeCells = new();
+    [SerializeField] private List<BigPetPoint> manualBigPetPoints = new();
+
+    [Header("Popup Search")]
+    [SerializeField] private Transform popupSearchRoot;
+    [SerializeField] private bool allowGlobalPopupFallback = true;
+
     [Header("Claim Settings")]
     [SerializeField] private string rewardedAdId = "ClaimAllCoins";
     [SerializeField] private double rewardedMultiplier = 2d;
@@ -58,10 +68,14 @@ public class ClaimAllCoinsZone : MonoBehaviour
     private Coroutine _stateRoutine;
     private Coroutine _autoCollectRoutine;
     private string _resolvedSaveKey;
+    private readonly List<FieldCell> _cachedIncomeCells = new();
+    private readonly List<BigPetPoint> _cachedBigPetPoints = new();
+    private bool _incomeSourcesCached;
 
     private void Awake()
     {
         AutoSetupReferences();
+        EnsureIncomeSourcesCache(forceRebuild: true);
     }
 
     private void OnValidate()
@@ -70,18 +84,21 @@ public class ClaimAllCoinsZone : MonoBehaviour
             return;
 
         AutoSetupReferences();
+        EnsureIncomeSourcesCache(forceRebuild: true);
     }
 
     private void Start()
     {
         _resolvedSaveKey = ResolveUnlockSaveKey();
         _permanentUnlocked = LoadPermanentUnlocked();
+        EnsureIncomeSourcesCache(forceRebuild: true);
         RefreshVisualState();
     }
 
     private void OnEnable()
     {
         SubscribeEvents();
+        EnsureIncomeSourcesCache();
         RefreshVisualState();
     }
 
@@ -189,6 +206,23 @@ public class ClaimAllCoinsZone : MonoBehaviour
             if (marker != null)
                 readyIndicator = marker.gameObject;
         }
+
+        if (autoDiscoverIncomeSources && incomeSourcesRoot == null)
+            incomeSourcesRoot = transform.root;
+
+        if (autoDiscoverPopup && popupSearchRoot == null)
+        {
+            var canvas = GetComponentInParent<Canvas>(true);
+            popupSearchRoot = canvas != null ? canvas.transform : transform.root;
+        }
+
+        _incomeSourcesCached = false;
+    }
+
+    [ContextMenu("ClaimAll/Rebuild Income Sources Cache")]
+    private void RebuildIncomeSourcesCache()
+    {
+        EnsureIncomeSourcesCache(forceRebuild: true);
     }
 
     private IEnumerator StateRefreshRoutine()
@@ -396,24 +430,26 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private double CollectAllIncomeRaw()
     {
+        EnsureIncomeSourcesCache();
         double total = 0d;
 
-        var brainrots = FindObjectsByType<Brainrot>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (var i = 0; i < brainrots.Length; i++)
+        for (var i = 0; i < _cachedIncomeCells.Count; i++)
         {
-            if (brainrots[i] == null)
+            var cell = _cachedIncomeCells[i];
+            var brainrot = cell != null ? cell.CurrentBrainrot : null;
+            if (brainrot == null)
                 continue;
-            total += brainrots[i].CollectIncome(playAudio: false);
+            total += brainrot.CollectIncome(playAudio: false);
         }
 
         if (includeBigPetIncome)
         {
-            var bigPets = FindObjectsByType<BigPetPoint>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (var i = 0; i < bigPets.Length; i++)
+            for (var i = 0; i < _cachedBigPetPoints.Count; i++)
             {
-                if (bigPets[i] == null)
+                var bigPet = _cachedBigPetPoints[i];
+                if (bigPet == null)
                     continue;
-                total += bigPets[i].CollectIncome(playAudio: false);
+                total += bigPet.CollectIncome(playAudio: false);
             }
         }
 
@@ -422,24 +458,88 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private bool HasCollectibleIncome()
     {
-        var brainrots = FindObjectsByType<Brainrot>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (var i = 0; i < brainrots.Length; i++)
+        EnsureIncomeSourcesCache();
+
+        for (var i = 0; i < _cachedIncomeCells.Count; i++)
         {
-            if (brainrots[i] != null && brainrots[i].HasCollectibleIncome)
+            var cell = _cachedIncomeCells[i];
+            var brainrot = cell != null ? cell.CurrentBrainrot : null;
+            if (brainrot != null && brainrot.HasCollectibleIncome)
                 return true;
         }
 
         if (!includeBigPetIncome)
             return false;
 
-        var bigPets = FindObjectsByType<BigPetPoint>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (var i = 0; i < bigPets.Length; i++)
+        for (var i = 0; i < _cachedBigPetPoints.Count; i++)
         {
-            if (bigPets[i] != null && bigPets[i].HasCollectibleIncome)
+            var bigPet = _cachedBigPetPoints[i];
+            if (bigPet != null && bigPet.HasCollectibleIncome)
                 return true;
         }
 
         return false;
+    }
+
+    private void EnsureIncomeSourcesCache(bool forceRebuild = false)
+    {
+        if (_incomeSourcesCached && !forceRebuild)
+            return;
+
+        _cachedIncomeCells.Clear();
+        _cachedBigPetPoints.Clear();
+
+        var root = incomeSourcesRoot != null ? incomeSourcesRoot : transform.root;
+        if (root != null)
+        {
+            var cells = root.GetComponentsInChildren<FieldCell>(true);
+            for (var i = 0; i < cells.Length; i++)
+                TryAddIncomeCell(cells[i]);
+
+            var bigPets = root.GetComponentsInChildren<BigPetPoint>(true);
+            for (var i = 0; i < bigPets.Length; i++)
+                TryAddBigPetPoint(bigPets[i]);
+        }
+
+        if (manualIncomeCells != null)
+        {
+            for (var i = 0; i < manualIncomeCells.Count; i++)
+                TryAddIncomeCell(manualIncomeCells[i]);
+        }
+
+        if (manualBigPetPoints != null)
+        {
+            for (var i = 0; i < manualBigPetPoints.Count; i++)
+                TryAddBigPetPoint(manualBigPetPoints[i]);
+        }
+
+        _incomeSourcesCached = true;
+    }
+
+    private void TryAddIncomeCell(FieldCell cell)
+    {
+        if (cell == null)
+            return;
+        if (_cachedIncomeCells.Contains(cell))
+            return;
+
+        var field = cell.GetComponentInParent<Field>();
+        if (field != null && field.IsRemoteMode)
+            return;
+
+        _cachedIncomeCells.Add(cell);
+    }
+
+    private void TryAddBigPetPoint(BigPetPoint bigPet)
+    {
+        if (bigPet == null)
+            return;
+        if (_cachedBigPetPoints.Contains(bigPet))
+            return;
+        if (bigPet.IsRemoteMode)
+            return;
+
+        _cachedBigPetPoints.Add(bigPet);
     }
 
     private void RefreshVisualState()
@@ -476,9 +576,21 @@ public class ClaimAllCoinsZone : MonoBehaviour
         if (!autoDiscoverPopup)
             return null;
 
-        var popups = FindObjectsByType<UniversalDecisionPopup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        if (popups != null && popups.Length > 0)
-            decisionPopup = popups[0];
+        if (popupSearchRoot == null)
+        {
+            var canvas = GetComponentInParent<Canvas>(true);
+            popupSearchRoot = canvas != null ? canvas.transform : transform.root;
+        }
+
+        if (popupSearchRoot != null)
+            decisionPopup = popupSearchRoot.GetComponentInChildren<UniversalDecisionPopup>(true);
+
+        if (decisionPopup == null && allowGlobalPopupFallback)
+        {
+            var popups = FindObjectsByType<UniversalDecisionPopup>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (popups != null && popups.Length > 0)
+                decisionPopup = popups[0];
+        }
 
         return decisionPopup;
     }

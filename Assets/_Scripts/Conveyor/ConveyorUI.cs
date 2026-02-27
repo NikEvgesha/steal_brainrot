@@ -20,10 +20,13 @@ public class ConveyorUI : MonoBehaviour
     [SerializeField] private GameObject _notAvailableText;
     [SerializeField] private Text _dropChancesText;
     [SerializeField] private bool _showLuckComparison = true;
+    [SerializeField] private bool _showEggBreakdown = true;
     [SerializeField] private string _chancesBaseLocalizationKey = "UI/Conveyor/ChancesBase";
     [SerializeField] private string _chancesBaseText = "Without luck bonus";
     [SerializeField] private string _chancesWithLuckLocalizationKey = "UI/Conveyor/ChancesWithLuck";
     [SerializeField] private string _chancesWithLuckText = "With luck bonus";
+    [SerializeField] private string _eggBreakdownLocalizationKey = "UI/Conveyor/EggBreakdown";
+    [SerializeField] private string _eggBreakdownText = "Eggs and possible hatch outcomes";
     [SerializeField] private ConveyorLevelTab _tabPrefab;
     [SerializeField] private Transform _tansParent;
 
@@ -34,6 +37,7 @@ public class ConveyorUI : MonoBehaviour
     private List<ConveyorLevelTab> _tabs;
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChances = new();
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChancesWithLuck = new();
+    private readonly List<ConveyorDropChanceCalculator.EggBreakdownEntry> _cachedEggBreakdown = new();
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
@@ -65,6 +69,8 @@ public class ConveyorUI : MonoBehaviour
         EnsurePanel();
         if (_panel == null) return;
         _panel.SetActive(open);
+        if (open)
+            RefreshCurrentDropChances();
     }
 
     private void EnsurePanel()
@@ -149,10 +155,24 @@ public class ConveyorUI : MonoBehaviour
         return _cachedDropChancesWithLuck;
     }
 
+    public IReadOnlyList<ConveyorDropChanceCalculator.EggBreakdownEntry> GetCurrentEggBreakdown()
+    {
+        return _cachedEggBreakdown;
+    }
+
+    public void RefreshCurrentDropChances()
+    {
+        if (_currentLevelInfo == null)
+            return;
+
+        UpdateDropChances(_currentLevelInfo);
+    }
+
     private void UpdateDropChances(ConveyorLevel level)
     {
         _cachedDropChances.Clear();
         _cachedDropChancesWithLuck.Clear();
+        _cachedEggBreakdown.Clear();
         if (level == null)
             return;
 
@@ -164,10 +184,14 @@ public class ConveyorUI : MonoBehaviour
         if (luckList != null && luckList.Count > 0)
             _cachedDropChancesWithLuck.AddRange(luckList);
 
+        var eggBreakdown = ConveyorDropChanceCalculator.BuildEggBreakdown(level);
+        if (eggBreakdown != null && eggBreakdown.Count > 0)
+            _cachedEggBreakdown.AddRange(eggBreakdown);
+
         if (_dropChancesText == null)
             return;
 
-        if (_cachedDropChances.Count == 0 && _cachedDropChancesWithLuck.Count == 0)
+        if (_cachedDropChances.Count == 0 && _cachedDropChancesWithLuck.Count == 0 && _cachedEggBreakdown.Count == 0)
         {
             _dropChancesText.text = string.Empty;
             return;
@@ -187,6 +211,14 @@ public class ConveyorUI : MonoBehaviour
         else
         {
             AppendSection(sb, string.Empty, _cachedDropChancesWithLuck.Count > 0 ? _cachedDropChancesWithLuck : _cachedDropChances);
+        }
+
+        if (_showEggBreakdown && _cachedEggBreakdown.Count > 0)
+        {
+            if (sb.Length > 0)
+                sb.Append('\n').Append('\n');
+
+            AppendEggBreakdownSection(sb, _cachedEggBreakdown, _showLuckComparison);
         }
 
         _dropChancesText.text = sb.ToString();
@@ -215,6 +247,78 @@ public class ConveyorUI : MonoBehaviour
         }
     }
 
+    private void AppendEggBreakdownSection(
+        StringBuilder sb,
+        IReadOnlyList<ConveyorDropChanceCalculator.EggBreakdownEntry> eggRows,
+        bool showLuckComparison)
+    {
+        if (eggRows == null || eggRows.Count == 0)
+            return;
+
+        sb.Append(L(_eggBreakdownLocalizationKey, _eggBreakdownText));
+
+        for (int i = 0; i < eggRows.Count; i++)
+        {
+            var eggRow = eggRows[i];
+            if (eggRow == null || eggRow.egg == null)
+                continue;
+
+            sb.Append('\n');
+            sb.Append("- ");
+            sb.Append(eggRow.name);
+            sb.Append(": ");
+            sb.Append((eggRow.chance * 100d).ToString("0.00"));
+            sb.Append('%');
+
+            var perEggBase = ConveyorDropChanceCalculator.BuildBrainrotChances(eggRow.egg, applyLuckBonus: false);
+            if (perEggBase == null || perEggBase.Count == 0)
+                continue;
+
+            var perEggLuck = showLuckComparison
+                ? ConveyorDropChanceCalculator.BuildBrainrotChances(eggRow.egg, applyLuckBonus: true)
+                : null;
+            var luckById = BuildChanceLookup(perEggLuck);
+
+            for (int j = 0; j < perEggBase.Count; j++)
+            {
+                var row = perEggBase[j];
+                sb.Append('\n');
+                sb.Append("   - ");
+                sb.Append(row.name);
+                sb.Append(": ");
+                sb.Append((row.chance * 100d).ToString("0.00"));
+                sb.Append('%');
+
+                if (!showLuckComparison)
+                    continue;
+
+                if (luckById.TryGetValue(row.id ?? string.Empty, out var luckChance))
+                {
+                    sb.Append(" -> ");
+                    sb.Append((luckChance * 100d).ToString("0.00"));
+                    sb.Append('%');
+                }
+            }
+        }
+    }
+
+    private static Dictionary<string, double> BuildChanceLookup(IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> rows)
+    {
+        var map = new Dictionary<string, double>(StringComparer.Ordinal);
+        if (rows == null)
+            return map;
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row == null || string.IsNullOrWhiteSpace(row.id))
+                continue;
+            map[row.id] = row.chance;
+        }
+
+        return map;
+    }
+
     private static string L(string key, string fallback)
     {
         if (LocalizationManager.Instance != null && LocalizationManager.Instance.LocalizationData != null)
@@ -236,6 +340,15 @@ public static class ConveyorDropChanceCalculator
     {
         public string id;
         public string name;
+        public double chance;
+    }
+
+    [Serializable]
+    public class EggBreakdownEntry
+    {
+        public string id;
+        public string name;
+        public Egg egg;
         public double chance;
     }
 
@@ -272,6 +385,53 @@ public static class ConveyorDropChanceCalculator
     public static List<ChanceEntry> BuildBrainrotChances(ConveyorLevel level)
     {
         return BuildBrainrotChances(level, applyLuckBonus: false);
+    }
+
+    public static List<EggBreakdownEntry> BuildEggBreakdown(ConveyorLevel level)
+    {
+        var result = new List<EggBreakdownEntry>();
+        if (level == null || level.Eggs == null || level.Eggs.Count == 0)
+            return result;
+
+        var totalWeight = 0d;
+        for (int i = 0; i < level.Eggs.Count; i++)
+            totalWeight += Math.Max(0d, level.Eggs[i].weight);
+        if (totalWeight <= 0d)
+            return result;
+
+        var aggregate = new Dictionary<string, EggBreakdownEntry>(StringComparer.Ordinal);
+        for (int i = 0; i < level.Eggs.Count; i++)
+        {
+            var source = level.Eggs[i];
+            var egg = source.egg;
+            if (egg == null || source.weight <= 0f)
+                continue;
+
+            var chance = Math.Max(0d, source.weight) / totalWeight;
+            var id = GetId(egg.name, egg.Name);
+            var name = string.IsNullOrWhiteSpace(egg.Name) ? egg.name : egg.Name;
+            if (!aggregate.TryGetValue(id, out var entry))
+            {
+                entry = new EggBreakdownEntry
+                {
+                    id = id,
+                    name = string.IsNullOrWhiteSpace(name) ? id : name,
+                    egg = egg,
+                    chance = 0d
+                };
+                aggregate.Add(id, entry);
+            }
+            else if (entry.egg == null)
+            {
+                entry.egg = egg;
+            }
+
+            entry.chance += chance;
+        }
+
+        result.AddRange(aggregate.Values);
+        result.Sort((a, b) => b.chance.CompareTo(a.chance));
+        return result;
     }
 
     public static List<ChanceEntry> BuildBrainrotChances(ConveyorLevel level, bool applyLuckBonus)
