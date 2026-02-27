@@ -490,3 +490,14 @@
 ### 2026-02-27 (likes hardening: self-like guard on client)
 - `RemoteProfilePopup` now hides/blocks like actions when target resolves to local player (`playerId`/`friendCode` match local profile).
 - Server already had `cannot_like_self`; now client and server both enforce it.
+
+### 2026-02-27 (album requirements spec: eggs + animals + mentions)
+- Added product/tech spec: `Docs/ALBUM_SYSTEM_SPEC.md`.
+- Captured requirements:
+  - two tabs (`Eggs`, `Animals`), locked silhouette cards, `???` placeholders for locked info;
+  - unlock by first inventory obtain (egg/animal);
+  - rare-type tabs unlock by holding item with corresponding rare type;
+  - hierarchical mention flow (album -> tab -> card -> rare -> reward) with child-first clearing;
+  - first-discovery rewards (animal default `5` hard currency, egg reward configurable);
+  - persistent album progress schema and runtime integration events.
+- Updated TODO: album moved to in-progress (`[~]`) with next implementation steps.
