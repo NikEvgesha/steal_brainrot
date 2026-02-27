@@ -29,6 +29,7 @@ public class ConveyorUI : MonoBehaviour
     [SerializeField] private string _eggBreakdownText = "Eggs and possible hatch outcomes";
     [SerializeField] private ConveyorLevelTab _tabPrefab;
     [SerializeField] private Transform _tansParent;
+    [SerializeField] private EggDropCatalogUI _chancesPanel;
 
     private GameObject _panel;
     private bool _isOpen;
@@ -69,6 +70,7 @@ public class ConveyorUI : MonoBehaviour
         EnsurePanel();
         if (_panel == null) return;
         _panel.SetActive(open);
+        _chancesPanel.Close();
         if (open)
             RefreshCurrentDropChances();
     }
@@ -646,4 +648,5 @@ public static class ConveyorDropChanceCalculator
             _ => 1
         };
     }
+
 }

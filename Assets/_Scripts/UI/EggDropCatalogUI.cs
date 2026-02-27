@@ -34,6 +34,7 @@ public class EggDropCatalogUI : MonoBehaviour
     private void Awake()
     {
         AutoSetupReferences();
+        Refresh();
         ToggleOpen(false);
     }
 
