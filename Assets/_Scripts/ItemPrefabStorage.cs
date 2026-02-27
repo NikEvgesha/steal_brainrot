@@ -1,4 +1,5 @@
 using MirraGames.SDK;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class ItemPrefabStorage : MonoBehaviour
@@ -29,6 +30,14 @@ public class ItemPrefabStorage : MonoBehaviour
     {
         InventoryItem item = _eggs.GetByName(name);
         return item.GetComponent<Egg>();
+    }
+
+    public IReadOnlyList<Egg> GetAllEggPrefabs()
+    {
+        if (_eggs == null)
+            return System.Array.Empty<Egg>();
+
+        return _eggs.GetAllOfType<Egg>();
     }
 
     public Brainrot GetPet(string name)

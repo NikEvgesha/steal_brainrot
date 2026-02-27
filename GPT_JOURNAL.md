@@ -448,3 +448,13 @@
   - local root search first (`Popup Search Root`),
   - optional global fallback preserved for compatibility.
 - Added setup doc: `Docs/CLAIM_ALL_COINS_ZONE_SETUP.md`.
+
+### 2026-02-27 (separate egg-drop catalog UI)
+- Added separate runtime UI for egg drop chances across all eggs from project storage list:
+  - `Assets/_Scripts/UI/EggDropCatalogUI.cs`
+  - `Assets/_Scripts/UI/EggDropCatalogInteractionPoint.cs`
+- Added data access helpers:
+  - `ItemsList.Items` + `ItemsList.GetAllOfType<T>()`
+  - `ItemPrefabStorage.GetAllEggPrefabs()`
+- Flow: world interaction point opens dedicated panel; panel builds per-egg animal chances using `ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonus)`.
+- Added setup doc: `Docs/EGG_DROP_CATALOG_UI_SETUP.md`.

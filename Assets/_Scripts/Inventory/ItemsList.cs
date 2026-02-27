@@ -7,6 +7,7 @@ public class ItemsList : ScriptableObject
     [SerializeField] private List<InventoryItem> _items;
 
     private Dictionary<string, InventoryItem> _dict;
+    public IReadOnlyList<InventoryItem> Items => _items;
 
 
     public void Init()
@@ -23,5 +24,20 @@ public class ItemsList : ScriptableObject
         InventoryItem item = null;
         _dict.TryGetValue(name, out item);
         return item;
+    }
+
+    public List<T> GetAllOfType<T>() where T : InventoryItem
+    {
+        var result = new List<T>();
+        if (_items == null || _items.Count == 0)
+            return result;
+
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (_items[i] is T typed && typed != null)
+                result.Add(typed);
+        }
+
+        return result;
     }
 }
