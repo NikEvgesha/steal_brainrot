@@ -42,6 +42,8 @@ public class Inventory : MonoBehaviour
     private List<ItemSaveData> _foodSaveData;
 
     public UnityEvent<Item, List<InventoryItem>> ItemsUpdated;
+    public UnityEvent<InventoryItem> ItemAdded = new UnityEvent<InventoryItem>();
+    public UnityEvent<InventoryItem> ItemRemoved = new UnityEvent<InventoryItem>();
 
     private void Awake()
     {
@@ -114,6 +116,7 @@ public class Inventory : MonoBehaviour
         item.SellAllowed = true;
         item.OnInventoryAdd();
         G.QuickAccess.Add(item);
+        ItemAdded?.Invoke(item);
     }
 
     public void Remove(InventoryItem item)
@@ -143,6 +146,7 @@ public class Inventory : MonoBehaviour
                 break;
         }
         G.QuickAccess.Remove(item);
+        ItemRemoved?.Invoke(item);
     }
 
     public ReadOnlyCollection<InventoryItem> GetItems(Item type)

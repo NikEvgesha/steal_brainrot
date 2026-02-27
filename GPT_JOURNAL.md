@@ -501,3 +501,31 @@
   - first-discovery rewards (animal default `5` hard currency, egg reward configurable);
   - persistent album progress schema and runtime integration events.
 - Updated TODO: album moved to in-progress (`[~]`) with next implementation steps.
+
+### 2026-02-27 (album foundation implementation)
+- Added album runtime core:
+  - `Assets/_Scripts/UI/Album/AlbumProgressService.cs`
+  - tracks discovered eggs/animals, rare unlocks, mention flags, reward claim flags;
+  - persists via `SaveManager.SaveLevelStatus/GetLevelStatus` keys.
+- Added album UI foundation:
+  - `Assets/_Scripts/UI/Album/AlbumScreenController.cs`
+  - `Assets/_Scripts/UI/Album/AlbumEntryView.cs`
+  - `Assets/_Scripts/UI/Album/AlbumRareTabView.cs`
+- Integration points:
+  - `Assets/Inventory.cs`: emits `ItemAdded`/`ItemRemoved`.
+  - `Assets/_Scripts/Inventory/QuickAccessManager.cs`: sends held-item rare unlock signal.
+  - `Assets/_Scripts/GameBootstrap.cs`: creates `AlbumProgressService` at runtime.
+  - `Assets/Igrodelnya2.0/G.cs`: added `G.Album`.
+- Updated spec with implemented baseline and file map:
+  - `Docs/ALBUM_SYSTEM_SPEC.md`.
+
+### 2026-02-27 (album polish: mention hierarchy + setup guide)
+- Added missing Unity meta:
+  - `Assets/_Scripts/UI/Album/AlbumScreenController.cs.meta`.
+- Updated album card mention logic:
+  - `AlbumScreenController` card badge now stays active when any deeper mention exists (`card` or `reward` or matching `rare`), to better match nested mention flow.
+- Added step-by-step Unity wiring document:
+  - `Docs/ALBUM_SETUP.md` (scene object bindings, card/rare prefabs, localization keys, smoke checklist).
+- Updated status docs:
+  - `Assets/_Scripts/TODO_List.md`
+  - `Docs/ALBUM_SYSTEM_SPEC.md`

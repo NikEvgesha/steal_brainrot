@@ -46,6 +46,14 @@ public class ItemPrefabStorage : MonoBehaviour
         return item.GetComponent<Brainrot>();
     }
 
+    public IReadOnlyList<Brainrot> GetAllPetPrefabs()
+    {
+        if (_pets == null)
+            return System.Array.Empty<Brainrot>();
+
+        return _pets.GetAllOfType<Brainrot>();
+    }
+
 
     public Food GetFood(string name)
     {

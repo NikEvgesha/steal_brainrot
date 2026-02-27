@@ -40,6 +40,7 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_storage);
         Instantiate(_backend);
         Instantiate(_lobby);
+        new GameObject("AlbumProgressService").AddComponent<AlbumProgressService>();
 
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
         TryCreateRuntimeUi("FriendRequestInboxUI", "FriendRequestInboxUI");

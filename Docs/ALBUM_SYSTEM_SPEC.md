@@ -139,3 +139,29 @@ After refs are provided, update:
 - exact text blocks,
 - rare-type tab visuals,
 - mention icon style/placement.
+
+## 11) Current implementation baseline (2026-02-27)
+
+Implemented code foundation:
+- `Assets/_Scripts/UI/Album/AlbumProgressService.cs`
+  - discovery/unlock persistence for eggs/animals,
+  - rare-type unlock from held items,
+  - mention flags (card/reward/rare),
+  - reward claim flags.
+- `Assets/_Scripts/UI/Album/AlbumScreenController.cs`
+  - tabs (`Eggs`/`Animals`),
+  - card list generation from `ItemPrefabStorage`,
+  - locked/unlocked info panel state (`???` fallback),
+  - egg<->animal source/chance text blocks,
+  - reward claim action (gems).
+- `Assets/_Scripts/UI/Album/AlbumEntryView.cs`
+- `Assets/_Scripts/UI/Album/AlbumRareTabView.cs`
+
+Runtime integration:
+- `Assets/Inventory.cs`: new `ItemAdded`/`ItemRemoved` events.
+- `Assets/_Scripts/Inventory/QuickAccessManager.cs`: rare discover trigger on held item change.
+- `Assets/_Scripts/GameBootstrap.cs`: runtime spawn of `AlbumProgressService`.
+- `Assets/Igrodelnya2.0/G.cs`: global reference `G.Album`.
+
+Setup instructions:
+- `Docs/ALBUM_SETUP.md` (scene wiring, inspector bindings, localization keys, smoke checklist).
