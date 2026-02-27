@@ -282,7 +282,7 @@ public class RemoteFriendBoard : MonoBehaviour
                 StartCoroutine(SendRequest());
                 break;
             case BoardAction.ShowStats:
-                RemoteProfilePopup.Instance.Show(displayName, stats);
+                RemoteProfilePopup.Instance.Show(displayName, stats, playerId, friendCode);
                 break;
         }
     }
@@ -578,12 +578,26 @@ public class RemoteFriendBoard : MonoBehaviour
 public sealed class RemoteProfilePopup : MonoBehaviour
 {
     private static RemoteProfilePopup _instance;
+    private const float ExtraLikeNoticeSeconds = 2.5f;
 
     private Canvas _canvas;
     private GameObject _panel;
     private Text _title;
     private Text _body;
+    private Text _likes;
+    private Text _notice;
     private Button _closeButton;
+    private Button _likeButton;
+    private Text _likeButtonLabel;
+    private Coroutine _noticeRoutine;
+    private Coroutine _likeStateRoutine;
+    private Coroutine _sendLikeRoutine;
+    private FriendsApi _api;
+    private string _targetPlayerId;
+    private string _targetFriendCode;
+    private bool _likedToday;
+    private bool _likeRequestInFlight;
+    private int _likesCount;
 
     public static RemoteProfilePopup Instance
     {
@@ -613,13 +627,42 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         Hide();
     }
 
-    public void Show(string displayName, PlayerPublicStatsDto stats)
+    private void OnDestroy()
+    {
+        if (_closeButton != null)
+            _closeButton.onClick.RemoveListener(Hide);
+        if (_likeButton != null)
+            _likeButton.onClick.RemoveListener(OnLikePressed);
+    }
+
+    public void Show(string displayName, PlayerPublicStatsDto stats, string targetPlayerId = null, string targetFriendCode = null)
     {
         if (_panel == null)
             BuildUI();
 
         var playerName = string.IsNullOrWhiteSpace(displayName) ? L("UI/Common/Player", "Player") : displayName;
         var safeStats = stats ?? new PlayerPublicStatsDto();
+        _targetPlayerId = string.IsNullOrWhiteSpace(targetPlayerId) ? null : targetPlayerId;
+        _targetFriendCode = string.IsNullOrWhiteSpace(targetFriendCode) ? null : targetFriendCode;
+        _likedToday = false;
+        _likesCount = 0;
+        _likeRequestInFlight = false;
+
+        if (_noticeRoutine != null)
+        {
+            StopCoroutine(_noticeRoutine);
+            _noticeRoutine = null;
+        }
+        if (_sendLikeRoutine != null)
+        {
+            StopCoroutine(_sendLikeRoutine);
+            _sendLikeRoutine = null;
+        }
+        if (_likeStateRoutine != null)
+        {
+            StopCoroutine(_likeStateRoutine);
+            _likeStateRoutine = null;
+        }
 
         if (_title != null)
             _title.text = playerName;
@@ -633,12 +676,39 @@ public sealed class RemoteProfilePopup : MonoBehaviour
                 $"{L("UI/Profile/IncomeBigPet", "Big pet income/sec")}: {FormatValue(safeStats.bigPetIncomePerSec)}";
         }
 
+        UpdateLikeUi();
+
+        if (HasLikeTarget())
+        {
+            _likeStateRoutine = StartCoroutine(LoadLikeState());
+        }
+
         if (_panel != null)
             _panel.SetActive(true);
     }
 
     public void Hide()
     {
+        if (_noticeRoutine != null)
+        {
+            StopCoroutine(_noticeRoutine);
+            _noticeRoutine = null;
+        }
+        if (_sendLikeRoutine != null)
+        {
+            StopCoroutine(_sendLikeRoutine);
+            _sendLikeRoutine = null;
+        }
+        if (_likeStateRoutine != null)
+        {
+            StopCoroutine(_likeStateRoutine);
+            _likeStateRoutine = null;
+        }
+        _likeRequestInFlight = false;
+
+        if (_notice != null)
+            _notice.gameObject.SetActive(false);
+
         if (_panel != null)
             _panel.SetActive(false);
     }
@@ -672,7 +742,15 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         panelRect.offsetMax = Vector2.zero;
 
         _title = CreateText("Title", _panel.transform, new Vector2(0.06f, 0.78f), new Vector2(0.82f, 0.95f), TextAnchor.MiddleLeft, 38);
-        _body = CreateText("Body", _panel.transform, new Vector2(0.06f, 0.2f), new Vector2(0.94f, 0.74f), TextAnchor.UpperLeft, 28);
+        _body = CreateText("Body", _panel.transform, new Vector2(0.06f, 0.38f), new Vector2(0.94f, 0.74f), TextAnchor.UpperLeft, 28);
+        _likes = CreateText("Likes", _panel.transform, new Vector2(0.06f, 0.24f), new Vector2(0.6f, 0.34f), TextAnchor.MiddleLeft, 30);
+        _notice = CreateText("Notice", _panel.transform, new Vector2(0.06f, 0.08f), new Vector2(0.94f, 0.16f), TextAnchor.MiddleCenter, 24);
+        _notice.color = new Color(1f, 0.92f, 0.48f, 1f);
+        _notice.gameObject.SetActive(false);
+
+        _likeButton = CreateButton("LikeButton", _panel.transform, L("UI/Profile/LikeButton", "Like"), new Vector2(0.64f, 0.22f), new Vector2(0.94f, 0.36f));
+        _likeButtonLabel = _likeButton.GetComponentInChildren<Text>(true);
+        _likeButton.onClick.AddListener(OnLikePressed);
 
         _closeButton = CreateButton("CloseButton", _panel.transform, "X", new Vector2(0.84f, 0.82f), new Vector2(0.95f, 0.95f));
         _closeButton.onClick.AddListener(Hide);
@@ -725,6 +803,229 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     private static string FormatValue(double value)
     {
         return Math.Round(Math.Max(0d, value)).ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    private bool HasLikeTarget()
+    {
+        return !string.IsNullOrWhiteSpace(_targetPlayerId) || !string.IsNullOrWhiteSpace(_targetFriendCode);
+    }
+
+    private FriendsApi ResolveApi()
+    {
+        if (_api != null)
+            return _api;
+
+        if (G.Backend != null && G.Backend.FriendsApi != null)
+        {
+            _api = G.Backend.FriendsApi;
+            return _api;
+        }
+
+        _api = FindAnyObjectByType<FriendsApi>();
+        return _api;
+    }
+
+    private IEnumerator LoadLikeState()
+    {
+        var api = ResolveApi();
+        if (api == null)
+        {
+            UpdateLikeUi();
+            yield break;
+        }
+
+        var hasResponse = false;
+        FriendsApi.LikeStateResponse state = null;
+        yield return api.GetLikeState(
+            _targetPlayerId,
+            _targetFriendCode,
+            onOk: resp =>
+            {
+                hasResponse = true;
+                state = resp;
+            });
+
+        if (!hasResponse || state == null)
+        {
+            UpdateLikeUi();
+            yield break;
+        }
+
+        _likesCount = Mathf.Max(0, state.likesCount);
+        _likedToday = state.likedToday || !state.canLike;
+        UpdateLikeUi();
+    }
+
+    private void OnLikePressed()
+    {
+        if (!HasLikeTarget())
+            return;
+
+        if (_likeRequestInFlight)
+            return;
+
+        if (_likedToday)
+        {
+            ShowNotice(BuildAlreadyLikedText(null), ExtraLikeNoticeSeconds);
+            return;
+        }
+
+        var api = ResolveApi();
+        if (api == null)
+        {
+            ShowNotice(L("UI/Profile/LikeUnavailable", "Like is temporarily unavailable"), ExtraLikeNoticeSeconds);
+            return;
+        }
+
+        if (_sendLikeRoutine != null)
+        {
+            StopCoroutine(_sendLikeRoutine);
+            _sendLikeRoutine = null;
+        }
+
+        _sendLikeRoutine = StartCoroutine(SendLikeRoutine(api));
+    }
+
+    private IEnumerator SendLikeRoutine(FriendsApi api)
+    {
+        _likeRequestInFlight = true;
+        UpdateLikeUi();
+
+        var hasResponse = false;
+        FriendsApi.LikeSendResponse response = null;
+        long errCode = 0;
+        string errText = null;
+
+        yield return api.SendLike(
+            _targetPlayerId,
+            _targetFriendCode,
+            onOk: resp =>
+            {
+                hasResponse = true;
+                response = resp;
+            },
+            onErr: (code, text) =>
+            {
+                errCode = code;
+                errText = text;
+            });
+
+        _likeRequestInFlight = false;
+
+        if (!hasResponse || response == null)
+        {
+            Debug.LogWarning($"[RemoteProfilePopup] Like request failed: {errCode} {errText}");
+            ShowNotice(L("UI/Profile/LikeUnavailable", "Like is temporarily unavailable"), ExtraLikeNoticeSeconds);
+            UpdateLikeUi();
+            yield break;
+        }
+
+        _likesCount = Mathf.Max(0, response.likesCount);
+        _likedToday = response.likedToday || !response.canLike || response.ok;
+        UpdateLikeUi();
+
+        if (!response.ok)
+            ShowNotice(BuildAlreadyLikedText(response.nextLikeAtUtc), ExtraLikeNoticeSeconds);
+    }
+
+    private void UpdateLikeUi()
+    {
+        var hasTarget = HasLikeTarget();
+
+        if (_likes != null)
+        {
+            _likes.gameObject.SetActive(hasTarget);
+            if (hasTarget)
+                _likes.text = $"{L("UI/Profile/Likes", "Likes")}: {_likesCount}";
+        }
+
+        if (_likeButton != null)
+        {
+            _likeButton.gameObject.SetActive(hasTarget);
+            _likeButton.interactable = hasTarget && !_likeRequestInFlight && !_likedToday;
+        }
+
+        if (_likeButtonLabel != null)
+        {
+            if (!hasTarget)
+            {
+                _likeButtonLabel.text = string.Empty;
+            }
+            else if (_likeRequestInFlight)
+            {
+                _likeButtonLabel.text = L("UI/Common/Loading", "Loading...");
+            }
+            else if (_likedToday)
+            {
+                _likeButtonLabel.text = L("UI/Profile/LikedToday", "Liked today");
+            }
+            else
+            {
+                _likeButtonLabel.text = L("UI/Profile/LikeButton", "Like");
+            }
+        }
+
+        if (!hasTarget && _notice != null)
+            _notice.gameObject.SetActive(false);
+    }
+
+    private void ShowNotice(string text, float seconds)
+    {
+        if (_notice == null)
+            return;
+
+        _notice.text = text ?? string.Empty;
+        _notice.gameObject.SetActive(true);
+
+        if (_noticeRoutine != null)
+        {
+            StopCoroutine(_noticeRoutine);
+            _noticeRoutine = null;
+        }
+
+        _noticeRoutine = StartCoroutine(HideNoticeAfter(seconds));
+    }
+
+    private IEnumerator HideNoticeAfter(float seconds)
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.1f, seconds));
+        if (_notice != null)
+            _notice.gameObject.SetActive(false);
+        _noticeRoutine = null;
+    }
+
+    private string BuildAlreadyLikedText(string nextLikeAtUtc)
+    {
+        var baseText = L("UI/Profile/LikeAlreadyToday", "You already liked this player today");
+        if (!TryParseUtc(nextLikeAtUtc, out var nextUtc))
+            return baseText;
+
+        var remaining = nextUtc - DateTime.UtcNow;
+        if (remaining.TotalSeconds <= 0)
+            return baseText;
+
+        var hours = Mathf.Max(0, Mathf.FloorToInt((float)remaining.TotalHours));
+        var minutes = Mathf.Max(0, remaining.Minutes);
+        return $"{baseText} ({hours:00}:{minutes:00})";
+    }
+
+    private static bool TryParseUtc(string value, out DateTime utc)
+    {
+        utc = default;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        if (DateTimeOffset.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var dto))
+        {
+            utc = dto.UtcDateTime;
+            return true;
+        }
+
+        return false;
     }
 
     private static string L(string key, string fallback)

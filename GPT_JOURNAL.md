@@ -466,3 +466,23 @@
   - stats source: prefer `ZooBaseSnapshotSync.BuildSnapshotDto().playerStats`, fallback to runtime scan of local `FieldCell`/`BigPetPoint`.
 - Added setup doc: `Docs/LOCAL_PROFILE_BOARD_SETUP.md`.
 - Updated TODO: profile board moved to in-progress (`[~]`).
+
+### 2026-02-27 (remote likes: once per day per player)
+- Backend (`/Users/Roman/zoogame-backend`):
+  - Added DTOs in `src/Zoogame.Api/Models.cs` for likes API.
+  - Added lazy DB schema init for likes table:
+    - `player_like_daily(liker_player_id, target_player_id, liked_on)` with PK on the full tuple.
+  - Added endpoints in `src/Zoogame.Api/Program.cs`:
+    - `POST /likes/state` -> returns `likesCount`, `canLike`, `likedToday`, `nextLikeAtUtc`.
+    - `POST /likes/send` -> inserts daily like once, returns updated counter; repeat same day returns `ok=false`, `error=already_liked_today`.
+- Client (`/Users/Roman/steal_brainrot`):
+  - `Assets/_Scripts/Net/FriendsApi.cs`: added `GetLikeState(...)` and `SendLike(...)`.
+  - `Assets/_Scripts/Net/RemoteFriendBoard.cs`:
+    - `RemoteProfilePopup.Show(...)` now accepts `targetPlayerId/targetFriendCode`.
+    - `RemoteProfilePopup` got:
+      - like button,
+      - likes counter,
+      - temporary notification when like is pressed again same day,
+      - anti-spam behavior: repeated presses refresh the same notification timer (no stacking).
+- TODO updated:
+  - `Assets/_Scripts/TODO_List.md` "Лайки 1 раз в день" moved to in-progress (`[~]`), pending integration smoke.

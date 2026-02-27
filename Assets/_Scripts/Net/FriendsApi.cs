@@ -36,11 +36,35 @@ public class FriendsApi : MonoBehaviour
         public string createdAt;
     }
 
+    [Serializable]
+    public class LikeStateResponse
+    {
+        public int likesCount;
+        public bool canLike;
+        public bool likedToday;
+        public string nextLikeAtUtc;
+        public string targetPlayerId;
+        public string error;
+    }
+
+    [Serializable]
+    public class LikeSendResponse
+    {
+        public bool ok;
+        public int likesCount;
+        public bool canLike;
+        public bool likedToday;
+        public string nextLikeAtUtc;
+        public string targetPlayerId;
+        public string error;
+    }
+
 
     [Serializable] private class FriendAddRequest { public string friendCode; }
     [Serializable] private class FriendRequestCreateRequest { public string targetFriendCode; }
     [Serializable] private class FriendRequestDecisionRequest { public string requestId; }
     [Serializable] private class RenameRequest { public string displayName; }
+    [Serializable] private class LikeActionRequest { public string targetPlayerId; public string targetFriendCode; }
 
     private void Awake()
     {
@@ -316,5 +340,112 @@ public class FriendsApi : MonoBehaviour
         onOk?.Invoke(true);
     }
 
-}
+    public IEnumerator GetLikeState(
+        string targetPlayerId,
+        string targetFriendCode,
+        Action<LikeStateResponse> onOk = null,
+        Action<long, string> onErr = null)
+    {
+        var p = LocalProfile();
+        if (string.IsNullOrWhiteSpace(p.playerId))
+        {
+            onErr?.Invoke(0, "No playerId. Call EnsureGuest first.");
+            yield break;
+        }
 
+        if (string.IsNullOrWhiteSpace(targetPlayerId) && string.IsNullOrWhiteSpace(targetFriendCode))
+        {
+            onErr?.Invoke(0, "targetPlayerId or targetFriendCode required.");
+            yield break;
+        }
+
+        var url = baseUrl + "/likes/state";
+        var body = new LikeActionRequest
+        {
+            targetPlayerId = string.IsNullOrWhiteSpace(targetPlayerId) ? null : targetPlayerId.Trim(),
+            targetFriendCode = string.IsNullOrWhiteSpace(targetFriendCode) ? null : targetFriendCode.Trim().ToUpperInvariant()
+        };
+        var json = JsonUtility.ToJson(body);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        req.SetRequestHeader("X-Player-Id", p.playerId);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        LikeStateResponse resp;
+        try
+        {
+            resp = JsonUtility.FromJson<LikeStateResponse>(req.downloadHandler.text) ?? new LikeStateResponse();
+        }
+        catch
+        {
+            resp = new LikeStateResponse();
+        }
+
+        onOk?.Invoke(resp);
+    }
+
+    public IEnumerator SendLike(
+        string targetPlayerId,
+        string targetFriendCode,
+        Action<LikeSendResponse> onOk = null,
+        Action<long, string> onErr = null)
+    {
+        var p = LocalProfile();
+        if (string.IsNullOrWhiteSpace(p.playerId))
+        {
+            onErr?.Invoke(0, "No playerId. Call EnsureGuest first.");
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(targetPlayerId) && string.IsNullOrWhiteSpace(targetFriendCode))
+        {
+            onErr?.Invoke(0, "targetPlayerId or targetFriendCode required.");
+            yield break;
+        }
+
+        var url = baseUrl + "/likes/send";
+        var body = new LikeActionRequest
+        {
+            targetPlayerId = string.IsNullOrWhiteSpace(targetPlayerId) ? null : targetPlayerId.Trim(),
+            targetFriendCode = string.IsNullOrWhiteSpace(targetFriendCode) ? null : targetFriendCode.Trim().ToUpperInvariant()
+        };
+        var json = JsonUtility.ToJson(body);
+
+        using var req = new UnityWebRequest(url, "POST");
+        req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+        req.downloadHandler = new DownloadHandlerBuffer();
+        req.SetRequestHeader("Content-Type", "application/json");
+        req.SetRequestHeader("X-Player-Id", p.playerId);
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            yield break;
+        }
+
+        LikeSendResponse resp;
+        try
+        {
+            resp = JsonUtility.FromJson<LikeSendResponse>(req.downloadHandler.text) ?? new LikeSendResponse();
+        }
+        catch
+        {
+            resp = new LikeSendResponse();
+        }
+
+        onOk?.Invoke(resp);
+    }
+
+}
