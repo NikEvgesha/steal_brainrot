@@ -458,3 +458,11 @@
   - `ItemPrefabStorage.GetAllEggPrefabs()`
 - Flow: world interaction point opens dedicated panel; panel builds per-egg animal chances using `ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonus)`.
 - Added setup doc: `Docs/EGG_DROP_CATALOG_UI_SETUP.md`.
+
+### 2026-02-27 (local profile board interaction point)
+- Added `Assets/_Scripts/UI/LocalProfileBoardPoint.cs`:
+  - interaction point in world (`InteractionPanel` + trigger enter/exit),
+  - opens existing `RemoteProfilePopup` with local player stats,
+  - stats source: prefer `ZooBaseSnapshotSync.BuildSnapshotDto().playerStats`, fallback to runtime scan of local `FieldCell`/`BigPetPoint`.
+- Added setup doc: `Docs/LOCAL_PROFILE_BOARD_SETUP.md`.
+- Updated TODO: profile board moved to in-progress (`[~]`).
