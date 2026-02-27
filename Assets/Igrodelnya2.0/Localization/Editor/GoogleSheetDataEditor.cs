@@ -22,6 +22,13 @@ public class GoogleSheetDataEditor : Editor
             Debug.Log("Downloading data from Google Sheets...");
         }
 
+        if (GUILayout.Button("Upload Localization -> Sheet"))
+        {
+            script.UploadLocalizationToSheet();
+            EditorUtility.SetDirty(script);
+            Debug.Log("Uploading localization data to Google Sheets...");
+        }
+
         if (GUILayout.Button("Open Sheet in Browser"))
         {
             script.OpenSheetInBrowser();

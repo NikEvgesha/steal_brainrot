@@ -12,20 +12,23 @@ using UnityEditor;
 [CreateAssetMenu(fileName = "GoogleSheetData", menuName = "Google Sheets/Data")]
 public class GoogleSheetData : ScriptableObject
 {
-    [SerializeField] private string sheetId; // ID таблицы
-    [SerializeField] private string sheetName; // Имя листа (например, "Sheet1")
-    [SerializeField] private string credentialsPath = "Assets/Resources/credentials.json"; // Путь к JSON
-    [SerializeField] private LocalizationData localizationData; 
+    [SerializeField] private string sheetId;
+    [SerializeField] private string sheetName;
+    [SerializeField] private string credentialsPath = "Assets/Resources/credentials.json";
+    [SerializeField] private LocalizationData localizationData;
 
-
-    private SheetsService GetSheetsService()
+    private SheetsService GetSheetsService(bool readOnly)
     {
         try
         {
-            var credential = GoogleCredential.FromFile(credentialsPath)
-                .CreateScoped(SheetsService.Scope.SpreadsheetsReadonly);
+            var scopes = readOnly
+                ? new[] { SheetsService.Scope.SpreadsheetsReadonly }
+                : new[] { SheetsService.Scope.Spreadsheets };
 
-            return new SheetsService(new BaseClientService.Initializer()
+            var credential = GoogleCredential.FromFile(credentialsPath)
+                .CreateScoped(scopes);
+
+            return new SheetsService(new BaseClientService.Initializer
             {
                 HttpClientInitializer = credential,
                 ApplicationName = "UnityGoogleSheets",
@@ -48,8 +51,8 @@ public class GoogleSheetData : ScriptableObject
 
         try
         {
-            string range = $"{sheetName}!A1:Z";
-            var service = GetSheetsService();
+            var range = $"{sheetName}!A1:Z";
+            var service = GetSheetsService(readOnly: true);
 
             if (service == null)
             {
@@ -57,9 +60,7 @@ public class GoogleSheetData : ScriptableObject
                 return;
             }
 
-            SpreadsheetsResource.ValuesResource.GetRequest request =
-                service.Spreadsheets.Values.Get(sheetId, range);
-
+            var request = service.Spreadsheets.Values.Get(sheetId, range);
             ValueRange response = request.Execute();
             IList<IList<object>> values = response.Values;
 
@@ -67,9 +68,7 @@ public class GoogleSheetData : ScriptableObject
             {
                 List<string[]> data = new List<string[]>();
                 foreach (var row in values)
-                {
-                    data.Add(row.Select(cell => cell?.ToString() ?? "").ToArray());
-                }
+                    data.Add(row.Select(cell => cell?.ToString() ?? string.Empty).ToArray());
 
                 if (localizationData != null)
                 {
@@ -77,7 +76,7 @@ public class GoogleSheetData : ScriptableObject
                     Debug.Log("Localization data updated via Google Sheets API!");
 #if UNITY_EDITOR
                     EditorUtility.SetDirty(localizationData);
-                    AssetDatabase.SaveAssets();  // Сохраняем изменения в ScriptableObject
+                    AssetDatabase.SaveAssets();
 #endif
                 }
                 else
@@ -96,6 +95,90 @@ public class GoogleSheetData : ScriptableObject
         }
     }
 
+    public void UploadLocalizationToSheet()
+    {
+        if (string.IsNullOrEmpty(sheetId) || string.IsNullOrEmpty(sheetName))
+        {
+            Debug.LogError("Sheet ID or Sheet Name is empty!");
+            return;
+        }
+
+        if (localizationData == null)
+        {
+            Debug.LogError("LocalizationData is not assigned!");
+            return;
+        }
+
+        if (localizationData.Languages == null || localizationData.Languages.Count == 0)
+        {
+            Debug.LogError("LocalizationData has no languages.");
+            return;
+        }
+
+        try
+        {
+            var service = GetSheetsService(readOnly: false);
+            if (service == null)
+            {
+                Debug.LogError("Failed to initialize Google Sheets service.");
+                return;
+            }
+
+            var values = BuildSheetValues();
+            if (values.Count == 0)
+            {
+                Debug.LogWarning("No localization rows prepared for upload.");
+                return;
+            }
+
+            var clearRequest = new ClearValuesRequest();
+            service.Spreadsheets.Values.Clear(clearRequest, sheetId, $"{sheetName}!A:ZZ").Execute();
+
+            var valueRange = new ValueRange { Values = values };
+            var updateRequest = service.Spreadsheets.Values.Update(valueRange, sheetId, $"{sheetName}!A1");
+            updateRequest.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.RAW;
+            var updateResult = updateRequest.Execute();
+
+            Debug.Log($"Localization uploaded to Google Sheet. Rows: {values.Count}, UpdatedCells: {updateResult?.UpdatedCells ?? 0}");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"Failed to upload localization data: {ex.Message}");
+        }
+    }
+
+    private IList<IList<object>> BuildSheetValues()
+    {
+        var rows = new List<IList<object>>();
+        var header = new List<object> { "Key" };
+
+        for (var i = 0; i < localizationData.Languages.Count; i++)
+            header.Add(localizationData.Languages[i] ?? string.Empty);
+
+        rows.Add(header);
+
+        if (localizationData.Entries == null)
+            return rows;
+
+        foreach (var entry in localizationData.Entries)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.Key))
+                continue;
+
+            var row = new List<object> { entry.Key };
+            for (var i = 0; i < localizationData.Languages.Count; i++)
+            {
+                var value = (entry.Translations != null && i < entry.Translations.Count)
+                    ? entry.Translations[i]
+                    : string.Empty;
+                row.Add(value ?? string.Empty);
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
+    }
 
     public void OpenSheetInBrowser()
     {
@@ -104,6 +187,7 @@ public class GoogleSheetData : ScriptableObject
             Debug.LogError("Sheet ID is empty!");
             return;
         }
+
         Application.OpenURL($"https://docs.google.com/spreadsheets/d/{sheetId}");
     }
 }
