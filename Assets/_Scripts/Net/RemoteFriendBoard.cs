@@ -51,6 +51,12 @@ public class RemoteFriendBoard : MonoBehaviour
     private InventoryItem _lockedGiftItem;
 
     public InteractionPanel InteractionPanel => interactionPanel;
+    public bool HasRemoteData => _hasRemoteData;
+    public bool IsOnline => isOnline;
+    public string RemotePlayerId => playerId;
+    public string RemoteFriendCode => friendCode;
+    public string RemoteDisplayName => displayName;
+    public PlayerPublicStatsDto RemoteStats => stats;
 
     private void Awake()
     {

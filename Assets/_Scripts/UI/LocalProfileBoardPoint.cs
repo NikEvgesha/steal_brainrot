@@ -9,8 +9,13 @@ public class LocalProfileBoardPoint : MonoBehaviour
     [SerializeField] private RemoteBasesApplier remoteBases;
     [SerializeField] private Transform statsRoot;
     [SerializeField] private bool autoDiscoverReferences = true;
+    [SerializeField] private int slotIndexOverride = -1;
 
     [Header("Behavior")]
+    [SerializeField] private bool hideIfNoOnlinePlayerOnSlot = true;
+    [SerializeField] private bool allowLocalSlotFallback = true;
+    [SerializeField] private float targetRefreshIntervalSec = 0.3f;
+    [SerializeField] private bool closePopupWhenTargetUnavailable = true;
     [SerializeField] private bool closePopupOnExit = false;
     [SerializeField] private bool preferSnapshotStats = true;
 
@@ -21,6 +26,14 @@ public class LocalProfileBoardPoint : MonoBehaviour
     [SerializeField] private string playerFallbackText = "Player";
 
     private bool _playerInside;
+    private bool _hasTarget;
+    private bool _targetIsLocal;
+    private int _resolvedSlotIndex = -1;
+    private float _nextTargetRefreshAt;
+    private string _targetPlayerId;
+    private string _targetFriendCode;
+    private string _targetDisplayName;
+    private PlayerPublicStatsDto _targetStats;
 
     private void Awake()
     {
@@ -39,6 +52,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
     {
         if (interactionPanel != null)
             interactionPanel.InteractionComplete.AddListener(OnInteractionRequested);
+        RefreshTargetData(force: true);
         RefreshInteractionState();
     }
 
@@ -49,12 +63,20 @@ public class LocalProfileBoardPoint : MonoBehaviour
         HideInteraction();
     }
 
+    private void Update()
+    {
+        RefreshTargetData();
+        if (_playerInside)
+            RefreshInteractionState();
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (!other.CompareTag("Player"))
             return;
 
         _playerInside = true;
+        RefreshTargetData(force: true);
         RefreshInteractionState();
     }
 
@@ -74,9 +96,15 @@ public class LocalProfileBoardPoint : MonoBehaviour
         if (!_playerInside)
             return;
 
-        var stats = BuildStats();
-        var displayName = ResolveDisplayName();
-        RemoteProfilePopup.Instance.Show(displayName, stats);
+        RefreshTargetData(force: true);
+        if (!_hasTarget)
+            return;
+
+        RemoteProfilePopup.Instance.Show(
+            _targetDisplayName,
+            _targetStats ?? new PlayerPublicStatsDto(),
+            _targetPlayerId,
+            _targetFriendCode);
     }
 
     private PlayerPublicStatsDto BuildStats()
@@ -218,8 +246,9 @@ public class LocalProfileBoardPoint : MonoBehaviour
         if (interactionPanel == null)
             return;
 
-        interactionPanel.gameObject.SetActive(_playerInside);
-        if (_playerInside)
+        var canInteract = _playerInside && _hasTarget;
+        interactionPanel.gameObject.SetActive(canInteract);
+        if (canInteract)
             interactionPanel.SetInfo(L(interactionLocalizationKey, interactionTextFallback));
     }
 
@@ -250,6 +279,193 @@ public class LocalProfileBoardPoint : MonoBehaviour
             if (bases != null && bases.TryGetResolvedLocalSlotRoot(out var resolvedRoot))
                 statsRoot = resolvedRoot;
         }
+
+        if (slotIndexOverride < 0)
+        {
+            var bases = remoteBases;
+            if (bases != null && bases.TryResolveSlotIndex(transform, out var slotIndex))
+                _resolvedSlotIndex = slotIndex;
+        }
+    }
+
+    private void RefreshTargetData(bool force = false)
+    {
+        var now = Time.unscaledTime;
+        if (!force && now < _nextTargetRefreshAt)
+            return;
+
+        _nextTargetRefreshAt = now + Mathf.Max(0.1f, targetRefreshIntervalSec);
+
+        var hadTarget = _hasTarget;
+        var prevPlayerId = _targetPlayerId;
+        var prevFriendCode = _targetFriendCode;
+
+        var hasTarget = TryResolveSlotTarget(
+            out var playerId,
+            out var friendCode,
+            out var displayName,
+            out var stats,
+            out var isLocalTarget);
+
+        _hasTarget = hasTarget;
+        _targetIsLocal = hasTarget && isLocalTarget;
+
+        if (!hasTarget)
+        {
+            _targetPlayerId = null;
+            _targetFriendCode = null;
+            _targetDisplayName = null;
+            _targetStats = null;
+
+            if (hadTarget && closePopupWhenTargetUnavailable)
+                RemoteProfilePopup.Instance.Hide();
+            return;
+        }
+
+        _targetPlayerId = string.IsNullOrWhiteSpace(playerId) ? null : playerId;
+        _targetFriendCode = string.IsNullOrWhiteSpace(friendCode) ? null : friendCode;
+        _targetDisplayName = string.IsNullOrWhiteSpace(displayName) ? ResolveDisplayName() : displayName;
+        _targetStats = _targetIsLocal
+            ? BuildStats()
+            : (stats ?? new PlayerPublicStatsDto());
+
+        var targetChanged = !string.Equals(prevPlayerId, _targetPlayerId, StringComparison.Ordinal) ||
+                            !string.Equals(prevFriendCode, _targetFriendCode, StringComparison.Ordinal);
+        if (hadTarget && targetChanged && closePopupWhenTargetUnavailable)
+            RemoteProfilePopup.Instance.Hide();
+    }
+
+    private bool TryResolveSlotTarget(
+        out string playerId,
+        out string friendCode,
+        out string displayName,
+        out PlayerPublicStatsDto stats,
+        out bool isLocalTarget)
+    {
+        playerId = null;
+        friendCode = null;
+        displayName = null;
+        stats = null;
+        isLocalTarget = false;
+
+        var bases = GetRemoteBases();
+        var slotIndex = ResolveSlotIndex(bases);
+        if (bases != null && slotIndex >= 0)
+        {
+            if (bases.TryGetProfileTargetForSlot(
+                    slotIndex,
+                    out var boardPlayerId,
+                    out var boardFriendCode,
+                    out var boardDisplayName,
+                    out var boardStats,
+                    out var boardOnline))
+            {
+                if (!hideIfNoOnlinePlayerOnSlot || boardOnline)
+                {
+                    playerId = boardPlayerId;
+                    friendCode = boardFriendCode;
+                    displayName = boardDisplayName;
+                    stats = boardStats;
+                    isLocalTarget = IsLocalProfile(boardPlayerId, boardFriendCode);
+                    return true;
+                }
+            }
+
+            if (allowLocalSlotFallback && bases.IsLocalSlotForClient(slotIndex))
+            {
+                if (TryResolveLocalTarget(out playerId, out friendCode, out displayName, out stats))
+                {
+                    isLocalTarget = true;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (!allowLocalSlotFallback)
+            return false;
+
+        if (!TryResolveLocalTarget(out playerId, out friendCode, out displayName, out stats))
+            return false;
+
+        isLocalTarget = true;
+        return true;
+    }
+
+    private int ResolveSlotIndex(RemoteBasesApplier bases)
+    {
+        if (slotIndexOverride >= 0)
+            return slotIndexOverride;
+
+        if (_resolvedSlotIndex >= 0)
+            return _resolvedSlotIndex;
+
+        if (bases == null)
+            return -1;
+
+        if (bases.TryResolveSlotIndex(transform, out var slotIndex))
+        {
+            _resolvedSlotIndex = slotIndex;
+            return slotIndex;
+        }
+
+        if (statsRoot != null && bases.TryResolveSlotIndex(statsRoot, out slotIndex))
+        {
+            _resolvedSlotIndex = slotIndex;
+            return slotIndex;
+        }
+
+        return -1;
+    }
+
+    private bool TryResolveLocalTarget(
+        out string playerId,
+        out string friendCode,
+        out string displayName,
+        out PlayerPublicStatsDto stats)
+    {
+        playerId = null;
+        friendCode = null;
+        displayName = ResolveDisplayName();
+        stats = BuildStats();
+
+        if (G.Save != null)
+        {
+            var profile = G.Save.LoadBackendProfile();
+            playerId = string.IsNullOrWhiteSpace(profile.playerId) ? null : profile.playerId;
+            friendCode = string.IsNullOrWhiteSpace(profile.friendCode) ? null : profile.friendCode;
+            if (!string.IsNullOrWhiteSpace(profile.displayName))
+                displayName = profile.displayName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(playerId) || !string.IsNullOrWhiteSpace(friendCode))
+            return true;
+
+        return G.Player != null;
+    }
+
+    private bool IsLocalProfile(string playerId, string friendCode)
+    {
+        if (G.Save == null)
+            return false;
+
+        var profile = G.Save.LoadBackendProfile();
+        if (!string.IsNullOrWhiteSpace(playerId) &&
+            !string.IsNullOrWhiteSpace(profile.playerId) &&
+            string.Equals(playerId, profile.playerId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(friendCode) &&
+            !string.IsNullOrWhiteSpace(profile.friendCode) &&
+            string.Equals(friendCode, profile.friendCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static string L(string key, string fallback)

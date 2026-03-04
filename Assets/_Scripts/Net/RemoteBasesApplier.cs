@@ -1833,6 +1833,66 @@ public class RemoteBasesApplier : MonoBehaviour
         return null;
     }
 
+    public bool TryResolveSlotIndex(Transform context, out int slotIndex)
+    {
+        slotIndex = -1;
+        if (context == null || slots == null || slots.Count == 0)
+            return false;
+
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            if (slot == null || slot.root == null)
+                continue;
+
+            if (context == slot.root || context.IsChildOf(slot.root) || slot.root.IsChildOf(context))
+            {
+                slotIndex = i;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool IsLocalSlotForClient(int slotIndex)
+    {
+        return IsLocalSlotIndex(slotIndex);
+    }
+
+    public bool TryGetProfileTargetForSlot(
+        int slotIndex,
+        out string playerId,
+        out string friendCode,
+        out string displayName,
+        out PlayerPublicStatsDto stats,
+        out bool isOnline)
+    {
+        playerId = null;
+        friendCode = null;
+        displayName = null;
+        stats = null;
+        isOnline = false;
+
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count)
+            return false;
+
+        var slot = slots[slotIndex];
+        if (slot == null)
+            return false;
+
+        var board = GetBoardForSlot(slot);
+        if (board == null || !board.HasRemoteData)
+            return false;
+
+        playerId = board.RemotePlayerId;
+        friendCode = board.RemoteFriendCode;
+        displayName = board.RemoteDisplayName;
+        stats = board.RemoteStats;
+        isOnline = board.IsOnline;
+        return true;
+    }
+
     public bool TryGetResolvedLocalSlotRoot(out Transform root)
     {
         root = null;

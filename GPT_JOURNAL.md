@@ -529,3 +529,19 @@
 - Updated status docs:
   - `Assets/_Scripts/TODO_List.md`
   - `Docs/ALBUM_SYSTEM_SPEC.md`
+
+### 2026-02-27 (LocalProfileBoardPoint: slot owner + likes)
+- `LocalProfileBoardPoint` переработан под владельца конкретного слота:
+  - точка теперь резолвит слот (`Slot Index Override` или авто-резолв через `RemoteBasesApplier`),
+  - интеракция скрывается, если в этом слоте нет активного игрока,
+  - при взаимодействии открывается профиль именно владельца слота.
+- Для поддержки лайков в popup:
+  - `LocalProfileBoardPoint` передает в `RemoteProfilePopup.Show(...)` `playerId/friendCode`,
+  - это включает `Like`-блок для чужого игрока и корректно блокирует лайк самому себе.
+- Добавлены публичные accessor-ы у `RemoteFriendBoard` (id/code/name/stats/online/hasData).
+- В `RemoteBasesApplier` добавлены публичные helper-методы:
+  - `TryResolveSlotIndex(...)`,
+  - `IsLocalSlotForClient(...)`,
+  - `TryGetProfileTargetForSlot(...)`.
+- Обновлена документация:
+  - `Docs/LOCAL_PROFILE_BOARD_SETUP.md`.
