@@ -380,6 +380,12 @@ public class AlbumProgressService : MonoBehaviour
             return false;
 
         id = NormalizeId(item.Name);
+        if (string.IsNullOrEmpty(id))
+        {
+            var runtimeName = item.gameObject != null ? item.gameObject.name : item.name;
+            id = NormalizeId(StripCloneSuffix(runtimeName));
+        }
+
         rareType = item.RareType;
         return !string.IsNullOrEmpty(id);
     }
@@ -484,5 +490,18 @@ public class AlbumProgressService : MonoBehaviour
     private static bool IsValidRareType(RareType rareType)
     {
         return rareType != RareType.RareType;
+    }
+
+    private static string StripCloneSuffix(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var trimmed = value.Trim();
+        const string suffix = "(Clone)";
+        if (trimmed.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed.Substring(0, trimmed.Length - suffix.Length).TrimEnd();
+
+        return trimmed;
     }
 }

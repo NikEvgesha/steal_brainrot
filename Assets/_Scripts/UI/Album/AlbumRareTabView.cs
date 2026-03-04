@@ -35,13 +35,24 @@ public class AlbumRareTabView : MonoBehaviour
             titleText.text = title;
 
         if (lockOverlay != null)
+        {
             lockOverlay.SetActive(!unlocked);
+            if (lockOverlay.TryGetComponent<Graphic>(out var lockGraphic))
+                lockGraphic.raycastTarget = false;
+        }
 
         if (mentionBadge != null)
+        {
             mentionBadge.SetActive(hasMention);
+            if (mentionBadge.TryGetComponent<Graphic>(out var mentionGraphic))
+                mentionGraphic.raycastTarget = false;
+        }
 
         if (selectedFrame != null)
+        {
             selectedFrame.enabled = selected;
+            selectedFrame.raycastTarget = false;
+        }
     }
 
     private void OnClicked()

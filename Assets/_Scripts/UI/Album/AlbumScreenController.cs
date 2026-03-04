@@ -191,7 +191,10 @@ public class AlbumScreenController : MonoBehaviour
             gameObject.SetActive(open);
 
         if (open)
+        {
+            _selectedRareFilter = null;
             Refresh();
+        }
     }
 
     public void SetTabEggs()
@@ -233,72 +236,19 @@ public class AlbumScreenController : MonoBehaviour
         _catalogReady = false;
 
         var storage = itemStorage != null ? itemStorage : G.Storage;
-        if (storage == null)
+        var eggs = CollectAllEggPrefabs(storage);
+        var animals = CollectAllAnimalPrefabs(storage, eggs);
+        if (eggs.Count == 0 && animals.Count == 0)
             return;
 
         _catalogReady = true;
+        var seenEggIds = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < eggs.Count; i++)
+            AddEggEntryIfNeeded(eggs[i], seenEggIds);
 
-        var eggs = storage.GetAllEggPrefabs();
-        if (eggs != null)
-        {
-            var seenEggIds = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < eggs.Count; i++)
-            {
-                var egg = eggs[i];
-                if (egg == null)
-                    continue;
-
-                var canonicalId = AlbumProgressService.NormalizeId(egg.Name);
-                if (string.IsNullOrEmpty(canonicalId))
-                    canonicalId = AlbumProgressService.NormalizeId(egg.name);
-                if (string.IsNullOrEmpty(canonicalId) || !seenEggIds.Add(canonicalId))
-                    continue;
-
-                _eggEntries.Add(new EntryData
-                {
-                    type = AlbumEntityType.Egg,
-                    id = canonicalId,
-                    displayName = ResolveDisplayName(egg.Name, egg.name),
-                    icon = egg.Icon,
-                    rareType = egg.RareType,
-                    egg = egg
-                });
-
-                var chances = ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonusInChances);
-                _eggChanceByEggId[canonicalId] = chances ?? new List<ConveyorDropChanceCalculator.ChanceEntry>();
-            }
-        }
-
-        var animals = storage.GetAllPetPrefabs();
-        if (animals != null)
-        {
-            var seenAnimalIds = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < animals.Count; i++)
-            {
-                var pet = animals[i];
-                if (pet == null)
-                    continue;
-
-                var canonicalId = AlbumProgressService.NormalizeId(pet.Name);
-                if (string.IsNullOrEmpty(canonicalId))
-                    canonicalId = AlbumProgressService.NormalizeId(pet.name);
-                if (string.IsNullOrEmpty(canonicalId) || !seenAnimalIds.Add(canonicalId))
-                    continue;
-
-                _animalEntries.Add(new EntryData
-                {
-                    type = AlbumEntityType.Animal,
-                    id = canonicalId,
-                    displayName = ResolveDisplayName(pet.Name, pet.name),
-                    icon = pet.Icon,
-                    rareType = pet.RareType,
-                    animal = pet
-                });
-
-                AddAnimalAlias(canonicalId, pet.Name);
-                AddAnimalAlias(canonicalId, pet.name);
-            }
-        }
+        var seenAnimalIds = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < animals.Count; i++)
+            AddAnimalEntryIfNeeded(animals[i], seenAnimalIds);
 
         BuildAnimalSourcesFromEggs();
 
@@ -307,6 +257,159 @@ public class AlbumScreenController : MonoBehaviour
             _eggEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
             _animalEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
         }
+    }
+
+    private List<Egg> CollectAllEggPrefabs(ItemPrefabStorage storage)
+    {
+        var result = new List<Egg>();
+        var seen = new HashSet<Egg>();
+
+        if (storage != null)
+        {
+            var storageEggs = storage.GetAllEggPrefabs();
+            if (storageEggs != null)
+            {
+                for (var i = 0; i < storageEggs.Count; i++)
+                    AppendUniqueEgg(result, seen, storageEggs[i]);
+            }
+        }
+
+        var conveyors = FindObjectsByType<Conveyor>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (var i = 0; i < conveyors.Length; i++)
+        {
+            var conveyor = conveyors[i];
+            if (conveyor == null || conveyor.Levels == null)
+                continue;
+
+            var levels = conveyor.Levels;
+            for (var levelIndex = 0; levelIndex < levels.Count; levelIndex++)
+            {
+                var level = levels[levelIndex];
+                if (level == null)
+                    continue;
+
+                if (level.Eggs != null)
+                {
+                    for (var eggIndex = 0; eggIndex < level.Eggs.Count; eggIndex++)
+                    {
+                        var egg = level.Eggs[eggIndex].egg;
+                        AppendUniqueEgg(result, seen, egg);
+                    }
+                }
+
+                AppendUniqueEgg(result, seen, level.NewEgg);
+            }
+        }
+
+        return result;
+    }
+
+    private List<Brainrot> CollectAllAnimalPrefabs(ItemPrefabStorage storage, IReadOnlyList<Egg> eggs)
+    {
+        var result = new List<Brainrot>();
+        var seen = new HashSet<Brainrot>();
+
+        if (storage != null)
+        {
+            var storageAnimals = storage.GetAllPetPrefabs();
+            if (storageAnimals != null)
+            {
+                for (var i = 0; i < storageAnimals.Count; i++)
+                    AppendUniqueAnimal(result, seen, storageAnimals[i]);
+            }
+        }
+
+        if (eggs != null)
+        {
+            for (var i = 0; i < eggs.Count; i++)
+            {
+                var egg = eggs[i];
+                var drops = egg != null ? egg.Data?.Brainrots : null;
+                if (drops == null)
+                    continue;
+
+                for (var dropIndex = 0; dropIndex < drops.Count; dropIndex++)
+                    AppendUniqueAnimal(result, seen, drops[dropIndex]);
+            }
+        }
+
+        return result;
+    }
+
+    private void AddEggEntryIfNeeded(Egg egg, ISet<string> seenEggIds)
+    {
+        if (egg == null)
+            return;
+
+        var canonicalId = AlbumProgressService.NormalizeId(egg.Name);
+        if (string.IsNullOrEmpty(canonicalId))
+            canonicalId = AlbumProgressService.NormalizeId(egg.name);
+        if (string.IsNullOrEmpty(canonicalId))
+            return;
+        if (seenEggIds != null && !seenEggIds.Add(canonicalId))
+            return;
+
+        _eggEntries.Add(new EntryData
+        {
+            type = AlbumEntityType.Egg,
+            id = canonicalId,
+            displayName = ResolveDisplayName(egg.Name, egg.name),
+            icon = egg.Icon,
+            rareType = egg.RareType,
+            egg = egg
+        });
+
+        var chances = ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonusInChances);
+        _eggChanceByEggId[canonicalId] = chances ?? new List<ConveyorDropChanceCalculator.ChanceEntry>();
+    }
+
+    private void AddAnimalEntryIfNeeded(Brainrot pet, ISet<string> seenAnimalIds)
+    {
+        if (pet == null)
+            return;
+
+        var canonicalId = AlbumProgressService.NormalizeId(pet.Name);
+        if (string.IsNullOrEmpty(canonicalId))
+            canonicalId = AlbumProgressService.NormalizeId(pet.name);
+        if (string.IsNullOrEmpty(canonicalId))
+            return;
+        if (seenAnimalIds != null && !seenAnimalIds.Add(canonicalId))
+            return;
+
+        _animalEntries.Add(new EntryData
+        {
+            type = AlbumEntityType.Animal,
+            id = canonicalId,
+            displayName = ResolveDisplayName(pet.Name, pet.name),
+            icon = pet.Icon,
+            rareType = pet.RareType,
+            animal = pet
+        });
+
+        AddAnimalAlias(canonicalId, pet.Name);
+        AddAnimalAlias(canonicalId, pet.name);
+    }
+
+    private static void AppendUniqueEgg(ICollection<Egg> target, ISet<Egg> seen, Egg egg)
+    {
+        if (egg == null || seen == null || target == null)
+            return;
+
+        if (!seen.Add(egg))
+            return;
+
+        target.Add(egg);
+    }
+
+    private static void AppendUniqueAnimal(ICollection<Brainrot> target, ISet<Brainrot> seen, Brainrot pet)
+    {
+        if (pet == null || seen == null || target == null)
+            return;
+
+        if (!seen.Add(pet))
+            return;
+
+        target.Add(pet);
     }
 
     private void BuildAnimalSourcesFromEggs()
@@ -376,12 +479,13 @@ public class AlbumScreenController : MonoBehaviour
         _supportedRareTypes.Clear();
         _supportedRareTypes.AddRange(AlbumProgressService.GetSupportedRareTypes());
 
-        if (rareTabsRoot == null || rareTabPrefab == null)
+        if (rareTabsRoot == null)
             return;
 
         _rareViews.Clear();
+        var rareTemplateObject = rareTabPrefab != null ? rareTabPrefab.gameObject : null;
         var existingViews = rareTabsRoot.GetComponentsInChildren<AlbumRareTabView>(true)
-            .Where(x => x != null && x.gameObject != rareTabPrefab.gameObject)
+            .Where(x => x != null && x.gameObject != rareTemplateObject)
             .ToList();
 
         for (var i = 0; i < _supportedRareTypes.Count; i++)
@@ -392,9 +496,13 @@ public class AlbumScreenController : MonoBehaviour
             {
                 view = existingViews[i];
             }
-            else
+            else if (rareTabPrefab != null)
             {
                 view = Instantiate(rareTabPrefab, rareTabsRoot);
+            }
+            else
+            {
+                break;
             }
 
             view.gameObject.SetActive(true);
@@ -425,19 +533,12 @@ public class AlbumScreenController : MonoBehaviour
             var selected = _selectedRareFilter.HasValue && _selectedRareFilter.Value == rare;
             var hasMention = progress != null && HasRareMentionForCurrentTab(rare);
             var label = L(rareLabelKeyPrefix + rare, GetRareLabelFallback(rare));
-            view.Bind(label, unlocked, selected, hasMention, () => OnRarePressed(rare, unlocked));
+            view.Bind(label, unlocked, selected, hasMention, () => OnRarePressed(rare));
         }
     }
 
-    private void OnRarePressed(RareType rareType, bool unlocked)
+    private void OnRarePressed(RareType rareType)
     {
-        if (!unlocked)
-        {
-            if (infoLockedText != null)
-                infoLockedText.text = L(rareLockedKey, rareLockedFallback);
-            return;
-        }
-
         if (_selectedRareFilter.HasValue && _selectedRareFilter.Value == rareType)
             _selectedRareFilter = null;
         else
@@ -445,8 +546,12 @@ public class AlbumScreenController : MonoBehaviour
 
         if (progressService != null)
         {
-            var ids = CollectIdsByRareForCurrentTab(rareType);
-            progressService.MarkRareViewedForEntities(_currentTab, rareType, ids);
+            var unlocked = progressService.IsRareUnlocked(rareType);
+            if (unlocked)
+            {
+                var ids = CollectIdsByRareForCurrentTab(rareType);
+                progressService.MarkRareViewedForEntities(_currentTab, rareType, ids);
+            }
         }
 
         RebuildCards();
@@ -555,14 +660,14 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         if (infoLockedOverlay != null)
-            infoLockedOverlay.SetActive(true);
+            infoLockedOverlay.SetActive(false);
 
         var unknown = L(unknownKey, unknownFallback);
         if (infoTitle != null) infoTitle.text = unknown;
         if (infoDescription != null) infoDescription.text = unknown;
         if (infoIncome != null) infoIncome.text = unknown;
         if (infoSources != null) infoSources.text = unknown;
-        if (infoLockedText != null) infoLockedText.text = unknown;
+        if (infoLockedText != null) infoLockedText.text = string.Empty;
     }
 
     private void SetUnlockedInfo(EntryData entry)
@@ -684,6 +789,14 @@ public class AlbumScreenController : MonoBehaviour
         var rewardAmount = ResolveRewardAmount(entry);
         var claimed = progressService.IsRewardClaimed(entry.type, entry.id);
         var canClaim = progressService.CanClaimReward(entry.type, entry.id);
+
+        if (claimed)
+        {
+            rewardButton.gameObject.SetActive(false);
+            if (rewardMentionBadge != null)
+                rewardMentionBadge.SetActive(false);
+            return;
+        }
 
         rewardButton.onClick.RemoveListener(OnRewardPressed);
         rewardButton.onClick.AddListener(OnRewardPressed);
