@@ -78,11 +78,16 @@ public class AlbumProgressService : MonoBehaviour
         return LoadFlag(BuildRareGlobalKey("RareUnlocked", rareType));
     }
 
-    public bool HasRareMention(AlbumEntityType type, RareType rareType)
+    public bool HasRareMention(AlbumEntityType type, string id, RareType rareType)
     {
         if (!IsValidRareType(rareType))
             return false;
-        return LoadFlag(BuildRareTabKey("MentionRare", type, rareType));
+
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        return LoadFlag(BuildEntityRareKey("MentionRare", type, normalizedId, rareType));
     }
 
     public bool TryDiscoverFromInventoryItem(InventoryItem item)
@@ -95,10 +100,10 @@ public class AlbumProgressService : MonoBehaviour
 
     public bool TryDiscoverRareFromHeldItem(InventoryItem item)
     {
-        if (!TryMapItem(item, out var type, out _, out var rareType))
+        if (!TryMapItem(item, out var type, out var id, out var rareType))
             return false;
 
-        return TryDiscoverRareType(type, rareType);
+        return TryDiscoverRareType(type, id, rareType);
     }
 
     public bool TryDiscover(AlbumEntityType type, string id, RareType rareType)
@@ -118,7 +123,7 @@ public class AlbumProgressService : MonoBehaviour
                 Debug.Log($"[Album] Discovered {type}:{normalizedId}");
         }
 
-        if (TryDiscoverRareType(type, rareType))
+        if (TryDiscoverRareType(type, normalizedId, rareType))
             changed = true;
 
         if (changed)
@@ -129,9 +134,15 @@ public class AlbumProgressService : MonoBehaviour
 
     public bool TryDiscoverRareType(AlbumEntityType type, RareType rareType)
     {
+        return TryDiscoverRareType(type, null, rareType);
+    }
+
+    public bool TryDiscoverRareType(AlbumEntityType type, string id, RareType rareType)
+    {
         if (!IsValidRareType(rareType))
             return false;
 
+        var normalizedId = NormalizeId(id);
         var changed = false;
         if (!IsRareUnlocked(rareType))
         {
@@ -141,14 +152,17 @@ public class AlbumProgressService : MonoBehaviour
                 Debug.Log($"[Album] Rare unlocked {rareType}");
         }
 
-        var seenKey = BuildRareTabKey("RareSeenByTab", type, rareType);
-        if (!LoadFlag(seenKey))
+        if (!string.IsNullOrEmpty(normalizedId))
         {
-            SaveFlag(seenKey, true);
-            SaveFlag(BuildRareTabKey("MentionRare", type, rareType), true);
-            changed = true;
-            if (debugLogs)
-                Debug.Log($"[Album] Rare seen in tab {type}:{rareType}");
+            var seenKey = BuildEntityRareKey("RareSeen", type, normalizedId, rareType);
+            if (!LoadFlag(seenKey))
+            {
+                SaveFlag(seenKey, true);
+                SaveFlag(BuildEntityRareKey("MentionRare", type, normalizedId, rareType), true);
+                changed = true;
+                if (debugLogs)
+                    Debug.Log($"[Album] Rare seen for {type}:{normalizedId}:{rareType}");
+            }
         }
 
         if (changed)
@@ -188,19 +202,50 @@ public class AlbumProgressService : MonoBehaviour
         if (!IsValidRareType(rareType))
             return;
 
-        var viewedKey = BuildRareTabKey("RareViewed", type, rareType);
         var mentionKey = BuildRareTabKey("MentionRare", type, rareType);
-        var changed = false;
+        if (!LoadFlag(mentionKey))
+            return;
 
-        if (!LoadFlag(viewedKey))
+        SaveFlag(mentionKey, false);
+        Changed?.Invoke();
+    }
+
+    public void MarkRareViewedForEntities(AlbumEntityType type, RareType rareType, IReadOnlyList<string> entityIds)
+    {
+        if (!IsValidRareType(rareType))
+            return;
+
+        var changed = false;
+        if (entityIds != null)
         {
-            SaveFlag(viewedKey, true);
-            changed = true;
+            for (var i = 0; i < entityIds.Count; i++)
+            {
+                var normalizedId = NormalizeId(entityIds[i]);
+                if (string.IsNullOrEmpty(normalizedId))
+                    continue;
+
+                var viewedKey = BuildEntityRareKey("RareViewed", type, normalizedId, rareType);
+                var mentionKey = BuildEntityRareKey("MentionRare", type, normalizedId, rareType);
+
+                if (!LoadFlag(viewedKey))
+                {
+                    SaveFlag(viewedKey, true);
+                    changed = true;
+                }
+
+                if (LoadFlag(mentionKey))
+                {
+                    SaveFlag(mentionKey, false);
+                    changed = true;
+                }
+            }
         }
 
-        if (LoadFlag(mentionKey))
+        // Legacy key cleanup from the previous tab-level mention format.
+        var legacyMentionKey = BuildRareTabKey("MentionRare", type, rareType);
+        if (LoadFlag(legacyMentionKey))
         {
-            SaveFlag(mentionKey, false);
+            SaveFlag(legacyMentionKey, false);
             changed = true;
         }
 
@@ -241,15 +286,15 @@ public class AlbumProgressService : MonoBehaviour
                 var id = knownIds[i];
                 if (HasCardMention(type, id) || HasRewardMention(type, id))
                     return true;
-            }
-        }
 
-        if (knownRareTypes != null)
-        {
-            for (var i = 0; i < knownRareTypes.Count; i++)
-            {
-                if (HasRareMention(type, knownRareTypes[i]))
-                    return true;
+                if (knownRareTypes == null)
+                    continue;
+
+                for (var j = 0; j < knownRareTypes.Count; j++)
+                {
+                    if (HasRareMention(type, id, knownRareTypes[j]))
+                        return true;
+                }
             }
         }
 
@@ -290,7 +335,7 @@ public class AlbumProgressService : MonoBehaviour
 
     private void HydrateFromInventory()
     {
-        if (G.Inventory == null)
+        if (G.Inventory == null || !G.Inventory.IsInitialized)
             return;
 
         var eggs = G.Inventory.GetItems(Item.Egg);
@@ -373,6 +418,11 @@ public class AlbumProgressService : MonoBehaviour
     private string BuildRareGlobalKey(string tag, RareType rareType)
     {
         return $"{savePrefix}.{tag}.{NormalizeRare(rareType)}";
+    }
+
+    private string BuildEntityRareKey(string tag, AlbumEntityType type, string id, RareType rareType)
+    {
+        return $"{savePrefix}.{tag}.{type}.{NormalizeId(id)}.{NormalizeRare(rareType)}";
     }
 
     private string BuildRareTabKey(string tag, AlbumEntityType type, RareType rareType)

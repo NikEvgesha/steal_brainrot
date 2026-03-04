@@ -53,6 +53,7 @@ public class AlbumScreenController : MonoBehaviour
     [Header("Cards")]
     [SerializeField] private Transform cardsRoot;
     [SerializeField] private AlbumEntryView cardPrefab;
+    [SerializeField] private DynamicGridSpawner cardsDynamicGrid;
 
     [Header("Rare Tabs")]
     [SerializeField] private Transform rareTabsRoot;
@@ -97,6 +98,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string rewardClaimedFallback = "Claimed";
     [SerializeField] private string rareLockedKey = "UI/Album/RareLocked";
     [SerializeField] private string rareLockedFallback = "Hold item of this rarity to unlock";
+    [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Rare/";
 
     [Header("Behavior")]
     [SerializeField] private bool applyLuckBonusInChances = true;
@@ -116,6 +118,7 @@ public class AlbumScreenController : MonoBehaviour
     private RareType? _selectedRareFilter;
     private string _selectedEntryId;
     private bool _bindingsReady;
+    private bool _catalogReady;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
 
@@ -149,6 +152,18 @@ public class AlbumScreenController : MonoBehaviour
             progressService.Changed.RemoveListener(OnProgressChanged);
             progressService.Changed.AddListener(OnProgressChanged);
         }
+
+        EnsureCatalogReady();
+        Refresh();
+    }
+
+    private void Update()
+    {
+        if (_catalogReady)
+            return;
+
+        if (!EnsureCatalogReady())
+            return;
 
         Refresh();
     }
@@ -191,6 +206,7 @@ public class AlbumScreenController : MonoBehaviour
 
     public void Refresh()
     {
+        EnsureCatalogReady();
         RefreshTabMentions();
         RefreshRareTabs();
         RebuildCards();
@@ -214,10 +230,13 @@ public class AlbumScreenController : MonoBehaviour
         _animalAliasToCanonicalId.Clear();
         _eggChanceByEggId.Clear();
         _animalSourcesByAnimalId.Clear();
+        _catalogReady = false;
 
         var storage = itemStorage != null ? itemStorage : G.Storage;
         if (storage == null)
             return;
+
+        _catalogReady = true;
 
         var eggs = storage.GetAllEggPrefabs();
         if (eggs != null)
@@ -404,8 +423,8 @@ public class AlbumScreenController : MonoBehaviour
 
             var unlocked = progress != null && progress.IsRareUnlocked(rare);
             var selected = _selectedRareFilter.HasValue && _selectedRareFilter.Value == rare;
-            var hasMention = progress != null && progress.HasRareMention(_currentTab, rare);
-            var label = rare.ToString();
+            var hasMention = progress != null && HasRareMentionForCurrentTab(rare);
+            var label = L(rareLabelKeyPrefix + rare, GetRareLabelFallback(rare));
             view.Bind(label, unlocked, selected, hasMention, () => OnRarePressed(rare, unlocked));
         }
     }
@@ -425,7 +444,10 @@ public class AlbumScreenController : MonoBehaviour
             _selectedRareFilter = rareType;
 
         if (progressService != null)
-            progressService.MarkRareViewed(_currentTab, rareType);
+        {
+            var ids = CollectIdsByRareForCurrentTab(rareType);
+            progressService.MarkRareViewedForEntities(_currentTab, rareType, ids);
+        }
 
         RebuildCards();
         RefreshInfoPanel();
@@ -437,12 +459,7 @@ public class AlbumScreenController : MonoBehaviour
         if (cardsRoot == null || cardPrefab == null)
             return;
 
-        for (var i = 0; i < _spawnedCardViews.Count; i++)
-        {
-            if (_spawnedCardViews[i] != null)
-                Destroy(_spawnedCardViews[i].gameObject);
-        }
-        _spawnedCardViews.Clear();
+        ClearCardsRootForRebuild();
 
         var source = GetEntriesForCurrentTab();
         var visibleEntries = new List<EntryData>();
@@ -463,6 +480,8 @@ public class AlbumScreenController : MonoBehaviour
         if (visibleEntries.Count == 0)
         {
             _selectedEntryId = null;
+            if (cardPrefab != null)
+                cardPrefab.gameObject.SetActive(false);
             return;
         }
 
@@ -472,7 +491,9 @@ public class AlbumScreenController : MonoBehaviour
         for (var i = 0; i < visibleEntries.Count; i++)
         {
             var entry = visibleEntries[i];
-            var view = Instantiate(cardPrefab, cardsRoot);
+            var view = SpawnCardView();
+            if (view == null)
+                continue;
             view.gameObject.SetActive(true);
 
             var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
@@ -480,7 +501,7 @@ public class AlbumScreenController : MonoBehaviour
             var hasMention = progressService != null &&
                              (progressService.HasCardMention(entry.type, entry.id) ||
                               progressService.HasRewardMention(entry.type, entry.id) ||
-                              progressService.HasRareMention(entry.type, entry.rareType));
+                              progressService.HasRareMention(entry.type, entry.id, entry.rareType));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
             view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry));
@@ -845,6 +866,98 @@ public class AlbumScreenController : MonoBehaviour
             itemStorage = G.Storage;
         if (progressService == null)
             progressService = G.Album;
+        if (cardsDynamicGrid == null && cardsRoot != null)
+            cardsDynamicGrid = cardsRoot.GetComponent<DynamicGridSpawner>();
+    }
+
+    private AlbumEntryView SpawnCardView()
+    {
+        if (cardsDynamicGrid != null)
+            return cardsDynamicGrid.SpawnObject<AlbumEntryView>(cardPrefab.gameObject);
+
+        return Instantiate(cardPrefab, cardsRoot);
+    }
+
+    private void ClearCardsRootForRebuild()
+    {
+        var templateTransform = cardPrefab != null ? cardPrefab.transform : null;
+        for (var i = cardsRoot.childCount - 1; i >= 0; i--)
+        {
+            var child = cardsRoot.GetChild(i);
+            if (templateTransform != null && child == templateTransform)
+                continue;
+
+            Destroy(child.gameObject);
+        }
+
+        _spawnedCardViews.Clear();
+    }
+
+    private bool EnsureCatalogReady()
+    {
+        if (_catalogReady)
+            return true;
+
+        AutoSetupReferences();
+        if (itemStorage == null)
+            return false;
+
+        BuildCatalog();
+        return _catalogReady;
+    }
+
+    private List<string> CollectIdsByRareForCurrentTab(RareType rareType)
+    {
+        var ids = new List<string>();
+        var source = GetEntriesForCurrentTab();
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null || entry.rareType != rareType || string.IsNullOrEmpty(entry.id))
+                continue;
+            ids.Add(entry.id);
+        }
+
+        return ids;
+    }
+
+    private bool HasRareMentionForCurrentTab(RareType rareType)
+    {
+        if (progressService == null)
+            return false;
+
+        var source = GetEntriesForCurrentTab();
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null || entry.rareType != rareType)
+                continue;
+            if (progressService.HasRareMention(entry.type, entry.id, rareType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string GetRareLabelFallback(RareType rareType)
+    {
+        switch (rareType)
+        {
+            case RareType.Common:
+                return "Common";
+            case RareType.Uncommon:
+                return "Uncommon";
+            case RareType.Rare:
+                return "Rare";
+            case RareType.Epic:
+                return "Epic";
+            case RareType.Legendary:
+                return "Legendary";
+            case RareType.Mythic:
+                return "Mythic";
+            default:
+                return rareType.ToString();
+        }
     }
 
     private static string L(string key, string fallback)

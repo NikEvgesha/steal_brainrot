@@ -44,6 +44,7 @@ public class Inventory : MonoBehaviour
     public UnityEvent<Item, List<InventoryItem>> ItemsUpdated;
     public UnityEvent<InventoryItem> ItemAdded = new UnityEvent<InventoryItem>();
     public UnityEvent<InventoryItem> ItemRemoved = new UnityEvent<InventoryItem>();
+    public bool IsInitialized => _brainrots != null && _eggs != null && _food != null;
 
     private void Awake()
     {
@@ -154,11 +155,11 @@ public class Inventory : MonoBehaviour
         switch (type)
         {
             case Item.Brainrot:
-                return _brainrots.AsReadOnly();
+                return _brainrots != null ? _brainrots.AsReadOnly() : null;
             case Item.Egg:
-                return _eggs.AsReadOnly();
+                return _eggs != null ? _eggs.AsReadOnly() : null;
             case Item.Food:
-                return _food.AsReadOnly();
+                return _food != null ? _food.AsReadOnly() : null;
             default:
                 return null;
         }

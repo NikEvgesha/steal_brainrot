@@ -545,3 +545,31 @@
   - `TryGetProfileTargetForSlot(...)`.
 - Обновлена документация:
   - `Docs/LOCAL_PROFILE_BOARD_SETUP.md`.
+
+### 2026-03-04 (album hardening before scene wiring)
+- Выполнен аудит альбома по `Docs/ALBUM_SETUP.md` и `Docs/ALBUM_SYSTEM_SPEC.md`; закрыты найденные технические риски в коде.
+- `AlbumProgressService`:
+  - rare-mention переведен с tab-level на entity-level ключи (`type + entityId + rareType`) для соответствия spec-поведению;
+  - добавлен метод пакетного снятия rare-mention для выбранной редкости в текущей вкладке;
+  - добавлен guard гидратации: сервис читает инвентарь только после `Inventory.IsInitialized`.
+- `AlbumScreenController`:
+  - карточка теперь проверяет rare-mention по конкретной сущности;
+  - бейджи редкостей считаются агрегированно по сущностям текущей вкладки (а не по глобальному tab-ключу);
+  - добавлена локализация названий редкостей (`UI/Album/Rare/*`);
+  - добавлен `EnsureCatalogReady()` + late-init update-loop, чтобы альбом корректно подхватывал `ItemPrefabStorage`, даже если он появился позже `Awake`.
+- `Inventory`:
+  - добавлен `IsInitialized`;
+  - `GetItems(...)` стал безопасным до `Init()` (без nullref при ранней подписке внешних сервисов).
+- Локализация:
+  - в `LocalizationData.asset` добавлены ключи `UI/Album/Rare/Common|Uncommon|Rare|Epic|Legendary|Mythic`;
+  - `Docs/ALBUM_SETUP.md` обновлен списком этих ключей.
+- Добавлен отдельный шаблон-схема иерархии:
+  - `Docs/ALBUM_PREFAB_TEMPLATE.md` (эталон `AlbumScreen` + checklist привязок).
+- Добавлен editor-tool для сборки сцены без ручной рутины:
+  - `Assets/_Scripts/UI/Album/Editor/AlbumScreenAutoWireEditor.cs`;
+  - меню: `Tools/Album/Build Missing Layout For Selected AlbumScreen`, `Tools/Album/Auto Wire Selected AlbumScreen`, `Tools/Album/Validate Selected AlbumScreen`.
+- `AlbumScreenController` расширен поддержкой `DynamicGridSpawner` на `cardsRoot`:
+  - если компонент присутствует, карточки спавнятся через него;
+  - при ребилде очищаются предыдущие runtime-строки/карточки (с сохранением template-префаба).
+- Статусы:
+  - обновлен пункт альбома в `Assets/_Scripts/TODO_List.md` (добавлена пометка про hardening, основной следующий шаг — сцена/UX smoke).

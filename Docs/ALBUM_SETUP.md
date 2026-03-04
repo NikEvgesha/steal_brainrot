@@ -9,6 +9,15 @@
 - меншенов (уведомлений),
 - наград за первое открытие.
 
+Быстрый визуальный шаблон иерархии: `Docs/ALBUM_PREFAB_TEMPLATE.md`.
+
+Опционально для ускорения:
+- В Unity меню `Tools/Album/Build Missing Layout For Selected AlbumScreen` (создает недостающий каркас UI в выбранном `AlbumScreen`).
+- В Unity меню `Tools/Album/Auto Wire Selected AlbumScreen`.
+- Затем `Tools/Album/Validate Selected AlbumScreen`.
+- Автопривязка ориентируется на имена объектов (см. шаблон в `ALBUM_PREFAB_TEMPLATE.md`).
+- Если в `AlbumEntryView/AlbumRareTabView` нет `LockOverlay` или `SelectedFrame`, tool создаст их автоматически.
+
 ## 1) Объекты в сцене
 
 1. Создай объект `AlbumScreen` внутри игрового canvas.
@@ -29,6 +38,10 @@
 3. В `AlbumScreenController` назначь:
 - `cardsRoot` -> root контейнера сетки,
 - `cardPrefab` -> префаб карточки из шага 1.
+
+Опционально для `cardsRoot`:
+- можно использовать `DynamicGridSpawner` вместо `GridLayoutGroup`;
+- `AlbumScreenController` теперь умеет спавнить карточки через `DynamicGridSpawner`, если компонент есть на `cardsRoot`.
 
 ## 3) Вкладки редкости (иконки справа сверху)
 
@@ -107,6 +120,12 @@
 - `UI/Album/ClaimReward`
 - `UI/Album/RewardClaimed`
 - `UI/Album/RareLocked`
+- `UI/Album/Rare/Common`
+- `UI/Album/Rare/Uncommon`
+- `UI/Album/Rare/Rare`
+- `UI/Album/Rare/Epic`
+- `UI/Album/Rare/Legendary`
+- `UI/Album/Rare/Mythic`
 
 Если ключа нет, используется fallback-текст из сериализованных полей.
 
