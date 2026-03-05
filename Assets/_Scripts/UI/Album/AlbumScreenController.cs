@@ -569,25 +569,33 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnRarePressed(RareType rareType)
     {
-        if (_selectedRareFilter.HasValue && _selectedRareFilter.Value == rareType)
-            _selectedRareFilter = null;
-        else
-            _selectedRareFilter = rareType;
+        _selectedRareFilter = rareType;
 
-        if (progressService != null && _selectedRareFilter.HasValue)
+        if (progressService != null)
         {
             var entry = FindSelectedEntry();
+            var selectedEntrySupportsRare = entry != null &&
+                                            !string.IsNullOrEmpty(entry.id) &&
+                                            progressService.IsRareSeenForEntity(entry.type, entry.id, rareType);
+
+            if (!selectedEntrySupportsRare)
+            {
+                TrySelectEntryWithRare(rareType);
+                entry = FindSelectedEntry();
+            }
+
             if (entry != null &&
                 !string.IsNullOrEmpty(entry.id) &&
-                progressService.IsRareSeenForEntity(entry.type, entry.id, _selectedRareFilter.Value))
+                progressService.IsRareSeenForEntity(entry.type, entry.id, rareType))
             {
                 progressService.MarkRareViewedForEntities(
                     entry.type,
-                    _selectedRareFilter.Value,
+                    rareType,
                     new List<string> { entry.id });
             }
         }
 
+        RebuildCards();
         RefreshInfoPanel();
         RefreshRareTabs();
     }
@@ -1305,6 +1313,41 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private void TrySelectEntryWithRare(RareType rareType)
+    {
+        if (progressService == null)
+            return;
+
+        var source = GetEntriesForCurrentTab();
+        EntryData fallbackDiscoveredByType = null;
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null || string.IsNullOrEmpty(entry.id))
+                continue;
+
+            if (progressService.IsRareSeenForEntity(entry.type, entry.id, rareType))
+            {
+                _selectedEntryId = entry.id;
+                _lastSelectedEntryByTab[_currentTab] = _selectedEntryId;
+                return;
+            }
+
+            if (fallbackDiscoveredByType == null &&
+                entry.rareType == rareType &&
+                progressService.IsDiscovered(entry.type, entry.id))
+            {
+                fallbackDiscoveredByType = entry;
+            }
+        }
+
+        if (fallbackDiscoveredByType == null)
+            return;
+
+        _selectedEntryId = fallbackDiscoveredByType.id;
+        _lastSelectedEntryByTab[_currentTab] = _selectedEntryId;
     }
 
     private static string GetRareLabelFallback(RareType rareType)
