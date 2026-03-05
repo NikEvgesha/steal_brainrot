@@ -1,9 +1,10 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class AlbumEntryView : MonoBehaviour
+public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
 {
     [SerializeField] private Button button;
     [SerializeField] private Image iconImage;
@@ -20,8 +21,15 @@ public class AlbumEntryView : MonoBehaviour
     {
         if (button == null)
             button = GetComponent<Button>();
+        if (button == null)
+            button = GetComponentInChildren<Button>(true);
         if (button != null)
+        {
+            button.onClick.RemoveListener(OnClicked);
             button.onClick.AddListener(OnClicked);
+        }
+        EnsureMentionBadgeLayout();
+        EnsureButtonPointerPassThrough();
     }
 
     private void OnDestroy()
@@ -55,17 +63,70 @@ public class AlbumEntryView : MonoBehaviour
             mentionBadge.SetActive(hasMention);
             if (mentionBadge.TryGetComponent<Graphic>(out var mentionGraphic))
                 mentionGraphic.raycastTarget = false;
+            if (hasMention)
+                mentionBadge.transform.SetAsLastSibling();
         }
+        EnsureMentionBadgeLayout();
 
         if (selectedFrame != null)
         {
             selectedFrame.enabled = selected;
             selectedFrame.raycastTarget = false;
         }
+
+        EnsureButtonPointerPassThrough();
     }
 
     private void OnClicked()
     {
         _onClick?.Invoke();
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+            return;
+
+        // Fallback for prefab layouts where raycast hits child graphics
+        // that are not in the Button component hierarchy.
+        OnClicked();
+    }
+
+    private void EnsureButtonPointerPassThrough()
+    {
+        if (button == null)
+            return;
+
+        var target = button.targetGraphic;
+        if (target == null)
+        {
+            target = GetComponentInChildren<Graphic>(true);
+            if (target != null)
+                button.targetGraphic = target;
+        }
+        var graphics = GetComponentsInChildren<Graphic>(true);
+        for (var i = 0; i < graphics.Length; i++)
+        {
+            var graphic = graphics[i];
+            if (graphic == null)
+                continue;
+
+            if (target != null && graphic == target)
+                continue;
+            graphic.raycastTarget = false;
+        }
+    }
+
+    private void EnsureMentionBadgeLayout()
+    {
+        if (mentionBadge == null)
+            return;
+
+        var rt = mentionBadge.transform as RectTransform;
+        if (rt == null)
+            return;
+
+        if (rt.sizeDelta.x <= 0f || rt.sizeDelta.y <= 0f || rt.sizeDelta.x > 64f || rt.sizeDelta.y > 64f)
+            rt.sizeDelta = new Vector2(18f, 18f);
     }
 }

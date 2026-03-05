@@ -43,7 +43,7 @@ public class IncomeCollector : MonoBehaviour
     }
 
     public void _ShowAd() {
-        if (G.Ad == null) return;
+        if (_purchaseInProgress || G.Ad == null) return;
 
         _purchaseInProgress = true;
         G.Ad.ShowRewardedAd("IncomeCollect", success =>

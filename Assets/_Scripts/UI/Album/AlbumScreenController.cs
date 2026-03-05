@@ -16,6 +16,13 @@ public class AlbumScreenController : MonoBehaviour
         public int gems;
     }
 
+    [Serializable]
+    private struct RareRewardOverride
+    {
+        public RareType rareType;
+        public int gems;
+    }
+
     private sealed class EntryData
     {
         public AlbumEntityType type;
@@ -78,6 +85,8 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private int defaultAnimalRewardGems = 5;
     [SerializeField] private List<RewardOverride> eggRewardOverrides = new();
     [SerializeField] private List<RewardOverride> animalRewardOverrides = new();
+    [SerializeField] private int defaultRareRewardGems = 5;
+    [SerializeField] private List<RareRewardOverride> rareRewardOverrides = new();
 
     [Header("Localization")]
     [SerializeField] private string eggsTabKey = "UI/Album/TabEggs";
@@ -96,8 +105,6 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string claimRewardFallback = "Claim +{0} Gems";
     [SerializeField] private string rewardClaimedKey = "UI/Album/RewardClaimed";
     [SerializeField] private string rewardClaimedFallback = "Claimed";
-    [SerializeField] private string rareLockedKey = "UI/Album/RareLocked";
-    [SerializeField] private string rareLockedFallback = "Hold item of this rarity to unlock";
     [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Rare/";
 
     [Header("Behavior")]
@@ -111,13 +118,13 @@ public class AlbumScreenController : MonoBehaviour
     private readonly Dictionary<string, List<ConveyorDropChanceCalculator.ChanceEntry>> _eggChanceByEggId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<AnimalSource>> _animalSourcesByAnimalId = new(StringComparer.Ordinal);
     private readonly Dictionary<RareType, AlbumRareTabView> _rareViews = new();
+    private readonly Dictionary<AlbumEntityType, string> _lastSelectedEntryByTab = new();
     private readonly List<AlbumEntryView> _spawnedCardViews = new();
     private readonly List<RareType> _supportedRareTypes = new();
 
     private AlbumEntityType _currentTab = AlbumEntityType.Egg;
     private RareType? _selectedRareFilter;
     private string _selectedEntryId;
-    private bool _bindingsReady;
     private bool _catalogReady;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
@@ -218,9 +225,12 @@ public class AlbumScreenController : MonoBehaviour
 
     private void SetTab(AlbumEntityType tab, bool preserveSelection)
     {
+        if (!string.IsNullOrEmpty(_selectedEntryId))
+            _lastSelectedEntryByTab[_currentTab] = _selectedEntryId;
+
         _currentTab = tab;
         _selectedRareFilter = null;
-        if (!preserveSelection)
+        if (!preserveSelection || !_lastSelectedEntryByTab.TryGetValue(_currentTab, out _selectedEntryId))
             _selectedEntryId = null;
 
         Refresh();
@@ -324,11 +334,15 @@ public class AlbumScreenController : MonoBehaviour
             for (var i = 0; i < eggs.Count; i++)
             {
                 var egg = eggs[i];
-                var drops = egg != null ? egg.Data?.Brainrots : null;
-                if (drops == null)
+                if (egg == null)
                     continue;
 
-                for (var dropIndex = 0; dropIndex < drops.Count; dropIndex++)
+                var drops = egg.Data.Brainrots;
+                if (drops == null || drops.Count == 0)
+                    continue;
+
+                var dropCount = drops.Count;
+                for (var dropIndex = 0; dropIndex < dropCount; dropIndex++)
                     AppendUniqueAnimal(result, seen, drops[dropIndex]);
             }
         }
@@ -487,6 +501,9 @@ public class AlbumScreenController : MonoBehaviour
         var existingViews = rareTabsRoot.GetComponentsInChildren<AlbumRareTabView>(true)
             .Where(x => x != null && x.gameObject != rareTemplateObject)
             .ToList();
+        existingViews.Sort((a, b) => a.transform.GetSiblingIndex().CompareTo(b.transform.GetSiblingIndex()));
+
+        ConfigureRareTabsRootLayout();
 
         for (var i = 0; i < _supportedRareTypes.Count; i++)
         {
@@ -500,12 +517,17 @@ public class AlbumScreenController : MonoBehaviour
             {
                 view = Instantiate(rareTabPrefab, rareTabsRoot);
             }
+            else if (existingViews.Count > 0)
+            {
+                view = Instantiate(existingViews[0], rareTabsRoot);
+            }
             else
             {
                 break;
             }
 
             view.gameObject.SetActive(true);
+            ConfigureRareTabView(view);
             _rareViews[rare] = view;
         }
 
@@ -522,6 +544,8 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         var progress = progressService;
+        var selectedEntry = FindSelectedEntry();
+        var hasSelectedEntry = selectedEntry != null && !string.IsNullOrEmpty(selectedEntry.id);
         foreach (var kv in _rareViews)
         {
             var rare = kv.Key;
@@ -529,9 +553,15 @@ public class AlbumScreenController : MonoBehaviour
             if (view == null)
                 continue;
 
-            var unlocked = progress != null && progress.IsRareUnlocked(rare);
+            var unlocked = progress != null &&
+                           hasSelectedEntry &&
+                           progress.IsRareSeenForEntity(selectedEntry.type, selectedEntry.id, rare);
             var selected = _selectedRareFilter.HasValue && _selectedRareFilter.Value == rare;
-            var hasMention = progress != null && HasRareMentionForCurrentTab(rare);
+            var hasPendingRareReward = HasPendingRareRewardForCurrentTab(rare);
+            var hasMention = progress != null &&
+                             (HasRareMentionForCurrentTab(rare) ||
+                              progress.HasRareRewardMention(_currentTab, rare) ||
+                              hasPendingRareReward);
             var label = L(rareLabelKeyPrefix + rare, GetRareLabelFallback(rare));
             view.Bind(label, unlocked, selected, hasMention, () => OnRarePressed(rare));
         }
@@ -544,17 +574,20 @@ public class AlbumScreenController : MonoBehaviour
         else
             _selectedRareFilter = rareType;
 
-        if (progressService != null)
+        if (progressService != null && _selectedRareFilter.HasValue)
         {
-            var unlocked = progressService.IsRareUnlocked(rareType);
-            if (unlocked)
+            var entry = FindSelectedEntry();
+            if (entry != null &&
+                !string.IsNullOrEmpty(entry.id) &&
+                progressService.IsRareSeenForEntity(entry.type, entry.id, _selectedRareFilter.Value))
             {
-                var ids = CollectIdsByRareForCurrentTab(rareType);
-                progressService.MarkRareViewedForEntities(_currentTab, rareType, ids);
+                progressService.MarkRareViewedForEntities(
+                    entry.type,
+                    _selectedRareFilter.Value,
+                    new List<string> { entry.id });
             }
         }
 
-        RebuildCards();
         RefreshInfoPanel();
         RefreshRareTabs();
     }
@@ -576,8 +609,6 @@ public class AlbumScreenController : MonoBehaviour
 
             var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
             if (!includeLockedInList && !unlocked)
-                continue;
-            if (_selectedRareFilter.HasValue && entry.rareType != _selectedRareFilter.Value)
                 continue;
             visibleEntries.Add(entry);
         }
@@ -606,10 +637,11 @@ public class AlbumScreenController : MonoBehaviour
             var hasMention = progressService != null &&
                              (progressService.HasCardMention(entry.type, entry.id) ||
                               progressService.HasRewardMention(entry.type, entry.id) ||
-                              progressService.HasRareMention(entry.type, entry.id, entry.rareType));
+                              HasAnyRareMentionForEntry(entry));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
             view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry));
+            ConfigureSpawnedCardView(view);
             _spawnedCardViews.Add(view);
         }
 
@@ -623,6 +655,7 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         _selectedEntryId = entry.id;
+        _lastSelectedEntryByTab[_currentTab] = _selectedEntryId;
         if (progressService != null)
             progressService.MarkCardViewed(entry.type, entry.id);
         RebuildCards();
@@ -640,6 +673,10 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
+        if (_selectedRareFilter.HasValue)
+            unlocked = progressService != null &&
+                       progressService.IsRareSeenForEntity(entry.type, entry.id, _selectedRareFilter.Value);
+
         if (!unlocked)
         {
             SetLockedInfo(entry);
@@ -777,7 +814,49 @@ public class AlbumScreenController : MonoBehaviour
         if (rewardButton == null)
             return;
 
-        if (!unlocked || entry == null || progressService == null)
+        if (progressService == null)
+        {
+            rewardButton.gameObject.SetActive(false);
+            if (rewardMentionBadge != null)
+                rewardMentionBadge.SetActive(false);
+            return;
+        }
+
+        if (_selectedRareFilter.HasValue)
+        {
+            var rare = _selectedRareFilter.Value;
+            var rareUnlockedInTab = HasAnyRareSeenForCurrentTab(rare);
+            var rareClaimed = progressService.IsRareRewardClaimed(_currentTab, rare);
+
+            if (!rareUnlockedInTab || rareClaimed)
+            {
+                rewardButton.gameObject.SetActive(false);
+                if (rewardMentionBadge != null)
+                    rewardMentionBadge.SetActive(false);
+                return;
+            }
+
+            rewardButton.gameObject.SetActive(true);
+            rewardButton.onClick.RemoveListener(OnRewardPressed);
+            rewardButton.onClick.AddListener(OnRewardPressed);
+            rewardButton.interactable = true;
+
+            var rareRewardAmount = ResolveRareRewardAmount(rare);
+            if (rewardButtonText != null)
+                rewardButtonText.text = string.Format(L(claimRewardKey, claimRewardFallback), rareRewardAmount);
+
+            if (rewardMentionBadge != null)
+            {
+                rewardMentionBadge.SetActive(
+                    progressService.HasRareRewardMention(_currentTab, rare) ||
+                    HasRareMentionForCurrentTab(rare) ||
+                    HasPendingRareRewardForCurrentTab(rare));
+            }
+
+            return;
+        }
+
+        if (!unlocked || entry == null)
         {
             rewardButton.gameObject.SetActive(false);
             if (rewardMentionBadge != null)
@@ -818,6 +897,23 @@ public class AlbumScreenController : MonoBehaviour
         if (progressService == null)
             return;
 
+        if (_selectedRareFilter.HasValue)
+        {
+            var rare = _selectedRareFilter.Value;
+            if (!HasAnyRareSeenForCurrentTab(rare))
+                return;
+
+            if (!progressService.TryClaimRareReward(_currentTab, rare))
+                return;
+
+            var rareRewardAmount = ResolveRareRewardAmount(rare);
+            if (rareRewardAmount > 0 && G.Currency != null)
+                G.Currency.AddCurrency(CurrencyType.Gems, rareRewardAmount);
+
+            Refresh();
+            return;
+        }
+
         var entry = FindSelectedEntry();
         if (entry == null)
             return;
@@ -852,6 +948,22 @@ public class AlbumScreenController : MonoBehaviour
         return Mathf.Max(0, defaults);
     }
 
+    private int ResolveRareRewardAmount(RareType rareType)
+    {
+        if (rareRewardOverrides != null)
+        {
+            for (var i = 0; i < rareRewardOverrides.Count; i++)
+            {
+                var row = rareRewardOverrides[i];
+                if (row.rareType != rareType)
+                    continue;
+                return Mathf.Max(0, row.gems);
+            }
+        }
+
+        return Mathf.Max(0, defaultRareRewardGems);
+    }
+
     private void RefreshTabMentions()
     {
         var progress = progressService;
@@ -882,26 +994,31 @@ public class AlbumScreenController : MonoBehaviour
 
     private void BindButtons()
     {
-        if (_bindingsReady)
-            return;
-
         if (eggsTabButton != null)
+        {
+            eggsTabButton.onClick.RemoveListener(SetTabEggs);
             eggsTabButton.onClick.AddListener(SetTabEggs);
+        }
         if (animalsTabButton != null)
+        {
+            animalsTabButton.onClick.RemoveListener(SetTabAnimals);
             animalsTabButton.onClick.AddListener(SetTabAnimals);
+        }
         if (closeButton != null)
+        {
+            closeButton.onClick.RemoveListener(Close);
             closeButton.onClick.AddListener(Close);
+        }
         if (rewardButton != null)
+        {
+            rewardButton.onClick.RemoveListener(OnRewardPressed);
             rewardButton.onClick.AddListener(OnRewardPressed);
+        }
 
-        _bindingsReady = true;
     }
 
     private void UnbindButtons()
     {
-        if (!_bindingsReady)
-            return;
-
         if (eggsTabButton != null)
             eggsTabButton.onClick.RemoveListener(SetTabEggs);
         if (animalsTabButton != null)
@@ -911,7 +1028,6 @@ public class AlbumScreenController : MonoBehaviour
         if (rewardButton != null)
             rewardButton.onClick.RemoveListener(OnRewardPressed);
 
-        _bindingsReady = false;
     }
 
     private void OnProgressChanged()
@@ -973,14 +1089,115 @@ public class AlbumScreenController : MonoBehaviour
     private void AutoSetupReferences()
     {
         if (panelRoot == null)
-            panelRoot = gameObject;
+        {
+            var panelRootTransform = FindChildRecursive(transform, "panelRoot");
+            panelRoot = panelRootTransform != null ? panelRootTransform.gameObject : gameObject;
+        }
+
+        var root = panelRoot != null ? panelRoot.transform : transform;
 
         if (itemStorage == null && G.Storage != null)
             itemStorage = G.Storage;
         if (progressService == null)
             progressService = G.Album;
+
+        if (eggsTabButton == null)
+            eggsTabButton = FindComponentByName<Button>(root, "EggsTabButton");
+        if (animalsTabButton == null)
+            animalsTabButton = FindComponentByName<Button>(root, "AnimalsTabButton");
+        if (closeButton == null)
+            closeButton = FindComponentByName<Button>(root, "CloseButton");
+        if (eggsTabText == null)
+            eggsTabText = FindComponentByName<TMP_Text>(root, "EggsTabText");
+        if (animalsTabText == null)
+            animalsTabText = FindComponentByName<TMP_Text>(root, "AnimalsTabText");
+        if (eggsTabMention == null)
+        {
+            var tr = FindChildRecursive(root, "EggsTabMention");
+            eggsTabMention = tr != null ? tr.gameObject : null;
+        }
+        if (animalsTabMention == null)
+        {
+            var tr = FindChildRecursive(root, "AnimalsTabMention");
+            animalsTabMention = tr != null ? tr.gameObject : null;
+        }
+        if (albumIconMention == null)
+        {
+            var tr = FindChildRecursive(root, "AlbumIconMention");
+            albumIconMention = tr != null ? tr.gameObject : null;
+        }
+        if (cardsRoot == null)
+            cardsRoot = FindChildRecursive(root, "cardsRoot") as RectTransform;
+        if (rareTabsRoot == null)
+            rareTabsRoot = FindChildRecursive(root, "rareTabsRoot") as RectTransform;
+        if (infoIcon == null)
+            infoIcon = FindComponentByName<Image>(root, "InfoIcon");
+        if (infoTitle == null)
+            infoTitle = FindComponentByName<TMP_Text>(root, "InfoTitle");
+        if (infoDescription == null)
+            infoDescription = FindComponentByName<TMP_Text>(root, "InfoDescription");
+        if (infoIncome == null)
+            infoIncome = FindComponentByName<TMP_Text>(root, "InfoIncome");
+        if (infoSources == null)
+            infoSources = FindComponentByName<TMP_Text>(root, "InfoSources");
+        if (infoLockedOverlay == null)
+        {
+            var tr = FindChildRecursive(root, "InfoLockedOverlay");
+            infoLockedOverlay = tr != null ? tr.gameObject : null;
+        }
+        if (infoLockedText == null)
+            infoLockedText = FindComponentByName<TMP_Text>(root, "InfoLockedText");
+        if (rewardButton == null)
+            rewardButton = FindComponentByName<Button>(root, "RewardButton");
+        if (rewardButtonText == null)
+            rewardButtonText = FindComponentByName<TMP_Text>(root, "RewardButtonText");
+        if (rewardMentionBadge == null)
+        {
+            var tr = FindChildRecursive(root, "RewardMentionBadge");
+            rewardMentionBadge = tr != null ? tr.gameObject : null;
+        }
+
+        if (cardPrefab == null)
+        {
+            var views = root.GetComponentsInChildren<AlbumEntryView>(true);
+            for (var i = 0; i < views.Length; i++)
+            {
+                if (views[i] == null)
+                    continue;
+                cardPrefab = views[i];
+                break;
+            }
+        }
+
+        if (rareTabPrefab == null)
+        {
+            var views = root.GetComponentsInChildren<AlbumRareTabView>(true);
+            for (var i = 0; i < views.Length; i++)
+            {
+                if (views[i] == null)
+                    continue;
+                rareTabPrefab = views[i];
+                break;
+            }
+        }
+
         if (cardsDynamicGrid == null && cardsRoot != null)
             cardsDynamicGrid = cardsRoot.GetComponent<DynamicGridSpawner>();
+
+        EnsureButtonPointerPassThrough(eggsTabButton);
+        EnsureButtonPointerPassThrough(animalsTabButton);
+        EnsureButtonPointerPassThrough(closeButton);
+        EnsureButtonPointerPassThrough(rewardButton);
+
+        if (eggsTabText != null)
+            eggsTabText.raycastTarget = false;
+        if (animalsTabText != null)
+            animalsTabText.raycastTarget = false;
+
+        ConfigureCardsRootLayout();
+        ConfigureRareTabsRootLayout();
+
+        BindButtons();
     }
 
     private AlbumEntryView SpawnCardView()
@@ -1019,21 +1236,6 @@ public class AlbumScreenController : MonoBehaviour
         return _catalogReady;
     }
 
-    private List<string> CollectIdsByRareForCurrentTab(RareType rareType)
-    {
-        var ids = new List<string>();
-        var source = GetEntriesForCurrentTab();
-        for (var i = 0; i < source.Count; i++)
-        {
-            var entry = source[i];
-            if (entry == null || entry.rareType != rareType || string.IsNullOrEmpty(entry.id))
-                continue;
-            ids.Add(entry.id);
-        }
-
-        return ids;
-    }
-
     private bool HasRareMentionForCurrentTab(RareType rareType)
     {
         if (progressService == null)
@@ -1043,9 +1245,62 @@ public class AlbumScreenController : MonoBehaviour
         for (var i = 0; i < source.Count; i++)
         {
             var entry = source[i];
-            if (entry == null || entry.rareType != rareType)
+            if (entry == null || string.IsNullOrEmpty(entry.id))
                 continue;
             if (progressService.HasRareMention(entry.type, entry.id, rareType))
+                return true;
+
+            if (!progressService.IsRareRewardClaimed(_currentTab, rareType) &&
+                progressService.IsRareSeenForEntity(entry.type, entry.id, rareType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasAnyRareSeenForCurrentTab(RareType rareType)
+    {
+        if (progressService == null)
+            return false;
+
+        var source = GetEntriesForCurrentTab();
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null || string.IsNullOrEmpty(entry.id))
+                continue;
+
+            if (progressService.IsRareSeenForEntity(entry.type, entry.id, rareType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasPendingRareRewardForCurrentTab(RareType rareType)
+    {
+        if (progressService == null)
+            return false;
+
+        if (progressService.IsRareRewardClaimed(_currentTab, rareType))
+            return false;
+
+        return HasAnyRareSeenForCurrentTab(rareType);
+    }
+
+    private bool HasAnyRareMentionForEntry(EntryData entry)
+    {
+        if (progressService == null || entry == null || string.IsNullOrEmpty(entry.id))
+            return false;
+
+        for (var i = 0; i < _supportedRareTypes.Count; i++)
+        {
+            var rareType = _supportedRareTypes[i];
+            if (progressService.HasRareMention(entry.type, entry.id, rareType))
+                return true;
+
+            if (!progressService.IsRareRewardClaimed(entry.type, rareType) &&
+                progressService.IsRareSeenForEntity(entry.type, entry.id, rareType))
                 return true;
         }
 
@@ -1083,5 +1338,158 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         return fallback;
+    }
+
+    private static Transform FindChildRecursive(Transform root, string targetName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(targetName))
+            return null;
+
+        if (string.Equals(root.name, targetName, StringComparison.OrdinalIgnoreCase))
+            return root;
+
+        for (var i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            var found = FindChildRecursive(child, targetName);
+            if (found != null)
+                return found;
+        }
+
+        return null;
+    }
+
+    private static T FindComponentByName<T>(Transform root, string objectName) where T : Component
+    {
+        var tr = FindChildRecursive(root, objectName);
+        return tr != null ? tr.GetComponent<T>() : null;
+    }
+
+    private static void EnsureButtonPointerPassThrough(Button button)
+    {
+        if (button == null)
+            return;
+
+        var target = button.targetGraphic;
+        var graphics = button.GetComponentsInChildren<Graphic>(true);
+        for (var i = 0; i < graphics.Length; i++)
+        {
+            var graphic = graphics[i];
+            if (graphic == null || graphic == target)
+                continue;
+            graphic.raycastTarget = false;
+        }
+    }
+
+    private void ConfigureCardsRootLayout()
+    {
+        if (cardsRoot == null)
+            return;
+
+        var rootRect = cardsRoot as RectTransform;
+        if (rootRect != null)
+        {
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+        }
+
+        if (cardsRoot.TryGetComponent<VerticalLayoutGroup>(out var vertical))
+        {
+            vertical.spacing = Mathf.Max(0f, vertical.spacing);
+            vertical.childControlWidth = true;
+            vertical.childForceExpandWidth = true;
+            vertical.childControlHeight = true;
+            vertical.childForceExpandHeight = false;
+        }
+    }
+
+    private void ConfigureSpawnedCardView(AlbumEntryView view)
+    {
+        if (view == null)
+            return;
+
+        const float cardSize = 100f;
+
+        var viewRect = view.transform as RectTransform;
+        if (viewRect != null)
+        {
+            viewRect.anchorMin = new Vector2(0.5f, 0.5f);
+            viewRect.anchorMax = new Vector2(0.5f, 0.5f);
+            viewRect.pivot = new Vector2(0.5f, 0.5f);
+            viewRect.anchoredPosition = Vector2.zero;
+            viewRect.sizeDelta = new Vector2(cardSize, cardSize);
+        }
+
+        var rowRect = view.transform.parent as RectTransform;
+        if (rowRect != null)
+        {
+            rowRect.anchorMin = new Vector2(0f, rowRect.anchorMin.y);
+            rowRect.anchorMax = new Vector2(1f, rowRect.anchorMax.y);
+
+            var rowElement = rowRect.GetComponent<LayoutElement>();
+            if (rowElement == null)
+                rowElement = rowRect.gameObject.AddComponent<LayoutElement>();
+            rowElement.ignoreLayout = false;
+            rowElement.minHeight = cardSize;
+            rowElement.preferredHeight = cardSize;
+            rowElement.flexibleHeight = 0f;
+
+            var rowLayout = rowRect.GetComponent<HorizontalLayoutGroup>();
+            if (rowLayout != null)
+            {
+                rowLayout.childControlWidth = true;
+                rowLayout.childForceExpandWidth = false;
+                rowLayout.childControlHeight = true;
+                rowLayout.childForceExpandHeight = false;
+            }
+        }
+
+        var element = view.GetComponent<LayoutElement>();
+        if (element == null)
+            element = view.gameObject.AddComponent<LayoutElement>();
+        element.ignoreLayout = false;
+        element.minWidth = cardSize;
+        element.minHeight = cardSize;
+        element.preferredWidth = cardSize;
+        element.preferredHeight = cardSize;
+        element.flexibleWidth = 0f;
+        element.flexibleHeight = 0f;
+    }
+
+    private void ConfigureRareTabsRootLayout()
+    {
+        if (rareTabsRoot == null)
+            return;
+
+        if (rareTabsRoot.TryGetComponent<HorizontalLayoutGroup>(out var layout))
+        {
+            layout.childControlWidth = false;
+            layout.childForceExpandWidth = false;
+            layout.childControlHeight = false;
+            layout.childForceExpandHeight = false;
+        }
+    }
+
+    private static void ConfigureRareTabView(AlbumRareTabView view)
+    {
+        if (view == null)
+            return;
+
+        var rect = view.transform as RectTransform;
+        const float rareTabSize = 80f;
+        if (rect != null)
+            rect.sizeDelta = new Vector2(rareTabSize, rareTabSize);
+
+        var element = view.GetComponent<LayoutElement>();
+        if (element == null)
+            element = view.gameObject.AddComponent<LayoutElement>();
+
+        element.ignoreLayout = false;
+        element.minWidth = rareTabSize;
+        element.minHeight = rareTabSize;
+        element.preferredWidth = rareTabSize;
+        element.preferredHeight = rareTabSize;
+        element.flexibleWidth = 0f;
+        element.flexibleHeight = 0f;
     }
 }
