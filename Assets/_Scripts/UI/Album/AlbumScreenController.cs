@@ -430,17 +430,19 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnRarePressed(RareType rareType, bool unlocked)
     {
-        if (!unlocked)
-        {
-            if (infoLockedText != null)
-                infoLockedText.text = L(rareLockedKey, rareLockedFallback);
-            return;
-        }
-
         if (_selectedRareFilter.HasValue && _selectedRareFilter.Value == rareType)
             _selectedRareFilter = null;
         else
             _selectedRareFilter = rareType;
+
+        if (!unlocked)
+        {
+            if (infoLockedText != null)
+                infoLockedText.text = L(rareLockedKey, rareLockedFallback);
+
+            RefreshRareTabs();
+            return;
+        }
 
         if (progressService != null)
         {
