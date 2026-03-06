@@ -379,9 +379,30 @@ public class AlbumProgressService : MonoBehaviour
         else
             return false;
 
-        id = NormalizeId(item.Name);
+        id = ResolveItemId(item);
         rareType = item.RareType;
         return !string.IsNullOrEmpty(id);
+    }
+
+    private static string ResolveItemId(InventoryItem item)
+    {
+        if (item == null)
+            return string.Empty;
+
+        var normalized = NormalizeRuntimeId(item.Name);
+        if (!string.IsNullOrEmpty(normalized))
+            return normalized;
+
+        return NormalizeRuntimeId(item.gameObject != null ? item.gameObject.name : null);
+    }
+
+    private static string NormalizeRuntimeId(string raw)
+    {
+        var normalized = NormalizeId(raw);
+        if (normalized.EndsWith("_clone", StringComparison.Ordinal))
+            normalized = normalized.Substring(0, normalized.Length - "_clone".Length).Trim('_');
+
+        return normalized;
     }
 
     private bool LoadFlag(string key)

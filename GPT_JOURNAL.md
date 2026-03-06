@@ -573,3 +573,33 @@
   - при ребилде очищаются предыдущие runtime-строки/карточки (с сохранением template-префаба).
 - Статусы:
   - обновлен пункт альбома в `Assets/_Scripts/TODO_List.md` (добавлена пометка про hardening, основной следующий шаг — сцена/UX smoke).
+
+### 2026-03-06 (album fixes: click dedupe + robust id mapping)
+- По запросу пользователя на “слегка некорректную” работу альбома внесены 2 точечных фикса в runtime:
+  - `Assets/_Scripts/UI/Album/AlbumEntryView.cs`:
+    - добавлен frame-level dedupe клика карточки (`_lastClickFrame`), чтобы один тап не вызывал обработчик дважды через комбинацию `Button.onClick` + `IPointerClickHandler`.
+  - `Assets/_Scripts/UI/Album/AlbumProgressService.cs`:
+    - усилено маппирование ID предмета в `TryMapItem(...)`: теперь используется `ResolveItemId(...)` с fallback на `gameObject.name` и нормализацией суффикса `_clone`.
+- Цель изменений:
+  - убрать повторный вызов выбора карточки за один клик;
+  - исключить пропуски открытия сущностей/редкостей в альбоме, если `InventoryItem.Name` пустой или пришел в runtime-формате.
+- Проверка:
+  - `dotnet build Assembly-CSharp.csproj -nologo` проходит успешно (ошибок нет).
+- Что осталось:
+  - ручной UX/smoke в Unity-сцене (`AlbumScreen`) на реальном профиле: single-click выбор карточки, открытие новых сущностей и корректность mention после получения предметов.
+
+### 2026-03-06 (album layout tuning: DynamicGridSpawner compact mode)
+- Goal: align Album grid visuals with reference (denser card matrix, stable card size, less empty gaps).
+- Updated `Assets/Igrodelnya2.0/DynamicGrid/DynamicGridSpawner.cs`:
+  - added optional `compactLayout` settings (`horizontalSpacing`, `verticalSpacing`);
+  - compact mode now applies top-left alignment and disables force expand for vertical/horizontal groups;
+  - row height is derived from spawned child preferred/min height to avoid oversized row gaps.
+- Updated `Assets/_Prefabs/UI/Album/AlbumScreen.prefab`:
+  - `maxItemsPerRow` increased `3 -> 5` for cards root;
+  - enabled `compactLayout` with spacing `8/8`.
+- Updated `Assets/_Scripts/UI/Album/AlbumEntryView.cs`:
+  - enforced card `LayoutElement` preferred/min size (`156x156`) for deterministic grid packing.
+- Safety:
+  - build check `dotnet build Assembly-CSharp.csproj -nologo` passes (warnings only, no errors).
+- Follow-up in Unity scene:
+  - verify visual parity at target resolution and adjust `preferredSize`/spacing if needed by art direction.

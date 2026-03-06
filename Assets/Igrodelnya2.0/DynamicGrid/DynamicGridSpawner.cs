@@ -4,60 +4,63 @@ using UnityEngine.UI;
 [RequireComponent(typeof(VerticalLayoutGroup))]
 public class DynamicGridSpawner : MonoBehaviour
 {
-    [SerializeField] private int maxItemsPerRow = 3; // Максимум элементов в строке
-    //[SerializeField] private Vector2 spacing = new Vector2(10f, 10f); // Отступы между элементами
-    [SerializeField] private GameObject rowPrefab; // Префаб строки (с HorizontalLayoutGroup)
+    [SerializeField] private int maxItemsPerRow = 3;
+    [SerializeField] private GameObject rowPrefab;
+
+    [Header("Optional Compact Layout")]
+    [SerializeField] private bool compactLayout = false;
+    [SerializeField] private float horizontalSpacing = 8f;
+    [SerializeField] private float verticalSpacing = 8f;
 
     private VerticalLayoutGroup verticalLayout;
 
-    void Awake()
+    private void Awake()
     {
         verticalLayout = GetComponent<VerticalLayoutGroup>();
-        //verticalLayout.spacing = spacing.y;
+        ApplyVerticalLayoutDefaults();
 
-        // Если rowPrefab не задан, создаём его автоматически
         if (rowPrefab == null)
-        {
             rowPrefab = CreateRowPrefab();
-        }
     }
 
-    // Метод для спавна объекта
     public GameObject SpawnObject(GameObject prefab)
     {
-        Transform targetRow = GetOrCreateAvailableRow();
-        GameObject spawnedObject = Instantiate(prefab, targetRow);
+        var targetRow = GetOrCreateAvailableRow();
+        var spawnedObject = Instantiate(prefab, targetRow);
+        UpdateRowHeightFromChild(targetRow, spawnedObject);
         return spawnedObject;
     }
+
     public T SpawnObject<T>(GameObject prefab) where T : Component
     {
-        Transform targetRow = GetOrCreateAvailableRow();
-        GameObject spawnedObject = Instantiate(prefab, targetRow);
+        var targetRow = GetOrCreateAvailableRow();
+        var spawnedObject = Instantiate(prefab, targetRow);
+        UpdateRowHeightFromChild(targetRow, spawnedObject);
         return spawnedObject.GetComponent<T>();
     }
-    // Получение или создание строки с местом
+
     private Transform GetOrCreateAvailableRow()
     {
-        // Проверяем существующие строки
         foreach (Transform row in transform)
         {
+            if (compactLayout && row.TryGetComponent<HorizontalLayoutGroup>(out var existingLayout))
+                ApplyRowLayoutDefaults(existingLayout);
+
             if (row.childCount < maxItemsPerRow)
-            {
                 return row;
-            }
         }
-        // Если нет свободной строки, создаём новую
-        GameObject newRow = Instantiate(rowPrefab, transform);
-        HorizontalLayoutGroup horizontalLayout = newRow.GetComponent<HorizontalLayoutGroup>();
-        //horizontalLayout.spacing = spacing.x;
+
+        var newRow = Instantiate(rowPrefab, transform);
+        if (compactLayout && newRow.TryGetComponent<HorizontalLayoutGroup>(out var horizontalLayout))
+            ApplyRowLayoutDefaults(horizontalLayout);
+
         return newRow.transform;
     }
 
-    // Создание шаблона строки по умолчанию
     private GameObject CreateRowPrefab()
     {
-        GameObject row = new GameObject("Row", typeof(RectTransform));
-        HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+        var row = new GameObject("Row", typeof(RectTransform));
+        var layout = row.AddComponent<HorizontalLayoutGroup>();
         layout.childAlignment = TextAnchor.UpperLeft;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -66,9 +69,62 @@ public class DynamicGridSpawner : MonoBehaviour
         return row;
     }
 
-    // Метод для пересчёта layout (если нужно вручную обновить)
     public void RefreshLayout()
     {
         LayoutRebuilder.ForceRebuildLayoutImmediate(GetComponent<RectTransform>());
+    }
+
+    private void ApplyVerticalLayoutDefaults()
+    {
+        if (verticalLayout == null || !compactLayout)
+            return;
+
+        verticalLayout.childAlignment = TextAnchor.UpperLeft;
+        verticalLayout.childControlWidth = true;
+        verticalLayout.childControlHeight = true;
+        verticalLayout.childForceExpandWidth = false;
+        verticalLayout.childForceExpandHeight = false;
+        verticalLayout.spacing = Mathf.Max(0f, verticalSpacing);
+    }
+
+    private void ApplyRowLayoutDefaults(HorizontalLayoutGroup layout)
+    {
+        if (layout == null || !compactLayout)
+            return;
+
+        layout.childAlignment = TextAnchor.UpperLeft;
+        layout.childControlWidth = true;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        layout.spacing = Mathf.Max(0f, horizontalSpacing);
+    }
+
+    private void UpdateRowHeightFromChild(Transform row, GameObject child)
+    {
+        if (!compactLayout || row == null || child == null)
+            return;
+
+        var childLayout = child.GetComponent<LayoutElement>();
+        var preferred = 0f;
+        if (childLayout != null)
+        {
+            preferred = Mathf.Max(preferred, childLayout.preferredHeight);
+            preferred = Mathf.Max(preferred, childLayout.minHeight);
+        }
+
+        if (preferred <= 0f && child.transform is RectTransform childRt)
+            preferred = Mathf.Abs(childRt.sizeDelta.y);
+
+        if (preferred <= 0f)
+            return;
+
+        var rowLayout = row.GetComponent<LayoutElement>();
+        if (rowLayout == null)
+            rowLayout = row.gameObject.AddComponent<LayoutElement>();
+
+        rowLayout.minHeight = Mathf.Max(rowLayout.minHeight, preferred);
+        rowLayout.preferredHeight = Mathf.Max(rowLayout.preferredHeight, preferred);
+        rowLayout.flexibleHeight = 0f;
     }
 }

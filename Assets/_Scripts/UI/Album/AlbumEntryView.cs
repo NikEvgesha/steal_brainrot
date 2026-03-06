@@ -14,8 +14,11 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Image selectedFrame;
     [SerializeField] private Color unlockedColor = Color.white;
     [SerializeField] private Color lockedColor = new Color(0f, 0f, 0f, 0.92f);
+    [SerializeField] private bool enforcePreferredSize = true;
+    [SerializeField] private Vector2 preferredSize = new Vector2(156f, 156f);
 
     private Action _onClick;
+    private int _lastClickFrame = -1;
 
     private void Awake()
     {
@@ -28,6 +31,7 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
             button.onClick.RemoveListener(OnClicked);
             button.onClick.AddListener(OnClicked);
         }
+        EnsureLayoutElement();
         EnsureMentionBadgeLayout();
         EnsureButtonPointerPassThrough();
     }
@@ -79,6 +83,10 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
 
     private void OnClicked()
     {
+        if (_lastClickFrame == Time.frameCount)
+            return;
+
+        _lastClickFrame = Time.frameCount;
         _onClick?.Invoke();
     }
 
@@ -128,5 +136,24 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
 
         if (rt.sizeDelta.x <= 0f || rt.sizeDelta.y <= 0f || rt.sizeDelta.x > 64f || rt.sizeDelta.y > 64f)
             rt.sizeDelta = new Vector2(18f, 18f);
+    }
+
+    private void EnsureLayoutElement()
+    {
+        if (!enforcePreferredSize)
+            return;
+
+        var layoutElement = GetComponent<LayoutElement>();
+        if (layoutElement == null)
+            layoutElement = gameObject.AddComponent<LayoutElement>();
+
+        var width = Mathf.Max(1f, preferredSize.x);
+        var height = Mathf.Max(1f, preferredSize.y);
+        layoutElement.minWidth = width;
+        layoutElement.preferredWidth = width;
+        layoutElement.flexibleWidth = 0f;
+        layoutElement.minHeight = height;
+        layoutElement.preferredHeight = height;
+        layoutElement.flexibleHeight = 0f;
     }
 }
