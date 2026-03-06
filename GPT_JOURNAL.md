@@ -635,3 +635,13 @@
   - `OnProgressChanged()` now ignores callbacks while local guarded updates are in progress.
 - Verification:
   - `dotnet build Assembly-CSharp.csproj -nologo` passes (warnings only, no errors).
+
+### 2026-03-06 (album follow-up bugs: rare tab UX + reward button visibility)
+- Fixed rare tab behavior in album to match expected UX:
+  - clicking a rare tab no longer filters/hides cards in the grid (`RebuildCards()` ignores rare selection for list visibility);
+  - rare tab selection is now more visible (`AlbumRareTabView`: stronger selected visuals via title bold + target graphic tint + selected frame brought to front).
+- Fixed reward button visibility:
+  - reward button is now shown only when a real claim is available (`rewardAmount > 0` and `CanClaimReward == true`);
+  - if reward is absent/already claimed, button and mention badge are hidden.
+- Verification:
+  - `dotnet build Assembly-CSharp.csproj -nologo` passes (warnings only, no errors).

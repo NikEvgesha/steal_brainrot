@@ -12,13 +12,31 @@ public class AlbumRareTabView : MonoBehaviour
     [SerializeField] private Image selectedFrame;
 
     private Action _onClick;
+    private FontStyles _defaultTitleStyle = FontStyles.Normal;
+    private bool _hasTitleStyleCache;
+    private Color _baseButtonColor = Color.white;
+    private bool _hasBaseButtonColor;
 
     private void Awake()
     {
         if (button == null)
             button = GetComponent<Button>();
         if (button != null)
+        {
             button.onClick.AddListener(OnClicked);
+            if (button.targetGraphic != null)
+            {
+                _baseButtonColor = button.targetGraphic.color;
+                _hasBaseButtonColor = true;
+            }
+        }
+
+        if (titleText != null)
+        {
+            _defaultTitleStyle = titleText.fontStyle;
+            _hasTitleStyleCache = true;
+        }
+
         EnsureMentionBadgeLayout();
         EnsureButtonPointerPassThrough();
     }
@@ -36,10 +54,34 @@ public class AlbumRareTabView : MonoBehaviour
         if (button != null)
             button.interactable = true;
 
+        if (button != null && button.targetGraphic != null)
+        {
+            if (!_hasBaseButtonColor)
+            {
+                _baseButtonColor = button.targetGraphic.color;
+                _hasBaseButtonColor = true;
+            }
+
+            var targetColor = _baseButtonColor;
+            if (!unlocked)
+                targetColor = Color.Lerp(targetColor, Color.black, 0.2f);
+            if (selected)
+                targetColor = Color.Lerp(targetColor, Color.white, 0.35f);
+            targetColor.a = _baseButtonColor.a;
+            button.targetGraphic.color = targetColor;
+        }
+
         if (titleText != null)
         {
+            if (!_hasTitleStyleCache)
+            {
+                _defaultTitleStyle = titleText.fontStyle;
+                _hasTitleStyleCache = true;
+            }
+
             titleText.text = title;
             titleText.alpha = unlocked ? 1f : 0.9f;
+            titleText.fontStyle = selected ? (_defaultTitleStyle | FontStyles.Bold) : _defaultTitleStyle;
         }
 
         if (lockOverlay != null)
@@ -65,6 +107,8 @@ public class AlbumRareTabView : MonoBehaviour
         {
             selectedFrame.enabled = selected;
             selectedFrame.raycastTarget = false;
+            if (selected)
+                selectedFrame.transform.SetAsLastSibling();
         }
 
         EnsureButtonPointerPassThrough();

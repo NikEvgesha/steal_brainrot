@@ -94,8 +94,6 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string incomeLabelFallback = "Income/sec";
     [SerializeField] private string claimRewardKey = "UI/Album/ClaimReward";
     [SerializeField] private string claimRewardFallback = "Claim +{0} Gems";
-    [SerializeField] private string rewardClaimedKey = "UI/Album/RewardClaimed";
-    [SerializeField] private string rewardClaimedFallback = "Claimed";
     [SerializeField] private string rareLockedKey = "UI/Album/RareLocked";
     [SerializeField] private string rareLockedFallback = "Hold item of this rarity to unlock";
     [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Rare/";
@@ -471,8 +469,6 @@ public class AlbumScreenController : MonoBehaviour
             var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
             if (!includeLockedInList && !unlocked)
                 continue;
-            if (_selectedRareFilter.HasValue && entry.rareType != _selectedRareFilter.Value)
-                continue;
             visibleEntries.Add(entry);
         }
 
@@ -676,20 +672,25 @@ public class AlbumScreenController : MonoBehaviour
             return;
         }
 
-        rewardButton.gameObject.SetActive(true);
         var rewardAmount = ResolveRewardAmount(entry);
-        var claimed = progressService.IsRewardClaimed(entry.type, entry.id);
-        var canClaim = progressService.CanClaimReward(entry.type, entry.id);
+        var canClaim = rewardAmount > 0 && progressService.CanClaimReward(entry.type, entry.id);
 
+        if (!canClaim)
+        {
+            rewardButton.gameObject.SetActive(false);
+            if (rewardMentionBadge != null)
+                rewardMentionBadge.SetActive(false);
+            return;
+        }
+
+        rewardButton.gameObject.SetActive(true);
         rewardButton.onClick.RemoveListener(OnRewardPressed);
         rewardButton.onClick.AddListener(OnRewardPressed);
-        rewardButton.interactable = canClaim;
+        rewardButton.interactable = true;
 
         if (rewardButtonText != null)
         {
-            rewardButtonText.text = claimed
-                ? L(rewardClaimedKey, rewardClaimedFallback)
-                : string.Format(L(claimRewardKey, claimRewardFallback), rewardAmount);
+            rewardButtonText.text = string.Format(L(claimRewardKey, claimRewardFallback), rewardAmount);
         }
 
         if (rewardMentionBadge != null)
