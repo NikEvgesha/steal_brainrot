@@ -119,6 +119,7 @@ public class AlbumScreenController : MonoBehaviour
     private string _selectedEntryId;
     private bool _bindingsReady;
     private bool _catalogReady;
+    private bool _suppressProgressChangedRefresh;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
 
@@ -446,12 +447,10 @@ public class AlbumScreenController : MonoBehaviour
         if (progressService != null)
         {
             var ids = CollectIdsByRareForCurrentTab(rareType);
-            progressService.MarkRareViewedForEntities(_currentTab, rareType, ids);
+            ExecuteWithoutProgressRefresh(() => progressService.MarkRareViewedForEntities(_currentTab, rareType, ids));
         }
 
-        RebuildCards();
-        RefreshInfoPanel();
-        RefreshRareTabs();
+        Refresh();
     }
 
     private void RebuildCards()
@@ -480,8 +479,7 @@ public class AlbumScreenController : MonoBehaviour
         if (visibleEntries.Count == 0)
         {
             _selectedEntryId = null;
-            if (cardPrefab != null)
-                cardPrefab.gameObject.SetActive(false);
+            HideEmbeddedCardTemplate();
             return;
         }
 
@@ -508,8 +506,7 @@ public class AlbumScreenController : MonoBehaviour
             _spawnedCardViews.Add(view);
         }
 
-        if (cardPrefab != null)
-            cardPrefab.gameObject.SetActive(false);
+        HideEmbeddedCardTemplate();
     }
 
     private void OnCardPressed(EntryData entry)
@@ -519,9 +516,8 @@ public class AlbumScreenController : MonoBehaviour
 
         _selectedEntryId = entry.id;
         if (progressService != null)
-            progressService.MarkCardViewed(entry.type, entry.id);
-        RebuildCards();
-        RefreshInfoPanel();
+            ExecuteWithoutProgressRefresh(() => progressService.MarkCardViewed(entry.type, entry.id));
+        Refresh();
     }
 
     private void RefreshInfoPanel()
@@ -709,7 +705,9 @@ public class AlbumScreenController : MonoBehaviour
         if (entry == null)
             return;
 
-        if (!progressService.TryClaimReward(entry.type, entry.id))
+        var claimed = false;
+        ExecuteWithoutProgressRefresh(() => claimed = progressService.TryClaimReward(entry.type, entry.id));
+        if (!claimed)
             return;
 
         var rewardAmount = ResolveRewardAmount(entry);
@@ -803,6 +801,9 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnProgressChanged()
     {
+        if (_suppressProgressChangedRefresh)
+            return;
+
         Refresh();
     }
 
@@ -866,8 +867,18 @@ public class AlbumScreenController : MonoBehaviour
             itemStorage = G.Storage;
         if (progressService == null)
             progressService = G.Album;
-        if (cardsDynamicGrid == null && cardsRoot != null)
-            cardsDynamicGrid = cardsRoot.GetComponent<DynamicGridSpawner>();
+
+        if (cardsRoot != null)
+        {
+            if (cardsDynamicGrid == null)
+                cardsDynamicGrid = cardsRoot.GetComponent<DynamicGridSpawner>();
+            if (cardsDynamicGrid == null)
+                cardsDynamicGrid = cardsRoot.GetComponentInChildren<DynamicGridSpawner>(true);
+
+            // If inspector references a wrapper root, prefer the actual grid root.
+            if (cardsDynamicGrid != null && cardsRoot != cardsDynamicGrid.transform)
+                cardsRoot = cardsDynamicGrid.transform;
+        }
     }
 
     private AlbumEntryView SpawnCardView()
@@ -880,17 +891,50 @@ public class AlbumScreenController : MonoBehaviour
 
     private void ClearCardsRootForRebuild()
     {
-        var templateTransform = cardPrefab != null ? cardPrefab.transform : null;
+        var templateTransform = GetEmbeddedCardTemplateTransform();
+        _spawnedCardViews.Clear();
+        var pendingDestroy = new List<GameObject>();
+
         for (var i = cardsRoot.childCount - 1; i >= 0; i--)
         {
             var child = cardsRoot.GetChild(i);
             if (templateTransform != null && child == templateTransform)
                 continue;
 
-            Destroy(child.gameObject);
+            var isRuntimeRow = child.GetComponent<HorizontalLayoutGroup>() != null;
+            var isDirectRuntimeCard = child.GetComponent<AlbumEntryView>() != null;
+            if (!isRuntimeRow && !isDirectRuntimeCard)
+                continue;
+
+            child.SetParent(null, false);
+            pendingDestroy.Add(child.gameObject);
         }
 
-        _spawnedCardViews.Clear();
+        for (var i = 0; i < pendingDestroy.Count; i++)
+        {
+            var go = pendingDestroy[i];
+            if (go != null)
+                Destroy(go);
+        }
+    }
+
+    private Transform GetEmbeddedCardTemplateTransform()
+    {
+        if (cardPrefab == null || cardsRoot == null)
+            return null;
+
+        var template = cardPrefab.transform;
+        if (template == null || !template.IsChildOf(cardsRoot))
+            return null;
+
+        return template;
+    }
+
+    private void HideEmbeddedCardTemplate()
+    {
+        var template = GetEmbeddedCardTemplateTransform();
+        if (template != null)
+            template.gameObject.SetActive(false);
     }
 
     private bool EnsureCatalogReady()
@@ -904,6 +948,23 @@ public class AlbumScreenController : MonoBehaviour
 
         BuildCatalog();
         return _catalogReady;
+    }
+
+    private void ExecuteWithoutProgressRefresh(Action action)
+    {
+        if (action == null)
+            return;
+
+        var previous = _suppressProgressChangedRefresh;
+        _suppressProgressChangedRefresh = true;
+        try
+        {
+            action.Invoke();
+        }
+        finally
+        {
+            _suppressProgressChangedRefresh = previous;
+        }
     }
 
     private List<string> CollectIdsByRareForCurrentTab(RareType rareType)

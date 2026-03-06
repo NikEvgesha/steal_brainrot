@@ -145,13 +145,24 @@ public static class AlbumScreenAutoWireEditor
             panelRoot = controller.transform;
         SetRef(so, "panelRoot", panelRoot != null ? panelRoot.gameObject : null);
 
-        var cardsRoot = FindByName(root, "cardsRoot");
+        var cardsContainer = FindByName(root, "cards");
+        var cardsRoot = cardsContainer != null ? cardsContainer : FindByName(root, "cardsRoot");
         SetRef(so, "cardsRoot", cardsRoot as RectTransform);
-        SetRef(so, "cardPrefab", FindComponentByName<AlbumEntryView>(root, "AlbumEntryView"));
+
+        var cardsDynamicGrid = cardsRoot != null ? cardsRoot.GetComponent<DynamicGridSpawner>() : null;
+        if (cardsDynamicGrid == null && cardsRoot != null)
+            cardsDynamicGrid = cardsRoot.GetComponentInChildren<DynamicGridSpawner>(true);
+        SetRef(so, "cardsDynamicGrid", cardsDynamicGrid);
+
+        var cardPrefab = FindComponentByName<AlbumEntryView>(root, "AlbumEntryView");
+        if (cardPrefab != null)
+            SetRef(so, "cardPrefab", cardPrefab);
 
         var rareTabsRoot = FindByName(root, "rareTabsRoot");
         SetRef(so, "rareTabsRoot", rareTabsRoot as RectTransform);
-        SetRef(so, "rareTabPrefab", FindComponentByName<AlbumRareTabView>(root, "AlbumRareTabView"));
+        var rareTabPrefab = FindComponentByName<AlbumRareTabView>(root, "AlbumRareTabView");
+        if (rareTabPrefab != null)
+            SetRef(so, "rareTabPrefab", rareTabPrefab);
 
         SetRef(so, "eggsTabButton", FindComponentByName<Button>(root, "EggsTabButton"));
         SetRef(so, "animalsTabButton", FindComponentByName<Button>(root, "AnimalsTabButton"));

@@ -36,12 +36,13 @@
 - `lockOverlay` -> силуэт/черный оверлей,
 - `selectedFrame` -> рамка выбранного элемента.
 3. В `AlbumScreenController` назначь:
-- `cardsRoot` -> root контейнера сетки,
-- `cardPrefab` -> префаб карточки из шага 1.
+- `cardsRoot` -> контейнер `cards` (если есть wrapper `cardsRoot`, то указывай именно вложенный `cards`),
+- `cardPrefab` -> префаб карточки из шага 1 (рекомендуется prefab asset, не scene template).
 
 Опционально для `cardsRoot`:
 - можно использовать `DynamicGridSpawner` вместо `GridLayoutGroup`;
-- `AlbumScreenController` теперь умеет спавнить карточки через `DynamicGridSpawner`, если компонент есть на `cardsRoot`.
+- `AlbumScreenController` теперь умеет спавнить карточки через `DynamicGridSpawner`, если компонент есть на `cardsRoot`;
+- при DynamicGrid также укажи поле `cardsDynamicGrid` на этот же компонент.
 
 ## 3) Вкладки редкости (иконки справа сверху)
 

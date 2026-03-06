@@ -18,14 +18,10 @@ AlbumScreen (GameObject, AlbumScreenController)
    │  ├─ CloseButton (Button)
    │  └─ AlbumIconMention (GameObject)   // точка на кнопке входа в альбом (может быть вне panelRoot)
    ├─ Content
-   │  ├─ cardsRoot (RectTransform, Grid/Vertical Layout)
-   │  │  └─ AlbumEntryView (prefab template, disabled in scene)
-   │  │     ├─ Button (Button)
-   │  │     ├─ Image (Image)             // iconImage
-   │  │     ├─ Titl (TMP_Text)           // titleText
-   │  │     ├─ Mention (GameObject)      // mentionBadge
-   │  │     ├─ LockOverlay (GameObject)  // lockOverlay
-   │  │     └─ SelectedFrame (Image)     // selectedFrame
+   │  ├─ cardsRoot (RectTransform wrapper)
+   │  │  ├─ BG (Image, optional)
+   │  │  ├─ cards (RectTransform, VerticalLayoutGroup, DynamicGridSpawner)
+   │  │  └─ CardName (TMP_Text, optional section label)
    │  ├─ rareTabsRoot (RectTransform, Horizontal Layout)
    │  │  └─ AlbumRareTabView (prefab template, disabled in scene)
    │  │     ├─ Button (Button)
@@ -48,8 +44,9 @@ AlbumScreen (GameObject, AlbumScreenController)
 ```
 
 Примечание по лейауту карточек:
-- если хочешь, можно оставить `cardsRoot` с `DynamicGridSpawner` + `VerticalLayoutGroup`;
-- `AlbumScreenController` поддерживает оба варианта: обычный `GridLayoutGroup` и `DynamicGridSpawner`.
+- if using DynamicGrid, assign `AlbumScreenController.cardsRoot` to `cards` child (not wrapper `cardsRoot`);
+- keep `cardPrefab` as prefab asset (`Assets/_Prefabs/UI/Album/AlbumEntryView.prefab`) instead of scene template under `cards`;
+- set `cardsDynamicGrid` to the `DynamicGridSpawner` on `cards`.
 
 ## 2) Что обязательно заполнить в AlbumScreenController
 
@@ -62,7 +59,7 @@ AlbumScreen (GameObject, AlbumScreenController)
   - `eggsTabText`, `animalsTabText`
   - `eggsTabMention`, `animalsTabMention`, `albumIconMention`
 - Cards:
-  - `cardsRoot`, `cardPrefab`
+  - `cardsRoot` (assign `cards` child), `cardPrefab` (prefab asset), `cardsDynamicGrid` (optional, for DynamicGrid)
 - Rare Tabs:
   - `rareTabsRoot`, `rareTabPrefab`
 - Info Panel:

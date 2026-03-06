@@ -27,6 +27,8 @@ public class DynamicGridSpawner : MonoBehaviour
     {
         var targetRow = GetOrCreateAvailableRow();
         var spawnedObject = Instantiate(prefab, targetRow);
+        if (!spawnedObject.activeSelf)
+            spawnedObject.SetActive(true);
         UpdateRowHeightFromChild(targetRow, spawnedObject);
         return spawnedObject;
     }
@@ -35,18 +37,28 @@ public class DynamicGridSpawner : MonoBehaviour
     {
         var targetRow = GetOrCreateAvailableRow();
         var spawnedObject = Instantiate(prefab, targetRow);
+        if (!spawnedObject.activeSelf)
+            spawnedObject.SetActive(true);
         UpdateRowHeightFromChild(targetRow, spawnedObject);
         return spawnedObject.GetComponent<T>();
     }
 
     private Transform GetOrCreateAvailableRow()
     {
+        var itemsPerRow = Mathf.Max(1, maxItemsPerRow);
+
         foreach (Transform row in transform)
         {
-            if (compactLayout && row.TryGetComponent<HorizontalLayoutGroup>(out var existingLayout))
+            if (row == null || !row.gameObject.activeSelf)
+                continue;
+
+            if (!row.TryGetComponent<HorizontalLayoutGroup>(out var existingLayout))
+                continue;
+
+            if (compactLayout)
                 ApplyRowLayoutDefaults(existingLayout);
 
-            if (row.childCount < maxItemsPerRow)
+            if (row.childCount < itemsPerRow)
                 return row;
         }
 
@@ -114,7 +126,10 @@ public class DynamicGridSpawner : MonoBehaviour
         }
 
         if (preferred <= 0f && child.transform is RectTransform childRt)
-            preferred = Mathf.Abs(childRt.sizeDelta.y);
+            preferred = LayoutUtility.GetPreferredHeight(childRt);
+
+        if (preferred <= 0f && child.transform is RectTransform fallbackRt)
+            preferred = Mathf.Min(256f, Mathf.Abs(fallbackRt.sizeDelta.y));
 
         if (preferred <= 0f)
             return;

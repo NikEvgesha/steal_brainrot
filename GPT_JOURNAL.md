@@ -603,3 +603,35 @@
   - build check `dotnet build Assembly-CSharp.csproj -nologo` passes (warnings only, no errors).
 - Follow-up in Unity scene:
   - verify visual parity at target resolution and adjust `preferredSize`/spacing if needed by art direction.
+
+### 2026-03-06 (album bugfix: tab/card rebuild instability after hierarchy update)
+- Fixed runtime robustness for updated Album hierarchy where `cardsRoot` can be a wrapper and actual grid lives in child `cards`.
+- `Assets/_Scripts/UI/Album/AlbumScreenController.cs`:
+  - `AutoSetupReferences()` now auto-resolves `DynamicGridSpawner` from descendants and aligns `cardsRoot` to the actual grid transform.
+  - `ClearCardsRootForRebuild()` now clears only runtime rows/cards (and tracked spawned views), avoiding destruction of static wrapper children.
+  - template hiding is now applied only for embedded scene template via `HideEmbeddedCardTemplate()`; prefab-asset references are no longer toggled.
+- `Assets/Igrodelnya2.0/DynamicGrid/DynamicGridSpawner.cs`:
+  - row reuse now considers only active children with `HorizontalLayoutGroup`; prevents treating decorative/template objects as rows.
+  - `maxItemsPerRow` is clamped to at least 1 at runtime.
+- `Assets/_Scripts/UI/Album/Editor/AlbumScreenAutoWireEditor.cs`:
+  - auto-wire now prefers child `cards` as `cardsRoot` and also fills `cardsDynamicGrid`.
+  - avoids overwriting `cardPrefab` / `rareTabPrefab` with null when scene template objects are absent.
+- Docs updated for new hierarchy/assignments:
+  - `Docs/ALBUM_PREFAB_TEMPLATE.md`
+  - `Docs/ALBUM_SETUP.md`
+- Verification:
+  - `dotnet build Assembly-CSharp.csproj -nologo` passes (no errors).
+- Follow-up runtime fix (same date):
+  - `DynamicGridSpawner` now activates spawned objects before row-height estimation.
+  - row-height fallback now prefers `LayoutUtility.GetPreferredHeight` and clamps raw `sizeDelta` fallback.
+  - This prevents unstable row sizing when `cardPrefab` root is disabled in prefab asset.
+
+### 2026-03-06 (album runtime stability follow-up)
+- Additional fix for intermittent card disappearance while switching tabs/selecting cards:
+  - `AlbumScreenController.ClearCardsRootForRebuild()` now detaches runtime row/card children from `cardsRoot` before `Destroy(...)`, so `DynamicGridSpawner` cannot reuse objects already scheduled for destruction in the same frame.
+- Removed duplicate refresh cycles caused by `AlbumProgressService.Changed` during local click handlers:
+  - added guarded helper `ExecuteWithoutProgressRefresh(...)`;
+  - applied in `OnCardPressed`, `OnRarePressed`, and `OnRewardPressed`;
+  - `OnProgressChanged()` now ignores callbacks while local guarded updates are in progress.
+- Verification:
+  - `dotnet build Assembly-CSharp.csproj -nologo` passes (warnings only, no errors).
