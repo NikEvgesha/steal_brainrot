@@ -1,0 +1,375 @@
+﻿#if UNITY_EDITOR
+using System;
+using System.Collections.Generic;
+using MirraGames.SDK;
+using UnityEditor;
+using UnityEngine;
+
+public static class AlbumSaveToolsEditor
+{
+    private const string DefaultSavePrefix = "AlbumV1";
+    private const string DefaultDateSavePrefix = "AlbumDateV1";
+
+    [MenuItem("Tools/Save/Clear Album Saves")]
+    private static void ClearAlbumSavesMenu()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "Clear Album Saves",
+                "Clear album progress (eggs/animals, rarities, rewards, dates)?\n\nThis action cannot be undone.",
+                "Clear",
+                "Cancel"))
+        {
+            return;
+        }
+
+        var result = ClearAlbumSavesInternal();
+        var message = result.success
+            ? $"Album saves cleared.\nEntities: {result.entityCount}\nAlbum keys processed: {result.albumKeysProcessed}\nDate keys deleted: {result.dateKeysDeleted}\nPlayerPrefs keys deleted: {result.playerPrefsKeysDeleted}"
+            : result.error;
+
+        if (result.success)
+            Debug.Log("[AlbumSaveTools] " + message);
+        else
+            Debug.LogWarning("[AlbumSaveTools] " + message);
+
+        EditorUtility.DisplayDialog("Album Saves", message, "OK");
+    }
+
+    [MenuItem("Tools/Save/Clear ALL Save Data")]
+    private static void ClearAllSaveDataMenu()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "Clear ALL Save Data",
+                "This will wipe all game saves.\n\nIncludes:\n- PlayerPrefs (local)\n- MirraSDK data\n\nThis action cannot be undone.",
+                "Continue",
+                "Cancel"))
+        {
+            return;
+        }
+
+        if (!EditorUtility.DisplayDialog(
+                "Final Confirmation",
+                "Are you absolutely sure you want to delete ALL save data?",
+                "Yes, delete all",
+                "Cancel"))
+        {
+            return;
+        }
+
+        var result = ClearAllSaveDataInternal();
+        var message = result.success
+            ? $"All save data cleared.\nPlayerPrefs cleared: {result.playerPrefsCleared}\nMirraSDK cleared: {result.mirraCleared}"
+            : result.error;
+
+        if (result.success)
+            Debug.Log("[SaveTools] " + message);
+        else
+            Debug.LogWarning("[SaveTools] " + message);
+
+        EditorUtility.DisplayDialog("All Save Data", message, "OK");
+    }
+
+    private static ClearResult ClearAlbumSavesInternal()
+    {
+        var result = new ClearResult();
+
+        var storage = ResolveStorage();
+        if (storage == null)
+        {
+            result.success = false;
+            result.error = "ItemPrefabStorage not found. Open a scene with ItemPrefabStorage (or run in Play Mode) and retry.";
+            return result;
+        }
+
+        var savePrefix = DefaultSavePrefix;
+        var datePrefix = DefaultDateSavePrefix;
+        TryResolvePrefixes(ref savePrefix, ref datePrefix);
+
+        var eggIds = CollectEggIds(storage);
+        var animalIds = CollectAnimalIds(storage);
+        var allRares = AlbumProgressService.GetSupportedRareTypes();
+
+        var albumKeys = new HashSet<string>(StringComparer.Ordinal);
+        var dateKeys = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var i = 0; i < eggIds.Count; i++)
+            AddEntityKeys(albumKeys, dateKeys, savePrefix, AlbumEntityType.Egg, eggIds[i], allRares);
+
+        for (var i = 0; i < animalIds.Count; i++)
+            AddEntityKeys(albumKeys, dateKeys, savePrefix, AlbumEntityType.Animal, animalIds[i], allRares);
+
+        for (var i = 0; i < allRares.Count; i++)
+        {
+            var rare = allRares[i];
+            albumKeys.Add(BuildRareGlobalKey(savePrefix, "RareUnlocked", rare));
+            albumKeys.Add(BuildRareTabKey(savePrefix, "MentionRare", AlbumEntityType.Egg, rare));
+            albumKeys.Add(BuildRareTabKey(savePrefix, "MentionRare", AlbumEntityType.Animal, rare));
+        }
+
+        var prefDeleted = 0;
+        var dateDeleted = 0;
+        var keysProcessed = 0;
+        var inPlayWithSave = Application.isPlaying && G.Save != null;
+
+        foreach (var key in albumKeys)
+        {
+            keysProcessed++;
+
+            if (inPlayWithSave)
+            {
+                // Through SaveManager for current active provider.
+                G.Save.SaveLevelStatus(key, false);
+            }
+
+            if (DeletePrefKey("LevelStatus_" + key))
+                prefDeleted++;
+            if (DeletePrefKey("AlbumFallback." + key))
+                prefDeleted++;
+        }
+
+        foreach (var dateKey in dateKeys)
+        {
+            if (DeletePrefKey(datePrefix + "." + dateKey))
+                dateDeleted++;
+        }
+
+        if (prefDeleted > 0 || dateDeleted > 0)
+            PlayerPrefs.Save();
+
+        if (Application.isPlaying && G.Album != null)
+            G.Album.Changed?.Invoke();
+
+        result.success = true;
+        result.entityCount = eggIds.Count + animalIds.Count;
+        result.albumKeysProcessed = keysProcessed;
+        result.dateKeysDeleted = dateDeleted;
+        result.playerPrefsKeysDeleted = prefDeleted;
+        return result;
+    }
+
+    private static ClearAllResult ClearAllSaveDataInternal()
+    {
+        var result = new ClearAllResult
+        {
+            success = true
+        };
+
+        try
+        {
+            PlayerPrefs.DeleteAll();
+            PlayerPrefs.Save();
+            result.playerPrefsCleared = true;
+        }
+        catch (Exception ex)
+        {
+            result.success = false;
+            result.error = "Failed to clear PlayerPrefs: " + ex.Message;
+            return result;
+        }
+
+        try
+        {
+            MirraSDK.Data.DeleteAll();
+            result.mirraCleared = true;
+        }
+        catch (Exception ex)
+        {
+            // PlayerPrefs are already cleared, but Mirra data could not be wiped.
+            result.mirraCleared = false;
+            result.error = "PlayerPrefs cleared, but MirraSDK delete failed: " + ex.Message;
+        }
+
+        if (Application.isPlaying && G.Save != null)
+            G.Save.SetSave(false);
+
+        if (Application.isPlaying && G.Album != null)
+            G.Album.Changed?.Invoke();
+
+        if (!string.IsNullOrEmpty(result.error))
+            result.success = false;
+
+        return result;
+    }
+
+    private static void TryResolvePrefixes(ref string savePrefix, ref string datePrefix)
+    {
+        var services = Resources.FindObjectsOfTypeAll<AlbumProgressService>();
+        for (var i = 0; i < services.Length; i++)
+        {
+            var service = services[i];
+            if (service == null || EditorUtility.IsPersistent(service))
+                continue;
+
+            var so = new SerializedObject(service);
+            var saveProp = so.FindProperty("savePrefix");
+            var dateProp = so.FindProperty("dateSavePrefix");
+            if (saveProp != null && !string.IsNullOrWhiteSpace(saveProp.stringValue))
+                savePrefix = saveProp.stringValue.Trim();
+            if (dateProp != null && !string.IsNullOrWhiteSpace(dateProp.stringValue))
+                datePrefix = dateProp.stringValue.Trim();
+            return;
+        }
+    }
+
+    private static ItemPrefabStorage ResolveStorage()
+    {
+        if (Application.isPlaying && G.Storage != null)
+            return G.Storage;
+
+        var sceneStorages = Resources.FindObjectsOfTypeAll<ItemPrefabStorage>();
+        for (var i = 0; i < sceneStorages.Length; i++)
+        {
+            var storage = sceneStorages[i];
+            if (storage == null || EditorUtility.IsPersistent(storage))
+                continue;
+            return storage;
+        }
+
+        var prefabGuids = AssetDatabase.FindAssets("ItemPrefabStorage t:Prefab");
+        for (var i = 0; i < prefabGuids.Length; i++)
+        {
+            var path = AssetDatabase.GUIDToAssetPath(prefabGuids[i]);
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (go == null)
+                continue;
+
+            var storage = go.GetComponentInChildren<ItemPrefabStorage>(true);
+            if (storage != null)
+                return storage;
+        }
+
+        return null;
+    }
+
+    private static List<string> CollectEggIds(ItemPrefabStorage storage)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var eggs = storage.GetAllEggPrefabs();
+        if (eggs == null)
+            return result;
+
+        for (var i = 0; i < eggs.Count; i++)
+        {
+            var egg = eggs[i];
+            if (egg == null)
+                continue;
+
+            var id = AlbumProgressService.NormalizeId(egg.Name);
+            if (string.IsNullOrEmpty(id))
+                id = AlbumProgressService.NormalizeId(egg.name);
+            if (string.IsNullOrEmpty(id) || !seen.Add(id))
+                continue;
+
+            result.Add(id);
+        }
+
+        return result;
+    }
+
+    private static List<string> CollectAnimalIds(ItemPrefabStorage storage)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var animals = storage.GetAllPetPrefabs();
+        if (animals == null)
+            return result;
+
+        for (var i = 0; i < animals.Count; i++)
+        {
+            var animal = animals[i];
+            if (animal == null)
+                continue;
+
+            var id = AlbumProgressService.NormalizeId(animal.Name);
+            if (string.IsNullOrEmpty(id))
+                id = AlbumProgressService.NormalizeId(animal.name);
+            if (string.IsNullOrEmpty(id) || !seen.Add(id))
+                continue;
+
+            result.Add(id);
+        }
+
+        return result;
+    }
+
+    private static void AddEntityKeys(
+        ISet<string> albumKeys,
+        ISet<string> dateKeys,
+        string savePrefix,
+        AlbumEntityType type,
+        string id,
+        IReadOnlyList<RareType> rares)
+    {
+        if (string.IsNullOrEmpty(id))
+            return;
+
+        albumKeys.Add(BuildEntityKey(savePrefix, "Discovered", type, id));
+        albumKeys.Add(BuildEntityKey(savePrefix, "Viewed", type, id));
+        albumKeys.Add(BuildEntityKey(savePrefix, "MentionCard", type, id));
+        albumKeys.Add(BuildEntityKey(savePrefix, "RewardClaimed", type, id));
+        albumKeys.Add(BuildEntityKey(savePrefix, "MentionReward", type, id));
+
+        dateKeys.Add(BuildEntityKey(savePrefix, "FirstDiscoveredAt", type, id));
+
+        if (rares == null)
+            return;
+
+        for (var i = 0; i < rares.Count; i++)
+        {
+            var rare = rares[i];
+            albumKeys.Add(BuildEntityRareKey(savePrefix, "RareSeen", type, id, rare));
+            albumKeys.Add(BuildEntityRareKey(savePrefix, "RareViewed", type, id, rare));
+            albumKeys.Add(BuildEntityRareKey(savePrefix, "MentionRare", type, id, rare));
+            dateKeys.Add(BuildEntityRareKey(savePrefix, "FirstRareSeenAt", type, id, rare));
+        }
+    }
+
+    private static bool DeletePrefKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key) || !PlayerPrefs.HasKey(key))
+            return false;
+
+        PlayerPrefs.DeleteKey(key);
+        return true;
+    }
+
+    private static string BuildEntityKey(string prefix, string tag, AlbumEntityType type, string id)
+    {
+        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(id)}";
+    }
+
+    private static string BuildEntityRareKey(string prefix, string tag, AlbumEntityType type, string id, RareType rareType)
+    {
+        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(id)}.{AlbumProgressService.NormalizeId(rareType.ToString())}";
+    }
+
+    private static string BuildRareGlobalKey(string prefix, string tag, RareType rareType)
+    {
+        return $"{prefix}.{tag}.{AlbumProgressService.NormalizeId(rareType.ToString())}";
+    }
+
+    private static string BuildRareTabKey(string prefix, string tag, AlbumEntityType type, RareType rareType)
+    {
+        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(rareType.ToString())}";
+    }
+
+    private struct ClearResult
+    {
+        public bool success;
+        public string error;
+        public int entityCount;
+        public int albumKeysProcessed;
+        public int dateKeysDeleted;
+        public int playerPrefsKeysDeleted;
+    }
+
+    private struct ClearAllResult
+    {
+        public bool success;
+        public string error;
+        public bool playerPrefsCleared;
+        public bool mirraCleared;
+    }
+}
+#endif

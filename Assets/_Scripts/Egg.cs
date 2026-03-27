@@ -329,6 +329,11 @@ public class Egg : InventoryItem
         Brainrot brainrot = Instantiate(brainrotPrefab, _currentCell.transform);
         brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         brainrot.Init(_data.DinamicData, _currentCell);
+
+        // Album progress should track hatched pets even before they are picked up.
+        if (G.Album != null)
+            G.Album.TryDiscover(AlbumEntityType.Animal, brainrot.Name, brainrot.RareType);
+
         LocalPlayerStatsStore.IncrementHatched();
         _currentCell.UpdateFieldItem(Item.Brainrot);
         Destroy(gameObject);

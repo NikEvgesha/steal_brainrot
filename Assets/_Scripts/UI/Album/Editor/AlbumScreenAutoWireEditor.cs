@@ -173,9 +173,17 @@ public static class AlbumScreenAutoWireEditor
         SetRef(so, "closeButton", FindComponentByName<Button>(root, "CloseButton"));
         SetRef(so, "eggsTabText", FindComponentByName<TMP_Text>(root, "EggsTabText"));
         SetRef(so, "animalsTabText", FindComponentByName<TMP_Text>(root, "AnimalsTabText"));
+        SetRef(so, "eggsTabBackground", ResolveTopTabBackground(root, "EggsTabButton"));
+        SetRef(so, "animalsTabBackground", ResolveTopTabBackground(root, "AnimalsTabButton"));
+        SetRef(so, "eggsTabSelectedFrame", ResolveTopTabSelectedFrame(root, "EggsTabButton"));
+        SetRef(so, "animalsTabSelectedFrame", ResolveTopTabSelectedFrame(root, "AnimalsTabButton"));
         SetRef(so, "eggsTabMention", FindByName(root, "EggsTabMention")?.gameObject);
         SetRef(so, "animalsTabMention", FindByName(root, "AnimalsTabMention")?.gameObject);
         SetRef(so, "albumIconMention", FindByName(root, "AlbumIconMention")?.gameObject);
+        SetRef(so, "cardsSectionTitle",
+            FindComponentByName<TMP_Text>(root, "CardName") ??
+            FindComponentByName<TMP_Text>(root, "CardsTitle") ??
+            FindComponentByName<TMP_Text>(root, "SectionTitle"));
 
         SetRef(so, "infoIcon", FindComponentByName<Image>(root, "InfoIcon"));
         SetRef(so, "infoTitle", FindComponentByName<TMP_Text>(root, "InfoTitle"));
@@ -439,6 +447,74 @@ public static class AlbumScreenAutoWireEditor
             var child = parent.GetChild(i);
             if (NamesMatch(child.name, childName))
                 return child;
+        }
+
+        return null;
+    }
+
+    private static Image ResolveTopTabBackground(Transform root, string buttonName)
+    {
+        var buttonRoot = FindByName(root, buttonName);
+        if (buttonRoot == null)
+            return null;
+
+        var button = buttonRoot.GetComponent<Button>();
+        var targetImage = button != null ? button.targetGraphic as Image : null;
+        if (targetImage != null && targetImage.sprite != null)
+            return targetImage;
+
+        Image candidate = null;
+        var images = buttonRoot.GetComponentsInChildren<Image>(true);
+        for (var i = 0; i < images.Length; i++)
+        {
+            var image = images[i];
+            if (image == null || image == targetImage)
+                continue;
+            if (image.sprite == null)
+                continue;
+
+            var imageName = image.gameObject.name;
+            if (imageName.IndexOf("mention", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("badge", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("text", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("label", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                continue;
+            }
+
+            if (imageName.IndexOf("bg", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("background", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return image;
+            }
+
+            if (candidate == null)
+                candidate = image;
+        }
+
+        return candidate ?? targetImage;
+    }
+
+    private static Image ResolveTopTabSelectedFrame(Transform root, string buttonName)
+    {
+        var buttonRoot = FindByName(root, buttonName);
+        if (buttonRoot == null)
+            return null;
+
+        var images = buttonRoot.GetComponentsInChildren<Image>(true);
+        for (var i = 0; i < images.Length; i++)
+        {
+            var image = images[i];
+            if (image == null)
+                continue;
+
+            var imageName = image.gameObject.name;
+            if (imageName.IndexOf("selectedframe", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("activeframe", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return image;
+            }
         }
 
         return null;

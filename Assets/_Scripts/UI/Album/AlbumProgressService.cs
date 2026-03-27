@@ -124,6 +124,18 @@ public class AlbumProgressService : MonoBehaviour
         return LoadFlag(BuildRareGlobalKey("RareUnlocked", rareType));
     }
 
+    public bool IsRareSeen(AlbumEntityType type, string id, RareType rareType)
+    {
+        if (!IsValidRareType(rareType))
+            return false;
+
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        return LoadFlag(BuildEntityRareKey("RareSeen", type, normalizedId, rareType));
+    }
+
     public bool HasRareMention(AlbumEntityType type, string id, RareType rareType)
     {
         if (!IsValidRareType(rareType))

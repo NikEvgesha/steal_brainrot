@@ -60,11 +60,16 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private Button closeButton;
     [SerializeField] private TMP_Text eggsTabText;
     [SerializeField] private TMP_Text animalsTabText;
+    [SerializeField] private Image eggsTabBackground;
+    [SerializeField] private Image animalsTabBackground;
+    [SerializeField] private Image eggsTabSelectedFrame;
+    [SerializeField] private Image animalsTabSelectedFrame;
     [SerializeField] private GameObject eggsTabMention;
     [SerializeField] private GameObject animalsTabMention;
     [SerializeField] private GameObject albumIconMention;
 
     [Header("Cards")]
+    [SerializeField] private TMP_Text cardsSectionTitle;
     [SerializeField] private Transform cardsRoot;
     [SerializeField] private AlbumEntryView cardPrefab;
     [SerializeField] private DynamicGridSpawner cardsDynamicGrid;
@@ -104,6 +109,10 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string eggsTabFallback = "Eggs";
     [SerializeField] private string animalsTabKey = "UI/Album/TabAnimals";
     [SerializeField] private string animalsTabFallback = "Animals";
+    [SerializeField] private string eggsSectionTitleKey = "UI/Album/SectionEggs";
+    [SerializeField] private string eggsSectionTitleFallback = "Egg";
+    [SerializeField] private string animalsSectionTitleKey = "UI/Album/SectionAnimals";
+    [SerializeField] private string animalsSectionTitleFallback = "Pet";
     [SerializeField] private string unknownKey = "UI/Album/Unknown";
     [SerializeField] private string unknownFallback = "???";
     [SerializeField] private string eggInfoDescKey = "UI/Album/EggInfoDescription";
@@ -138,6 +147,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private bool applyLuckBonusInChances = true;
     [SerializeField] private bool sortByName = true;
     [SerializeField] private bool includeLockedInList = true;
+    [SerializeField, Range(0f, 1f)] private float activeTopTabLighten = 0.22f;
 
     private readonly List<EntryData> _eggEntries = new();
     private readonly List<EntryData> _animalEntries = new();
@@ -156,6 +166,14 @@ public class AlbumScreenController : MonoBehaviour
     private bool _bindingsReady;
     private bool _catalogReady;
     private bool _suppressProgressChangedRefresh;
+    private FontStyles _eggsTabDefaultStyle = FontStyles.Normal;
+    private bool _hasEggsTabDefaultStyle;
+    private FontStyles _animalsTabDefaultStyle = FontStyles.Normal;
+    private bool _hasAnimalsTabDefaultStyle;
+    private Color _eggsTabBaseColor = Color.white;
+    private bool _hasEggsTabBaseColor;
+    private Color _animalsTabBaseColor = Color.white;
+    private bool _hasAnimalsTabBaseColor;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
 
@@ -245,15 +263,17 @@ public class AlbumScreenController : MonoBehaviour
     {
         EnsureCatalogReady();
         RefreshTabMentions();
-        RefreshRareTabs();
+        RefreshTopTabVisuals();
+        RefreshCardsSectionTitle();
         RebuildCards();
+        RefreshRareTabs();
         RefreshInfoPanel();
     }
 
     private void SetTab(AlbumEntityType tab, bool preserveSelection)
     {
         _currentTab = tab;
-        _selectedRareFilter = null;
+        _selectedRareFilter = ResolveDefaultRareFilter(tab);
         if (!preserveSelection)
             _selectedEntryId = null;
 
@@ -471,24 +491,16 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnRarePressed(RareType rareType, bool unlocked)
     {
-        if (_selectedRareFilter.HasValue && _selectedRareFilter.Value == rareType)
-            _selectedRareFilter = null;
-        else
-            _selectedRareFilter = rareType;
+        _selectedRareFilter = rareType;
 
-        if (!unlocked)
+        if (progressService != null && unlocked)
         {
-            if (infoLockedText != null)
-                infoLockedText.text = L(rareLockedKey, rareLockedFallback);
-
-            RefreshRareTabs();
-            return;
-        }
-
-        if (progressService != null)
-        {
-            var ids = CollectIdsByRareForCurrentTab(rareType);
-            ExecuteWithoutProgressRefresh(() => progressService.MarkRareViewedForEntities(_currentTab, rareType, ids));
+            var selectedEntry = FindSelectedEntry();
+            if (selectedEntry != null && !string.IsNullOrEmpty(selectedEntry.id))
+            {
+                var ids = new List<string> { selectedEntry.id };
+                ExecuteWithoutProgressRefresh(() => progressService.MarkRareViewedForEntities(_currentTab, rareType, ids));
+            }
         }
 
         Refresh();
@@ -509,7 +521,7 @@ public class AlbumScreenController : MonoBehaviour
             if (entry == null)
                 continue;
 
-            var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
+            var unlocked = IsEntryUnlockedForSelectedRare(entry);
             if (!includeLockedInList && !unlocked)
                 continue;
             visibleEntries.Add(entry);
@@ -533,12 +545,12 @@ public class AlbumScreenController : MonoBehaviour
                 continue;
             view.gameObject.SetActive(true);
 
-            var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
+            var unlocked = IsEntryUnlockedForSelectedRare(entry);
             var selected = string.Equals(entry.id, _selectedEntryId, StringComparison.Ordinal);
             var hasMention = progressService != null &&
                              (progressService.HasCardMention(entry.type, entry.id) ||
                               progressService.HasRewardMention(entry.type, entry.id) ||
-                              progressService.HasRareMention(entry.type, entry.id, entry.rareType));
+                              progressService.HasRareMention(entry.type, entry.id, (_selectedRareFilter ?? entry.rareType)));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
             view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry));
@@ -569,7 +581,7 @@ public class AlbumScreenController : MonoBehaviour
             return;
         }
 
-        var unlocked = progressService != null && progressService.IsDiscovered(entry.type, entry.id);
+        var unlocked = IsEntryUnlockedForSelectedRare(entry);
         if (!unlocked)
         {
             SetLockedInfo(entry);
@@ -776,7 +788,8 @@ public class AlbumScreenController : MonoBehaviour
         if (entry == null || progressService == null)
             return string.Format(rawLabel, fallbackDate);
 
-        if (!progressService.TryGetFirstRareDiscoveryDate(entry.type, entry.id, entry.rareType, out var firstSeenDate))
+        var selectedRare = _selectedRareFilter ?? entry.rareType;
+        if (!progressService.TryGetFirstRareDiscoveryDate(entry.type, entry.id, selectedRare, out var firstSeenDate))
             return string.Format(rawLabel, fallbackDate);
 
         return string.Format(rawLabel, FormatAlbumDate(firstSeenDate));
@@ -1004,13 +1017,21 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         var claimed = false;
-        ExecuteWithoutProgressRefresh(() => claimed = progressService.TryClaimReward(entry.type, entry.id));
+        ExecuteWithoutProgressRefresh(() =>
+        {
+            claimed = progressService.TryClaimReward(entry.type, entry.id);
+            if (claimed)
+                progressService.MarkCardViewed(entry.type, entry.id);
+        });
         if (!claimed)
             return;
 
         var rewardAmount = ResolveRewardAmount(entry);
         if (rewardAmount > 0 && G.Currency != null)
             G.Currency.AddCurrency(CurrencyType.Gems, rewardAmount);
+
+        if (rewardMentionBadge != null)
+            rewardMentionBadge.SetActive(false);
 
         Refresh();
     }
@@ -1063,6 +1084,173 @@ public class AlbumScreenController : MonoBehaviour
             animalsTabText.text = L(animalsTabKey, animalsTabFallback);
     }
 
+    private void RefreshCardsSectionTitle()
+    {
+        if (cardsSectionTitle == null)
+            return;
+
+        cardsSectionTitle.text = _currentTab == AlbumEntityType.Egg
+            ? L(eggsSectionTitleKey, eggsSectionTitleFallback)
+            : L(animalsSectionTitleKey, animalsSectionTitleFallback);
+    }
+
+    private void RefreshTopTabVisuals()
+    {
+        ApplyTopTabVisual(
+            eggsTabButton,
+            eggsTabText,
+            ref eggsTabBackground,
+            ref eggsTabSelectedFrame,
+            _currentTab == AlbumEntityType.Egg,
+            ref _eggsTabBaseColor,
+            ref _hasEggsTabBaseColor,
+            ref _eggsTabDefaultStyle,
+            ref _hasEggsTabDefaultStyle);
+
+        ApplyTopTabVisual(
+            animalsTabButton,
+            animalsTabText,
+            ref animalsTabBackground,
+            ref animalsTabSelectedFrame,
+            _currentTab == AlbumEntityType.Animal,
+            ref _animalsTabBaseColor,
+            ref _hasAnimalsTabBaseColor,
+            ref _animalsTabDefaultStyle,
+            ref _hasAnimalsTabDefaultStyle);
+    }
+
+    private void ApplyTopTabVisual(
+        Button button,
+        TMP_Text label,
+        ref Image background,
+        ref Image selectedFrame,
+        bool selected,
+        ref Color baseColor,
+        ref bool hasBaseColor,
+        ref FontStyles defaultStyle,
+        ref bool hasDefaultStyle)
+    {
+        if (button == null)
+            return;
+
+        if (background == null)
+            background = ResolveTopTabBackground(button);
+        if (selectedFrame == null)
+            selectedFrame = ResolveTopTabSelectedFrame(button);
+
+        if (background != null)
+        {
+            if (!hasBaseColor)
+            {
+                baseColor = background.color;
+                hasBaseColor = true;
+            }
+
+            var targetColor = selected
+                ? Color.Lerp(baseColor, Color.white, Mathf.Clamp01(activeTopTabLighten))
+                : baseColor;
+            targetColor.a = baseColor.a;
+            background.color = targetColor;
+        }
+        else if (button.targetGraphic != null)
+        {
+            if (!hasBaseColor)
+            {
+                baseColor = button.targetGraphic.color;
+                hasBaseColor = true;
+            }
+
+            var targetColor = selected
+                ? Color.Lerp(baseColor, Color.white, Mathf.Clamp01(activeTopTabLighten))
+                : baseColor;
+            targetColor.a = baseColor.a;
+            button.targetGraphic.color = targetColor;
+        }
+
+        if (label != null)
+        {
+            if (!hasDefaultStyle)
+            {
+                defaultStyle = label.fontStyle;
+                hasDefaultStyle = true;
+            }
+
+            label.fontStyle = selected ? (defaultStyle | FontStyles.Bold) : defaultStyle;
+            label.alpha = selected ? 1f : 0.95f;
+        }
+
+        if (selectedFrame != null)
+        {
+            selectedFrame.enabled = selected;
+            selectedFrame.raycastTarget = false;
+        }
+    }
+
+    private static Image ResolveTopTabBackground(Button button)
+    {
+        if (button == null)
+            return null;
+
+        var targetImage = button.targetGraphic as Image;
+        if (targetImage != null && targetImage.sprite != null)
+            return targetImage;
+
+        Image candidate = null;
+        var images = button.GetComponentsInChildren<Image>(true);
+        for (var i = 0; i < images.Length; i++)
+        {
+            var image = images[i];
+            if (image == null || image == targetImage)
+                continue;
+            if (image.sprite == null)
+                continue;
+
+            var imageName = image.gameObject.name;
+            if (imageName.IndexOf("mention", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("badge", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("text", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("label", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                continue;
+            }
+
+            if (imageName.IndexOf("bg", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("background", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return image;
+            }
+
+            if (candidate == null)
+                candidate = image;
+        }
+
+        return candidate ?? targetImage;
+    }
+
+    private static Image ResolveTopTabSelectedFrame(Button button)
+    {
+        if (button == null)
+            return null;
+
+        var images = button.GetComponentsInChildren<Image>(true);
+        for (var i = 0; i < images.Length; i++)
+        {
+            var image = images[i];
+            if (image == null)
+                continue;
+
+            var imageName = image.gameObject.name;
+            if (imageName.IndexOf("selectedframe", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                imageName.IndexOf("activeframe", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return image;
+            }
+        }
+
+        return null;
+    }
+
     private void BindButtons()
     {
         if (_bindingsReady)
@@ -1103,6 +1291,54 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         Refresh();
+    }
+
+    private RareType? ResolveDefaultRareFilter(AlbumEntityType tab)
+    {
+        if (_supportedRareTypes.Contains(RareType.Common))
+            return RareType.Common;
+
+        var source = tab == AlbumEntityType.Egg ? _eggEntries : _animalEntries;
+        if (source == null || source.Count == 0)
+            return null;
+
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry == null)
+                continue;
+            if (entry.rareType == RareType.Common)
+                return RareType.Common;
+        }
+
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (entry != null)
+                return entry.rareType;
+        }
+
+        return null;
+    }
+
+    private bool IsEntryDiscovered(EntryData entry)
+    {
+        if (entry == null || progressService == null)
+            return false;
+        return progressService.IsDiscovered(entry.type, entry.id);
+    }
+
+    private bool IsEntryUnlockedForSelectedRare(EntryData entry)
+    {
+        if (!IsEntryDiscovered(entry))
+            return false;
+
+        var selectedRare = _selectedRareFilter ?? entry.rareType;
+        if (progressService != null && progressService.IsRareSeen(entry.type, entry.id, selectedRare))
+            return true;
+
+        // Compatibility fallback for old saves where per-rare keys may be missing.
+        return selectedRare == entry.rareType;
     }
 
     private List<EntryData> GetEntriesForCurrentTab()
@@ -1165,6 +1401,14 @@ public class AlbumScreenController : MonoBehaviour
             itemStorage = G.Storage;
         if (progressService == null)
             progressService = G.Album;
+        if (eggsTabBackground == null && eggsTabButton != null)
+            eggsTabBackground = ResolveTopTabBackground(eggsTabButton);
+        if (animalsTabBackground == null && animalsTabButton != null)
+            animalsTabBackground = ResolveTopTabBackground(animalsTabButton);
+        if (eggsTabSelectedFrame == null && eggsTabButton != null)
+            eggsTabSelectedFrame = ResolveTopTabSelectedFrame(eggsTabButton);
+        if (animalsTabSelectedFrame == null && animalsTabButton != null)
+            animalsTabSelectedFrame = ResolveTopTabSelectedFrame(animalsTabButton);
 
         if (cardsRoot != null)
         {
@@ -1181,6 +1425,15 @@ public class AlbumScreenController : MonoBehaviour
         if (panelRoot != null)
         {
             var panelTransform = panelRoot.transform;
+
+            if (cardsSectionTitle == null)
+            {
+                var titleTransform = FindChildByName(panelTransform, "CardName") ??
+                                     FindChildByName(panelTransform, "CardsTitle") ??
+                                     FindChildByName(panelTransform, "SectionTitle");
+                if (titleTransform != null)
+                    cardsSectionTitle = titleTransform.GetComponent<TMP_Text>();
+            }
 
             if (eggHatchSection == null)
             {
@@ -1305,25 +1558,14 @@ public class AlbumScreenController : MonoBehaviour
         }
     }
 
-    private List<string> CollectIdsByRareForCurrentTab(RareType rareType)
-    {
-        var ids = new List<string>();
-        var source = GetEntriesForCurrentTab();
-        for (var i = 0; i < source.Count; i++)
-        {
-            var entry = source[i];
-            if (entry == null || entry.rareType != rareType || string.IsNullOrEmpty(entry.id))
-                continue;
-            ids.Add(entry.id);
-        }
-
-        return ids;
-    }
-
     private bool HasRareMentionForCurrentTab(RareType rareType)
     {
         if (progressService == null)
             return false;
+
+        var selectedEntry = FindSelectedEntry();
+        if (selectedEntry != null && !string.IsNullOrEmpty(selectedEntry.id))
+            return progressService.HasRareMention(selectedEntry.type, selectedEntry.id, rareType);
 
         var source = GetEntriesForCurrentTab();
         for (var i = 0; i < source.Count; i++)
