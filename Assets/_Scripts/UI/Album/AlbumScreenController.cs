@@ -16,6 +16,13 @@ public class AlbumScreenController : MonoBehaviour
         public int gems;
     }
 
+    [Serializable]
+    private struct AnimalDescriptionOverride
+    {
+        public string id;
+        [TextArea(2, 6)] public string description;
+    }
+
     private sealed class EntryData
     {
         public AlbumEntityType type;
@@ -31,6 +38,13 @@ public class AlbumScreenController : MonoBehaviour
     {
         public string eggId;
         public Egg egg;
+        public double chance;
+    }
+
+    private struct HatchPreviewEntry
+    {
+        public Sprite icon;
+        public bool unlocked;
         public double chance;
     }
 
@@ -65,6 +79,12 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private TMP_Text infoDescription;
     [SerializeField] private TMP_Text infoIncome;
     [SerializeField] private TMP_Text infoSources;
+    [SerializeField] private GameObject eggHatchSection;
+    [SerializeField] private Transform eggHatchIconsRoot;
+    [SerializeField] private Image eggHatchIconTemplate;
+    [SerializeField] private int eggHatchMaxIcons = 4;
+    [SerializeField] private Color eggHatchUnlockedColor = Color.white;
+    [SerializeField] private Color eggHatchLockedColor = new Color(0f, 0f, 0f, 0.92f);
     [SerializeField] private GameObject infoLockedOverlay;
     [SerializeField] private TMP_Text infoLockedText;
     [SerializeField] private Color infoUnlockedColor = Color.white;
@@ -92,11 +112,27 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string animalInfoDescFallback = "Can hatch from eggs:";
     [SerializeField] private string incomeLabelKey = "UI/Album/Income";
     [SerializeField] private string incomeLabelFallback = "Income/sec";
+    [SerializeField] private string eggPriceLabelKey = "UI/Album/EggPrice";
+    [SerializeField] private string eggPriceLabelFallback = "Price";
+    [SerializeField] private string eggFirstRareDateKey = "UI/Album/EggFirstRareDate";
+    [SerializeField] private string eggFirstRareDateFallback = "First rarity date: {0}";
+    [SerializeField] private string animalFirstDateKey = "UI/Album/AnimalFirstDate";
+    [SerializeField] private string animalFirstDateFallback = "First obtained: {0}";
+    [SerializeField] private string albumDateUnknownKey = "UI/Album/DateUnknown";
+    [SerializeField] private string albumDateUnknownFallback = "Unknown";
+    [SerializeField] private string animalDescriptionKeyPrefix = "UI/Album/AnimalDescription/";
+    [SerializeField] private string animalDescriptionFallback = "-";
+    [SerializeField] private string rewardInfoKey = "UI/Album/RewardInfo";
+    [SerializeField] private string rewardInfoFallback = "Reward: +{0} Gems";
     [SerializeField] private string claimRewardKey = "UI/Album/ClaimReward";
     [SerializeField] private string claimRewardFallback = "Claim +{0} Gems";
+    [SerializeField] private string rewardClaimedKey = "UI/Album/RewardClaimed";
+    [SerializeField] private string rewardClaimedFallback = "Claimed";
     [SerializeField] private string rareLockedKey = "UI/Album/RareLocked";
     [SerializeField] private string rareLockedFallback = "Hold item of this rarity to unlock";
     [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Rare/";
+    [SerializeField] private string albumDateFormat = "yyyy.MM.dd";
+    [SerializeField] private List<AnimalDescriptionOverride> animalDescriptionOverrides = new();
 
     [Header("Behavior")]
     [SerializeField] private bool applyLuckBonusInChances = true;
@@ -106,8 +142,10 @@ public class AlbumScreenController : MonoBehaviour
     private readonly List<EntryData> _eggEntries = new();
     private readonly List<EntryData> _animalEntries = new();
     private readonly Dictionary<string, string> _animalAliasToCanonicalId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EntryData> _animalEntryById = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ConveyorDropChanceCalculator.ChanceEntry>> _eggChanceByEggId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<AnimalSource>> _animalSourcesByAnimalId = new(StringComparer.Ordinal);
+    private readonly List<Image> _eggHatchIconPool = new();
     private readonly Dictionary<RareType, AlbumRareTabView> _rareViews = new();
     private readonly List<AlbumEntryView> _spawnedCardViews = new();
     private readonly List<RareType> _supportedRareTypes = new();
@@ -227,6 +265,7 @@ public class AlbumScreenController : MonoBehaviour
         _eggEntries.Clear();
         _animalEntries.Clear();
         _animalAliasToCanonicalId.Clear();
+        _animalEntryById.Clear();
         _eggChanceByEggId.Clear();
         _animalSourcesByAnimalId.Clear();
         _catalogReady = false;
@@ -284,7 +323,7 @@ public class AlbumScreenController : MonoBehaviour
                 if (string.IsNullOrEmpty(canonicalId) || !seenAnimalIds.Add(canonicalId))
                     continue;
 
-                _animalEntries.Add(new EntryData
+                var animalEntry = new EntryData
                 {
                     type = AlbumEntityType.Animal,
                     id = canonicalId,
@@ -292,7 +331,9 @@ public class AlbumScreenController : MonoBehaviour
                     icon = pet.Icon,
                     rareType = pet.RareType,
                     animal = pet
-                });
+                };
+                _animalEntries.Add(animalEntry);
+                _animalEntryById[canonicalId] = animalEntry;
 
                 AddAnimalAlias(canonicalId, pet.Name);
                 AddAnimalAlias(canonicalId, pet.name);
@@ -548,6 +589,8 @@ public class AlbumScreenController : MonoBehaviour
             infoIcon.color = infoLockedColor;
         }
 
+        SetEggHatchIcons(Array.Empty<HatchPreviewEntry>(), false);
+
         if (infoLockedOverlay != null)
             infoLockedOverlay.SetActive(true);
 
@@ -576,25 +619,277 @@ public class AlbumScreenController : MonoBehaviour
         if (entry.type == AlbumEntityType.Egg)
         {
             if (infoDescription != null)
-                infoDescription.text = L(eggInfoDescKey, eggInfoDescFallback);
+                infoDescription.text = BuildEggFirstRareDateText(entry);
 
             if (infoIncome != null)
-                infoIncome.text = "-";
+                infoIncome.text = BuildEggPriceText(entry);
+
+            var previews = BuildEggHatchPreviewEntries(entry);
+            var hasHatchUi = SetEggHatchIcons(previews, true);
 
             if (infoSources != null)
-                infoSources.text = BuildEggSourcesText(entry);
+            {
+                var rewardLine = BuildRewardInfoText(entry);
+                if (hasHatchUi && previews.Count > 0)
+                {
+                    infoSources.text = rewardLine;
+                }
+                else
+                {
+                    var hatchLines = JoinNonEmptyLines(
+                        L(eggInfoDescKey, eggInfoDescFallback),
+                        BuildEggSourcesText(entry));
+                    infoSources.text = JoinNonEmptyLines(rewardLine, hatchLines);
+                }
+            }
         }
         else
         {
+            SetEggHatchIcons(Array.Empty<HatchPreviewEntry>(), false);
+
             if (infoDescription != null)
-                infoDescription.text = L(animalInfoDescKey, animalInfoDescFallback);
+                infoDescription.text = BuildAnimalDescriptionText(entry);
 
             if (infoIncome != null)
                 infoIncome.text = BuildAnimalIncomeText(entry);
 
             if (infoSources != null)
-                infoSources.text = BuildAnimalSourcesText(entry);
+                infoSources.text = BuildAnimalMetaText(entry);
         }
+    }
+
+    private List<HatchPreviewEntry> BuildEggHatchPreviewEntries(EntryData entry)
+    {
+        var result = new List<HatchPreviewEntry>();
+        if (entry == null || string.IsNullOrEmpty(entry.id))
+            return result;
+
+        if (!_eggChanceByEggId.TryGetValue(entry.id, out var rows) || rows == null || rows.Count == 0)
+            return result;
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row == null)
+                continue;
+
+            var canonicalAnimalId = ResolveCanonicalAnimalId(row.id);
+            if (string.IsNullOrEmpty(canonicalAnimalId))
+                canonicalAnimalId = AlbumProgressService.NormalizeId(row.id);
+            if (string.IsNullOrEmpty(canonicalAnimalId))
+                continue;
+
+            _animalEntryById.TryGetValue(canonicalAnimalId, out var animalEntry);
+            var unlocked = progressService != null && progressService.IsDiscovered(AlbumEntityType.Animal, canonicalAnimalId);
+            result.Add(new HatchPreviewEntry
+            {
+                icon = animalEntry?.icon,
+                unlocked = unlocked,
+                chance = row.chance
+            });
+        }
+
+        result.Sort((a, b) => b.chance.CompareTo(a.chance));
+
+        var limit = eggHatchMaxIcons > 0 ? eggHatchMaxIcons : result.Count;
+        if (result.Count > limit)
+            result.RemoveRange(limit, result.Count - limit);
+
+        return result;
+    }
+
+    private bool SetEggHatchIcons(IReadOnlyList<HatchPreviewEntry> previews, bool visible)
+    {
+        var shouldShowSection = visible && previews != null && previews.Count > 0;
+
+        var requiredSlots = Mathf.Max(
+            eggHatchMaxIcons > 0 ? eggHatchMaxIcons : 0,
+            previews != null ? previews.Count : 0);
+
+        if (!EnsureEggHatchIconPool(requiredSlots))
+        {
+            if (eggHatchSection != null)
+                eggHatchSection.SetActive(false);
+            return false;
+        }
+
+        if (eggHatchSection != null)
+            eggHatchSection.SetActive(shouldShowSection);
+
+        for (var i = 0; i < _eggHatchIconPool.Count; i++)
+        {
+            var icon = _eggHatchIconPool[i];
+            if (icon == null)
+                continue;
+
+            var show = shouldShowSection && previews != null && i < previews.Count;
+            icon.gameObject.SetActive(show);
+            if (!show)
+                continue;
+
+            var preview = previews[i];
+            icon.sprite = preview.icon;
+            icon.color = preview.unlocked ? eggHatchUnlockedColor : eggHatchLockedColor;
+        }
+
+        return true;
+    }
+
+    private bool EnsureEggHatchIconPool(int requiredSlots)
+    {
+        _eggHatchIconPool.RemoveAll(x => x == null);
+
+        if (_eggHatchIconPool.Count == 0 && eggHatchIconsRoot != null)
+        {
+            for (var i = 0; i < eggHatchIconsRoot.childCount; i++)
+            {
+                var child = eggHatchIconsRoot.GetChild(i);
+                if (eggHatchIconTemplate != null && child == eggHatchIconTemplate.transform)
+                    continue;
+
+                var childImage = child.GetComponent<Image>();
+                if (childImage != null)
+                    _eggHatchIconPool.Add(childImage);
+            }
+        }
+
+        if (eggHatchIconTemplate != null)
+            eggHatchIconTemplate.gameObject.SetActive(false);
+
+        if (eggHatchIconTemplate != null && eggHatchIconsRoot != null)
+        {
+            while (_eggHatchIconPool.Count < requiredSlots)
+            {
+                var icon = Instantiate(eggHatchIconTemplate, eggHatchIconsRoot);
+                icon.gameObject.SetActive(false);
+                _eggHatchIconPool.Add(icon);
+            }
+        }
+
+        return _eggHatchIconPool.Count > 0;
+    }
+
+    private string BuildEggFirstRareDateText(EntryData entry)
+    {
+        var fallbackDate = L(albumDateUnknownKey, albumDateUnknownFallback);
+        var rawLabel = L(eggFirstRareDateKey, eggFirstRareDateFallback);
+        if (entry == null || progressService == null)
+            return string.Format(rawLabel, fallbackDate);
+
+        if (!progressService.TryGetFirstRareDiscoveryDate(entry.type, entry.id, entry.rareType, out var firstSeenDate))
+            return string.Format(rawLabel, fallbackDate);
+
+        return string.Format(rawLabel, FormatAlbumDate(firstSeenDate));
+    }
+
+    private string BuildAnimalFirstDateText(EntryData entry)
+    {
+        var fallbackDate = L(albumDateUnknownKey, albumDateUnknownFallback);
+        var rawLabel = L(animalFirstDateKey, animalFirstDateFallback);
+        if (entry == null || progressService == null)
+            return string.Format(rawLabel, fallbackDate);
+
+        if (!progressService.TryGetFirstDiscoveryDate(entry.type, entry.id, out var firstSeenDate))
+            return string.Format(rawLabel, fallbackDate);
+
+        return string.Format(rawLabel, FormatAlbumDate(firstSeenDate));
+    }
+
+    private string BuildEggPriceText(EntryData entry)
+    {
+        if (entry?.egg == null)
+            return "-";
+
+        var label = L(eggPriceLabelKey, eggPriceLabelFallback);
+        var rawPrice = Math.Max(0d, entry.egg.Data.Price);
+        var priceText = G.Currency != null
+            ? G.Currency.ToString(rawPrice)
+            : Math.Round(rawPrice).ToString("N0", CultureInfo.InvariantCulture);
+
+        return $"{label}: {priceText}";
+    }
+
+    private string BuildAnimalDescriptionText(EntryData entry)
+    {
+        if (entry == null)
+            return animalDescriptionFallback;
+
+        if (animalDescriptionOverrides != null)
+        {
+            for (var i = 0; i < animalDescriptionOverrides.Count; i++)
+            {
+                var row = animalDescriptionOverrides[i];
+                if (string.IsNullOrWhiteSpace(row.id) || string.IsNullOrWhiteSpace(row.description))
+                    continue;
+                if (!string.Equals(AlbumProgressService.NormalizeId(row.id), entry.id, StringComparison.Ordinal))
+                    continue;
+                return row.description.Trim();
+            }
+        }
+
+        var key = animalDescriptionKeyPrefix + entry.id;
+        var localized = L(key, key);
+        if (!string.Equals(localized, key, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(localized))
+            return localized;
+
+        return L(animalInfoDescKey, animalInfoDescFallback);
+    }
+
+    private string BuildAnimalMetaText(EntryData entry)
+    {
+        return JoinNonEmptyLines(
+            BuildAnimalFirstDateText(entry),
+            BuildRewardInfoText(entry));
+    }
+
+    private string BuildRewardInfoText(EntryData entry)
+    {
+        if (entry == null)
+            return string.Empty;
+
+        var rewardAmount = ResolveRewardAmount(entry);
+        if (rewardAmount <= 0)
+            return string.Empty;
+
+        var canClaim = progressService == null || progressService.CanClaimReward(entry.type, entry.id);
+        if (canClaim)
+            return string.Format(L(rewardInfoKey, rewardInfoFallback), rewardAmount);
+
+        return L(rewardClaimedKey, rewardClaimedFallback);
+    }
+
+    private string FormatAlbumDate(DateTimeOffset dateUtc)
+    {
+        var localDate = dateUtc.ToLocalTime();
+        var format = string.IsNullOrWhiteSpace(albumDateFormat) ? "yyyy.MM.dd" : albumDateFormat;
+        try
+        {
+            return localDate.ToString(format, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return localDate.ToString("yyyy.MM.dd", CultureInfo.InvariantCulture);
+        }
+    }
+
+    private static string JoinNonEmptyLines(params string[] lines)
+    {
+        if (lines == null || lines.Length == 0)
+            return string.Empty;
+
+        var sb = new StringBuilder();
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append('\n');
+            sb.Append(line.Trim());
+        }
+
+        return sb.ToString();
     }
 
     private string BuildEggSourcesText(EntryData entry)
@@ -882,6 +1177,46 @@ public class AlbumScreenController : MonoBehaviour
             if (cardsDynamicGrid != null && cardsRoot != cardsDynamicGrid.transform)
                 cardsRoot = cardsDynamicGrid.transform;
         }
+
+        if (panelRoot != null)
+        {
+            var panelTransform = panelRoot.transform;
+
+            if (eggHatchSection == null)
+            {
+                var section = FindChildByName(panelTransform, "EggHatchSection") ??
+                              FindChildByName(panelTransform, "HatchSection");
+                if (section != null)
+                    eggHatchSection = section.gameObject;
+            }
+
+            if (eggHatchIconsRoot == null)
+            {
+                eggHatchIconsRoot = FindChildByName(panelTransform, "EggHatchIconsRoot") ??
+                                    FindChildByName(panelTransform, "HatchIconsRoot") ??
+                                    FindChildByName(panelTransform, "InfoHatchIcons");
+            }
+
+            if (eggHatchSection == null && eggHatchIconsRoot != null)
+                eggHatchSection = eggHatchIconsRoot.gameObject;
+
+            if (eggHatchIconTemplate == null && eggHatchIconsRoot != null)
+            {
+                for (var i = 0; i < eggHatchIconsRoot.childCount; i++)
+                {
+                    var child = eggHatchIconsRoot.GetChild(i);
+                    var image = child.GetComponent<Image>();
+                    if (image == null)
+                        continue;
+
+                    if (!child.gameObject.activeSelf || child.name.IndexOf("template", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        eggHatchIconTemplate = image;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     private AlbumEntryView SpawnCardView()
@@ -1001,6 +1336,25 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static Transform FindChildByName(Transform root, string name)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(name))
+            return null;
+
+        if (string.Equals(root.name, name, StringComparison.OrdinalIgnoreCase))
+            return root;
+
+        for (var i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            var match = FindChildByName(child, name);
+            if (match != null)
+                return match;
+        }
+
+        return null;
     }
 
     private static string GetRareLabelFallback(RareType rareType)

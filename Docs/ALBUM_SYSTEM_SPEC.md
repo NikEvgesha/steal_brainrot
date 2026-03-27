@@ -165,3 +165,28 @@ Runtime integration:
 
 Setup instructions:
 - `Docs/ALBUM_SETUP.md` (scene wiring, inspector bindings, localization keys, smoke checklist).
+
+## 12) Update 2026-03-06 (separated info contracts)
+
+Egg info contract:
+- name
+- first rare obtain date
+- egg price
+- egg icon
+- hatchable animals as icons
+- discovery reward status/value
+
+Animal info contract:
+- name
+- first obtain date
+- animal description
+- income/sec
+- animal icon
+- discovery reward status/value
+
+Persistence additions:
+- entity first discovery timestamp
+- entity+rare first seen timestamp
+
+Implementation note:
+- timestamps are persisted with local `PlayerPrefs` keys (`AlbumDateV1.*`) to avoid changing save-provider interfaces.

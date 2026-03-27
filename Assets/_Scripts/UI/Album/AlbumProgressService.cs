@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
@@ -14,6 +15,7 @@ public class AlbumProgressService : MonoBehaviour
 {
     [Header("Persistence")]
     [SerializeField] private string savePrefix = "AlbumV1";
+    [SerializeField] private string dateSavePrefix = "AlbumDateV1";
     [SerializeField] private bool debugLogs = false;
 
     public UnityEvent Changed = new UnityEvent();
@@ -54,6 +56,50 @@ public class AlbumProgressService : MonoBehaviour
     public bool IsDiscovered(AlbumEntityType type, string id)
     {
         return LoadFlag(BuildEntityKey("Discovered", type, id));
+    }
+
+    public bool TryGetFirstDiscoveryDate(AlbumEntityType type, string id, out DateTimeOffset discoveredAtUtc)
+    {
+        discoveredAtUtc = default;
+
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        var key = BuildEntityKey("FirstDiscoveredAt", type, normalizedId);
+        if (TryLoadTimestamp(key, out discoveredAtUtc))
+            return true;
+
+        if (!IsDiscovered(type, normalizedId))
+            return false;
+
+        discoveredAtUtc = DateTimeOffset.UtcNow;
+        SaveTimestampIfMissing(key, discoveredAtUtc);
+        return true;
+    }
+
+    public bool TryGetFirstRareDiscoveryDate(AlbumEntityType type, string id, RareType rareType, out DateTimeOffset discoveredAtUtc)
+    {
+        discoveredAtUtc = default;
+        if (!IsValidRareType(rareType))
+            return false;
+
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        var key = BuildEntityRareKey("FirstRareSeenAt", type, normalizedId, rareType);
+        if (TryLoadTimestamp(key, out discoveredAtUtc))
+            return true;
+
+        if (LoadFlag(BuildEntityRareKey("RareSeen", type, normalizedId, rareType)))
+        {
+            discoveredAtUtc = DateTimeOffset.UtcNow;
+            SaveTimestampIfMissing(key, discoveredAtUtc);
+            return true;
+        }
+
+        return TryGetFirstDiscoveryDate(type, normalizedId, out discoveredAtUtc);
     }
 
     public bool IsRewardClaimed(AlbumEntityType type, string id)
@@ -116,6 +162,7 @@ public class AlbumProgressService : MonoBehaviour
         if (!IsDiscovered(type, normalizedId))
         {
             SaveFlag(BuildEntityKey("Discovered", type, normalizedId), true);
+            SaveTimestampIfMissing(BuildEntityKey("FirstDiscoveredAt", type, normalizedId), DateTimeOffset.UtcNow);
             SaveFlag(BuildEntityKey("MentionCard", type, normalizedId), true);
             SaveFlag(BuildEntityKey("MentionReward", type, normalizedId), true);
             changed = true;
@@ -158,6 +205,7 @@ public class AlbumProgressService : MonoBehaviour
             if (!LoadFlag(seenKey))
             {
                 SaveFlag(seenKey, true);
+                SaveTimestampIfMissing(BuildEntityRareKey("FirstRareSeenAt", type, normalizedId, rareType), DateTimeOffset.UtcNow);
                 SaveFlag(BuildEntityRareKey("MentionRare", type, normalizedId, rareType), true);
                 changed = true;
                 if (debugLogs)
@@ -454,6 +502,64 @@ public class AlbumProgressService : MonoBehaviour
     private static string BuildFallbackPrefKey(string key)
     {
         return "AlbumFallback." + key;
+    }
+
+    private string BuildDatePrefKey(string key)
+    {
+        return $"{dateSavePrefix}.{key}";
+    }
+
+    private bool TryLoadTimestamp(string key, out DateTimeOffset value)
+    {
+        value = default;
+        if (string.IsNullOrWhiteSpace(key))
+            return false;
+
+        var raw = PlayerPrefs.GetString(BuildDatePrefKey(key), string.Empty);
+        if (string.IsNullOrWhiteSpace(raw))
+            return false;
+
+        if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+        {
+            try
+            {
+                // Old builds could store ticks; new builds store unix seconds.
+                value = number > 253402300799L
+                    ? new DateTimeOffset(number, TimeSpan.Zero)
+                    : DateTimeOffset.FromUnixTimeSeconds(number);
+                return true;
+            }
+            catch
+            {
+                // Ignore malformed values and fallback to string parse.
+            }
+        }
+
+        if (DateTimeOffset.TryParse(
+                raw,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void SaveTimestampIfMissing(string key, DateTimeOffset value)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return;
+
+        if (TryLoadTimestamp(key, out _))
+            return;
+
+        PlayerPrefs.SetString(
+            BuildDatePrefKey(key),
+            value.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+        PlayerPrefs.Save();
     }
 
     private static string NormalizeRare(RareType rareType)

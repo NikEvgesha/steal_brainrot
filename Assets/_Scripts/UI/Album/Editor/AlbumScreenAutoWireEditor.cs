@@ -45,6 +45,10 @@ public static class AlbumScreenAutoWireEditor
         EnsureTextObject(infoPanel, "InfoDescription", "Description");
         EnsureTextObject(infoPanel, "InfoIncome", "Income");
         EnsureTextObject(infoPanel, "InfoSources", "Sources");
+        var hatchSection = EnsureChild(infoPanel, "EggHatchSection");
+        var hatchIconsRoot = EnsureChild(hatchSection, "EggHatchIconsRoot");
+        var hatchTemplate = EnsureImageObject(hatchIconsRoot, "EggHatchIconTemplate");
+        hatchTemplate.gameObject.SetActive(false);
         EnsureOverlayChild(infoPanel, "InfoLockedOverlay", new Color(0f, 0f, 0f, 0.55f));
         EnsureTextObject(infoPanel, "InfoLockedText", "???");
 
@@ -178,6 +182,21 @@ public static class AlbumScreenAutoWireEditor
         SetRef(so, "infoDescription", FindComponentByName<TMP_Text>(root, "InfoDescription"));
         SetRef(so, "infoIncome", FindComponentByName<TMP_Text>(root, "InfoIncome"));
         SetRef(so, "infoSources", FindComponentByName<TMP_Text>(root, "InfoSources"));
+
+        var hatchSection = FindByName(root, "EggHatchSection") ?? FindByName(root, "HatchSection");
+        var hatchIconsRoot = FindByName(root, "EggHatchIconsRoot") ??
+                             FindByName(root, "HatchIconsRoot") ??
+                             FindByName(root, "InfoHatchIcons");
+        Image hatchTemplate = null;
+        if (hatchIconsRoot != null)
+        {
+            hatchTemplate = FindComponentByName<Image>(hatchIconsRoot, "EggHatchIconTemplate") ??
+                            FindComponentByName<Image>(hatchIconsRoot, "HatchIconTemplate");
+        }
+        SetRef(so, "eggHatchSection", hatchSection != null ? hatchSection.gameObject : null);
+        SetRef(so, "eggHatchIconsRoot", hatchIconsRoot as RectTransform);
+        SetRef(so, "eggHatchIconTemplate", hatchTemplate);
+
         SetRef(so, "infoLockedOverlay", FindByName(root, "InfoLockedOverlay")?.gameObject);
         SetRef(so, "infoLockedText", FindComponentByName<TMP_Text>(root, "InfoLockedText"));
 

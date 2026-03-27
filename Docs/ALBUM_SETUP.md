@@ -153,3 +153,22 @@
 - вкладка животных обновляет состояние открытия и сохраняет его после перезапуска.
 5. Взять в руку предмет новой редкости:
 - соответствующая вкладка редкости открывается.
+
+## 10) Update 2026-03-06 (Egg/Animal split info)
+
+New optional `InfoPanel` bindings in `AlbumScreenController`:
+- `eggHatchSection` (`GameObject`) - container shown only for egg entries.
+- `eggHatchIconsRoot` (`Transform`) - root where hatch-result icons are rendered.
+- `eggHatchIconTemplate` (`Image`) - optional template for dynamic icon pool.
+
+Recommended hierarchy (inside `InfoPanel`):
+- `EggHatchSection`
+- `EggHatchSection/EggHatchIconsRoot`
+- `EggHatchSection/EggHatchIconsRoot/EggHatchIconTemplate` (disabled)
+
+Current data rendering rules:
+- Egg: `InfoTitle` = name, `InfoDescription` = first rare-date, `InfoIncome` = egg price, hatch results = icons in `EggHatchSection`, `InfoSources` = reward info.
+- Animal: `InfoTitle` = name, `InfoDescription` = animal description, `InfoIncome` = income/sec, `InfoSources` = first obtained date + reward info.
+
+Date source:
+- `AlbumProgressService` now stores first discovery date and first rare-seen date (local key prefix: `AlbumDateV1`).

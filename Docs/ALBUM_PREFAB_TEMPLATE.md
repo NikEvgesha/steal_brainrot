@@ -107,3 +107,21 @@ AlbumScreen (GameObject, AlbumScreenController)
 4. После получения яйца/животного карточка открывается.
 5. Блок награды активен только для открытых карточек и меняет статус после claim.
 6. Бейджи mention появляются и снимаются по действиям.
+
+## Update 2026-03-06
+
+Add optional subtree in `InfoPanel` for egg hatch previews:
+
+```text
+InfoPanel
+L- EggHatchSection
+   L- EggHatchIconsRoot
+      L- EggHatchIconTemplate (Image, disabled)
+```
+
+Controller bindings:
+- `eggHatchSection`
+- `eggHatchIconsRoot`
+- `eggHatchIconTemplate`
+
+If this subtree is not assigned, album falls back to text hatch list in `InfoSources`.
