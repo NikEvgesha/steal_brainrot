@@ -321,6 +321,8 @@ public static class AlbumSaveToolsEditor
             albumKeys.Add(BuildEntityElementKey(savePrefix, "ElementSeen", type, id, elementType));
             albumKeys.Add(BuildEntityElementKey(savePrefix, "ElementViewed", type, id, elementType));
             albumKeys.Add(BuildEntityElementKey(savePrefix, "MentionElement", type, id, elementType));
+            albumKeys.Add(BuildEntityElementKey(savePrefix, "RewardClaimed", type, id, elementType));
+            albumKeys.Add(BuildEntityElementKey(savePrefix, "MentionReward", type, id, elementType));
             dateKeys.Add(BuildEntityElementKey(savePrefix, "FirstElementSeenAt", type, id, elementType));
         }
     }

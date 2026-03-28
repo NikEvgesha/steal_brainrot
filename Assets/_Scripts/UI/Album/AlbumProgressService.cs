@@ -117,6 +117,30 @@ public class AlbumProgressService : MonoBehaviour
         return LoadFlag(BuildEntityKey("MentionReward", type, id));
     }
 
+    public bool IsRewardClaimed(AlbumEntityType type, string id, ElementType elementType)
+    {
+        if (!IsValidElementType(elementType))
+            return false;
+
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        return LoadFlag(BuildEntityElementKey("RewardClaimed", type, normalizedId, elementType));
+    }
+
+    public bool HasRewardMention(AlbumEntityType type, string id, ElementType elementType)
+    {
+        if (!IsValidElementType(elementType))
+            return false;
+
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        return LoadFlag(BuildEntityElementKey("MentionReward", type, normalizedId, elementType));
+    }
+
     public bool IsElementUnlocked(ElementType elementType)
     {
         if (!IsValidElementType(elementType))
@@ -178,7 +202,6 @@ public class AlbumProgressService : MonoBehaviour
             SaveFlag(BuildEntityKey("Discovered", type, normalizedId), true);
             SaveTimestampIfMissing(BuildEntityKey("FirstDiscoveredAt", type, normalizedId), DateTimeOffset.UtcNow);
             SaveFlag(BuildEntityKey("MentionCard", type, normalizedId), true);
-            SaveFlag(BuildEntityKey("MentionReward", type, normalizedId), true);
             changed = true;
             if (debugLogs)
                 Debug.Log($"[Album] Discovered {type}:{normalizedId}");
@@ -222,6 +245,7 @@ public class AlbumProgressService : MonoBehaviour
                 SaveFlag(seenKey, true);
                 SaveTimestampIfMissing(BuildEntityElementKey("FirstElementSeenAt", type, normalizedId, elementType), DateTimeOffset.UtcNow);
                 SaveFlag(BuildEntityElementKey("MentionElement", type, normalizedId, elementType), true);
+                SaveFlag(BuildEntityElementKey("MentionReward", type, normalizedId, elementType), true);
                 changed = true;
                 if (debugLogs)
                     Debug.Log($"[Album] Element seen for {type}:{normalizedId}:{elementType}");
@@ -325,6 +349,21 @@ public class AlbumProgressService : MonoBehaviour
         return IsDiscovered(type, normalizedId) && !IsRewardClaimed(type, normalizedId);
     }
 
+    public bool CanClaimReward(AlbumEntityType type, string id, ElementType elementType)
+    {
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        elementType = ResolveElementTypeFallback(type, normalizedId, elementType);
+        if (!IsValidElementType(elementType))
+            return false;
+
+        return IsDiscovered(type, normalizedId) &&
+               IsElementSeen(type, normalizedId, elementType) &&
+               !IsRewardClaimed(type, normalizedId, elementType);
+    }
+
     public bool TryClaimReward(AlbumEntityType type, string id)
     {
         var normalizedId = NormalizeId(id);
@@ -340,6 +379,22 @@ public class AlbumProgressService : MonoBehaviour
         return true;
     }
 
+    public bool TryClaimReward(AlbumEntityType type, string id, ElementType elementType)
+    {
+        var normalizedId = NormalizeId(id);
+        if (string.IsNullOrEmpty(normalizedId))
+            return false;
+
+        elementType = ResolveElementTypeFallback(type, normalizedId, elementType);
+        if (!CanClaimReward(type, normalizedId, elementType))
+            return false;
+
+        SaveFlag(BuildEntityElementKey("RewardClaimed", type, normalizedId, elementType), true);
+        SaveFlag(BuildEntityElementKey("MentionReward", type, normalizedId, elementType), false);
+        Changed?.Invoke();
+        return true;
+    }
+
     public bool HasAnyTabMention(AlbumEntityType type, IReadOnlyList<string> knownIds, IReadOnlyList<ElementType> knownElementTypes)
     {
         if (knownIds != null)
@@ -347,7 +402,7 @@ public class AlbumProgressService : MonoBehaviour
             for (var i = 0; i < knownIds.Count; i++)
             {
                 var id = knownIds[i];
-                if (HasCardMention(type, id) || HasRewardMention(type, id))
+                if (HasCardMention(type, id))
                     return true;
 
                 if (knownElementTypes == null)
@@ -355,7 +410,8 @@ public class AlbumProgressService : MonoBehaviour
 
                 for (var j = 0; j < knownElementTypes.Count; j++)
                 {
-                    if (HasElementMention(type, id, knownElementTypes[j]))
+                    if (HasElementMention(type, id, knownElementTypes[j]) ||
+                        HasRewardMention(type, id, knownElementTypes[j]))
                         return true;
                 }
             }

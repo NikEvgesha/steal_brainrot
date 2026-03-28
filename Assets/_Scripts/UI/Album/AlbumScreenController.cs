@@ -581,7 +581,7 @@ public class AlbumScreenController : MonoBehaviour
             var selected = string.Equals(entry.id, _selectedEntryId, StringComparison.Ordinal);
             var hasMention = progressService != null &&
                              (progressService.HasCardMention(entry.type, entry.id) ||
-                              progressService.HasRewardMention(entry.type, entry.id) ||
+                              HasAnyRewardMention(entry) ||
                               HasAnyElementMention(entry));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
@@ -896,7 +896,8 @@ public class AlbumScreenController : MonoBehaviour
         if (rewardAmount <= 0)
             return string.Empty;
 
-        var canClaim = progressService == null || progressService.CanClaimReward(entry.type, entry.id);
+        var selectedElementType = _selectedElementFilter ?? ResolveDefaultElementForDisplay();
+        var canClaim = progressService == null || progressService.CanClaimReward(entry.type, entry.id, selectedElementType);
         if (canClaim)
             return string.Format(L(rewardInfoKey, rewardInfoFallback), rewardAmount);
 
@@ -1015,7 +1016,8 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         var rewardAmount = ResolveRewardAmount(entry);
-        var canClaim = rewardAmount > 0 && progressService.CanClaimReward(entry.type, entry.id);
+        var selectedElementType = _selectedElementFilter ?? ResolveDefaultElementForDisplay();
+        var canClaim = rewardAmount > 0 && progressService.CanClaimReward(entry.type, entry.id, selectedElementType);
 
         if (!canClaim)
         {
@@ -1036,7 +1038,7 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         if (rewardMentionBadge != null)
-            rewardMentionBadge.SetActive(progressService.HasRewardMention(entry.type, entry.id));
+            rewardMentionBadge.SetActive(progressService.HasRewardMention(entry.type, entry.id, selectedElementType));
     }
 
     private void OnRewardPressed()
@@ -1049,9 +1051,10 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         var claimed = false;
+        var selectedElementType = _selectedElementFilter ?? ResolveDefaultElementForDisplay();
         ExecuteWithoutProgressRefresh(() =>
         {
-            claimed = progressService.TryClaimReward(entry.type, entry.id);
+            claimed = progressService.TryClaimReward(entry.type, entry.id, selectedElementType);
             if (claimed)
                 progressService.MarkCardViewed(entry.type, entry.id);
         });
@@ -1670,6 +1673,21 @@ public class AlbumScreenController : MonoBehaviour
         {
             var elementType = _supportedElementTypes[i];
             if (progressService.HasElementMention(entry.type, entry.id, elementType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasAnyRewardMention(EntryData entry)
+    {
+        if (entry == null || progressService == null || _supportedElementTypes == null || _supportedElementTypes.Count == 0)
+            return false;
+
+        for (var i = 0; i < _supportedElementTypes.Count; i++)
+        {
+            var elementType = _supportedElementTypes[i];
+            if (progressService.HasRewardMention(entry.type, entry.id, elementType))
                 return true;
         }
 
