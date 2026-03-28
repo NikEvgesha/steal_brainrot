@@ -15,7 +15,7 @@ public static class AlbumSaveToolsEditor
     {
         if (!EditorUtility.DisplayDialog(
                 "Clear Album Saves",
-                "Clear album progress (eggs/animals, rarities, rewards, dates)?\n\nThis action cannot be undone.",
+                "Clear album progress (eggs/animals, elements, rewards, dates)?\n\nThis action cannot be undone.",
                 "Clear",
                 "Cancel"))
         {
@@ -87,23 +87,23 @@ public static class AlbumSaveToolsEditor
 
         var eggIds = CollectEggIds(storage);
         var animalIds = CollectAnimalIds(storage);
-        var allRares = AlbumProgressService.GetSupportedRareTypes();
+        var allElements = AlbumProgressService.GetSupportedElementTypes();
 
         var albumKeys = new HashSet<string>(StringComparer.Ordinal);
         var dateKeys = new HashSet<string>(StringComparer.Ordinal);
 
         for (var i = 0; i < eggIds.Count; i++)
-            AddEntityKeys(albumKeys, dateKeys, savePrefix, AlbumEntityType.Egg, eggIds[i], allRares);
+            AddEntityKeys(albumKeys, dateKeys, savePrefix, AlbumEntityType.Egg, eggIds[i], allElements);
 
         for (var i = 0; i < animalIds.Count; i++)
-            AddEntityKeys(albumKeys, dateKeys, savePrefix, AlbumEntityType.Animal, animalIds[i], allRares);
+            AddEntityKeys(albumKeys, dateKeys, savePrefix, AlbumEntityType.Animal, animalIds[i], allElements);
 
-        for (var i = 0; i < allRares.Count; i++)
+        for (var i = 0; i < allElements.Count; i++)
         {
-            var rare = allRares[i];
-            albumKeys.Add(BuildRareGlobalKey(savePrefix, "RareUnlocked", rare));
-            albumKeys.Add(BuildRareTabKey(savePrefix, "MentionRare", AlbumEntityType.Egg, rare));
-            albumKeys.Add(BuildRareTabKey(savePrefix, "MentionRare", AlbumEntityType.Animal, rare));
+            var elementType = allElements[i];
+            albumKeys.Add(BuildElementGlobalKey(savePrefix, "ElementUnlocked", elementType));
+            albumKeys.Add(BuildElementTabKey(savePrefix, "MentionElement", AlbumEntityType.Egg, elementType));
+            albumKeys.Add(BuildElementTabKey(savePrefix, "MentionElement", AlbumEntityType.Animal, elementType));
         }
 
         var prefDeleted = 0;
@@ -299,7 +299,7 @@ public static class AlbumSaveToolsEditor
         string savePrefix,
         AlbumEntityType type,
         string id,
-        IReadOnlyList<RareType> rares)
+        IReadOnlyList<ElementType> elements)
     {
         if (string.IsNullOrEmpty(id))
             return;
@@ -312,16 +312,16 @@ public static class AlbumSaveToolsEditor
 
         dateKeys.Add(BuildEntityKey(savePrefix, "FirstDiscoveredAt", type, id));
 
-        if (rares == null)
+        if (elements == null)
             return;
 
-        for (var i = 0; i < rares.Count; i++)
+        for (var i = 0; i < elements.Count; i++)
         {
-            var rare = rares[i];
-            albumKeys.Add(BuildEntityRareKey(savePrefix, "RareSeen", type, id, rare));
-            albumKeys.Add(BuildEntityRareKey(savePrefix, "RareViewed", type, id, rare));
-            albumKeys.Add(BuildEntityRareKey(savePrefix, "MentionRare", type, id, rare));
-            dateKeys.Add(BuildEntityRareKey(savePrefix, "FirstRareSeenAt", type, id, rare));
+            var elementType = elements[i];
+            albumKeys.Add(BuildEntityElementKey(savePrefix, "ElementSeen", type, id, elementType));
+            albumKeys.Add(BuildEntityElementKey(savePrefix, "ElementViewed", type, id, elementType));
+            albumKeys.Add(BuildEntityElementKey(savePrefix, "MentionElement", type, id, elementType));
+            dateKeys.Add(BuildEntityElementKey(savePrefix, "FirstElementSeenAt", type, id, elementType));
         }
     }
 
@@ -339,19 +339,19 @@ public static class AlbumSaveToolsEditor
         return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(id)}";
     }
 
-    private static string BuildEntityRareKey(string prefix, string tag, AlbumEntityType type, string id, RareType rareType)
+    private static string BuildEntityElementKey(string prefix, string tag, AlbumEntityType type, string id, ElementType elementType)
     {
-        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(id)}.{AlbumProgressService.NormalizeId(rareType.ToString())}";
+        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(id)}.{AlbumProgressService.NormalizeId(elementType.ToString())}";
     }
 
-    private static string BuildRareGlobalKey(string prefix, string tag, RareType rareType)
+    private static string BuildElementGlobalKey(string prefix, string tag, ElementType elementType)
     {
-        return $"{prefix}.{tag}.{AlbumProgressService.NormalizeId(rareType.ToString())}";
+        return $"{prefix}.{tag}.{AlbumProgressService.NormalizeId(elementType.ToString())}";
     }
 
-    private static string BuildRareTabKey(string prefix, string tag, AlbumEntityType type, RareType rareType)
+    private static string BuildElementTabKey(string prefix, string tag, AlbumEntityType type, ElementType elementType)
     {
-        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(rareType.ToString())}";
+        return $"{prefix}.{tag}.{type}.{AlbumProgressService.NormalizeId(elementType.ToString())}";
     }
 
     private struct ClearResult

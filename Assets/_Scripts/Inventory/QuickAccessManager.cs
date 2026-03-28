@@ -156,7 +156,7 @@ public class QuickAccessManager : MonoBehaviour
 
         SwitchActiveItem?.Invoke(_currentActive);
         if (G.Album != null)
-            G.Album.TryDiscoverRareFromHeldItem(_currentActive);
+            G.Album.TryDiscoverElementFromHeldItem(_currentActive);
     }
 
 

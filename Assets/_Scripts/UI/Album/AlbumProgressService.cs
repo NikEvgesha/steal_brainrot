@@ -78,21 +78,21 @@ public class AlbumProgressService : MonoBehaviour
         return true;
     }
 
-    public bool TryGetFirstRareDiscoveryDate(AlbumEntityType type, string id, RareType rareType, out DateTimeOffset discoveredAtUtc)
+    public bool TryGetFirstElementDiscoveryDate(AlbumEntityType type, string id, ElementType elementType, out DateTimeOffset discoveredAtUtc)
     {
         discoveredAtUtc = default;
-        if (!IsValidRareType(rareType))
+        if (!IsValidElementType(elementType))
             return false;
 
         var normalizedId = NormalizeId(id);
         if (string.IsNullOrEmpty(normalizedId))
             return false;
 
-        var key = BuildEntityRareKey("FirstRareSeenAt", type, normalizedId, rareType);
+        var key = BuildEntityElementKey("FirstElementSeenAt", type, normalizedId, elementType);
         if (TryLoadTimestamp(key, out discoveredAtUtc))
             return true;
 
-        if (LoadFlag(BuildEntityRareKey("RareSeen", type, normalizedId, rareType)))
+        if (LoadFlag(BuildEntityElementKey("ElementSeen", type, normalizedId, elementType)))
         {
             discoveredAtUtc = DateTimeOffset.UtcNow;
             SaveTimestampIfMissing(key, discoveredAtUtc);
@@ -117,60 +117,60 @@ public class AlbumProgressService : MonoBehaviour
         return LoadFlag(BuildEntityKey("MentionReward", type, id));
     }
 
-    public bool IsRareUnlocked(RareType rareType)
+    public bool IsElementUnlocked(ElementType elementType)
     {
-        if (!IsValidRareType(rareType))
+        if (!IsValidElementType(elementType))
             return false;
-        return LoadFlag(BuildRareGlobalKey("RareUnlocked", rareType));
+        return LoadFlag(BuildElementGlobalKey("ElementUnlocked", elementType));
     }
 
-    public bool IsRareSeen(AlbumEntityType type, string id, RareType rareType)
+    public bool IsElementSeen(AlbumEntityType type, string id, ElementType elementType)
     {
-        if (!IsValidRareType(rareType))
+        if (!IsValidElementType(elementType))
             return false;
 
         var normalizedId = NormalizeId(id);
         if (string.IsNullOrEmpty(normalizedId))
             return false;
 
-        return LoadFlag(BuildEntityRareKey("RareSeen", type, normalizedId, rareType));
+        return LoadFlag(BuildEntityElementKey("ElementSeen", type, normalizedId, elementType));
     }
 
-    public bool HasRareMention(AlbumEntityType type, string id, RareType rareType)
+    public bool HasElementMention(AlbumEntityType type, string id, ElementType elementType)
     {
-        if (!IsValidRareType(rareType))
+        if (!IsValidElementType(elementType))
             return false;
 
         var normalizedId = NormalizeId(id);
         if (string.IsNullOrEmpty(normalizedId))
             return false;
 
-        return LoadFlag(BuildEntityRareKey("MentionRare", type, normalizedId, rareType));
+        return LoadFlag(BuildEntityElementKey("MentionElement", type, normalizedId, elementType));
     }
 
     public bool TryDiscoverFromInventoryItem(InventoryItem item)
     {
-        if (!TryMapItem(item, out var type, out var id, out var rareType))
+        if (!TryMapItem(item, out var type, out var id, out var elementType))
             return false;
 
-        return TryDiscover(type, id, rareType);
+        return TryDiscover(type, id, elementType);
     }
 
-    public bool TryDiscoverRareFromHeldItem(InventoryItem item)
+    public bool TryDiscoverElementFromHeldItem(InventoryItem item)
     {
-        if (!TryMapItem(item, out var type, out var id, out var rareType))
+        if (!TryMapItem(item, out var type, out var id, out var elementType))
             return false;
 
-        return TryDiscoverRareType(type, id, rareType);
+        return TryDiscoverElementType(type, id, elementType);
     }
 
-    public bool TryDiscover(AlbumEntityType type, string id, RareType rareType)
+    public bool TryDiscover(AlbumEntityType type, string id, ElementType elementType)
     {
         var normalizedId = NormalizeId(id);
         if (string.IsNullOrEmpty(normalizedId))
             return false;
 
-        var resolvedRareType = ResolveRareTypeFallback(type, normalizedId, rareType);
+        var resolvedElementType = ResolveElementTypeFallback(type, normalizedId, elementType);
 
         var changed = false;
         if (!IsDiscovered(type, normalizedId))
@@ -184,7 +184,7 @@ public class AlbumProgressService : MonoBehaviour
                 Debug.Log($"[Album] Discovered {type}:{normalizedId}");
         }
 
-        if (TryDiscoverRareType(type, normalizedId, resolvedRareType))
+        if (TryDiscoverElementType(type, normalizedId, resolvedElementType))
             changed = true;
 
         if (changed)
@@ -193,38 +193,38 @@ public class AlbumProgressService : MonoBehaviour
         return changed;
     }
 
-    public bool TryDiscoverRareType(AlbumEntityType type, RareType rareType)
+    public bool TryDiscoverElementType(AlbumEntityType type, ElementType elementType)
     {
-        return TryDiscoverRareType(type, null, rareType);
+        return TryDiscoverElementType(type, null, elementType);
     }
 
-    public bool TryDiscoverRareType(AlbumEntityType type, string id, RareType rareType)
+    public bool TryDiscoverElementType(AlbumEntityType type, string id, ElementType elementType)
     {
         var normalizedId = NormalizeId(id);
-        rareType = ResolveRareTypeFallback(type, normalizedId, rareType);
-        if (!IsValidRareType(rareType))
+        elementType = ResolveElementTypeFallback(type, normalizedId, elementType);
+        if (!IsValidElementType(elementType))
             return false;
 
         var changed = false;
-        if (!IsRareUnlocked(rareType))
+        if (!IsElementUnlocked(elementType))
         {
-            SaveFlag(BuildRareGlobalKey("RareUnlocked", rareType), true);
+            SaveFlag(BuildElementGlobalKey("ElementUnlocked", elementType), true);
             changed = true;
             if (debugLogs)
-                Debug.Log($"[Album] Rare unlocked {rareType}");
+                Debug.Log($"[Album] Element unlocked {elementType}");
         }
 
         if (!string.IsNullOrEmpty(normalizedId))
         {
-            var seenKey = BuildEntityRareKey("RareSeen", type, normalizedId, rareType);
+            var seenKey = BuildEntityElementKey("ElementSeen", type, normalizedId, elementType);
             if (!LoadFlag(seenKey))
             {
                 SaveFlag(seenKey, true);
-                SaveTimestampIfMissing(BuildEntityRareKey("FirstRareSeenAt", type, normalizedId, rareType), DateTimeOffset.UtcNow);
-                SaveFlag(BuildEntityRareKey("MentionRare", type, normalizedId, rareType), true);
+                SaveTimestampIfMissing(BuildEntityElementKey("FirstElementSeenAt", type, normalizedId, elementType), DateTimeOffset.UtcNow);
+                SaveFlag(BuildEntityElementKey("MentionElement", type, normalizedId, elementType), true);
                 changed = true;
                 if (debugLogs)
-                    Debug.Log($"[Album] Rare seen for {type}:{normalizedId}:{rareType}");
+                    Debug.Log($"[Album] Element seen for {type}:{normalizedId}:{elementType}");
             }
         }
 
@@ -260,12 +260,12 @@ public class AlbumProgressService : MonoBehaviour
             Changed?.Invoke();
     }
 
-    public void MarkRareViewed(AlbumEntityType type, RareType rareType)
+    public void MarkElementViewed(AlbumEntityType type, ElementType elementType)
     {
-        if (!IsValidRareType(rareType))
+        if (!IsValidElementType(elementType))
             return;
 
-        var mentionKey = BuildRareTabKey("MentionRare", type, rareType);
+        var mentionKey = BuildElementTabKey("MentionElement", type, elementType);
         if (!LoadFlag(mentionKey))
             return;
 
@@ -273,9 +273,9 @@ public class AlbumProgressService : MonoBehaviour
         Changed?.Invoke();
     }
 
-    public void MarkRareViewedForEntities(AlbumEntityType type, RareType rareType, IReadOnlyList<string> entityIds)
+    public void MarkElementViewedForEntities(AlbumEntityType type, ElementType elementType, IReadOnlyList<string> entityIds)
     {
-        if (!IsValidRareType(rareType))
+        if (!IsValidElementType(elementType))
             return;
 
         var changed = false;
@@ -287,8 +287,8 @@ public class AlbumProgressService : MonoBehaviour
                 if (string.IsNullOrEmpty(normalizedId))
                     continue;
 
-                var viewedKey = BuildEntityRareKey("RareViewed", type, normalizedId, rareType);
-                var mentionKey = BuildEntityRareKey("MentionRare", type, normalizedId, rareType);
+                var viewedKey = BuildEntityElementKey("ElementViewed", type, normalizedId, elementType);
+                var mentionKey = BuildEntityElementKey("MentionElement", type, normalizedId, elementType);
 
                 if (!LoadFlag(viewedKey))
                 {
@@ -305,7 +305,7 @@ public class AlbumProgressService : MonoBehaviour
         }
 
         // Legacy key cleanup from the previous tab-level mention format.
-        var legacyMentionKey = BuildRareTabKey("MentionRare", type, rareType);
+        var legacyMentionKey = BuildElementTabKey("MentionElement", type, elementType);
         if (LoadFlag(legacyMentionKey))
         {
             SaveFlag(legacyMentionKey, false);
@@ -340,7 +340,7 @@ public class AlbumProgressService : MonoBehaviour
         return true;
     }
 
-    public bool HasAnyTabMention(AlbumEntityType type, IReadOnlyList<string> knownIds, IReadOnlyList<RareType> knownRareTypes)
+    public bool HasAnyTabMention(AlbumEntityType type, IReadOnlyList<string> knownIds, IReadOnlyList<ElementType> knownElementTypes)
     {
         if (knownIds != null)
         {
@@ -350,12 +350,12 @@ public class AlbumProgressService : MonoBehaviour
                 if (HasCardMention(type, id) || HasRewardMention(type, id))
                     return true;
 
-                if (knownRareTypes == null)
+                if (knownElementTypes == null)
                     continue;
 
-                for (var j = 0; j < knownRareTypes.Count; j++)
+                for (var j = 0; j < knownElementTypes.Count; j++)
                 {
-                    if (HasRareMention(type, id, knownRareTypes[j]))
+                    if (HasElementMention(type, id, knownElementTypes[j]))
                         return true;
                 }
             }
@@ -423,14 +423,14 @@ public class AlbumProgressService : MonoBehaviour
 
     private void OnHeldItemChanged(InventoryItem item)
     {
-        TryDiscoverRareFromHeldItem(item);
+        TryDiscoverElementFromHeldItem(item);
     }
 
-    private static bool TryMapItem(InventoryItem item, out AlbumEntityType type, out string id, out RareType rareType)
+    private static bool TryMapItem(InventoryItem item, out AlbumEntityType type, out string id, out ElementType elementType)
     {
         type = AlbumEntityType.Egg;
         id = null;
-        rareType = RareType.RareType;
+        elementType = ElementType.ElementType;
 
         if (item == null)
             return false;
@@ -443,7 +443,7 @@ public class AlbumProgressService : MonoBehaviour
             return false;
 
         id = ResolveItemId(item);
-        rareType = ResolveRareTypeFallback(type, id, item.RareType);
+        elementType = ResolveElementTypeFallback(type, id, ResolveItemElementType(item));
         return !string.IsNullOrEmpty(id);
     }
 
@@ -468,17 +468,35 @@ public class AlbumProgressService : MonoBehaviour
         return normalized;
     }
 
-    private static RareType ResolveRareTypeFallback(AlbumEntityType type, string normalizedId, RareType rareType)
+    private static ElementType ResolveItemElementType(InventoryItem item)
     {
-        if (IsValidRareType(rareType))
-            return rareType;
+        if (item == null)
+            return ElementType.ElementType;
+
+        if (item is Egg egg)
+            return egg.Data.DinamicData.ElementType;
+        if (item is Brainrot brainrot)
+            return brainrot.DinamicData.ElementType;
+
+        if (item.TryGetComponent<Egg>(out var eggComponent))
+            return eggComponent.Data.DinamicData.ElementType;
+        if (item.TryGetComponent<Brainrot>(out var brainrotComponent))
+            return brainrotComponent.DinamicData.ElementType;
+
+        return ElementType.ElementType;
+    }
+
+    private static ElementType ResolveElementTypeFallback(AlbumEntityType type, string normalizedId, ElementType elementType)
+    {
+        if (IsValidElementType(elementType))
+            return elementType;
 
         if (string.IsNullOrEmpty(normalizedId))
-            return rareType;
+            return elementType;
 
         var storage = G.Storage;
         if (storage == null)
-            return rareType;
+            return elementType;
 
         if (type == AlbumEntityType.Egg)
         {
@@ -494,8 +512,10 @@ public class AlbumProgressService : MonoBehaviour
                     candidateId = NormalizeRuntimeId(egg.name);
                 if (!string.Equals(candidateId, normalizedId, StringComparison.Ordinal))
                     continue;
-                if (IsValidRareType(egg.RareType))
-                    return egg.RareType;
+
+                var candidateElement = egg.Data.DinamicData.ElementType;
+                if (IsValidElementType(candidateElement))
+                    return candidateElement;
             }
         }
         else
@@ -512,12 +532,14 @@ public class AlbumProgressService : MonoBehaviour
                     candidateId = NormalizeRuntimeId(pet.name);
                 if (!string.Equals(candidateId, normalizedId, StringComparison.Ordinal))
                     continue;
-                if (IsValidRareType(pet.RareType))
-                    return pet.RareType;
+
+                var candidateElement = pet.DinamicData.ElementType;
+                if (IsValidElementType(candidateElement))
+                    return candidateElement;
             }
         }
 
-        return rareType;
+        return elementType;
     }
 
     private bool LoadFlag(string key)
@@ -551,19 +573,19 @@ public class AlbumProgressService : MonoBehaviour
         return $"{savePrefix}.{tag}.{type}.{NormalizeId(id)}";
     }
 
-    private string BuildRareGlobalKey(string tag, RareType rareType)
+    private string BuildElementGlobalKey(string tag, ElementType elementType)
     {
-        return $"{savePrefix}.{tag}.{NormalizeRare(rareType)}";
+        return $"{savePrefix}.{tag}.{NormalizeElement(elementType)}";
     }
 
-    private string BuildEntityRareKey(string tag, AlbumEntityType type, string id, RareType rareType)
+    private string BuildEntityElementKey(string tag, AlbumEntityType type, string id, ElementType elementType)
     {
-        return $"{savePrefix}.{tag}.{type}.{NormalizeId(id)}.{NormalizeRare(rareType)}";
+        return $"{savePrefix}.{tag}.{type}.{NormalizeId(id)}.{NormalizeElement(elementType)}";
     }
 
-    private string BuildRareTabKey(string tag, AlbumEntityType type, RareType rareType)
+    private string BuildElementTabKey(string tag, AlbumEntityType type, ElementType elementType)
     {
-        return $"{savePrefix}.{tag}.{type}.{NormalizeRare(rareType)}";
+        return $"{savePrefix}.{tag}.{type}.{NormalizeElement(elementType)}";
     }
 
     private static string BuildFallbackPrefKey(string key)
@@ -629,9 +651,9 @@ public class AlbumProgressService : MonoBehaviour
         PlayerPrefs.Save();
     }
 
-    private static string NormalizeRare(RareType rareType)
+    private static string NormalizeElement(ElementType elementType)
     {
-        return NormalizeId(rareType.ToString());
+        return NormalizeId(elementType.ToString());
     }
 
     public static string NormalizeId(string raw)
@@ -661,22 +683,22 @@ public class AlbumProgressService : MonoBehaviour
         return normalized;
     }
 
-    public static List<RareType> GetSupportedRareTypes()
+    public static List<ElementType> GetSupportedElementTypes()
     {
-        var result = new List<RareType>();
-        var values = (RareType[])Enum.GetValues(typeof(RareType));
+        var result = new List<ElementType>();
+        var values = (ElementType[])Enum.GetValues(typeof(ElementType));
         for (var i = 0; i < values.Length; i++)
         {
-            var rare = values[i];
-            if (!IsValidRareType(rare))
+            var elementType = values[i];
+            if (!IsValidElementType(elementType))
                 continue;
-            result.Add(rare);
+            result.Add(elementType);
         }
         return result;
     }
 
-    private static bool IsValidRareType(RareType rareType)
+    private static bool IsValidElementType(ElementType elementType)
     {
-        return rareType != RareType.RareType;
+        return elementType != ElementType.ElementType;
     }
 }

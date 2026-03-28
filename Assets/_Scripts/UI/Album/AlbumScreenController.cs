@@ -74,7 +74,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private AlbumEntryView cardPrefab;
     [SerializeField] private DynamicGridSpawner cardsDynamicGrid;
 
-    [Header("Rare Tabs")]
+    [Header("Element Tabs")]
     [SerializeField] private Transform rareTabsRoot;
     [SerializeField] private AlbumRareTabView rareTabPrefab;
 
@@ -123,8 +123,8 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string incomeLabelFallback = "Income/sec";
     [SerializeField] private string eggPriceLabelKey = "UI/Album/EggPrice";
     [SerializeField] private string eggPriceLabelFallback = "Price";
-    [SerializeField] private string eggFirstRareDateKey = "UI/Album/EggFirstRareDate";
-    [SerializeField] private string eggFirstRareDateFallback = "First rarity date: {0}";
+    [SerializeField] private string eggFirstRareDateKey = "UI/Album/EggFirstElementDate";
+    [SerializeField] private string eggFirstRareDateFallback = "First element date: {0}";
     [SerializeField] private string animalFirstDateKey = "UI/Album/AnimalFirstDate";
     [SerializeField] private string animalFirstDateFallback = "First obtained: {0}";
     [SerializeField] private string albumDateUnknownKey = "UI/Album/DateUnknown";
@@ -137,7 +137,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string claimRewardFallback = "Claim +{0} Gems";
     [SerializeField] private string rewardClaimedKey = "UI/Album/RewardClaimed";
     [SerializeField] private string rewardClaimedFallback = "Claimed";
-    [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Rare/";
+    [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Element/";
     [SerializeField] private string albumDateFormat = "yyyy.MM.dd";
     [SerializeField] private List<AnimalDescriptionOverride> animalDescriptionOverrides = new();
 
@@ -154,12 +154,12 @@ public class AlbumScreenController : MonoBehaviour
     private readonly Dictionary<string, List<ConveyorDropChanceCalculator.ChanceEntry>> _eggChanceByEggId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<AnimalSource>> _animalSourcesByAnimalId = new(StringComparer.Ordinal);
     private readonly List<Image> _eggHatchIconPool = new();
-    private readonly Dictionary<RareType, AlbumRareTabView> _rareViews = new();
+    private readonly Dictionary<ElementType, AlbumRareTabView> _elementViews = new();
     private readonly List<AlbumEntryView> _spawnedCardViews = new();
-    private readonly List<RareType> _supportedRareTypes = new();
+    private readonly List<ElementType> _supportedElementTypes = new();
 
     private AlbumEntityType _currentTab = AlbumEntityType.Egg;
-    private RareType? _selectedRareFilter;
+    private ElementType? _selectedElementFilter;
     private string _selectedEntryId;
     private bool _bindingsReady;
     private bool _catalogReady;
@@ -179,7 +179,7 @@ public class AlbumScreenController : MonoBehaviour
     {
         AutoSetupReferences();
         BuildCatalog();
-        BuildRareTabs();
+        BuildElementTabs();
         BindButtons();
         RefreshStaticTexts();
         SetTab(AlbumEntityType.Egg, preserveSelection: false);
@@ -264,14 +264,14 @@ public class AlbumScreenController : MonoBehaviour
         RefreshTopTabVisuals();
         RefreshCardsSectionTitle();
         RebuildCards();
-        RefreshRareTabs();
+        RefreshElementTabs();
         RefreshInfoPanel();
     }
 
     private void SetTab(AlbumEntityType tab, bool preserveSelection)
     {
         _currentTab = tab;
-        _selectedRareFilter = ResolveDefaultRareFilter(tab);
+        _selectedElementFilter = ResolveDefaultElementFilter(tab);
         if (!preserveSelection)
             _selectedEntryId = null;
 
@@ -463,22 +463,22 @@ public class AlbumScreenController : MonoBehaviour
         return normalized;
     }
 
-    private void BuildRareTabs()
+    private void BuildElementTabs()
     {
-        _supportedRareTypes.Clear();
-        _supportedRareTypes.AddRange(AlbumProgressService.GetSupportedRareTypes());
+        _supportedElementTypes.Clear();
+        _supportedElementTypes.AddRange(AlbumProgressService.GetSupportedElementTypes());
 
         if (rareTabsRoot == null || rareTabPrefab == null)
             return;
 
-        _rareViews.Clear();
+        _elementViews.Clear();
         var existingViews = rareTabsRoot.GetComponentsInChildren<AlbumRareTabView>(true)
             .Where(x => x != null && x.gameObject != rareTabPrefab.gameObject)
             .ToList();
 
-        for (var i = 0; i < _supportedRareTypes.Count; i++)
+        for (var i = 0; i < _supportedElementTypes.Count; i++)
         {
-            var rare = _supportedRareTypes[i];
+            var elementType = _supportedElementTypes[i];
             AlbumRareTabView view;
             if (i < existingViews.Count)
             {
@@ -490,40 +490,40 @@ public class AlbumScreenController : MonoBehaviour
             }
 
             view.gameObject.SetActive(true);
-            _rareViews[rare] = view;
+            _elementViews[elementType] = view;
         }
 
-        for (var i = _supportedRareTypes.Count; i < existingViews.Count; i++)
+        for (var i = _supportedElementTypes.Count; i < existingViews.Count; i++)
             existingViews[i].gameObject.SetActive(false);
 
         if (rareTabPrefab != null)
             rareTabPrefab.gameObject.SetActive(false);
     }
 
-    private void RefreshRareTabs()
+    private void RefreshElementTabs()
     {
-        if (_rareViews.Count == 0)
+        if (_elementViews.Count == 0)
             return;
 
         var progress = progressService;
-        foreach (var kv in _rareViews)
+        foreach (var kv in _elementViews)
         {
-            var rare = kv.Key;
+            var elementType = kv.Key;
             var view = kv.Value;
             if (view == null)
                 continue;
 
-            var unlocked = progress != null && progress.IsRareUnlocked(rare);
-            var selected = _selectedRareFilter.HasValue && _selectedRareFilter.Value == rare;
-            var hasMention = progress != null && HasRareMentionForCurrentTab(rare);
-            var label = L(rareLabelKeyPrefix + rare, GetRareLabelFallback(rare));
-            view.Bind(label, unlocked, selected, hasMention, () => OnRarePressed(rare, unlocked));
+            var unlocked = progress != null && progress.IsElementUnlocked(elementType);
+            var selected = _selectedElementFilter.HasValue && _selectedElementFilter.Value == elementType;
+            var hasMention = progress != null && HasElementMentionForCurrentTab(elementType);
+            var label = L(rareLabelKeyPrefix + elementType, GetElementLabelFallback(elementType));
+            view.Bind(label, unlocked, selected, hasMention, () => OnElementPressed(elementType, unlocked));
         }
     }
 
-    private void OnRarePressed(RareType rareType, bool unlocked)
+    private void OnElementPressed(ElementType elementType, bool unlocked)
     {
-        _selectedRareFilter = rareType;
+        _selectedElementFilter = elementType;
 
         if (progressService != null && unlocked)
         {
@@ -531,7 +531,7 @@ public class AlbumScreenController : MonoBehaviour
             if (selectedEntry != null && !string.IsNullOrEmpty(selectedEntry.id))
             {
                 var ids = new List<string> { selectedEntry.id };
-                ExecuteWithoutProgressRefresh(() => progressService.MarkRareViewedForEntities(_currentTab, rareType, ids));
+                ExecuteWithoutProgressRefresh(() => progressService.MarkElementViewedForEntities(_currentTab, elementType, ids));
             }
         }
 
@@ -582,7 +582,7 @@ public class AlbumScreenController : MonoBehaviour
             var hasMention = progressService != null &&
                              (progressService.HasCardMention(entry.type, entry.id) ||
                               progressService.HasRewardMention(entry.type, entry.id) ||
-                              HasAnyRareMention(entry));
+                              HasAnyElementMention(entry));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
             view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry));
@@ -613,7 +613,7 @@ public class AlbumScreenController : MonoBehaviour
             return;
         }
 
-        var unlocked = IsEntryUnlockedForSelectedRare(entry);
+        var unlocked = IsEntryUnlockedForSelectedElement(entry);
         if (!unlocked)
         {
             SetLockedInfo(entry);
@@ -663,7 +663,7 @@ public class AlbumScreenController : MonoBehaviour
         if (entry.type == AlbumEntityType.Egg)
         {
             if (infoDescription != null)
-                infoDescription.text = BuildEggFirstRareDateText(entry);
+                infoDescription.text = BuildEggFirstElementDateText(entry);
 
             if (infoIncome != null)
                 infoIncome.text = BuildEggPriceText(entry);
@@ -813,15 +813,15 @@ public class AlbumScreenController : MonoBehaviour
         return _eggHatchIconPool.Count > 0;
     }
 
-    private string BuildEggFirstRareDateText(EntryData entry)
+    private string BuildEggFirstElementDateText(EntryData entry)
     {
         var fallbackDate = L(albumDateUnknownKey, albumDateUnknownFallback);
         var rawLabel = L(eggFirstRareDateKey, eggFirstRareDateFallback);
         if (entry == null || progressService == null)
             return string.Format(rawLabel, fallbackDate);
 
-        var selectedRare = _selectedRareFilter ?? entry.rareType;
-        if (!progressService.TryGetFirstRareDiscoveryDate(entry.type, entry.id, selectedRare, out var firstSeenDate))
+        var selectedElementType = _selectedElementFilter ?? ResolveDefaultElementForDisplay();
+        if (!progressService.TryGetFirstElementDiscoveryDate(entry.type, entry.id, selectedElementType, out var firstSeenDate))
             return string.Format(rawLabel, fallbackDate);
 
         return string.Format(rawLabel, FormatAlbumDate(firstSeenDate));
@@ -1097,8 +1097,8 @@ public class AlbumScreenController : MonoBehaviour
         var eggIds = _eggEntries.Select(x => x.id).ToList();
         var animalIds = _animalEntries.Select(x => x.id).ToList();
 
-        var eggMention = progress.HasAnyTabMention(AlbumEntityType.Egg, eggIds, _supportedRareTypes);
-        var animalMention = progress.HasAnyTabMention(AlbumEntityType.Animal, animalIds, _supportedRareTypes);
+        var eggMention = progress.HasAnyTabMention(AlbumEntityType.Egg, eggIds, _supportedElementTypes);
+        var animalMention = progress.HasAnyTabMention(AlbumEntityType.Animal, animalIds, _supportedElementTypes);
 
         if (eggsTabMention != null)
             eggsTabMention.SetActive(eggMention);
@@ -1325,30 +1325,36 @@ public class AlbumScreenController : MonoBehaviour
         Refresh();
     }
 
-    private RareType? ResolveDefaultRareFilter(AlbumEntityType tab)
+    private ElementType? ResolveDefaultElementFilter(AlbumEntityType tab)
     {
-        if (_supportedRareTypes.Contains(RareType.Common))
-            return RareType.Common;
-
         var source = tab == AlbumEntityType.Egg ? _eggEntries : _animalEntries;
         if (source == null || source.Count == 0)
             return null;
 
-        for (var i = 0; i < source.Count; i++)
+        if (progressService != null)
         {
-            var entry = source[i];
-            if (entry == null)
-                continue;
-            if (entry.rareType == RareType.Common)
-                return RareType.Common;
+            for (var i = 0; i < _supportedElementTypes.Count; i++)
+            {
+                var elementType = _supportedElementTypes[i];
+                for (var j = 0; j < source.Count; j++)
+                {
+                    var entry = source[j];
+                    if (entry == null || !IsEntryDiscovered(entry))
+                        continue;
+                    if (progressService.IsElementSeen(entry.type, entry.id, elementType))
+                        return elementType;
+                }
+            }
         }
 
-        for (var i = 0; i < source.Count; i++)
-        {
-            var entry = source[i];
-            if (entry != null)
-                return entry.rareType;
-        }
+        if (_supportedElementTypes.Contains(ElementType.NoElement))
+            return ElementType.NoElement;
+
+        if (_supportedElementTypes.Contains(ElementType.Gold))
+            return ElementType.Gold;
+
+        if (_supportedElementTypes.Count > 0)
+            return _supportedElementTypes[0];
 
         return null;
     }
@@ -1360,17 +1366,60 @@ public class AlbumScreenController : MonoBehaviour
         return progressService.IsDiscovered(entry.type, entry.id);
     }
 
-    private bool IsEntryUnlockedForSelectedRare(EntryData entry)
+    private bool IsEntryUnlockedForSelectedElement(EntryData entry)
     {
         if (!IsEntryDiscovered(entry))
             return false;
 
-        var selectedRare = _selectedRareFilter ?? entry.rareType;
-        if (progressService != null && progressService.IsRareSeen(entry.type, entry.id, selectedRare))
+        var selectedElementType = _selectedElementFilter ?? ResolveDefaultElementForDisplay();
+        if (progressService != null && progressService.IsElementSeen(entry.type, entry.id, selectedElementType))
             return true;
 
-        // Compatibility fallback for old saves where per-rare keys may be missing.
-        return selectedRare == entry.rareType;
+        // Compatibility fallback for old saves where per-element keys are absent.
+        // In that case keep only the entry's base element visible, not all elements.
+        if (progressService != null && !HasAnyElementSeenForEntry(entry))
+            return ResolveEntryBaseElement(entry) == selectedElementType;
+
+        return false;
+    }
+
+    private bool HasAnyElementSeenForEntry(EntryData entry)
+    {
+        if (entry == null || progressService == null || _supportedElementTypes == null || _supportedElementTypes.Count == 0)
+            return false;
+
+        for (var i = 0; i < _supportedElementTypes.Count; i++)
+        {
+            if (progressService.IsElementSeen(entry.type, entry.id, _supportedElementTypes[i]))
+                return true;
+        }
+
+        return false;
+    }
+
+    private ElementType ResolveDefaultElementForDisplay()
+    {
+        if (_selectedElementFilter.HasValue)
+            return _selectedElementFilter.Value;
+
+        if (_supportedElementTypes.Count > 0)
+            return _supportedElementTypes[0];
+
+        return ElementType.NoElement;
+    }
+
+    private static ElementType ResolveEntryBaseElement(EntryData entry)
+    {
+        if (entry == null)
+            return ElementType.NoElement;
+
+        var element = ElementType.NoElement;
+        if (entry.type == AlbumEntityType.Egg && entry.egg != null)
+            element = entry.egg.Data.DinamicData.ElementType;
+        else if (entry.type == AlbumEntityType.Animal && entry.animal != null)
+            element = entry.animal.DinamicData.ElementType;
+
+        return element == ElementType.ElementType ? ElementType.NoElement : element;
     }
 
     private List<EntryData> GetEntriesForCurrentTab()
@@ -1590,37 +1639,37 @@ public class AlbumScreenController : MonoBehaviour
         }
     }
 
-    private bool HasRareMentionForCurrentTab(RareType rareType)
+    private bool HasElementMentionForCurrentTab(ElementType elementType)
     {
         if (progressService == null)
             return false;
 
         var selectedEntry = FindSelectedEntry();
         if (selectedEntry != null && !string.IsNullOrEmpty(selectedEntry.id))
-            return progressService.HasRareMention(selectedEntry.type, selectedEntry.id, rareType);
+            return progressService.HasElementMention(selectedEntry.type, selectedEntry.id, elementType);
 
         var source = GetEntriesForCurrentTab();
         for (var i = 0; i < source.Count; i++)
         {
             var entry = source[i];
-            if (entry == null || entry.rareType != rareType)
+            if (entry == null)
                 continue;
-            if (progressService.HasRareMention(entry.type, entry.id, rareType))
+            if (progressService.HasElementMention(entry.type, entry.id, elementType))
                 return true;
         }
 
         return false;
     }
 
-    private bool HasAnyRareMention(EntryData entry)
+    private bool HasAnyElementMention(EntryData entry)
     {
-        if (entry == null || progressService == null || _supportedRareTypes == null || _supportedRareTypes.Count == 0)
+        if (entry == null || progressService == null || _supportedElementTypes == null || _supportedElementTypes.Count == 0)
             return false;
 
-        for (var i = 0; i < _supportedRareTypes.Count; i++)
+        for (var i = 0; i < _supportedElementTypes.Count; i++)
         {
-            var rareType = _supportedRareTypes[i];
-            if (progressService.HasRareMention(entry.type, entry.id, rareType))
+            var elementType = _supportedElementTypes[i];
+            if (progressService.HasElementMention(entry.type, entry.id, elementType))
                 return true;
         }
 
@@ -1680,24 +1729,22 @@ public class AlbumScreenController : MonoBehaviour
         return null;
     }
 
-    private static string GetRareLabelFallback(RareType rareType)
+    private static string GetElementLabelFallback(ElementType elementType)
     {
-        switch (rareType)
+        switch (elementType)
         {
-            case RareType.Common:
-                return "Common";
-            case RareType.Uncommon:
-                return "Uncommon";
-            case RareType.Rare:
-                return "Rare";
-            case RareType.Epic:
-                return "Epic";
-            case RareType.Legendary:
-                return "Legendary";
-            case RareType.Mythic:
-                return "Mythic";
+            case ElementType.Gold:
+                return "Gold";
+            case ElementType.Diamond:
+                return "Diamond";
+            case ElementType.Electric:
+                return "Electric";
+            case ElementType.Fire:
+                return "Fire";
+            case ElementType.NoElement:
+                return "Neutral";
             default:
-                return rareType.ToString();
+                return elementType.ToString();
         }
     }
 

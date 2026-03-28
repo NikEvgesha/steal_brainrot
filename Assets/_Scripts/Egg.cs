@@ -332,7 +332,7 @@ public class Egg : InventoryItem
 
         // Album progress should track hatched pets even before they are picked up.
         if (G.Album != null)
-            G.Album.TryDiscover(AlbumEntityType.Animal, brainrot.Name, brainrot.RareType);
+            G.Album.TryDiscover(AlbumEntityType.Animal, brainrot.Name, brainrot.DinamicData.ElementType);
 
         LocalPlayerStatsStore.IncrementHatched();
         _currentCell.UpdateFieldItem(Item.Brainrot);
