@@ -180,7 +180,28 @@ public static class AlbumSaveToolsEditor
         }
 
         if (Application.isPlaying && G.Save != null)
+        {
             G.Save.SetSave(false);
+            G.Save.SaveBackendProfile(string.Empty, string.Empty, string.Empty);
+        }
+
+        if (Application.isPlaying)
+        {
+            var lobby = LobbyClient.Instance;
+            if (lobby == null)
+                lobby = UnityEngine.Object.FindAnyObjectByType<LobbyClient>();
+
+            if (lobby != null)
+            {
+                lobby.HandleLocalSaveReset();
+            }
+            else
+            {
+                var remoteBases = UnityEngine.Object.FindAnyObjectByType<RemoteBasesApplier>();
+                if (remoteBases != null)
+                    remoteBases.HandleLocalSaveReset();
+            }
+        }
 
         if (Application.isPlaying && G.Album != null)
             G.Album.Changed?.Invoke();

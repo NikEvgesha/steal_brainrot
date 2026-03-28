@@ -1245,6 +1245,24 @@ public class LobbyClient : MonoBehaviour
         return _cachedLocalPlayerId;
     }
 
+    public void HandleLocalSaveReset()
+    {
+        _cachedLocalPlayerId = null;
+        _lastVersion = 0;
+        _lastMembers.Clear();
+        _remoteBaseRawCache.Clear();
+        _remoteBaseSnapshotCache.Clear();
+        LobbyStateUpdated?.Invoke(_lastMembers);
+
+        if (_remoteBases == null)
+            _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        if (_remoteBases != null)
+            _remoteBases.HandleLocalSaveReset();
+
+        if (IsOnline)
+            DisableOnline("local_save_reset");
+    }
+
     private void SetPlayerHeader(UnityWebRequest req)
     {
         var pid = GetLocalPlayerId();

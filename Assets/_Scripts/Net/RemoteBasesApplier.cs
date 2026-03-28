@@ -2260,4 +2260,36 @@ public class RemoteBasesApplier : MonoBehaviour
     {
         _suppressNextAutoTeleport = true;
     }
+
+    public void HandleLocalSaveReset()
+    {
+        if (_waitForSaveReadyRoutine != null)
+        {
+            StopCoroutine(_waitForSaveReadyRoutine);
+            _waitForSaveReadyRoutine = null;
+        }
+
+        _pendingLocalRestoreSlotIndex = -1;
+        _lastLocalPlayerId = null;
+        _serverLocalSlotIndex = -1;
+        _lastPreparedLocalSlotIndex = -1;
+        _lastTeleportedSlotIndex = -2;
+        _lastTeleportedPlayerId = null;
+        _hasServerResolvedLocalSlot = false;
+        _forceLocalRestoreOnNextResolve = true;
+        _suppressNextAutoTeleport = false;
+
+        _playerToSlot.Clear();
+
+        EnsureSlotState();
+        if (_slotPlayerIds != null)
+            Array.Clear(_slotPlayerIds, 0, _slotPlayerIds.Length);
+        if (_slotUpdatedAt != null)
+        {
+            for (var i = 0; i < _slotUpdatedAt.Length; i++)
+                _slotUpdatedAt[i] = EmptySlotMarker;
+        }
+
+        ApplyOfflineLocalOnly();
+    }
 }

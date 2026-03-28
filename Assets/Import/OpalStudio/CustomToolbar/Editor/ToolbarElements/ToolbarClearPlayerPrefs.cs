@@ -9,7 +9,7 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements
             private GUIContent _buttonContent;
 
             protected override string Name => "Clear PlayerPrefs";
-            protected override string Tooltip => "Deletes all keys and values from PlayerPrefs. This cannot be undone.";
+            protected override string Tooltip => "Deletes only PlayerPrefs keys. For full reset use Tools/Save/Clear ALL Save Data.";
 
             public override void OnInit()
             {
@@ -20,10 +20,11 @@ namespace OpalStudio.CustomToolbar.Editor.ToolbarElements
             public override void OnDrawInToolbar()
             {
                   if (GUILayout.Button(_buttonContent, ToolbarStyles.CommandButtonStyle, GUILayout.Width(this.Width)) && EditorUtility.DisplayDialog("Clear PlayerPrefs",
-                                  "Are you sure you want to delete all PlayerPrefs? This action cannot be undone.", "Yes, delete them", "Cancel"))
+                                  "Delete ONLY PlayerPrefs keys?\n\nUse Tools/Save/Clear ALL Save Data for full save reset (PlayerPrefs + provider data).", "Yes, delete PlayerPrefs", "Cancel"))
                   {
                         PlayerPrefs.DeleteAll();
-                        Debug.Log("PlayerPrefs cleared successfully.");
+                        PlayerPrefs.Save();
+                        Debug.LogWarning("PlayerPrefs cleared. Note: this is a partial reset. For full save reset use Tools/Save/Clear ALL Save Data.");
                   }
             }
       }
