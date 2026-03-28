@@ -137,8 +137,6 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string claimRewardFallback = "Claim +{0} Gems";
     [SerializeField] private string rewardClaimedKey = "UI/Album/RewardClaimed";
     [SerializeField] private string rewardClaimedFallback = "Claimed";
-    [SerializeField] private string rareLockedKey = "UI/Album/RareLocked";
-    [SerializeField] private string rareLockedFallback = "Hold item of this rarity to unlock";
     [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Rare/";
     [SerializeField] private string albumDateFormat = "yyyy.MM.dd";
     [SerializeField] private List<AnimalDescriptionOverride> animalDescriptionOverrides = new();
@@ -299,7 +297,7 @@ public class AlbumScreenController : MonoBehaviour
         var eggs = storage.GetAllEggPrefabs();
         if (eggs != null)
         {
-            var seenEggIds = new HashSet<string>(StringComparer.Ordinal);
+            var eggEntriesById = new Dictionary<string, EntryData>(StringComparer.Ordinal);
             for (var i = 0; i < eggs.Count; i++)
             {
                 var egg = eggs[i];
@@ -309,10 +307,28 @@ public class AlbumScreenController : MonoBehaviour
                 var canonicalId = AlbumProgressService.NormalizeId(egg.Name);
                 if (string.IsNullOrEmpty(canonicalId))
                     canonicalId = AlbumProgressService.NormalizeId(egg.name);
-                if (string.IsNullOrEmpty(canonicalId) || !seenEggIds.Add(canonicalId))
+                if (string.IsNullOrEmpty(canonicalId))
                     continue;
 
-                _eggEntries.Add(new EntryData
+                if (eggEntriesById.TryGetValue(canonicalId, out var existingEggEntry))
+                {
+                    if (ShouldPreferAsDefaultVariant(existingEggEntry.rareType, egg.RareType))
+                    {
+                        existingEggEntry.displayName = ResolveDisplayName(egg.Name, egg.name);
+                        existingEggEntry.icon = egg.Icon;
+                        existingEggEntry.rareType = egg.RareType;
+                        existingEggEntry.egg = egg;
+                    }
+
+                    if (existingEggEntry.egg == egg || !_eggChanceByEggId.ContainsKey(canonicalId))
+                    {
+                        var mergedChances = ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonusInChances);
+                        _eggChanceByEggId[canonicalId] = mergedChances ?? new List<ConveyorDropChanceCalculator.ChanceEntry>();
+                    }
+                    continue;
+                }
+
+                var createdEggEntry = new EntryData
                 {
                     type = AlbumEntityType.Egg,
                     id = canonicalId,
@@ -320,7 +336,9 @@ public class AlbumScreenController : MonoBehaviour
                     icon = egg.Icon,
                     rareType = egg.RareType,
                     egg = egg
-                });
+                };
+                _eggEntries.Add(createdEggEntry);
+                eggEntriesById[canonicalId] = createdEggEntry;
 
                 var chances = ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonusInChances);
                 _eggChanceByEggId[canonicalId] = chances ?? new List<ConveyorDropChanceCalculator.ChanceEntry>();
@@ -330,7 +348,6 @@ public class AlbumScreenController : MonoBehaviour
         var animals = storage.GetAllPetPrefabs();
         if (animals != null)
         {
-            var seenAnimalIds = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < animals.Count; i++)
             {
                 var pet = animals[i];
@@ -340,10 +357,25 @@ public class AlbumScreenController : MonoBehaviour
                 var canonicalId = AlbumProgressService.NormalizeId(pet.Name);
                 if (string.IsNullOrEmpty(canonicalId))
                     canonicalId = AlbumProgressService.NormalizeId(pet.name);
-                if (string.IsNullOrEmpty(canonicalId) || !seenAnimalIds.Add(canonicalId))
+                if (string.IsNullOrEmpty(canonicalId))
                     continue;
 
-                var animalEntry = new EntryData
+                if (_animalEntryById.TryGetValue(canonicalId, out var existingAnimalEntry))
+                {
+                    if (ShouldPreferAsDefaultVariant(existingAnimalEntry.rareType, pet.RareType))
+                    {
+                        existingAnimalEntry.displayName = ResolveDisplayName(pet.Name, pet.name);
+                        existingAnimalEntry.icon = pet.Icon;
+                        existingAnimalEntry.rareType = pet.RareType;
+                        existingAnimalEntry.animal = pet;
+                    }
+
+                    AddAnimalAlias(canonicalId, pet.Name);
+                    AddAnimalAlias(canonicalId, pet.name);
+                    continue;
+                }
+
+                var createdAnimalEntry = new EntryData
                 {
                     type = AlbumEntityType.Animal,
                     id = canonicalId,
@@ -352,8 +384,8 @@ public class AlbumScreenController : MonoBehaviour
                     rareType = pet.RareType,
                     animal = pet
                 };
-                _animalEntries.Add(animalEntry);
-                _animalEntryById[canonicalId] = animalEntry;
+                _animalEntries.Add(createdAnimalEntry);
+                _animalEntryById[canonicalId] = createdAnimalEntry;
 
                 AddAnimalAlias(canonicalId, pet.Name);
                 AddAnimalAlias(canonicalId, pet.name);
@@ -521,7 +553,7 @@ public class AlbumScreenController : MonoBehaviour
             if (entry == null)
                 continue;
 
-            var unlocked = IsEntryUnlockedForSelectedRare(entry);
+            var unlocked = IsEntryDiscovered(entry);
             if (!includeLockedInList && !unlocked)
                 continue;
             visibleEntries.Add(entry);
@@ -545,12 +577,12 @@ public class AlbumScreenController : MonoBehaviour
                 continue;
             view.gameObject.SetActive(true);
 
-            var unlocked = IsEntryUnlockedForSelectedRare(entry);
+            var unlocked = IsEntryDiscovered(entry);
             var selected = string.Equals(entry.id, _selectedEntryId, StringComparison.Ordinal);
             var hasMention = progressService != null &&
                              (progressService.HasCardMention(entry.type, entry.id) ||
                               progressService.HasRewardMention(entry.type, entry.id) ||
-                              progressService.HasRareMention(entry.type, entry.id, (_selectedRareFilter ?? entry.rareType)));
+                              HasAnyRareMention(entry));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
             view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry));
@@ -1578,6 +1610,55 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private bool HasAnyRareMention(EntryData entry)
+    {
+        if (entry == null || progressService == null || _supportedRareTypes == null || _supportedRareTypes.Count == 0)
+            return false;
+
+        for (var i = 0; i < _supportedRareTypes.Count; i++)
+        {
+            var rareType = _supportedRareTypes[i];
+            if (progressService.HasRareMention(entry.type, entry.id, rareType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ShouldPreferAsDefaultVariant(RareType current, RareType candidate)
+    {
+        if (current == candidate)
+            return false;
+
+        if (candidate == RareType.Common && current != RareType.Common)
+            return true;
+        if (current == RareType.Common && candidate != RareType.Common)
+            return false;
+
+        return GetRarePriority(candidate) < GetRarePriority(current);
+    }
+
+    private static int GetRarePriority(RareType rareType)
+    {
+        switch (rareType)
+        {
+            case RareType.Common:
+                return 0;
+            case RareType.Uncommon:
+                return 1;
+            case RareType.Rare:
+                return 2;
+            case RareType.Epic:
+                return 3;
+            case RareType.Legendary:
+                return 4;
+            case RareType.Mythic:
+                return 5;
+            default:
+                return 99;
+        }
     }
 
     private static Transform FindChildByName(Transform root, string name)

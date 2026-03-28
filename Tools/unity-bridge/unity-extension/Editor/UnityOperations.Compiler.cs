@@ -13,6 +13,11 @@ namespace UnityBridge
 {
     public static partial class UnityOperations
     {
+        private static readonly object OptionalAssemblyResolverLock = new object();
+        private static bool OptionalAssemblyResolverRegistered;
+        private static string CachedCodePagesAssemblyPath;
+        private static string PreferredCodePagesAssemblyPath;
+
         public static OperationResult ExecuteCode(UnityRequest request)
         {
             try
@@ -92,20 +97,23 @@ namespace UnityBridge
                 var fullCode = GenerateFullCodeForExecution(code);
                 File.WriteAllText(sourcePath, fullCode, Encoding.UTF8);
 
+                var needUnityEditor = code != null &&
+                                      code.IndexOf("UnityEditor", StringComparison.OrdinalIgnoreCase) >= 0;
+
                 var references = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 
-                AddAssemblyIfNotExists(references, "mscorlib.dll");
-                AddAssemblyIfNotExists(references, "System.dll");
-                AddAssemblyIfNotExists(references, "System.Core.dll");
+                AddAssemblyIfNotExists(references, typeof(object).Assembly.Location);
+                AddAssemblyIfNotExists(references, typeof(Uri).Assembly.Location);
                 
                 AddAssemblyIfNotExists(references, typeof(UnityEngine.GameObject).Assembly.Location);
-                AddAssemblyIfNotExists(references, typeof(UnityEditor.EditorWindow).Assembly.Location);
+                if (needUnityEditor)
+                    AddAssemblyIfNotExists(references, typeof(UnityEditor.EditorWindow).Assembly.Location);
                 
                 var allowedUnityAssemblies = new[] {
                     "UnityEngine.CoreModule", "UnityEngine.IMGUIModule", "UnityEngine.PhysicsModule",
                     "UnityEngine.AnimationModule", "UnityEngine.AudioModule", "UnityEngine.ParticleSystemModule",
                     "UnityEngine.TerrainModule", "UnityEngine.UIModule", "UnityEngine.TextRenderingModule",
-                    "UnityEngine.UIElementsModule", "UnityEngine.ImageConversionModule", "UnityEditor.CoreModule"
+                    "UnityEngine.UIElementsModule", "UnityEngine.ImageConversionModule"
                 };
 
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -117,11 +125,13 @@ namespace UnityBridge
                         var name = asm.GetName().Name;
                         if (allowedUnityAssemblies.Contains(name) || 
                             name == "Assembly-CSharp" || 
-                            name == "Assembly-CSharp-Editor" ||
-                            name == "netstandard")
+                            name == "Assembly-CSharp-Editor")
                         {
                             AddAssemblyIfNotExists(references, asm.Location);
                         }
+
+                        if (needUnityEditor && string.Equals(name, "UnityEditor.CoreModule", StringComparison.Ordinal))
+                            AddAssemblyIfNotExists(references, asm.Location);
                     }
                     catch { /* ignore */ }
                 }
@@ -178,6 +188,8 @@ namespace UnityBridge
             var scriptingRoot = Path.Combine(contentsRoot, "Resources", "Scripting");
             var candidates = new[]
             {
+                // Mono compiler path - most compatible with Unity Editor runtime on Windows.
+                Path.Combine(scriptingRoot, "MonoBleedingEdge", "lib", "mono", "4.5", "mcs.exe"),
                 // Unity 6/macOS reliable path.
                 Path.Combine(scriptingRoot, "MonoBleedingEdge", "lib", "mono", "4.5", "csc.exe"),
                 // Legacy Unity paths.
@@ -209,10 +221,274 @@ namespace UnityBridge
             }
         }
 
+        private static string FindAssemblyPath(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return null;
+
+            if (string.Equals(fileName, "System.Text.Encoding.CodePages.dll", StringComparison.OrdinalIgnoreCase))
+                return FindCodePagesAssemblyPath();
+
+            try
+            {
+                var loaded = AppDomain.CurrentDomain.GetAssemblies();
+                for (int i = 0; i < loaded.Length; i++)
+                {
+                    var asm = loaded[i];
+                    if (asm == null || asm.IsDynamic || string.IsNullOrWhiteSpace(asm.Location))
+                        continue;
+                    if (string.Equals(Path.GetFileName(asm.Location), fileName, StringComparison.OrdinalIgnoreCase))
+                        return asm.Location;
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            try
+            {
+                var contentsRoot = EditorApplication.applicationContentsPath;
+                if (!Directory.Exists(contentsRoot))
+                    return null;
+
+                var match = Directory
+                    .EnumerateFiles(contentsRoot, fileName, SearchOption.AllDirectories)
+                    .FirstOrDefault();
+                return match;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string FindCodePagesAssemblyPath()
+        {
+            lock (OptionalAssemblyResolverLock)
+            {
+                const string fileName = "System.Text.Encoding.CodePages.dll";
+                var preferredVersion = new Version(4, 1, 1, 0);
+                var candidates = new List<string>();
+
+                void AddCandidate(string path)
+                {
+                    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                        return;
+                    if (candidates.Any(x => string.Equals(x, path, StringComparison.OrdinalIgnoreCase)))
+                        return;
+                    candidates.Add(path);
+                }
+
+                var contentsRoot = EditorApplication.applicationContentsPath;
+                if (!string.IsNullOrWhiteSpace(contentsRoot))
+                {
+                    AddCandidate(Path.Combine(contentsRoot, "MonoBleedingEdge", "lib", "mono", "4.5", "Facades", fileName));
+                    AddCandidate(Path.Combine(contentsRoot, "MonoBleedingEdge", "lib", "mono", "net_4_x-win32", "Facades", fileName));
+                    AddCandidate(Path.Combine(contentsRoot, "MonoBleedingEdge", "lib", "mono", "unityjit-win32", "Facades", fileName));
+                    AddCandidate(Path.Combine(contentsRoot, "NetStandard", "EditorExtensions", fileName));
+                    AddCandidate(Path.Combine(contentsRoot, "netcorerun", fileName));
+                    AddCandidate(Path.Combine(contentsRoot, "NetCoreRuntime", "shared", "Microsoft.NETCore.App", "6.0.21", fileName));
+                }
+
+                AddCandidate(PreferredCodePagesAssemblyPath);
+
+                try
+                {
+                    var loaded = AppDomain.CurrentDomain.GetAssemblies();
+                    for (var i = 0; i < loaded.Length; i++)
+                    {
+                        var asm = loaded[i];
+                        if (asm == null || asm.IsDynamic || string.IsNullOrWhiteSpace(asm.Location))
+                            continue;
+                        if (!string.Equals(asm.GetName().Name, "System.Text.Encoding.CodePages", StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        AddCandidate(asm.Location);
+                    }
+                }
+                catch
+                {
+                    // ignore
+                }
+
+                var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+
+                AddCandidate(Path.Combine(programFiles, "Microsoft Visual Studio", "2022", "Community", "MSBuild", "Current", "Bin", "Roslyn", fileName));
+                AddCandidate(Path.Combine(programFiles, "Microsoft Visual Studio", "2022", "Community", "Common7", "IDE", "PublicAssemblies", fileName));
+                AddCandidate(Path.Combine(programFiles, "Microsoft Visual Studio", "2022", "Community", "Common7", "IDE", "Extensions", "35cxvrwr.a1z", fileName));
+                AddCandidate(Path.Combine(programFiles, "Unity Hub", "UnityLicensingClient_V1", fileName));
+
+                var dotnetSharedRoot = Path.Combine(programFiles, "dotnet", "shared", "Microsoft.NETCore.App");
+                if (Directory.Exists(dotnetSharedRoot))
+                {
+                    try
+                    {
+                        var versionDirs = Directory.GetDirectories(dotnetSharedRoot);
+                        for (var i = 0; i < versionDirs.Length; i++)
+                            AddCandidate(Path.Combine(versionDirs[i], fileName));
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+
+                var extensionRoots = new[]
+                {
+                    Path.Combine(programFiles, "Microsoft Visual Studio", "2022", "Community", "Common7", "IDE", "Extensions"),
+                    Path.Combine(programFilesX86, "Microsoft Visual Studio", "2022", "Community", "Common7", "IDE", "Extensions")
+                };
+
+                for (var i = 0; i < extensionRoots.Length; i++)
+                {
+                    var extRoot = extensionRoots[i];
+                    if (string.IsNullOrWhiteSpace(extRoot) || !Directory.Exists(extRoot))
+                        continue;
+
+                    try
+                    {
+                        var subDirs = Directory.GetDirectories(extRoot);
+                        for (var j = 0; j < subDirs.Length; j++)
+                            AddCandidate(Path.Combine(subDirs[j], fileName));
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }
+
+                string bestPath = null;
+                Version bestVersion = null;
+                for (var i = 0; i < candidates.Count; i++)
+                {
+                    var candidate = candidates[i];
+                    Version version;
+                    try
+                    {
+                        version = AssemblyName.GetAssemblyName(candidate).Version;
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (version != null && version.Equals(preferredVersion))
+                    {
+                        bestPath = candidate;
+                        break;
+                    }
+
+                    if (bestVersion == null || (version != null && version > bestVersion))
+                    {
+                        bestVersion = version;
+                        bestPath = candidate;
+                    }
+                }
+
+                CachedCodePagesAssemblyPath = bestPath;
+
+                if (!string.IsNullOrWhiteSpace(bestPath))
+                    Debug.Log($"[UnityBridge] CodePages assembly selected: {bestPath}");
+
+                return CachedCodePagesAssemblyPath;
+            }
+        }
+
+        private static void EnsureOptionalAssemblyResolver(string codePagesAssemblyPath)
+        {
+            lock (OptionalAssemblyResolverLock)
+            {
+                if (!OptionalAssemblyResolverRegistered)
+                {
+                    AppDomain.CurrentDomain.AssemblyResolve += ResolveOptionalAssembly;
+                    OptionalAssemblyResolverRegistered = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(codePagesAssemblyPath) && File.Exists(codePagesAssemblyPath))
+                    PreferredCodePagesAssemblyPath = codePagesAssemblyPath;
+            }
+        }
+
+        private static Assembly ResolveOptionalAssembly(object sender, ResolveEventArgs args)
+        {
+            try
+            {
+                var requested = new AssemblyName(args.Name);
+                if (!string.Equals(requested.Name, "System.Text.Encoding.CodePages", StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                var loaded = AppDomain.CurrentDomain.GetAssemblies()
+                    .FirstOrDefault(a => a != null &&
+                                         string.Equals(a.GetName().Name, requested.Name, StringComparison.OrdinalIgnoreCase));
+                if (loaded != null)
+                    return loaded;
+
+                var candidates = new List<string>();
+                if (!string.IsNullOrWhiteSpace(PreferredCodePagesAssemblyPath) && File.Exists(PreferredCodePagesAssemblyPath))
+                    candidates.Add(PreferredCodePagesAssemblyPath);
+
+                var discovered = FindCodePagesAssemblyPath();
+                if (!string.IsNullOrWhiteSpace(discovered) &&
+                    !candidates.Any(x => string.Equals(x, discovered, StringComparison.OrdinalIgnoreCase)))
+                {
+                    candidates.Add(discovered);
+                }
+
+                for (var i = 0; i < candidates.Count; i++)
+                {
+                    var path = candidates[i];
+                    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                        continue;
+
+                    try
+                    {
+                        return Assembly.LoadFrom(path);
+                    }
+                    catch
+                    {
+                        // try next path
+                    }
+                }
+            }
+            catch
+            {
+                // no-op
+            }
+
+            return null;
+        }
+
+        private static void EnsureOptionalRuntimeAssemblyLoaded(string assemblyName, string assemblyPath)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyName))
+                return;
+
+            try
+            {
+                var loaded = AppDomain.CurrentDomain.GetAssemblies();
+                for (int i = 0; i < loaded.Length; i++)
+                {
+                    var asm = loaded[i];
+                    if (asm == null)
+                        continue;
+                    if (string.Equals(asm.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase))
+                        return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(assemblyPath) && File.Exists(assemblyPath))
+                    Assembly.LoadFrom(assemblyPath);
+            }
+            catch
+            {
+                // optional dependency, safe to ignore if unavailable
+            }
+        }
+
         private static (bool Success, string ErrorMessage) CompileWithRoslyn(string compilerPath, string sourcePath, string outputDll, HashSet<string> references)
         {
             var args = new StringBuilder();
-            args.Append($"/target:library /out:\"{outputDll}\" /nologo /langversion:latest ");
+            args.Append($"/target:library /out:\"{outputDll}\" /nologo /noconfig /langversion:latest /nostdlib+ ");
             foreach (var refPath in references)
             {
                 args.Append($"/reference:\"{refPath}\" ");
@@ -221,12 +497,25 @@ namespace UnityBridge
 
             var fileName = compilerPath;
             var arguments = args.ToString();
+            var contentsRoot = EditorApplication.applicationContentsPath;
+
+            // Force Unity Mono runtime for MonoBleedingEdge compilers to avoid host runtime assembly mismatches.
+            if (compilerPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
+                compilerPath.IndexOf("MonoBleedingEdge", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                var monoPathWin = Path.Combine(contentsRoot, "MonoBleedingEdge", "bin", "mono.exe");
+                var monoPathUnix = Path.Combine(contentsRoot, "MonoBleedingEdge", "bin", "mono");
+                var monoPath = File.Exists(monoPathWin) ? monoPathWin : monoPathUnix;
+                if (File.Exists(monoPath))
+                {
+                    fileName = monoPath;
+                    arguments = $"\"{compilerPath}\" {arguments}";
+                }
+            }
 
             if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXEditor ||
                 UnityEngine.Application.platform == UnityEngine.RuntimePlatform.LinuxEditor)
             {
-                var contentsRoot = EditorApplication.applicationContentsPath;
-
                 if (compilerPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                 {
                     var dotnetPath = Path.Combine(contentsRoot, "Resources", "Scripting", "NetCoreRuntime", "dotnet");
@@ -456,9 +745,7 @@ namespace UnityBridge
             {
                 "System",
                 "System.Collections.Generic", 
-                "System.Linq",
                 "UnityEngine",
-                "UnityEditor",
                 "Random = UnityEngine.Random",
                 "Object = UnityEngine.Object"
             };

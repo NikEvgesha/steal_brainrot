@@ -170,6 +170,8 @@ public class AlbumProgressService : MonoBehaviour
         if (string.IsNullOrEmpty(normalizedId))
             return false;
 
+        var resolvedRareType = ResolveRareTypeFallback(type, normalizedId, rareType);
+
         var changed = false;
         if (!IsDiscovered(type, normalizedId))
         {
@@ -182,7 +184,7 @@ public class AlbumProgressService : MonoBehaviour
                 Debug.Log($"[Album] Discovered {type}:{normalizedId}");
         }
 
-        if (TryDiscoverRareType(type, normalizedId, rareType))
+        if (TryDiscoverRareType(type, normalizedId, resolvedRareType))
             changed = true;
 
         if (changed)
@@ -198,10 +200,11 @@ public class AlbumProgressService : MonoBehaviour
 
     public bool TryDiscoverRareType(AlbumEntityType type, string id, RareType rareType)
     {
+        var normalizedId = NormalizeId(id);
+        rareType = ResolveRareTypeFallback(type, normalizedId, rareType);
         if (!IsValidRareType(rareType))
             return false;
 
-        var normalizedId = NormalizeId(id);
         var changed = false;
         if (!IsRareUnlocked(rareType))
         {
@@ -440,7 +443,7 @@ public class AlbumProgressService : MonoBehaviour
             return false;
 
         id = ResolveItemId(item);
-        rareType = item.RareType;
+        rareType = ResolveRareTypeFallback(type, id, item.RareType);
         return !string.IsNullOrEmpty(id);
     }
 
@@ -463,6 +466,58 @@ public class AlbumProgressService : MonoBehaviour
             normalized = normalized.Substring(0, normalized.Length - "_clone".Length).Trim('_');
 
         return normalized;
+    }
+
+    private static RareType ResolveRareTypeFallback(AlbumEntityType type, string normalizedId, RareType rareType)
+    {
+        if (IsValidRareType(rareType))
+            return rareType;
+
+        if (string.IsNullOrEmpty(normalizedId))
+            return rareType;
+
+        var storage = G.Storage;
+        if (storage == null)
+            return rareType;
+
+        if (type == AlbumEntityType.Egg)
+        {
+            var eggs = storage.GetAllEggPrefabs();
+            for (var i = 0; i < eggs.Count; i++)
+            {
+                var egg = eggs[i];
+                if (egg == null)
+                    continue;
+
+                var candidateId = NormalizeRuntimeId(egg.Name);
+                if (string.IsNullOrEmpty(candidateId))
+                    candidateId = NormalizeRuntimeId(egg.name);
+                if (!string.Equals(candidateId, normalizedId, StringComparison.Ordinal))
+                    continue;
+                if (IsValidRareType(egg.RareType))
+                    return egg.RareType;
+            }
+        }
+        else
+        {
+            var pets = storage.GetAllPetPrefabs();
+            for (var i = 0; i < pets.Count; i++)
+            {
+                var pet = pets[i];
+                if (pet == null)
+                    continue;
+
+                var candidateId = NormalizeRuntimeId(pet.Name);
+                if (string.IsNullOrEmpty(candidateId))
+                    candidateId = NormalizeRuntimeId(pet.name);
+                if (!string.Equals(candidateId, normalizedId, StringComparison.Ordinal))
+                    continue;
+                if (IsValidRareType(pet.RareType))
+                    return pet.RareType;
+            }
+        }
+
+        return rareType;
     }
 
     private bool LoadFlag(string key)

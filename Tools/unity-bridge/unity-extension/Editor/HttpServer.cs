@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -9,8 +9,8 @@ using UnityEngine;
 namespace UnityBridge
 {
     /// <summary>
-    /// Простой HTTP сервер для Unity Bridge
-    /// Только HTTP логика - без бизнес-логики
+    /// РџСЂРѕСЃС‚РѕР№ HTTP СЃРµСЂРІРµСЂ РґР»СЏ Unity Bridge
+    /// РўРѕР»СЊРєРѕ HTTP Р»РѕРіРёРєР° - Р±РµР· Р±РёР·РЅРµСЃ-Р»РѕРіРёРєРё
     /// </summary>
     public class HttpServer
     {
@@ -65,9 +65,10 @@ namespace UnityBridge
                 if (listenerThread?.IsAlive == true)
                 {
                     listenerThread.Join(1000);
-                    if (listenerThread.IsAlive)
-                        listenerThread.Abort();
                 }
+
+                listenerThread = null;
+                listener = null;
                 
                 Debug.Log("HTTP Server stopped");
             }
@@ -86,9 +87,16 @@ namespace UnityBridge
                     var context = listener.GetContext();
                     ThreadPool.QueueUserWorkItem(_ => ProcessRequest(context));
                 }
+                catch (ThreadAbortException)
+                {
+                    return;
+                }
                 catch (HttpListenerException)
                 {
-                    // Сервер останавливается
+                    if (!isRunning) return;
+                }
+                catch (ObjectDisposedException)
+                {
                     if (!isRunning) return;
                 }
                 catch (Exception ex)
@@ -129,6 +137,11 @@ namespace UnityBridge
                 // Send response
                 SendJsonResponse(response, responseData, 200);
             }
+            catch (ObjectDisposedException)
+            {
+                if (!isRunning)
+                    return;
+            }
             catch (Exception ex)
             {
                 Debug.LogError($"Request processing error: {ex.Message}");
@@ -144,7 +157,7 @@ namespace UnityBridge
                 
             try
             {
-                // 🚀 Принудительно используем UTF-8 для корректной обработки кириллицы
+                // рџљЂ РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ РёСЃРїРѕР»СЊР·СѓРµРј UTF-8 РґР»СЏ РєРѕСЂСЂРµРєС‚РЅРѕР№ РѕР±СЂР°Р±РѕС‚РєРё РєРёСЂРёР»Р»РёС†С‹
                 using (var reader = new StreamReader(request.InputStream, Encoding.UTF8))
                 {
                     var body = reader.ReadToEnd();
@@ -167,7 +180,7 @@ namespace UnityBridge
                 var json = JsonUtils.ToJson(data);
                 var buffer = Encoding.UTF8.GetBytes(json);
                 
-                // 🚀 Поддержка UTF-8 кодировки для кириллицы
+                // рџљЂ РџРѕРґРґРµСЂР¶РєР° UTF-8 РєРѕРґРёСЂРѕРІРєРё РґР»СЏ РєРёСЂРёР»Р»РёС†С‹
                 response.ContentType = "application/json; charset=utf-8";
                 response.ContentEncoding = Encoding.UTF8;
                 response.ContentLength64 = buffer.Length;
