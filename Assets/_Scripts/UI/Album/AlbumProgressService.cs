@@ -391,6 +391,11 @@ public class AlbumProgressService : MonoBehaviour
 
         SaveFlag(BuildEntityElementKey("RewardClaimed", type, normalizedId, elementType), true);
         SaveFlag(BuildEntityElementKey("MentionReward", type, normalizedId, elementType), false);
+
+        // Claiming reward should also clear the "new element" dot for this exact element.
+        SaveFlag(BuildEntityElementKey("ElementViewed", type, normalizedId, elementType), true);
+        SaveFlag(BuildEntityElementKey("MentionElement", type, normalizedId, elementType), false);
+
         Changed?.Invoke();
         return true;
     }
