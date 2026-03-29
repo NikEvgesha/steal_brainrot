@@ -16,12 +16,16 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [Header("Zone Identity")]
     [SerializeField] private string zoneId = "zone_1";
     [SerializeField] private bool fallbackToLegacyUnlockKey = true;
+    [SerializeField] private int slotIndexOverride = -1;
 
     [Header("Scene Refs")]
     [SerializeField] private InteractionPanel interactionPanel;
     [SerializeField] private UniversalDecisionPopup decisionPopup;
     [SerializeField] private GameObject readyIndicator;
     [SerializeField] private AudioSource collectAudio;
+    [SerializeField] private RemoteBasesApplier remoteBases;
+    [SerializeField] private Collider triggerCollider;
+    [SerializeField] private GameObject zoneVisualRoot;
 
     [Header("Income Sources")]
     [SerializeField] private bool autoDiscoverIncomeSources = true;
@@ -39,6 +43,11 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [SerializeField] private bool includeBigPetIncome = true;
     [SerializeField] private float stateRefreshSec = 0.5f;
     [SerializeField] private bool showIndicatorOnlyWhenIncomeAvailable = true;
+    [SerializeField] private bool onlyForLocalSlot = true;
+    [SerializeField] private bool allowWhenSlotUnknown = true;
+    [SerializeField] private bool hideZoneWhenNotLocal = true;
+    [SerializeField] private bool disableTriggerWhenNotLocal = true;
+    [SerializeField] private float slotResolutionRefreshSec = 0.5f;
 
     [Header("Permanent Unlock")]
     [SerializeField] private CurrencyType unlockPriceCurrency = CurrencyType.Gems;
@@ -68,6 +77,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
     private Coroutine _stateRoutine;
     private Coroutine _autoCollectRoutine;
     private string _resolvedSaveKey;
+    private bool _isAvailableForSlot = true;
+    private int _resolvedSlotIndex = -1;
+    private float _nextSlotRefreshAt;
     private readonly List<FieldCell> _cachedIncomeCells = new();
     private readonly List<BigPetPoint> _cachedBigPetPoints = new();
     private bool _incomeSourcesCached;
@@ -92,6 +104,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
         _resolvedSaveKey = ResolveUnlockSaveKey();
         _permanentUnlocked = LoadPermanentUnlocked();
         EnsureIncomeSourcesCache(forceRebuild: true);
+        RefreshSlotAvailability(forceApply: true);
         RefreshVisualState();
     }
 
@@ -99,6 +112,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
     {
         SubscribeEvents();
         EnsureIncomeSourcesCache();
+        RefreshSlotAvailability(forceApply: true);
         RefreshVisualState();
     }
 
@@ -110,9 +124,27 @@ public class ClaimAllCoinsZone : MonoBehaviour
         HideInteraction();
     }
 
+    private void Update()
+    {
+        if (!onlyForLocalSlot)
+            return;
+
+        var now = Time.unscaledTime;
+        if (now < _nextSlotRefreshAt)
+            return;
+
+        _nextSlotRefreshAt = now + Mathf.Max(0.1f, slotResolutionRefreshSec);
+        var wasAvailable = _isAvailableForSlot;
+        RefreshSlotAvailability();
+        if (wasAvailable != _isAvailableForSlot)
+            RefreshVisualState();
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (!other.CompareTag("Player"))
+            return;
+        if (!RefreshSlotAvailability())
             return;
 
         _playerInside = true;
@@ -207,6 +239,19 @@ public class ClaimAllCoinsZone : MonoBehaviour
                 readyIndicator = marker.gameObject;
         }
 
+        if (remoteBases == null)
+            remoteBases = GetComponentInParent<RemoteBasesApplier>();
+
+        if (triggerCollider == null)
+            triggerCollider = GetComponent<Collider>();
+
+        if (zoneVisualRoot == null)
+        {
+            var visual = FindChildByNameToken(transform, "visual", "mesh", "model");
+            if (visual != null)
+                zoneVisualRoot = visual.gameObject;
+        }
+
         if (autoDiscoverIncomeSources && incomeSourcesRoot == null)
             incomeSourcesRoot = transform.root;
 
@@ -252,7 +297,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private void OnInteractionRequested()
     {
-        if (_actionInFlight || !_playerInside)
+        if (_actionInFlight || !_playerInside || !RefreshSlotAvailability())
             return;
 
         if (_permanentUnlocked)
@@ -316,6 +361,13 @@ public class ClaimAllCoinsZone : MonoBehaviour
     {
         _actionInFlight = true;
         RefreshVisualState();
+
+        if (!RefreshSlotAvailability())
+        {
+            _actionInFlight = false;
+            RefreshVisualState();
+            yield break;
+        }
 
         if (!HasCollectibleIncome())
         {
@@ -383,7 +435,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private void TryCollectWithoutAd(string source)
     {
-        if (!_playerInside || _actionInFlight)
+        if (!_playerInside || _actionInFlight || !RefreshSlotAvailability())
             return;
         if (!HasCollectibleIncome())
             return;
@@ -458,6 +510,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private bool HasCollectibleIncome()
     {
+        if (!RefreshSlotAvailability())
+            return false;
+
         EnsureIncomeSourcesCache();
 
         for (var i = 0; i < _cachedIncomeCells.Count; i++)
@@ -544,6 +599,14 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private void RefreshVisualState()
     {
+        if (!RefreshSlotAvailability())
+        {
+            HideInteraction();
+            if (readyIndicator != null)
+                readyIndicator.SetActive(false);
+            return;
+        }
+
         var hasIncome = HasCollectibleIncome();
         var showInteraction = !_permanentUnlocked && _playerInside && !_actionInFlight;
 
@@ -567,6 +630,70 @@ public class ClaimAllCoinsZone : MonoBehaviour
     {
         if (interactionPanel != null)
             interactionPanel.gameObject.SetActive(false);
+    }
+
+    private RemoteBasesApplier GetRemoteBases()
+    {
+        if (remoteBases != null)
+            return remoteBases;
+        if (!autoDiscoverReferences)
+            return null;
+
+        remoteBases = GetComponentInParent<RemoteBasesApplier>();
+        if (remoteBases == null)
+            remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
+        return remoteBases;
+    }
+
+    private bool RefreshSlotAvailability(bool forceApply = false)
+    {
+        var previous = _isAvailableForSlot;
+        _isAvailableForSlot = ResolveSlotAvailability();
+        if (forceApply || previous != _isAvailableForSlot)
+            ApplySlotAvailabilityState();
+        return _isAvailableForSlot;
+    }
+
+    private bool ResolveSlotAvailability()
+    {
+        if (!onlyForLocalSlot)
+            return true;
+
+        var bases = GetRemoteBases();
+        if (bases == null)
+            return allowWhenSlotUnknown;
+
+        if (slotIndexOverride >= 0)
+            return bases.IsLocalSlotForClient(slotIndexOverride);
+
+        if (_resolvedSlotIndex >= 0)
+            return bases.IsLocalSlotForClient(_resolvedSlotIndex);
+
+        if (!bases.TryResolveSlotIndex(transform, out var slotIndex))
+            return false;
+
+        _resolvedSlotIndex = slotIndex;
+        return bases.IsLocalSlotForClient(slotIndex);
+    }
+
+    private void ApplySlotAvailabilityState()
+    {
+        if (zoneVisualRoot != null && hideZoneWhenNotLocal)
+            zoneVisualRoot.SetActive(_isAvailableForSlot);
+
+        if (triggerCollider != null && disableTriggerWhenNotLocal)
+            triggerCollider.enabled = _isAvailableForSlot;
+
+        if (_isAvailableForSlot)
+            return;
+
+        _playerInside = false;
+        StopStateRoutine();
+        StopAutoCollectRoutine();
+        HideInteraction();
+
+        if (readyIndicator != null)
+            readyIndicator.SetActive(false);
     }
 
     private UniversalDecisionPopup ResolveDecisionPopup()

@@ -19,6 +19,12 @@ public class LocalProfileBoardPoint : MonoBehaviour
     [SerializeField] private bool closePopupOnExit = false;
     [SerializeField] private bool preferSnapshotStats = true;
 
+    [Header("Visibility")]
+    [SerializeField] private GameObject boardVisualRoot;
+    [SerializeField] private Collider triggerCollider;
+    [SerializeField] private bool hideBoardVisualWhenNoTarget = true;
+    [SerializeField] private bool disableTriggerWhenNoTarget;
+
     [Header("Localization")]
     [SerializeField] private string interactionLocalizationKey = "UI/Profile/OpenBoard";
     [SerializeField] private string interactionTextFallback = "Profile";
@@ -53,6 +59,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         if (interactionPanel != null)
             interactionPanel.InteractionComplete.AddListener(OnInteractionRequested);
         RefreshTargetData(force: true);
+        RefreshVisibilityState();
         RefreshInteractionState();
     }
 
@@ -258,6 +265,23 @@ public class LocalProfileBoardPoint : MonoBehaviour
             interactionPanel.gameObject.SetActive(false);
     }
 
+    private void RefreshVisibilityState()
+    {
+        var shouldBeVisible = _hasTarget;
+
+        if (boardVisualRoot != null && hideBoardVisualWhenNoTarget)
+            boardVisualRoot.SetActive(shouldBeVisible);
+
+        if (triggerCollider != null && disableTriggerWhenNoTarget)
+            triggerCollider.enabled = shouldBeVisible;
+
+        if (shouldBeVisible)
+            return;
+
+        _playerInside = false;
+        HideInteraction();
+    }
+
     [ContextMenu("ProfileBoard/Auto Setup References")]
     private void AutoSetupReferences()
     {
@@ -272,6 +296,16 @@ public class LocalProfileBoardPoint : MonoBehaviour
 
         if (remoteBases == null)
             remoteBases = GetComponentInParent<RemoteBasesApplier>();
+
+        if (triggerCollider == null)
+            triggerCollider = GetComponent<Collider>();
+
+        if (boardVisualRoot == null)
+        {
+            var visual = FindChildByNameToken(transform, "visual", "board", "mesh", "model");
+            if (visual != null)
+                boardVisualRoot = visual.gameObject;
+        }
 
         if (statsRoot == null)
         {
@@ -319,6 +353,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
 
             if (hadTarget && closePopupWhenTargetUnavailable)
                 RemoteProfilePopup.Instance.Hide();
+            RefreshVisibilityState();
             return;
         }
 
@@ -328,6 +363,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         _targetStats = _targetIsLocal
             ? BuildStats()
             : (stats ?? new PlayerPublicStatsDto());
+        RefreshVisibilityState();
 
         var targetChanged = !string.Equals(prevPlayerId, _targetPlayerId, StringComparison.Ordinal) ||
                             !string.Equals(prevFriendCode, _targetFriendCode, StringComparison.Ordinal);
@@ -350,8 +386,11 @@ public class LocalProfileBoardPoint : MonoBehaviour
 
         var bases = GetRemoteBases();
         var slotIndex = ResolveSlotIndex(bases);
-        if (bases != null && slotIndex >= 0)
+        if (bases != null)
         {
+            if (slotIndex < 0)
+                return false;
+
             if (bases.TryGetProfileTargetForSlot(
                     slotIndex,
                     out var boardPlayerId,
@@ -466,6 +505,39 @@ public class LocalProfileBoardPoint : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static Transform FindChildByNameToken(Transform root, params string[] tokens)
+    {
+        if (root == null || tokens == null || tokens.Length == 0)
+            return null;
+
+        var stack = new System.Collections.Generic.Stack<Transform>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            var lowerName = current.name != null ? current.name.ToLowerInvariant() : string.Empty;
+            var hit = false;
+            for (var i = 0; i < tokens.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(tokens[i]))
+                    continue;
+                if (lowerName.Contains(tokens[i].ToLowerInvariant()))
+                {
+                    hit = true;
+                    break;
+                }
+            }
+
+            if (hit && current != root)
+                return current;
+
+            for (var i = 0; i < current.childCount; i++)
+                stack.Push(current.GetChild(i));
+        }
+
+        return null;
     }
 
     private static string L(string key, string fallback)

@@ -377,6 +377,12 @@ public class FriendsApi : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            if (TryParseLikeStateResponse(req.downloadHandler.text, out var fallbackState))
+            {
+                onOk?.Invoke(fallbackState);
+                yield break;
+            }
+
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             yield break;
         }
@@ -431,6 +437,12 @@ public class FriendsApi : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            if (TryParseLikeSendResponse(req.downloadHandler.text, out var fallbackResponse))
+            {
+                onOk?.Invoke(fallbackResponse);
+                yield break;
+            }
+
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             yield break;
         }
@@ -446,6 +458,59 @@ public class FriendsApi : MonoBehaviour
         }
 
         onOk?.Invoke(resp);
+    }
+
+    private static bool TryParseLikeStateResponse(string json, out LikeStateResponse response)
+    {
+        response = null;
+        if (string.IsNullOrWhiteSpace(json) || !LooksLikeLikeStatePayload(json))
+            return false;
+
+        try
+        {
+            response = JsonUtility.FromJson<LikeStateResponse>(json);
+            return response != null;
+        }
+        catch
+        {
+            response = null;
+            return false;
+        }
+    }
+
+    private static bool TryParseLikeSendResponse(string json, out LikeSendResponse response)
+    {
+        response = null;
+        if (string.IsNullOrWhiteSpace(json) || !LooksLikeLikeSendPayload(json))
+            return false;
+
+        try
+        {
+            response = JsonUtility.FromJson<LikeSendResponse>(json);
+            return response != null;
+        }
+        catch
+        {
+            response = null;
+            return false;
+        }
+    }
+
+    private static bool LooksLikeLikeStatePayload(string json)
+    {
+        return json.IndexOf("\"likesCount\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"canLike\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"likedToday\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"nextLikeAtUtc\"", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool LooksLikeLikeSendPayload(string json)
+    {
+        return json.IndexOf("\"ok\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"likesCount\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"canLike\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"likedToday\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               json.IndexOf("\"nextLikeAtUtc\"", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
 }
