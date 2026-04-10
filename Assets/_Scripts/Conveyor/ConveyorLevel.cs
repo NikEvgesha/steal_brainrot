@@ -13,6 +13,7 @@ public struct LevelEggs
 public class ConveyorLevel : MonoBehaviour
 {
     [SerializeField] private string _name;
+    [SerializeField] private RareType _rarity;
     [SerializeField] private double _priceCoin;
     [SerializeField] private double _priceGems;
     [SerializeField] private Sprite _icon;
@@ -29,6 +30,8 @@ public class ConveyorLevel : MonoBehaviour
     public float IncomeMultiplier => _incomeMultiplier;
     public List<LevelEggs> Eggs => _eggs;
     public Egg NewEgg => _newEgg;
+
+    public RareType RareType => _rarity;
 
     public string Name => _name;
     public double PriceCoin => _priceCoin;

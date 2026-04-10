@@ -66,7 +66,8 @@ public enum LocalizationKeyType
     Tag,
     Achievement,
     Level,
-    Quest
+    Quest,
+    Boost
 }
 
 public enum ItemSize
