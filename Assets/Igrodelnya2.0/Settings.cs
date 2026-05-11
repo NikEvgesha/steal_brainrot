@@ -6,6 +6,7 @@ public class Settings : MonoBehaviour
 {
     public Action<float> ChangeMouseSensitivity;
     public Action<float> ChangeVolume;
+    public Action<bool> ChangeAnimalsAnimations;
     //public Action<bool> ControllJostick;
     //[SerializeField] private Toggle _joystickToggle;
     //[SerializeField] private GameObject _UIWindow;
@@ -15,6 +16,7 @@ public class Settings : MonoBehaviour
     public Action Ready;
 
     public float Sensivity;
+    public bool AnimalsAnimationsEnabled { get; private set; } = true;
 
     //private bool _isOpen;
 
@@ -70,6 +72,7 @@ public class Settings : MonoBehaviour
         float[] volumes = G.Save.LoadVolume();
         MusicVolume(volumes[0]);
         SoundVolume(volumes[1]);
+        SetAnimalsAnimationsEnabled(AnimalsAnimationsEnabled);
         IsReady = true;
         Ready?.Invoke();
     }
@@ -96,6 +99,12 @@ public class Settings : MonoBehaviour
     public void MusicVolume(float volume)
     {
         G.Sound.MusicVolume = volume;
+    }
+
+    public void SetAnimalsAnimationsEnabled(bool isEnabled)
+    {
+        AnimalsAnimationsEnabled = isEnabled;
+        ChangeAnimalsAnimations?.Invoke(isEnabled);
     }
 
 /*    private void ToggleUIOpen()

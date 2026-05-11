@@ -30,6 +30,8 @@ public class ConveyorUI : MonoBehaviour
     [SerializeField] private ConveyorLevelTab _tabPrefab;
     [SerializeField] private Transform _tansParent;
     [SerializeField] private EggDropCatalogUI _chancesPanel;
+    [SerializeField] private Transform _newEggPetsPanel;
+    [SerializeField] private GameObject _newEggPetIcon;
 
     private GameObject _panel;
     private bool _isOpen;
@@ -91,6 +93,18 @@ public class ConveyorUI : MonoBehaviour
         _levelName.text = level.Name;
         _icon.sprite = level.Icon;
         _newEggIcon.sprite = level.NewEgg.Icon;
+
+        for (int i = _newEggPetsPanel.childCount - 1; i >= 0; i--)
+        {
+            Destroy(_newEggPetsPanel.GetChild(i).gameObject);
+        }
+
+        foreach (Brainrot pet in level.NewEgg.Data.Brainrots)
+        {
+            GameObject icon = Instantiate(_newEggPetIcon, _newEggPetsPanel);
+            icon.GetComponentInChildren<Image>().sprite = pet.Icon;
+        }
+
         _incomeMultiplier.text = "+" + ((level.IncomeMultiplier - 1) * 100).ToString() + "%";
         UpdateDropChances(level);
 

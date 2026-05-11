@@ -8,6 +8,7 @@ using UnityEngine.SceneManagement;
 public static class PlayModeStartSceneGuard
 {
     private const string StartScenePath = "Assets/Scenes/LoadingScene.unity";
+    private const string BypassSceneName = "Foto";
 
     static PlayModeStartSceneGuard()
     {
@@ -20,9 +21,17 @@ public static class PlayModeStartSceneGuard
         if (state != PlayModeStateChange.ExitingEditMode)
             return;
 
+        var activeScene = SceneManager.GetActiveScene();
+        if (string.Equals(activeScene.name, BypassSceneName, StringComparison.OrdinalIgnoreCase))
+        {
+            EditorSceneManager.playModeStartScene = null;
+            Debug.Log($"[PlayModeStartSceneGuard] Play from '{activeScene.path}' without redirect (bypass for '{BypassSceneName}').");
+            return;
+        }
+
         EnsurePlayModeStartScene();
 
-        var activeScenePath = SceneManager.GetActiveScene().path;
+        var activeScenePath = activeScene.path;
         if (!string.Equals(activeScenePath, StartScenePath, StringComparison.OrdinalIgnoreCase))
             Debug.Log($"[PlayModeStartSceneGuard] Play pressed from '{activeScenePath}', starting from '{StartScenePath}'.");
     }

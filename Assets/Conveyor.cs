@@ -112,9 +112,10 @@ public class Conveyor : MonoBehaviour
     private void FixedUpdate()
     {
         if (!_initialized) return;
-        if (_mt == null || _destroyPoint == null || _eggs == null) return;
+        if (_destroyPoint == null || _eggs == null) return;
 
-        _mt.mainTextureOffset = new Vector2(0, Time.time * _speed * _matSpeedMultiplier * Time.fixedDeltaTime);
+        if (_mt != null)
+            _mt.mainTextureOffset = new Vector2(0, Time.time * _speed * _matSpeedMultiplier * Time.fixedDeltaTime);
 
         List<Egg> toRemove = null;
         foreach (Egg egg in _eggs)

@@ -96,11 +96,13 @@ public class ZooBackendClient : MonoBehaviour
     [SerializeField] private int locationsOnlineSec = 60;
 
     public event Action<List<ZooLocationItem>> LocationsUpdated;
+    public event Action<List<ZooLocationItem>> InitialLocationsLoaded;
     public event Action<FriendBaseResponse> FriendBaseLoaded;
 
     private readonly List<ZooLocationItem> _lastLocations = new();
     public IReadOnlyList<ZooLocationItem> LastLocations => _lastLocations;
     public FriendBaseResponse LastFriendBase { get; private set; }
+    public bool IsInitialLocationsLoaded { get; private set; }
 
     private Coroutine _locationsLoop;
 
@@ -311,6 +313,11 @@ public class ZooBackendClient : MonoBehaviour
         _lastLocations.Clear();
         _lastLocations.AddRange(list);
         LocationsUpdated?.Invoke(_lastLocations);
+        if (!IsInitialLocationsLoaded)
+        {
+            IsInitialLocationsLoaded = true;
+            InitialLocationsLoaded?.Invoke(_lastLocations);
+        }
         onOk?.Invoke(_lastLocations);
     }
 

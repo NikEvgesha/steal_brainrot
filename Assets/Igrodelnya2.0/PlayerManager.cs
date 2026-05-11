@@ -9,6 +9,7 @@ public class PlayerManager : MonoBehaviour
 
     private TPPlayerController _tPPlayer;
     private CharacterController _controller;
+    private InventoryItem _heldItem;
 
     private void Awake()
     {
@@ -35,21 +36,34 @@ public class PlayerManager : MonoBehaviour
 
     public void SetItem(InventoryItem item)
     {
+        if (_heldItem != null && _heldItem != item)
+            SetItemCollidersEnabled(_heldItem, true);
+
         if (item.Type == Item.Hamer)
         {
             item.transform.SetParent(_handPoint.transform);
-        } else
+            _tPPlayer.SetHolding(false);
+        }
+        else
         {
             item.transform.SetParent(_getPoint.transform);
             _tPPlayer.SetHolding(true);
         }
             
         item.transform.localPosition = Vector3.zero;
+        SetItemCollidersEnabled(item, false);
+        _heldItem = item;
         //item.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
        
     }
     public void RemoveItem()
     {
+        if (_heldItem != null)
+        {
+            SetItemCollidersEnabled(_heldItem, true);
+            _heldItem = null;
+        }
+
         _tPPlayer.SetHolding(false);
     }
     
@@ -62,5 +76,18 @@ public class PlayerManager : MonoBehaviour
         _controller.enabled = true;
         _camera.ResetCamera();
         
+    }
+
+    private static void SetItemCollidersEnabled(InventoryItem item, bool isEnabled)
+    {
+        if (item == null)
+            return;
+
+        var colliders = item.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+                colliders[i].enabled = isEnabled;
+        }
     }
 }

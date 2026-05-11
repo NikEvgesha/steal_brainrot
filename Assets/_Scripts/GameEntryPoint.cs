@@ -15,6 +15,10 @@ public class GameEntryPoint : MonoBehaviour
 
     [SerializeField] private Transform _playerSpawnPoint;
     [SerializeField] private RemoteBasesApplier _remoteBasesApplier;
+
+    private ZooBackendClient _runtimeBackend;
+    private bool _loadingHidden;
+
     private void Start()
     {
         Instantiate(_playerManager).Init(_playerSpawnPoint);
@@ -33,6 +37,48 @@ public class GameEntryPoint : MonoBehaviour
 
         G.Initialized?.Invoke();
         //_scene.SetActive(true);
+        WaitForPlayerLocationsBeforeHideLoading();
+    }
+
+    private void OnDestroy()
+    {
+        if (_runtimeBackend != null)
+            _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
+    }
+
+    private void WaitForPlayerLocationsBeforeHideLoading()
+    {
+        _runtimeBackend = G.Backend;
+        if (_runtimeBackend == null)
+        {
+            HideLoadingScreen();
+            return;
+        }
+
+        if (_runtimeBackend.IsInitialLocationsLoaded)
+        {
+            HideLoadingScreen();
+            return;
+        }
+
+        _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
+        _runtimeBackend.InitialLocationsLoaded += OnInitialLocationsLoaded;
+    }
+
+    private void OnInitialLocationsLoaded(System.Collections.Generic.List<ZooLocationItem> _)
+    {
+        if (_runtimeBackend != null)
+            _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
+
+        HideLoadingScreen();
+    }
+
+    private void HideLoadingScreen()
+    {
+        if (_loadingHidden)
+            return;
+
+        _loadingHidden = true;
         G.GameLoader.ShowLoadingScreen(false);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
@@ -46,17 +47,42 @@ public class Brainrot : InventoryItem
 
     private FieldCell _floorListener;
 
-    private BrainrotItem _item;
 
     public Action Selled;
     public Action Stealed;
     private Coroutine _incomeCorutine;
+    private Animator[] _animators;
+    private Animation[] _legacyAnimations;
+    private bool _animationsSubscribed;
+    private Coroutine _disableAnimationsRoutine;
+
+    private struct AnimatorStopTarget
+    {
+        public Animator animator;
+        public int layer;
+        public int stateHash;
+        public float targetNormalizedTime;
+    }
+
+    private void OnEnable()
+    {
+        EnsureAnimationsSubscription();
+        ApplyAnimalsAnimationState();
+    }
+
+    private void OnDisable()
+    {
+        StopPendingAnimationsDisable();
+        ReleaseAnimationsSubscription();
+    }
 
 
     public void Init(BrainrotDinamicData rarity, FieldCell floor=null, long lastCollectTimestamp = -1) //передавать плейс из яйца
     {
         // rarity считается в яйце? 
         _canvas = GetComponentInChildren<BrainrotInfoUI>();
+        CacheAnimationComponents();
+        EnsureAnimationsSubscription();
         _dinamicData = rarity;
         //_model = Instantiate(_data.,_modelPoint);
         Vector3 scale = _canvas.transform.localScale;
@@ -80,6 +106,7 @@ public class Brainrot : InventoryItem
         if (incomeAccumulationTime > 0)
             _canvas.UpdateOfflineIncome(_currentIncome);
         SetTypeVisual();
+        ApplyAnimalsAnimationState();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
     }
 
@@ -185,5 +212,228 @@ public class Brainrot : InventoryItem
             _currentIncome = Math.Round(_currentIncome);
             _canvas.UpdateIncome(_currentIncome);
         }
+    }
+
+    private void EnsureAnimationsSubscription()
+    {
+        if (_animationsSubscribed || G.Settings == null)
+            return;
+
+        G.Settings.ChangeAnimalsAnimations += OnAnimalsAnimationsChanged;
+        _animationsSubscribed = true;
+    }
+
+    private void ReleaseAnimationsSubscription()
+    {
+        if (!_animationsSubscribed || G.Settings == null)
+            return;
+
+        G.Settings.ChangeAnimalsAnimations -= OnAnimalsAnimationsChanged;
+        _animationsSubscribed = false;
+    }
+
+    private void OnAnimalsAnimationsChanged(bool isEnabled)
+    {
+        CacheAnimationComponents();
+        ApplyAnimationsEnabled(isEnabled);
+    }
+
+    private void ApplyAnimalsAnimationState()
+    {
+        CacheAnimationComponents();
+        bool isEnabled = G.Settings == null || G.Settings.AnimalsAnimationsEnabled;
+        ApplyAnimationsEnabled(isEnabled);
+    }
+
+    private void CacheAnimationComponents()
+    {
+        _animators = GetComponentsInChildren<Animator>(true);
+        _legacyAnimations = GetComponentsInChildren<Animation>(true);
+    }
+
+    private void ApplyAnimationsEnabled(bool isEnabled)
+    {
+        StopPendingAnimationsDisable();
+
+        if (!isEnabled)
+        {
+            _disableAnimationsRoutine = StartCoroutine(DisableAnimationsAfterCurrentLoop());
+            return;
+        }
+
+        SetAnimationComponentsEnabled(true);
+    }
+
+    private IEnumerator DisableAnimationsAfterCurrentLoop()
+    {
+        SetAnimationComponentsEnabled(true);
+
+        var targets = BuildAnimatorStopTargets();
+        var legacyWaitUntil = Time.time + GetLegacyAnimationsRemainingTime();
+
+        while (!AllAnimatorTargetsReached(targets) || Time.time < legacyWaitUntil)
+            yield return null;
+
+        ResetAnimationsToStart(targets);
+        SetAnimationComponentsEnabled(false);
+        _disableAnimationsRoutine = null;
+    }
+
+    private List<AnimatorStopTarget> BuildAnimatorStopTargets()
+    {
+        var targets = new List<AnimatorStopTarget>();
+        if (_animators == null)
+            return targets;
+
+        for (int i = 0; i < _animators.Length; i++)
+        {
+            var animator = _animators[i];
+            if (animator == null || !animator.gameObject.activeInHierarchy)
+                continue;
+            if (Mathf.Abs(animator.speed) <= 0.0001f)
+                continue;
+
+            for (int layer = 0; layer < animator.layerCount; layer++)
+            {
+                var state = animator.GetCurrentAnimatorStateInfo(layer);
+                if (state.fullPathHash == 0)
+                    continue;
+
+                var normalizedTime = state.normalizedTime;
+                var targetNormalizedTime = state.loop
+                    ? Mathf.Floor(normalizedTime) + 1f
+                    : 1f;
+
+                targets.Add(new AnimatorStopTarget
+                {
+                    animator = animator,
+                    layer = layer,
+                    stateHash = state.fullPathHash,
+                    targetNormalizedTime = Mathf.Max(targetNormalizedTime, normalizedTime)
+                });
+            }
+        }
+
+        return targets;
+    }
+
+    private static bool AllAnimatorTargetsReached(List<AnimatorStopTarget> targets)
+    {
+        if (targets == null || targets.Count == 0)
+            return true;
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            var target = targets[i];
+            var animator = target.animator;
+            if (animator == null || !animator.gameObject.activeInHierarchy)
+                continue;
+
+            var state = animator.GetCurrentAnimatorStateInfo(target.layer);
+            if (state.fullPathHash != target.stateHash)
+                continue;
+
+            if (state.normalizedTime < target.targetNormalizedTime)
+                return false;
+        }
+
+        return true;
+    }
+
+    private float GetLegacyAnimationsRemainingTime()
+    {
+        var maxRemaining = 0f;
+        if (_legacyAnimations == null)
+            return maxRemaining;
+
+        for (int i = 0; i < _legacyAnimations.Length; i++)
+        {
+            var legacyAnimation = _legacyAnimations[i];
+            if (legacyAnimation == null || !legacyAnimation.gameObject.activeInHierarchy)
+                continue;
+
+            foreach (AnimationState state in legacyAnimation)
+            {
+                if (state == null || !legacyAnimation.IsPlaying(state.name) || state.length <= 0f)
+                    continue;
+
+                var speed = Mathf.Abs(state.speed);
+                if (speed <= 0.0001f)
+                    continue;
+
+                var normalizedTime = state.normalizedTime;
+                var remainingNormalized = state.wrapMode == WrapMode.Loop
+                    ? 1f - Mathf.Repeat(normalizedTime, 1f)
+                    : Mathf.Max(0f, 1f - normalizedTime);
+                maxRemaining = Mathf.Max(maxRemaining, remainingNormalized * state.length / speed);
+            }
+        }
+
+        return maxRemaining;
+    }
+
+    private void ResetAnimationsToStart(List<AnimatorStopTarget> targets)
+    {
+        if (targets != null)
+        {
+            for (int i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                if (target.animator == null || !target.animator.gameObject.activeInHierarchy)
+                    continue;
+
+                target.animator.Play(target.stateHash, target.layer, 0f);
+                target.animator.Update(0f);
+            }
+        }
+
+        if (_legacyAnimations == null)
+            return;
+
+        for (int i = 0; i < _legacyAnimations.Length; i++)
+        {
+            var legacyAnimation = _legacyAnimations[i];
+            if (legacyAnimation == null || !legacyAnimation.gameObject.activeInHierarchy)
+                continue;
+
+            foreach (AnimationState state in legacyAnimation)
+            {
+                if (state == null)
+                    continue;
+
+                state.normalizedTime = 0f;
+                legacyAnimation.Sample();
+            }
+        }
+    }
+
+    private void SetAnimationComponentsEnabled(bool isEnabled)
+    {
+        if (_animators != null)
+        {
+            for (int i = 0; i < _animators.Length; i++)
+            {
+                if (_animators[i] != null)
+                    _animators[i].enabled = isEnabled;
+            }
+        }
+
+        if (_legacyAnimations != null)
+        {
+            for (int i = 0; i < _legacyAnimations.Length; i++)
+            {
+                if (_legacyAnimations[i] != null)
+                    _legacyAnimations[i].enabled = isEnabled;
+            }
+        }
+    }
+
+    private void StopPendingAnimationsDisable()
+    {
+        if (_disableAnimationsRoutine == null)
+            return;
+
+        StopCoroutine(_disableAnimationsRoutine);
+        _disableAnimationsRoutine = null;
     }
 }
