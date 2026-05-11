@@ -294,14 +294,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1097865642256090634}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.48, y: -4.03, z: 0}
+  m_LocalRotation: {x: -0, y: -0.707107, z: -0, w: 0.7071066}
+  m_LocalPosition: {x: -0, y: 5.97, z: 1.48}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3718689575160957638}
   - {fileID: 7388698778178822366}
-  m_Father: {fileID: 6601729680148411028}
+  m_Father: {fileID: 2400156048590066171}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2375026751830165977
 GameObject:
@@ -328,7 +328,7 @@ Transform:
   m_GameObject: {fileID: 2375026751830165977}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 2.4999995}
+  m_LocalPosition: {x: 0, y: 0, z: 2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -392,7 +392,7 @@ Transform:
   m_GameObject: {fileID: 3325737585397256356}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -2.4999995}
+  m_LocalPosition: {x: 0, y: 0, z: -2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -522,7 +522,6 @@ Transform:
   - {fileID: 3894490657735911093}
   - {fileID: 2563835684232944490}
   - {fileID: 507659482721462461}
-  - {fileID: 7078788264599784341}
   m_Father: {fileID: 2400156048590066171}
   m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
 --- !u!1 &3883232203288819806
@@ -586,6 +585,7 @@ Transform:
   m_LocalScale: {x: 0.067, y: 0.067, z: 0.067}
   m_ConstrainProportionsScale: 1
   m_Children:
+  - {fileID: 7078788264599784341}
   - {fileID: 6601729680148411028}
   m_Father: {fileID: 1830240259190600945}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -720,6 +720,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1830240259190600945}
+  - component: {fileID: 4020112985406852693}
   m_Layer: 0
   m_Name: chicken
   m_TagString: Untagged
@@ -743,6 +744,28 @@ Transform:
   - {fileID: 2400156048590066171}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &4020112985406852693
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7289143591287991208}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 48c2251f0e2e4a64fb03b0680c43b832, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &7963635201390598772
 GameObject:
   m_ObjectHideFlags: 0
