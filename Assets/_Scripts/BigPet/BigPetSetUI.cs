@@ -16,14 +16,30 @@ public class BigPetSetUI : MonoBehaviour
     [HideInInspector]
     public UnityEvent<Brainrot> ActiveChanged;
 
-    public void InitUI(List<Brainrot> petList)
+    public void InitUI(IReadOnlyList<Brainrot> petList)
     {
+        ClearSlots();
+
+        if (petList == null)
+            return;
+
         foreach (var pet in petList)
         {
             BigPetSetSlot slot = Instantiate(_slotPrefab, _slotParent);
             slot.Init(this, pet);
             _slots.Add(slot);
         }
+    }
+
+    private void ClearSlots()
+    {
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            if (_slots[i] != null)
+                Destroy(_slots[i].gameObject);
+        }
+
+        _slots.Clear();
     }
 
     public void SetMaxAvailablePet(int idx)

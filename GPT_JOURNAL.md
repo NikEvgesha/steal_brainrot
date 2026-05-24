@@ -645,3 +645,23 @@
   - if reward is absent/already claimed, button and mention badge are hidden.
 - Verification:
   - `dotnet build Assembly-CSharp.csproj -nologo` passes (warnings only, no errors).
+
+### 2026-05-24 (BigPet animal progression)
+- Goal: remove meme/brainrot visuals from BigPet and make unlock order follow animal income from weakest to strongest.
+- Updated `Assets/_Scripts/BigPet/BigPetPoint.cs`:
+  - resolves BigPet progression from `G.Storage.GetAllPetPrefabs()` first, with prefab `_pets` as fallback;
+  - filters known brainrot ids (`balerina`, `frutodrillo`, `sahur`, etc.) and entries with non-positive `StartIncome`;
+  - sorts available animals by `Brainrot.Data.StartIncome`, then by name for ties;
+  - normalizes unlock math to `(level - 1) / _lvlsPerPet` for local load, live leveling, and remote base rendering;
+  - clamps selected pet id to the currently unlocked range.
+- Updated BigPet UI helpers:
+  - `BigPetSetUI.InitUI(...)` now rebuilds slots safely;
+  - `BigPetSetSlot` unsubscribes from active-state events on destroy.
+- Updated `Assets/_Prefabs/BigPet/BigPetPoint.prefab` fallback list:
+  - removed `BalerinaCapuchina`, `Frutodillo`, `Sahur`;
+  - added animal fallback order: Capybara, Cat, Rabbit, Wolf, Bailey, Fox, Cheetah, Giraffe, Tiger, Pig, Horse, Cow, Alpaca, Hippo, Dog, Penguin, Bee.
+- Notes:
+  - `Chicken` is present in `PetsList`, but has no positive `StartIncome`, so BigPet excludes it until its prefab data is fixed.
+- Verification:
+  - `dotnet build Assembly-CSharp.csproj -nologo -p:RunAnalyzers=false` still fails before gameplay compile because local generated projects reference missing Visual Studio Unity analyzer metadata.
+  - `dotnet build Assembly-CSharp.csproj -nologo --no-dependencies -p:RunAnalyzers=false` reaches `Assembly-CSharp` but fails on stale missing source entries `Assets/_Scripts/Brainrot/Palette/ZooAnimalPaletteLibrary.cs` and `ZooAnimalPaletteRuntime.cs`.

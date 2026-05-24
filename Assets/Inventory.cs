@@ -169,32 +169,56 @@ public class Inventory : MonoBehaviour
 
     private void AddLoadedItems()
     {
-        foreach (var item in _eggsSaveData)
+        if (G.Storage == null)
         {
-            Egg prefab = G.Storage.GetEgg(item.ID);
-            if (prefab != null)
+            Debug.LogWarning("[Inventory] ItemPrefabStorage is not initialized. Saved inventory was not loaded.");
+            return;
+        }
+
+        if (_eggsSaveData != null)
+        {
+            foreach (var item in _eggsSaveData)
             {
+                if (item == null || string.IsNullOrEmpty(item.ID))
+                    continue;
+
+                Egg prefab = G.Storage.GetEgg(item.ID);
+                if (prefab == null)
+                    continue;
+
                 Egg egg = Instantiate(prefab);
                 egg.SetData(item.DinamicData);
                 Add(egg, false);
             }
         }
 
-        foreach (var item in _foodSaveData)
+        if (_foodSaveData != null)
         {
-            Food prefab = G.Storage.GetFood(item.ID);
-            if (prefab != null)
+            foreach (var item in _foodSaveData)
             {
+                if (item == null || string.IsNullOrEmpty(item.ID))
+                    continue;
+
+                Food prefab = G.Storage.GetFood(item.ID);
+                if (prefab == null)
+                    continue;
+
                 Food food = Instantiate(prefab);
                 Add(food, false);
             }
         }
 
-        foreach (var item in _brainrotsSaveData)
+        if (_brainrotsSaveData != null)
         {
-            Brainrot prefab = G.Storage.GetPet(item.ID);
-            if (prefab != null)
+            foreach (var item in _brainrotsSaveData)
             {
+                if (item == null || string.IsNullOrEmpty(item.ID))
+                    continue;
+
+                Brainrot prefab = G.Storage.GetPet(item.ID);
+                if (prefab == null)
+                    continue;
+
                 Brainrot pet = Instantiate(prefab);
                 pet.Init(item.DinamicData);
                 Add(pet, false);

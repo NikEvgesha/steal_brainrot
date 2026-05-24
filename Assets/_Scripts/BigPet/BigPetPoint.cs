@@ -8,6 +8,18 @@ using UnityEngine.UI;
 
 public class BigPetPoint : MonoBehaviour
 {
+    private static readonly HashSet<string> ExcludedBigPetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "balerina",
+        "BalerinaCapuchina",
+        "frutodrillo",
+        "Frutodillo",
+        "sahur",
+        "Sahur",
+        "TungTungSahur",
+        "GlorboFruttodrillo",
+    };
+
     [SerializeField] private bool _remoteMode;
     [SerializeField] private double _unlockPrice;
     [SerializeField] private List<Brainrot> _pets;
@@ -46,6 +58,7 @@ public class BigPetPoint : MonoBehaviour
     private bool _initializedLocal;
     private Coroutine _incomeRoutine;
     private bool _quickAccessBound;
+    private readonly List<Brainrot> _activePets = new List<Brainrot>();
 
     public double CurrentIncomePerSecond => _purchased ? _currentIncome : 0d;
     public bool IsRemoteMode => _remoteMode;
@@ -74,14 +87,14 @@ public class BigPetPoint : MonoBehaviour
         }
 
         _setPetUI.SetRemoteMode(false);
-        if (_pets == null || _pets.Count == 0)
+        if (!ResolvePetList())
         {
             Debug.LogWarning("[BigPetPoint] Pets list is empty.");
             return;
         }
 
         _setPetUI.PetSlotClicked.AddListener(ChangeActivePet);
-        _setPetUI.InitUI(_pets);
+        _setPetUI.InitUI(_activePets);
 
         CacheSceneRefs();
 
@@ -249,10 +262,11 @@ public class BigPetPoint : MonoBehaviour
             G.Save.SaveBigPetLvl(_currentLvl);
             BaseDirtyTracker.MarkDirty();
 
-            if (_currentLvl % _lvlsPerPet == 1 && _maxAvailablePetIdx < _pets.Count - 1)
+            var newMaxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
+            if (newMaxAvailablePetIdx != _maxAvailablePetIdx)
             {
-                _maxAvailablePetIdx++;
-                _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome;
+                _maxAvailablePetIdx = newMaxAvailablePetIdx;
+                _currentIncome = _activePets[_maxAvailablePetIdx].Data.StartIncome;
                 if (_setPetUI != null)
                     _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
                 if (_petInfoUI != null)
@@ -280,17 +294,18 @@ public class BigPetPoint : MonoBehaviour
         }
         else
         {
-            float t = (((_currentLvl - 1) % _lvlsPerPet) + 1) / (float)_lvlsPerPet;
+            var levelsPerPet = Mathf.Max(1, _lvlsPerPet);
+            float t = (((_currentLvl - 1) % levelsPerPet) + 1) / (float)levelsPerPet;
             _currentPet.transform.localScale = Vector3.Lerp(Vector3.one, Vector3.one * _petScaler, t);
         }
     }
 
     private void SetPet(int idx)
     {
-        if (_pets == null || _pets.Count == 0)
+        if (_activePets == null || _activePets.Count == 0)
             return;
 
-        idx = Mathf.Clamp(idx, 0, _pets.Count - 1);
+        idx = Mathf.Clamp(idx, 0, _activePets.Count - 1);
 
         if (_currentPet != null)
             Destroy(_currentPet.gameObject);
@@ -302,10 +317,10 @@ public class BigPetPoint : MonoBehaviour
             BaseDirtyTracker.MarkDirty();
 
         if (_petPoint != null)
-            _currentPet = Instantiate(_pets[idx].Model, _petPoint);
+            _currentPet = Instantiate(_activePets[idx].Model, _petPoint);
 
         if (_setPetUI != null)
-            _setPetUI.ChangeActivePet(_pets[idx]);
+            _setPetUI.ChangeActivePet(_activePets[idx]);
 
         CheckScale();
     }
@@ -313,8 +328,9 @@ public class BigPetPoint : MonoBehaviour
     private void ChangeActivePet(Brainrot pet)
     {
         if (_remoteMode) return;
-        int idx = _pets.IndexOf(pet);
+        int idx = _activePets.IndexOf(pet);
         if (idx < 0) return;
+        if (idx > _maxAvailablePetIdx) return;
         SetPet(idx);
     }
 
@@ -387,6 +403,13 @@ public class BigPetPoint : MonoBehaviour
         CacheSceneRefs();
 
         _purchased = purchased;
+        if (!ResolvePetList())
+        {
+            _currentIncome = 0d;
+            _accumulatedIncome = 0d;
+            return;
+        }
+
         if (!_purchased)
         {
             if (_currentPet != null)
@@ -403,19 +426,18 @@ public class BigPetPoint : MonoBehaviour
         _currentXp = Mathf.Max(0, xp);
         _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
 
-        _maxAvailablePetIdx = _currentLvl / _lvlsPerPet;
-        _maxAvailablePetIdx = _maxAvailablePetIdx > (_pets.Count - 1) ? _pets.Count - 1 : _maxAvailablePetIdx;
-        _maxLvl = _pets.Count * _lvlsPerPet;
+        _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
+        _maxLvl = _activePets.Count * Mathf.Max(1, _lvlsPerPet);
 
         if (_setPetUI != null)
             _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
 
-        petId = Mathf.Clamp(petId, 0, _pets.Count - 1);
+        petId = Mathf.Clamp(petId, 0, _maxAvailablePetIdx);
         SetPet(petId);
 
+        _currentIncome = _activePets[_maxAvailablePetIdx].Data.StartIncome;
         if (_petInfoUI != null)
         {
-            _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome;
             _petInfoUI.SetInfo(_currentIncome);
             _petInfoUI.UpdateIncome(0);
         }
@@ -429,7 +451,7 @@ public class BigPetPoint : MonoBehaviour
         _remoteMode = true;
         HideRemoteUI();
 
-        if (_pets == null || _pets.Count == 0)
+        if (!ResolvePetList())
             return;
 
         ApplyRemoteState(petId, lvl, xp, purchased);
@@ -531,15 +553,15 @@ public class BigPetPoint : MonoBehaviour
 
     private void InitPurchasedState()
     {
-        if (_pets == null || _pets.Count == 0)
+        if (!ResolvePetList())
             return;
 
         _currentLvl = Mathf.Max(1, G.Save.LoadBigPetLvl());
         _currentXp = Mathf.Max(0, G.Save.LoadBigPetXP());
         _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
-        _currentPetIdx = Mathf.Clamp(G.Save.LoadBigPetId(), 0, _pets.Count - 1);
-        _maxAvailablePetIdx = Mathf.Clamp(_currentLvl / _lvlsPerPet, 0, _pets.Count - 1);
-        _maxLvl = _pets.Count * _lvlsPerPet;
+        _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
+        _currentPetIdx = Mathf.Clamp(G.Save.LoadBigPetId(), 0, _maxAvailablePetIdx);
+        _maxLvl = _activePets.Count * Mathf.Max(1, _lvlsPerPet);
 
         if (_setPetUI != null)
         {
@@ -553,7 +575,7 @@ public class BigPetPoint : MonoBehaviour
         SetPet(_currentPetIdx);
         CheckLvl();
 
-        _currentIncome = _pets[_maxAvailablePetIdx].Data.StartIncome;
+        _currentIncome = _activePets[_maxAvailablePetIdx].Data.StartIncome;
         if (_petInfoUI != null)
         {
             _petInfoUI.SetInfo(_currentIncome);
@@ -590,6 +612,76 @@ public class BigPetPoint : MonoBehaviour
         }
 
         EnsureIncomeRoutine();
+    }
+
+    private bool ResolvePetList()
+    {
+        _activePets.Clear();
+
+        var storagePets = G.Storage != null ? G.Storage.GetAllPetPrefabs() : null;
+        AddValidBigPets(storagePets, _activePets);
+
+        if (_activePets.Count == 0)
+            AddValidBigPets(_pets, _activePets);
+
+        _activePets.Sort(CompareBigPetAnimals);
+        return _activePets.Count > 0;
+    }
+
+    private static void AddValidBigPets(IReadOnlyList<Brainrot> source, List<Brainrot> destination)
+    {
+        if (source == null || destination == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            var pet = source[i];
+            if (!IsValidBigPetAnimal(pet))
+                continue;
+
+            if (!destination.Contains(pet))
+                destination.Add(pet);
+        }
+    }
+
+    private static bool IsValidBigPetAnimal(Brainrot pet)
+    {
+        if (pet == null)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(pet.Name))
+            return false;
+
+        if (ExcludedBigPetIds.Contains(pet.Name))
+            return false;
+
+        return pet.Data.StartIncome > 0d;
+    }
+
+    private static int CompareBigPetAnimals(Brainrot left, Brainrot right)
+    {
+        if (ReferenceEquals(left, right))
+            return 0;
+        if (left == null)
+            return 1;
+        if (right == null)
+            return -1;
+
+        var incomeCompare = left.Data.StartIncome.CompareTo(right.Data.StartIncome);
+        if (incomeCompare != 0)
+            return incomeCompare;
+
+        return string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private int GetMaxAvailablePetIndexForLevel(int level)
+    {
+        if (_activePets == null || _activePets.Count == 0)
+            return 0;
+
+        var levelsPerPet = Mathf.Max(1, _lvlsPerPet);
+        var safeLevel = Mathf.Max(1, level);
+        return Mathf.Clamp((safeLevel - 1) / levelsPerPet, 0, _activePets.Count - 1);
     }
 
     private static bool TryParseIncomeTimestamp(string raw, out long timestamp)

@@ -47,6 +47,12 @@ public class BigPetSetSlot : MonoBehaviour
         _ui.OnPetClicked(_pet);
     }
 
+    private void OnDestroy()
+    {
+        if (_ui != null)
+            _ui.ActiveChanged.RemoveListener(CheckActiveSlot);
+    }
+
     private void CheckActiveSlot(Brainrot activePet)
     {
         _active = activePet == _pet;

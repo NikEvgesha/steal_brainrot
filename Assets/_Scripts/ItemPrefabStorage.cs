@@ -28,8 +28,7 @@ public class ItemPrefabStorage : MonoBehaviour
 
     public Egg GetEgg(string name)
     {
-        InventoryItem item = _eggs.GetByName(name);
-        return item.GetComponent<Egg>();
+        return GetPrefab<Egg>(_eggs, name, "egg");
     }
 
     public IReadOnlyList<Egg> GetAllEggPrefabs()
@@ -42,8 +41,7 @@ public class ItemPrefabStorage : MonoBehaviour
 
     public Brainrot GetPet(string name)
     {
-        InventoryItem item = _pets.GetByName(name);
-        return item.GetComponent<Brainrot>();
+        return GetPrefab<Brainrot>(_pets, name, "pet");
     }
 
     public IReadOnlyList<Brainrot> GetAllPetPrefabs()
@@ -57,7 +55,34 @@ public class ItemPrefabStorage : MonoBehaviour
 
     public Food GetFood(string name)
     {
-        InventoryItem item = _food.GetByName(name);
-        return item.GetComponent<Food>();
+        return GetPrefab<Food>(_food, name, "food");
+    }
+
+    private T GetPrefab<T>(ItemsList list, string itemName, string listName) where T : InventoryItem
+    {
+        if (list == null)
+        {
+            Debug.LogWarning($"[ItemPrefabStorage] Missing {listName} items list.");
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(itemName))
+        {
+            Debug.LogWarning($"[ItemPrefabStorage] Empty {listName} prefab id.");
+            return null;
+        }
+
+        InventoryItem item = list.GetByName(itemName);
+        if (item == null)
+        {
+            Debug.LogWarning($"[ItemPrefabStorage] Missing {listName} prefab: '{itemName}'. The saved data may be outdated.");
+            return null;
+        }
+
+        T prefab = item.GetComponent<T>();
+        if (prefab == null)
+            Debug.LogWarning($"[ItemPrefabStorage] Prefab '{itemName}' is not a {typeof(T).Name}.");
+
+        return prefab;
     }
 }

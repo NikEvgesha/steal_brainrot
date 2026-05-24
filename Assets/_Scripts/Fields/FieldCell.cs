@@ -176,11 +176,27 @@ public class FieldCell : MonoBehaviour
         switch (_inField)
         {
             case Item.Egg:
-               data.DinamicData = _currentEgg.Data.DinamicData;
+                if (_currentEgg == null)
+                {
+                    Debug.LogWarning($"[FieldCell] Cannot save egg cell '{_id}': current egg is missing.");
+                    _inField = Item.Free;
+                    data.Status = Item.Free;
+                    break;
+                }
+
+                data.DinamicData = _currentEgg.Data.DinamicData;
                 data.ID = _currentEgg.Name;
                 data.HatchingTimestamp = _currentEgg.HatchingTime;
                 break;
             case Item.Brainrot:
+                if (_currentPet == null)
+                {
+                    Debug.LogWarning($"[FieldCell] Cannot save brainrot cell '{_id}': current pet is missing.");
+                    _inField = Item.Free;
+                    data.Status = Item.Free;
+                    break;
+                }
+
                 data.DinamicData = _currentPet.DinamicData;
                 data.ID = _currentPet.Name;
                 data.IncomeLastTime = _currentPet.LastIncomeCollectTime;
@@ -201,25 +217,30 @@ public class FieldCell : MonoBehaviour
         {
             case Item.Egg:
                 Egg prefabEgg = G.Storage.GetEgg(data.ID);
-                if (prefabEgg != null)
+                if (prefabEgg == null)
                 {
-                    Egg egg = Instantiate(prefabEgg, transform);
-                    egg.SetData(data.DinamicData);
-                    egg.InitTimer(this, DateTimeOffset.FromUnixTimeSeconds(data.HatchingTimestamp));
+                    Debug.LogWarning($"[FieldCell] Skipping saved egg '{data.ID}' for cell '{_id}': prefab was not found.");
+                    return;
                 }
 
+                Egg egg = Instantiate(prefabEgg, transform);
+                egg.SetData(data.DinamicData);
+                egg.InitTimer(this, DateTimeOffset.FromUnixTimeSeconds(data.HatchingTimestamp));
                 break;
             case Item.Brainrot:
                 Brainrot prefabPet = G.Storage.GetPet(data.ID);
-                if (prefabPet != null)
+                if (prefabPet == null)
                 {
-                    Brainrot pet = Instantiate(prefabPet, transform);
-                    pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-                    pet.Init(data.DinamicData, this, data.IncomeLastTime);
+                    Debug.LogWarning($"[FieldCell] Skipping saved brainrot '{data.ID}' for cell '{_id}': prefab was not found.");
+                    return;
                 }
+
+                Brainrot pet = Instantiate(prefabPet, transform);
+                pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                pet.Init(data.DinamicData, this, data.IncomeLastTime);
                 break;
             default:
-                break;
+                return;
         }
         UpdateFieldItem(data.Status);
 

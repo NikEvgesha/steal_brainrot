@@ -13,11 +13,38 @@ public class ItemsList : ScriptableObject
     public void Init()
     {
         _dict = new Dictionary<string, InventoryItem>();
-        _items.ForEach(x => _dict.Add(x.Name, x));
+
+        if (_items == null)
+            return;
+
+        foreach (InventoryItem item in _items)
+        {
+            if (item == null)
+            {
+                Debug.LogWarning($"[ItemsList] Null item in '{name}'.");
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(item.Name))
+            {
+                Debug.LogWarning($"[ItemsList] Item with empty name in '{name}'.");
+                continue;
+            }
+
+            if (_dict.ContainsKey(item.Name))
+            {
+                Debug.LogWarning($"[ItemsList] Duplicate item name '{item.Name}' in '{name}'.");
+                continue;
+            }
+
+            _dict.Add(item.Name, item);
+        }
     }
 
     public InventoryItem GetByName(string name)
     {
+        if (string.IsNullOrEmpty(name))
+            return null;
 
         if (_dict == null) Init();
 
