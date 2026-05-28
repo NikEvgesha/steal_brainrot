@@ -89,8 +89,8 @@ public static class MovingRoadSetupUtility
         if (rightLane == null || leftLane == null)
             return false;
 
-        ConfigureLane(rightLane, new Vector3(-57.00002f, 40f, 67f), Vector3.right, Vector2.right, recordUndo);
-        ConfigureLane(leftLane, new Vector3(-57.00002f, 40f, 117f), Vector3.left, Vector2.left, recordUndo);
+        ConfigureLane(rightLane, new Vector3(-57.00002f, 40f, 67f), Vector3.left, Vector2.left, recordUndo);
+        ConfigureLane(leftLane, new Vector3(-57.00002f, 40f, 117f), Vector3.right, Vector2.right, recordUndo);
         return true;
     }
 

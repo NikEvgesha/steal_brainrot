@@ -1389,7 +1389,7 @@ MonoBehaviour:
   renderers:
   - {fileID: 4400644150923548186}
   - {fileID: 394129025634305276}
-  uvDirection: {x: 1, y: 0}
+  uvDirection: {x: -1, y: 0}
   scrollSpeed: 0.35
 --- !u!1 &910010000000000102
 GameObject:
@@ -1458,7 +1458,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MovingRoad
   directionSource: {fileID: 2517569899870784543}
-  localDirection: {x: 1, y: 0, z: 0}
+  localDirection: {x: -1, y: 0, z: 0}
   moveSpeed: 5
   flattenDirectionY: 1
   affectOnlyLocalPlayer: 1
@@ -1477,7 +1477,7 @@ MonoBehaviour:
   renderers:
   - {fileID: 5803465668176450292}
   - {fileID: 3078882438994752136}
-  uvDirection: {x: -1, y: 0}
+  uvDirection: {x: 1, y: 0}
   scrollSpeed: 0.35
 --- !u!1 &910010000000000202
 GameObject:
@@ -1546,7 +1546,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::MovingRoad
   directionSource: {fileID: 7703440834656048767}
-  localDirection: {x: -1, y: 0, z: 0}
+  localDirection: {x: 1, y: 0, z: 0}
   moveSpeed: 5
   flattenDirectionY: 1
   affectOnlyLocalPlayer: 1

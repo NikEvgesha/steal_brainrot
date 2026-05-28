@@ -685,3 +685,5 @@
 - Verification:
   - YAML fileIDs added to the prefab were checked for duplicates.
   - Unity MCP was not used for this project because the running Bridge was connected to `E:\GitFork\dead_boat`, not `E:\GitFork\steal_brainrot`.
+- Follow-up fix:
+  - reversed lane movement and default UV scroll directions after in-scene testing showed the levators pushing opposite to the visible arrows.
