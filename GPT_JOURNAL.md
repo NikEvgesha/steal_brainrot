@@ -665,3 +665,23 @@
 - Verification:
   - `dotnet build Assembly-CSharp.csproj -nologo -p:RunAnalyzers=false` still fails before gameplay compile because local generated projects reference missing Visual Studio Unity analyzer metadata.
   - `dotnet build Assembly-CSharp.csproj -nologo --no-dependencies -p:RunAnalyzers=false` reaches `Assembly-CSharp` but fails on stale missing source entries `Assets/_Scripts/Brainrot/Palette/ZooAnimalPaletteLibrary.cs` and `ZooAnimalPaletteRuntime.cs`.
+
+### 2026-05-27 (desktop cursor stays visible after UI close)
+- Fixed `Assets/Igrodelnya2.0/Managers/ControlManager.cs` so `CursorActive=false` no longer hides or locks the mouse cursor on desktop/WebGL.
+- `ControlManager` still keeps its open-window counter and logical `CursorActive` state, but now applies `CursorLockMode.None` and visible cursor for both SDK provider and default Unity cursor paths.
+- Verification:
+  - `git diff --check -- Assets/Igrodelnya2.0/Managers/ControlManager.cs` passes.
+
+### 2026-05-28 (moving road / levator setup)
+- Added `MovingRoad` for trigger-based `CharacterController` movement in arrow direction.
+- Added `MovingRoadVisualScroller` for WebGL-friendly material UV offset via `MaterialPropertyBlock`.
+- Configured `Assets/_Prefabs/strelka doroga.prefab`:
+  - `Strelka right` moves along local `+X`;
+  - `Strelka Left` moves along local `-X`;
+  - both lanes now have `MoveTrigger` children and inspector speeds (`moveSpeed = 5`, `scrollSpeed = 0.35`).
+- Added `MovingRoadSetupUtility` editor menu for current VOX scene instances:
+  - `Tools/Moving Road/Configure Open Scenes Strelka Doroga`;
+  - useful because `Evgesha.unity` currently references imported `strelka doroga.vox` instances, not the new `_Prefabs/strelka doroga.prefab`.
+- Verification:
+  - YAML fileIDs added to the prefab were checked for duplicates.
+  - Unity MCP was not used for this project because the running Bridge was connected to `E:\GitFork\dead_boat`, not `E:\GitFork\steal_brainrot`.

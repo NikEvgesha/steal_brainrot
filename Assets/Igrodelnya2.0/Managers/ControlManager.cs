@@ -13,9 +13,6 @@ public class ControlManager : MonoBehaviour
     {
         get
         {
-            if (_provider && _provider.IsInitialized())
-                return _provider.IsCursorVisible();
-
             return _cursorActive;
         }
 
@@ -34,18 +31,7 @@ public class ControlManager : MonoBehaviour
                 if (_activeWindows > 0) return;
             }
 
-            if (_provider && _provider.IsInitialized())
-            {
-                    _cursorActive = value;
-                _provider.SetCursorLockState(value ? CursorLockMode.None : CursorLockMode.Locked);
-                _provider.SetCursorVisible(value);
-            } 
-            else
-            {
-                _cursorActive = value;
-                Cursor.visible = value;
-                Cursor.lockState = value ? CursorLockMode.None : CursorLockMode.Locked;
-            }
+            ApplyCursorState(value);
 
             /*if (_moveActive)
                 InventoryUI.Instance.ToggleOpen(false);*/
@@ -97,6 +83,23 @@ public class ControlManager : MonoBehaviour
         //{
         //    CursorActive = false;  
         //}
+        if (!_useTouchControls)
+            ApplyCursorState(_cursorActive);
+    }
+
+    private void ApplyCursorState(bool cursorActive)
+    {
+        _cursorActive = cursorActive;
+
+        if (_provider && _provider.IsInitialized())
+        {
+            _provider.SetCursorLockState(CursorLockMode.None);
+            _provider.SetCursorVisible(true);
+            return;
+        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
 
