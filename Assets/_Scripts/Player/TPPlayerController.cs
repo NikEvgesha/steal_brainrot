@@ -11,11 +11,11 @@ public class TPPlayerController : MonoBehaviour
 {
     // === Movement ===
     [Header("Movement")]
-    [SerializeField] private float walkSpeed = 3.5f;
-    [SerializeField] private float runSpeed = 6.0f;
-    [SerializeField] private float acceleration = 12f;
+    [SerializeField] private float walkSpeed = 7f;
+    [SerializeField] private float runSpeed = 12f;
+    [SerializeField] private float acceleration = 24f;
     [SerializeField] private float rotationLerp = 12f;
-    [SerializeField] private float jumpForce = 5f;
+    [SerializeField] private float jumpForce = 10f;
 
     [Header("Physics")]
     [SerializeField] private float gravity = -20f;

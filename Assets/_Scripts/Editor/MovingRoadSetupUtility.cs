@@ -10,9 +10,9 @@ public static class MovingRoadSetupUtility
     private const string RootName = "strelka doroga";
     private const string RightLaneName = "Strelka right";
     private const string LeftLaneName = "Strelka Left";
-    private const string TriggerName = "MoveTrigger";
+    private const string LegacyTriggerName = "MoveTrigger";
     private const float DefaultMoveSpeed = 5f;
-    private const float DefaultScrollSpeed = 0.35f;
+    private const float DefaultScrollSpeed = DefaultMoveSpeed;
 
     [MenuItem("Tools/Moving Road/Configure Selected Strelka Doroga")]
     private static void ConfigureSelected()
@@ -89,42 +89,16 @@ public static class MovingRoadSetupUtility
         if (rightLane == null || leftLane == null)
             return false;
 
-        ConfigureLane(rightLane, new Vector3(-57.00002f, 40f, 67f), Vector3.left, Vector2.left, recordUndo);
-        ConfigureLane(leftLane, new Vector3(-57.00002f, 40f, 117f), Vector3.right, Vector2.right, recordUndo);
+        ConfigureLane(rightLane, Vector3.left, Vector2.left, recordUndo);
+        ConfigureLane(leftLane, Vector3.right, Vector2.right, recordUndo);
         return true;
     }
 
-    private static void ConfigureLane(Transform lane, Vector3 triggerLocalPosition, Vector3 localDirection, Vector2 uvDirection, bool recordUndo)
+    private static void ConfigureLane(Transform lane, Vector3 localDirection, Vector2 uvDirection, bool recordUndo)
     {
-        Transform trigger = lane.Find(TriggerName);
-        if (trigger == null)
-        {
-            GameObject triggerObject = new GameObject(TriggerName);
-            if (recordUndo)
-                Undo.RegisterCreatedObjectUndo(triggerObject, "Create moving road trigger");
+        DisableLegacyTrigger(lane, recordUndo);
 
-            trigger = triggerObject.transform;
-            trigger.SetParent(lane, false);
-        }
-        else if (recordUndo)
-        {
-            Undo.RecordObject(trigger, "Configure moving road trigger");
-        }
-
-        trigger.localPosition = triggerLocalPosition;
-        trigger.localRotation = Quaternion.identity;
-        trigger.localScale = Vector3.one;
-
-        BoxCollider collider = GetOrAddComponent<BoxCollider>(trigger.gameObject, recordUndo);
-        if (recordUndo)
-            Undo.RecordObject(collider, "Configure moving road trigger collider");
-
-        collider.isTrigger = true;
-        collider.center = Vector3.zero;
-        collider.size = new Vector3(208f, 48f, 34f);
-        EditorUtility.SetDirty(collider);
-
-        MovingRoad movingRoad = GetOrAddComponent<MovingRoad>(trigger.gameObject, recordUndo);
+        MovingRoad movingRoad = GetOrAddComponent<MovingRoad>(lane.gameObject, recordUndo);
         if (recordUndo)
             Undo.RecordObject(movingRoad, "Configure moving road");
 
@@ -135,18 +109,31 @@ public static class MovingRoadSetupUtility
         if (recordUndo)
             Undo.RecordObject(scroller, "Configure moving road visual scroller");
 
-        scroller.Configure(GetLaneRenderers(lane, trigger), uvDirection, DefaultScrollSpeed);
+        scroller.Configure(GetLaneRenderers(lane), uvDirection, DefaultScrollSpeed);
         EditorUtility.SetDirty(scroller);
     }
 
-    private static Renderer[] GetLaneRenderers(Transform lane, Transform trigger)
+    private static void DisableLegacyTrigger(Transform lane, bool recordUndo)
+    {
+        Transform trigger = lane.Find(LegacyTriggerName);
+        if (trigger == null)
+            return;
+
+        if (recordUndo)
+            Undo.RecordObject(trigger.gameObject, "Disable legacy moving road trigger");
+
+        trigger.gameObject.SetActive(false);
+        EditorUtility.SetDirty(trigger.gameObject);
+    }
+
+    private static Renderer[] GetLaneRenderers(Transform lane)
     {
         List<Renderer> renderers = new List<Renderer>();
         Renderer[] childRenderers = lane.GetComponentsInChildren<Renderer>(true);
         for (int i = 0; i < childRenderers.Length; i++)
         {
             Renderer target = childRenderers[i];
-            if (target == null || target.transform == trigger || target.transform.IsChildOf(trigger))
+            if (target == null || !target.gameObject.activeInHierarchy)
                 continue;
 
             renderers.Add(target);

@@ -18,6 +18,18 @@ public struct EggData
 }
 public class Egg : InventoryItem
 {
+    private const int ElementVfxDefaultsVersion = 2;
+    private const float DefaultElementParticleSizeMultiplier = 6f;
+    private const float DefaultElementParticleEmissionMultiplier = 3f;
+    private const float DefaultElementParticleRadiusMultiplier = 0.7f;
+    private const float DefaultElementRayAlphaMultiplier = 2f;
+    private const float DefaultElementRayLength = 5f;
+    private const float DefaultElementRayThickness = 5f;
+    private const float DefaultElementRaySpinSpeed = 35f;
+    private const float DefaultElementGroundAlphaMultiplier = 2f;
+    private const float DefaultElementGroundRadius = 2f;
+    private const float DefaultElementGroundYOffset = 0.02f;
+
     [SerializeField] private EggData _data;
     [SerializeField] private float _animationHatchingTime;
     [SerializeField] private float _animationHatchingSpeed;
@@ -25,6 +37,18 @@ public class Egg : InventoryItem
     [SerializeField] private GameObject _mesh;
     [SerializeField] private Transform _rouleteModelsParent;
     [SerializeField] private Material _rouleteMaterial;
+    [Header("Element VFX")]
+    [SerializeField] private float _elementParticleSizeMultiplier = DefaultElementParticleSizeMultiplier;
+    [SerializeField] private float _elementParticleEmissionMultiplier = DefaultElementParticleEmissionMultiplier;
+    [SerializeField] private float _elementParticleRadiusMultiplier = DefaultElementParticleRadiusMultiplier;
+    [SerializeField] private float _elementRayAlphaMultiplier = DefaultElementRayAlphaMultiplier;
+    [SerializeField] private float _elementRayLength = DefaultElementRayLength;
+    [SerializeField] private float _elementRayThickness = DefaultElementRayThickness;
+    [SerializeField] private float _elementRaySpinSpeed = DefaultElementRaySpinSpeed;
+    [SerializeField] private float _elementGroundAlphaMultiplier = DefaultElementGroundAlphaMultiplier;
+    [SerializeField] private float _elementGroundRadius = DefaultElementGroundRadius;
+    [SerializeField] private float _elementGroundYOffset = DefaultElementGroundYOffset;
+    [SerializeField, HideInInspector] private int _elementVfxDefaultsVersion;
 
     private List<GameObject> _rouleteObjects;
     private EggInfoUI _infoUI;
@@ -49,13 +73,67 @@ public class Egg : InventoryItem
 
     private void Awake()
     {
+        ApplyElementVfxDefaultsIfNeeded();
+
         if (!_initialized)
         {
             Init();
         }
     }
+
+    private void OnValidate()
+    {
+        ApplyElementVfxDefaultsIfNeeded();
+        ClampElementVfxSettings();
+
+        if (Application.isPlaying && isActiveAndEnabled && _initialized)
+            RefreshElementVfx();
+    }
+
+    [ContextMenu("Refresh Element VFX")]
+    private void RefreshElementVfx()
+    {
+        ClampElementVfxSettings();
+        if (!Application.isPlaying || !_initialized)
+            return;
+
+        SetTypeVisual();
+    }
+
+    private void ClampElementVfxSettings()
+    {
+        _elementParticleSizeMultiplier = Mathf.Max(0.1f, _elementParticleSizeMultiplier);
+        _elementParticleEmissionMultiplier = Mathf.Max(0.1f, _elementParticleEmissionMultiplier);
+        _elementParticleRadiusMultiplier = Mathf.Max(0.1f, _elementParticleRadiusMultiplier);
+        _elementRayAlphaMultiplier = Mathf.Max(0f, _elementRayAlphaMultiplier);
+        _elementRayLength = Mathf.Max(0f, _elementRayLength);
+        _elementRayThickness = Mathf.Max(0f, _elementRayThickness);
+        _elementGroundAlphaMultiplier = Mathf.Max(0f, _elementGroundAlphaMultiplier);
+        _elementGroundRadius = Mathf.Max(0f, _elementGroundRadius);
+    }
+
+    private void ApplyElementVfxDefaultsIfNeeded()
+    {
+        if (_elementVfxDefaultsVersion >= ElementVfxDefaultsVersion)
+            return;
+
+        _elementParticleSizeMultiplier = DefaultElementParticleSizeMultiplier;
+        _elementParticleEmissionMultiplier = DefaultElementParticleEmissionMultiplier;
+        _elementParticleRadiusMultiplier = DefaultElementParticleRadiusMultiplier;
+        _elementRayAlphaMultiplier = DefaultElementRayAlphaMultiplier;
+        _elementRayLength = DefaultElementRayLength;
+        _elementRayThickness = DefaultElementRayThickness;
+        _elementRaySpinSpeed = DefaultElementRaySpinSpeed;
+        _elementGroundAlphaMultiplier = DefaultElementGroundAlphaMultiplier;
+        _elementGroundRadius = DefaultElementGroundRadius;
+        _elementGroundYOffset = DefaultElementGroundYOffset;
+        _elementVfxDefaultsVersion = ElementVfxDefaultsVersion;
+    }
+
     private void Init()
     {
+        ApplyElementVfxDefaultsIfNeeded();
+
         _infoUI = GetComponentInChildren<EggInfoUI>();
         _buyPanel = GetComponentInChildren<InteractionPanel>();
         _buyPanel.gameObject.SetActive(false);
@@ -94,25 +172,20 @@ public class Egg : InventoryItem
     }
     private void SetTypeVisual()
     {
-        switch (_data.DinamicData.ElementType)
-        {
-            case ElementType.Gold:
-                _mesh.GetComponent<Renderer>().material.color = Color.yellow;
-                break;
-            case ElementType.Diamond:
-                _mesh.GetComponent<Renderer>().material.color = Color.blue;
-                break;
-            case ElementType.Electric:
-                _mesh.GetComponent<Renderer>().material.color = Color.magenta;
-                break;
-            case ElementType.Fire:
-                _mesh.GetComponent<Renderer>().material.color = Color.red;
-                break;
-            default:
-                break;
-        }
-
-
+        ElementTypeVfx.Ensure(
+            this,
+            transform,
+            _data.DinamicData.ElementType,
+            sizeMultiplier: _elementParticleSizeMultiplier,
+            emissionMultiplier: _elementParticleEmissionMultiplier,
+            rayAlphaMultiplier: _elementRayAlphaMultiplier,
+            particleRadiusMultiplier: _elementParticleRadiusMultiplier,
+            rayLengthWorldOverride: _elementRayLength,
+            rayThicknessWorldOverride: _elementRayThickness,
+            raySpinSpeed: _elementRaySpinSpeed,
+            groundAlphaMultiplier: _elementGroundAlphaMultiplier,
+            groundRadiusWorldOverride: _elementGroundRadius,
+            groundYOffsetWorld: _elementGroundYOffset);
     }
     private void OnTriggerEnter(Collider other)
     {

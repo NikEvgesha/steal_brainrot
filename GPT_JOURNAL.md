@@ -687,3 +687,16 @@
   - Unity MCP was not used for this project because the running Bridge was connected to `E:\GitFork\dead_boat`, not `E:\GitFork\steal_brainrot`.
 - Follow-up fix:
   - reversed lane movement and default UV scroll directions after in-scene testing showed the levators pushing opposite to the visible arrows.
+- Follow-up raycast rewrite:
+  - `MovingRoad` now stores lane direction/speed only and no longer moves players through trigger callbacks.
+  - Added `MovingRoadRider` to `Player.prefab`; it raycasts down, ignores triggers, finds `MovingRoad` on the arrow/lane under the player, and applies horizontal `CharacterController.Move`.
+  - Legacy `MoveTrigger` children in `strelka doroga.prefab` are disabled; `MovingRoad` is now attached to `Strelka right` and `Strelka Left`.
+  - Editor setup utility now configures lane components directly and disables legacy trigger children.
+
+### 2026-05-28 (player movement tuning)
+- Doubled default `TPPlayerController` movement values:
+  - `walkSpeed`: `3.5 -> 7`;
+  - `runSpeed`: `6 -> 12`;
+  - `acceleration`: `12 -> 24`;
+  - `jumpForce`: `5 -> 10`.
+- Updated both script defaults and `Assets/_Prefabs/Player.prefab` serialized values.

@@ -1,8 +1,6 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
-[RequireComponent(typeof(Collider))]
 public sealed class MovingRoad : MonoBehaviour
 {
     [SerializeField] private Transform directionSource;
@@ -10,9 +8,6 @@ public sealed class MovingRoad : MonoBehaviour
     [SerializeField] private float moveSpeed = 4f;
     [SerializeField] private bool flattenDirectionY = true;
     [SerializeField] private bool affectOnlyLocalPlayer = true;
-
-    private readonly HashSet<CharacterController> _controllers = new HashSet<CharacterController>();
-    private readonly List<CharacterController> _removeBuffer = new List<CharacterController>();
 
     public float MoveSpeed
     {
@@ -29,79 +24,7 @@ public sealed class MovingRoad : MonoBehaviour
         affectOnlyLocalPlayer = localPlayerOnly;
     }
 
-    private void Reset()
-    {
-        directionSource = transform;
-        Collider trigger = GetComponent<Collider>();
-        if (trigger != null)
-            trigger.isTrigger = true;
-    }
-
-    private void OnValidate()
-    {
-        moveSpeed = Mathf.Max(0f, moveSpeed);
-        if (localDirection.sqrMagnitude < 0.0001f)
-            localDirection = Vector3.forward;
-    }
-
-    private void OnDisable()
-    {
-        _controllers.Clear();
-        _removeBuffer.Clear();
-    }
-
-    private void LateUpdate()
-    {
-        if (_controllers.Count == 0 || moveSpeed <= 0f)
-            return;
-
-        Vector3 direction = GetWorldDirection();
-        Vector3 offset = direction * (moveSpeed * Time.deltaTime);
-
-        foreach (CharacterController controller in _controllers)
-        {
-            if (!IsValidController(controller))
-            {
-                _removeBuffer.Add(controller);
-                continue;
-            }
-
-            controller.Move(offset);
-        }
-
-        for (int i = 0; i < _removeBuffer.Count; i++)
-            _controllers.Remove(_removeBuffer[i]);
-
-        _removeBuffer.Clear();
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {
-        TryAdd(other);
-    }
-
-    private void OnTriggerStay(Collider other)
-    {
-        TryAdd(other);
-    }
-
-    private void OnTriggerExit(Collider other)
-    {
-        CharacterController controller = other.GetComponentInParent<CharacterController>();
-        if (controller != null)
-            _controllers.Remove(controller);
-    }
-
-    private void TryAdd(Collider other)
-    {
-        CharacterController controller = other.GetComponentInParent<CharacterController>();
-        if (!IsValidController(controller))
-            return;
-
-        _controllers.Add(controller);
-    }
-
-    private bool IsValidController(CharacterController controller)
+    public bool CanAffect(CharacterController controller)
     {
         if (controller == null || !controller.enabled || !controller.gameObject.activeInHierarchy)
             return false;
@@ -110,6 +33,23 @@ public sealed class MovingRoad : MonoBehaviour
             return true;
 
         return G.Player != null && controller.GetComponentInParent<PlayerManager>() == G.Player;
+    }
+
+    public Vector3 GetWorldVelocity()
+    {
+        return GetWorldDirection() * moveSpeed;
+    }
+
+    private void Reset()
+    {
+        directionSource = transform;
+    }
+
+    private void OnValidate()
+    {
+        moveSpeed = Mathf.Max(0f, moveSpeed);
+        if (localDirection.sqrMagnitude < 0.0001f)
+            localDirection = Vector3.forward;
     }
 
     private Vector3 GetWorldDirection()

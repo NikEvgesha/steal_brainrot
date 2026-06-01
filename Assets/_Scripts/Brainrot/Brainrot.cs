@@ -25,10 +25,29 @@ public struct BrainrotDinamicData
 }
 public class Brainrot : InventoryItem
 {
+    private const int ElementRayDefaultsVersion = 1;
+    private const float DefaultElementRayAlphaMultiplier = 0.5f;
+    private const float DefaultElementRayLength = 2.5f;
+    private const float DefaultElementRayThickness = 4f;
+    private const float DefaultElementRaySpinSpeed = 35f;
+
     [SerializeField] private Transform _modelPoint;
     [SerializeField] private AudioSource _audio;
 
     [SerializeField] private BrainrotTypeData _data;
+    [Header("Element VFX")]
+    [SerializeField] private float _elementParticleSizeMultiplier = 1f;
+    [SerializeField] private float _elementParticleEmissionMultiplier = 1f;
+    [SerializeField] private float _elementParticleRadiusMultiplier = 1f;
+    [SerializeField] private float _elementRayAlphaMultiplier = DefaultElementRayAlphaMultiplier;
+    [SerializeField] private float _elementRayLength = DefaultElementRayLength;
+    [SerializeField] private float _elementRayThickness = DefaultElementRayThickness;
+    [SerializeField] private float _elementRaySpinSpeed = DefaultElementRaySpinSpeed;
+    [SerializeField] private float _elementGroundAlphaMultiplier = 1f;
+    [SerializeField] private float _elementGroundRadius = 0f;
+    [SerializeField] private float _elementGroundYOffset = 0.02f;
+    [SerializeField, HideInInspector] private int _elementRayDefaultsVersion;
+
     public BrainrotTypeData Data => _data;
 
     private BrainrotDinamicData _dinamicData;
@@ -76,9 +95,53 @@ public class Brainrot : InventoryItem
         ReleaseAnimationsSubscription();
     }
 
+    private void OnValidate()
+    {
+        ApplyElementRayDefaultsIfNeeded();
+        ClampElementVfxSettings();
+
+        if (Application.isPlaying && isActiveAndEnabled)
+            RefreshElementVfx();
+    }
+
+    [ContextMenu("Refresh Element VFX")]
+    private void RefreshElementVfx()
+    {
+        ClampElementVfxSettings();
+        if (!Application.isPlaying || _modelPoint == null)
+            return;
+
+        ApplyElementVfx();
+    }
+
+    private void ClampElementVfxSettings()
+    {
+        _elementParticleSizeMultiplier = Mathf.Max(0.1f, _elementParticleSizeMultiplier);
+        _elementParticleEmissionMultiplier = Mathf.Max(0.1f, _elementParticleEmissionMultiplier);
+        _elementParticleRadiusMultiplier = Mathf.Max(0.1f, _elementParticleRadiusMultiplier);
+        _elementRayAlphaMultiplier = Mathf.Max(0f, _elementRayAlphaMultiplier);
+        _elementRayLength = Mathf.Max(0f, _elementRayLength);
+        _elementRayThickness = Mathf.Max(0f, _elementRayThickness);
+        _elementGroundAlphaMultiplier = Mathf.Max(0f, _elementGroundAlphaMultiplier);
+        _elementGroundRadius = Mathf.Max(0f, _elementGroundRadius);
+    }
+
+    private void ApplyElementRayDefaultsIfNeeded()
+    {
+        if (_elementRayDefaultsVersion >= ElementRayDefaultsVersion)
+            return;
+
+        _elementRayAlphaMultiplier = DefaultElementRayAlphaMultiplier;
+        _elementRayLength = DefaultElementRayLength;
+        _elementRayThickness = DefaultElementRayThickness;
+        _elementRaySpinSpeed = DefaultElementRaySpinSpeed;
+        _elementRayDefaultsVersion = ElementRayDefaultsVersion;
+    }
 
     public void Init(BrainrotDinamicData rarity, FieldCell floor=null, long lastCollectTimestamp = -1) //передавать плейс из яйца
     {
+        ApplyElementRayDefaultsIfNeeded();
+
         // rarity считается в яйце? 
         _canvas = GetComponentInChildren<BrainrotInfoUI>();
         CacheAnimationComponents();
@@ -106,8 +169,27 @@ public class Brainrot : InventoryItem
         if (incomeAccumulationTime > 0)
             _canvas.UpdateOfflineIncome(_currentIncome);
         SetTypeVisual();
+        ApplyElementVfx();
         ApplyAnimalsAnimationState();
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
+    }
+
+    private void ApplyElementVfx()
+    {
+        ElementTypeVfx.Ensure(
+            this,
+            _modelPoint,
+            _dinamicData.ElementType,
+            sizeMultiplier: _elementParticleSizeMultiplier,
+            emissionMultiplier: _elementParticleEmissionMultiplier,
+            rayAlphaMultiplier: _elementRayAlphaMultiplier,
+            particleRadiusMultiplier: _elementParticleRadiusMultiplier,
+            rayLengthWorldOverride: _elementRayLength,
+            rayThicknessWorldOverride: _elementRayThickness,
+            raySpinSpeed: _elementRaySpinSpeed,
+            groundAlphaMultiplier: _elementGroundAlphaMultiplier,
+            groundRadiusWorldOverride: _elementGroundRadius,
+            groundYOffsetWorld: _elementGroundYOffset);
     }
 
     private void SetTypeVisual()

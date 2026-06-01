@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -18,9 +19,21 @@ public class EggInfoUI : MonoBehaviour
     public void SetInfo(Egg egg)
     {
         _name.text = egg.Name;
-        _luck.text = egg.Data.Luck+"X"+ " �����" ;
-        _price.text = "$"+ (egg.Data.Price * G.Elements.GetMultiplaer(egg.Data.DinamicData.ElementType)).ToString();
+        _luck.text = FormatAmount(egg.Data.Luck) + "X";
+        _price.text = "$" + FormatAmount(egg.Data.Price * G.Elements.GetMultiplaer(egg.Data.DinamicData.ElementType));
     }
+
+    private static string FormatAmount(double amount)
+    {
+        if (G.Currency != null)
+            return G.Currency.ToString(amount);
+
+        if (double.IsNaN(amount) || double.IsInfinity(amount))
+            return "0";
+
+        return Math.Round(Math.Max(0d, amount)).ToString("0", CultureInfo.InvariantCulture);
+    }
+
     public void SetStatus(EggStatus status)
     {
 
