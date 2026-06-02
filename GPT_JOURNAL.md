@@ -829,3 +829,23 @@
   - early rings stay readable (`2,600`, `7,600`, `22,000`);
   - late rings jump to `3,819,300` and `11,076,000`.
 - The two extra conveyors remain a future late-game expansion idea, not part of V1.
+
+### 2026-06-02 (water visual + float behavior V1)
+- Generated and imported a stylized water tile for WebGL use:
+  - source generated through built-in imagegen;
+  - project asset: `Assets/_Sprites/Environment/Water/water_tile.png`;
+  - importer set to 1024px, repeat wrap, mipmaps, compressed WebGL-friendly settings.
+- Added `Custom/WebGL/CartoonWater` shader:
+  - URP unlit transparent pass, no GrabPass/reflection/expensive screen reads;
+  - two scrolling samples of the same texture plus small vertex wave.
+- Added `Assets/_Materials/Environment/Water_WebGL.mat` and assigned it to the scene `Water` plane in `Evgesha.unity`.
+- Added water movement behavior:
+  - `WaterSurface` registers water bounds/surface height from the renderer;
+  - `WaterFloatRider` on `Player.prefab` makes the local player float up when falling into water and applies a big upward/forward impulse near walls;
+  - `TPPlayerController` now exposes vertical velocity and external horizontal impulse helpers.
+- Scene note:
+  - `Water` MeshCollider is disabled and marked trigger so the player does not stand on the water plane; `WaterSurface` uses the renderer bounds instead.
+- Verification:
+  - generated texture visually inspected;
+  - `git diff --check` passes;
+  - full `dotnet build Assembly-CSharp.csproj --no-dependencies -p:RunAnalyzers=false` is still blocked before gameplay compile by missing `.NETFramework,Version=v4.7.1` reference assemblies.

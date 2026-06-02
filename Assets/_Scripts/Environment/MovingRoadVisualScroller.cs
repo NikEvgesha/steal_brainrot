@@ -4,16 +4,18 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class MovingRoadVisualScroller : MonoBehaviour
 {
-    private const int MinCopyCount = 3;
-
     [SerializeField] private Renderer[] renderers;
     [SerializeField] private Vector2 uvDirection = Vector2.right;
     [SerializeField] private float scrollSpeed = 5f;
-    [SerializeField] private int copyCount = MinCopyCount;
+    [SerializeField] private bool autoCollectChildRenderers = true;
+    [SerializeField] private bool includeInactiveChildRenderers;
+    [SerializeField] private float stripLengthOverride;
     [SerializeField] private float visualSpacing;
 
     private Entry[] _entries;
-    private float _distance;
+    private float _stripMin;
+    private float _stripMax;
+    private float _stripLength;
 
     public float ScrollSpeed
     {
@@ -23,7 +25,7 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
 
     public void Configure(Renderer[] targetRenderers, Vector2 direction, float speed)
     {
-        CleanupClones();
+        RestoreOriginalPositions();
 
         renderers = targetRenderers;
         uvDirection = direction.sqrMagnitude > 0.0001f ? direction : Vector2.right;
@@ -44,7 +46,7 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
         if (uvDirection.sqrMagnitude < 0.0001f)
             uvDirection = Vector2.right;
 
-        copyCount = Mathf.Max(MinCopyCount, copyCount);
+        stripLengthOverride = Mathf.Max(0f, stripLengthOverride);
         visualSpacing = Mathf.Max(0f, visualSpacing);
         _entries = null;
     }
@@ -67,42 +69,47 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
         if (worldUnitsPerLocalUnit <= 0.0001f)
             return;
 
-        _distance += scrollSpeed * Time.deltaTime / worldUnitsPerLocalUnit;
-        ApplyPositions(axis);
+        float scrollStep = scrollSpeed * Time.deltaTime / worldUnitsPerLocalUnit;
+        ApplyPositions(axis, scrollStep);
     }
 
     private void OnDisable()
     {
-        CleanupClones();
+        RestoreOriginalPositions();
     }
 
-    private void ApplyPositions(Vector3 axis)
+    private void OnTransformChildrenChanged()
+    {
+        RestoreOriginalPositions();
+    }
+
+    private void ApplyPositions(Vector3 axis, float scrollStep)
     {
         for (int i = 0; i < _entries.Length; i++)
         {
             Entry entry = _entries[i];
-            if (entry.Visuals == null || entry.Visuals.Length == 0 || entry.Span <= 0.0001f)
+            if (entry.Original == null || _stripLength <= 0.0001f)
                 continue;
 
-            int centerIndex = entry.Visuals.Length / 2;
-            float wrappedDistance = Mathf.Repeat(_distance, entry.Span);
-            for (int visualIndex = 0; visualIndex < entry.Visuals.Length; visualIndex++)
-            {
-                Transform visual = entry.Visuals[visualIndex];
-                if (visual == null)
-                    continue;
+            float center = entry.CurrentCenter + scrollStep;
+            while (center - entry.HalfLength > _stripMax)
+                center -= _stripLength;
+            while (center + entry.HalfLength < _stripMin)
+                center += _stripLength;
 
-                float visualOffset = wrappedDistance + (visualIndex - centerIndex) * entry.Span;
-                visual.localPosition = entry.StartLocalPosition + axis * visualOffset;
-            }
+            entry.CurrentCenter = center;
+            float visualOffset = entry.CurrentCenter - entry.StartCenter;
+            entry.Original.localPosition = entry.StartLocalPosition + GetParentLocalDelta(entry.Original, axis, visualOffset);
+            _entries[i] = entry;
         }
     }
 
     private void RebuildEntries()
     {
-        CleanupClones();
+        RestoreOriginalPositions();
 
-        if (renderers == null || renderers.Length == 0)
+        Renderer[] targetRenderers = ResolveRenderers();
+        if (targetRenderers == null || targetRenderers.Length == 0)
         {
             _entries = new Entry[0];
             return;
@@ -110,25 +117,28 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
 
         Vector3 axis = GetLocalAxis();
         List<Entry> entries = new List<Entry>();
-        for (int rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+        for (int rendererIndex = 0; rendererIndex < targetRenderers.Length; rendererIndex++)
         {
-            Renderer targetRenderer = renderers[rendererIndex];
-            if (targetRenderer == null)
+            Renderer targetRenderer = targetRenderers[rendererIndex];
+            if (!IsUsableRenderer(targetRenderer))
                 continue;
 
+            Projection projection = MeasureProjection(targetRenderer, axis);
             Transform targetTransform = targetRenderer.transform;
-            Transform[] visuals = CreateVisualCopies(targetTransform);
             entries.Add(new Entry
             {
                 Original = targetTransform,
-                Visuals = visuals,
                 StartLocalPosition = targetTransform.localPosition,
-                Span = Mathf.Max(0.0001f, MeasureLocalLength(targetRenderer, axis) + visualSpacing)
+                StartCenter = projection.Center,
+                CurrentCenter = projection.Center,
+                HalfLength = projection.Length * 0.5f
             });
         }
 
+        entries.Sort((a, b) => a.StartCenter.CompareTo(b.StartCenter));
+        CacheStripBounds(entries);
         _entries = entries.ToArray();
-        ApplyPositions(axis);
+        ApplyPositions(axis, 0f);
     }
 
     private Vector3 GetLocalAxis()
@@ -137,31 +147,26 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
         return axis.sqrMagnitude > 0.0001f ? axis.normalized : Vector3.right;
     }
 
-    private Transform[] CreateVisualCopies(Transform original)
+    private Renderer[] ResolveRenderers()
     {
-        if (!Application.isPlaying)
-            return new[] { original };
+        if (!autoCollectChildRenderers)
+            return renderers;
 
-        int targetCopyCount = Mathf.Max(MinCopyCount, copyCount);
-        Transform[] visuals = new Transform[targetCopyCount];
-        visuals[0] = original;
-
-        for (int i = 1; i < targetCopyCount; i++)
-        {
-            Transform clone = Instantiate(original, original.parent);
-            clone.name = original.name + " Loop " + i;
-            clone.localPosition = original.localPosition;
-            clone.localRotation = original.localRotation;
-            clone.localScale = original.localScale;
-            clone.gameObject.hideFlags = HideFlags.DontSave;
-            DisableColliders(clone);
-            visuals[i] = clone;
-        }
-
-        return visuals;
+        return GetComponentsInChildren<Renderer>(includeInactiveChildRenderers);
     }
 
-    private void CleanupClones()
+    private bool IsUsableRenderer(Renderer targetRenderer)
+    {
+        if (targetRenderer == null || !targetRenderer.transform.IsChildOf(transform))
+            return false;
+
+        if (!includeInactiveChildRenderers && !targetRenderer.gameObject.activeInHierarchy)
+            return false;
+
+        return includeInactiveChildRenderers || targetRenderer.enabled;
+    }
+
+    private void RestoreOriginalPositions()
     {
         if (_entries == null)
             return;
@@ -171,27 +176,45 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
             Entry entry = _entries[entryIndex];
             if (entry.Original != null)
                 entry.Original.localPosition = entry.StartLocalPosition;
-
-            if (entry.Visuals == null)
-                continue;
-
-            for (int visualIndex = 1; visualIndex < entry.Visuals.Length; visualIndex++)
-            {
-                Transform clone = entry.Visuals[visualIndex];
-                if (clone == null)
-                    continue;
-
-                if (Application.isPlaying)
-                    Destroy(clone.gameObject);
-                else
-                    DestroyImmediate(clone.gameObject);
-            }
         }
 
         _entries = null;
     }
 
-    private float MeasureLocalLength(Renderer targetRenderer, Vector3 axis)
+    private void CacheStripBounds(List<Entry> entries)
+    {
+        if (entries.Count == 0)
+        {
+            _stripMin = 0f;
+            _stripMax = 0f;
+            _stripLength = 0f;
+            return;
+        }
+
+        _stripMin = float.MaxValue;
+        _stripMax = float.MinValue;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            Entry entry = entries[i];
+            _stripMin = Mathf.Min(_stripMin, entry.StartCenter - entry.HalfLength);
+            _stripMax = Mathf.Max(_stripMax, entry.StartCenter + entry.HalfLength);
+        }
+
+        _stripLength = stripLengthOverride > 0.0001f
+            ? stripLengthOverride
+            : Mathf.Max(0.0001f, _stripMax - _stripMin + visualSpacing);
+    }
+
+    private Vector3 GetParentLocalDelta(Transform target, Vector3 axis, float offset)
+    {
+        if (target.parent == null)
+            return transform.TransformVector(axis * offset);
+
+        Vector3 worldDelta = transform.TransformVector(axis * offset);
+        return target.parent.InverseTransformVector(worldDelta);
+    }
+
+    private Projection MeasureProjection(Renderer targetRenderer, Vector3 axis)
     {
         Bounds bounds = targetRenderer.localBounds;
         Vector3 center = bounds.center;
@@ -214,21 +237,26 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
             }
         }
 
-        return Mathf.Max(0.0001f, max - min);
-    }
-
-    private static void DisableColliders(Transform cloneRoot)
-    {
-        Collider[] colliders = cloneRoot.GetComponentsInChildren<Collider>(true);
-        for (int i = 0; i < colliders.Length; i++)
-            colliders[i].enabled = false;
+        float length = Mathf.Max(0.0001f, max - min);
+        return new Projection
+        {
+            Center = (min + max) * 0.5f,
+            Length = length
+        };
     }
 
     private struct Entry
     {
         public Transform Original;
-        public Transform[] Visuals;
         public Vector3 StartLocalPosition;
-        public float Span;
+        public float StartCenter;
+        public float CurrentCenter;
+        public float HalfLength;
+    }
+
+    private struct Projection
+    {
+        public float Center;
+        public float Length;
     }
 }

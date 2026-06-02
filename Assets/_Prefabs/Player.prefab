@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 5033938833508520467}
   - component: {fileID: 3110733507595287357}
   - component: {fileID: 910020000000000001}
+  - component: {fileID: 910020000000000002}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -83,6 +84,7 @@ MonoBehaviour:
   acceleration: 24
   rotationLerp: 12
   jumpForce: 10
+  externalVelocityDamping: 14
   gravity: -20
   groundedStick: -2
   cameraTransform: {fileID: 0}
@@ -168,6 +170,44 @@ MonoBehaviour:
   surfaceMask:
     serializedVersion: 2
     m_Bits: 4294967295
+--- !u!114 &910020000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000956167692723511}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d230258e6e34443a8ee0640b47d16d60, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::WaterFloatRider
+  affectOnlyLocalPlayer: 1
+  enterDepth: 0.15
+  exitHeight: 1.25
+  neckDepth: 1.5
+  kneeDepth: 0.62
+  depthTolerance: 0.06
+  sinkVelocity: 4.85
+  riseVelocity: 2.55
+  depthSpring: 5.15
+  floatDamping: 1.55
+  bobAmplitude: 0.015
+  bobFrequency: 0.9
+  wallProbeHeight: 0.95
+  wallProbeRadius: 0.35
+  wallProbeDistance: 1.25
+  wallMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  wallJumpVerticalVelocity: 9
+  wallJumpHorizontalVelocity: 4.25
+  wallJumpCooldown: 0.85
+  wallJumpFloatSuspendTime: 0.65
+  waterJumpVerticalVelocity: 4.5
+  waterJumpHorizontalVelocity: 1.35
+  waterJumpCooldown: 0.45
+  waterJumpFloatSuspendTime: 0.28
 --- !u!1 &1281633857935659766
 GameObject:
   m_ObjectHideFlags: 0

@@ -16,6 +16,7 @@ public class TPPlayerController : MonoBehaviour
     [SerializeField] private float acceleration = 24f;
     [SerializeField] private float rotationLerp = 12f;
     [SerializeField] private float jumpForce = 10f;
+    [SerializeField] private float externalVelocityDamping = 14f;
 
     [Header("Physics")]
     [SerializeField] private float gravity = -20f;
@@ -41,6 +42,9 @@ public class TPPlayerController : MonoBehaviour
 
     private CharacterController _cc;
     private float _verticalVel;
+    private Vector3 _externalHorizontalVelocity;
+    private bool _hasVerticalVelocityOverride;
+    private float _verticalVelocityOverride;
     private float _currentSpeed;
     private bool _isHolding; // текущее логическое состояние "держать"
     //private bool _teleportiong;
@@ -102,7 +106,12 @@ public class TPPlayerController : MonoBehaviour
         Vector3 velocity = moveDir * _currentSpeed;
 
         // ===== Гравитация =====
-        if (_cc.isGrounded)
+        if (_hasVerticalVelocityOverride)
+        {
+            _verticalVel = _verticalVelocityOverride;
+            _hasVerticalVelocityOverride = false;
+        }
+        else if (_cc.isGrounded)
         {
             if (_verticalVel < 0f) _verticalVel = groundedStick;
             if (G.Input && G.Input.JumpTriggered)
@@ -115,6 +124,7 @@ public class TPPlayerController : MonoBehaviour
             _verticalVel += gravity * Time.deltaTime;
         }
         velocity.y = _verticalVel;
+        velocity += _externalHorizontalVelocity;
 
         // ===== Поворот к движению =====
         if (moveDir.sqrMagnitude > 0.0001f)
@@ -125,6 +135,10 @@ public class TPPlayerController : MonoBehaviour
 
         // ===== Движение =====
         _cc.Move(velocity * Time.deltaTime);
+        _externalHorizontalVelocity = Vector3.MoveTowards(
+            _externalHorizontalVelocity,
+            Vector3.zero,
+            externalVelocityDamping * Time.deltaTime);
 
         // ===== Анимация =====
         if (animator != null)
@@ -156,5 +170,32 @@ public class TPPlayerController : MonoBehaviour
 
     /// <summary>Удобный вызов из других скриптов (или через UnityEvent).</summary>
     public void ToggleHolding() => SetHolding(!_isHolding);
+
+    public float VerticalVelocity => _verticalVel;
+
+    public void SetVerticalVelocity(float velocity, bool onlyIfGreater = true)
+    {
+        if (onlyIfGreater && velocity <= _verticalVel)
+            return;
+
+        _hasVerticalVelocityOverride = false;
+        _verticalVel = velocity;
+    }
+
+    public void OverrideVerticalVelocityForNextFrame(float velocity)
+    {
+        _verticalVel = velocity;
+        _verticalVelocityOverride = velocity;
+        _hasVerticalVelocityOverride = true;
+    }
+
+    public void AddExternalHorizontalVelocity(Vector3 velocity, bool replaceCurrent = false)
+    {
+        velocity.y = 0f;
+        if (replaceCurrent)
+            _externalHorizontalVelocity = velocity;
+        else
+            _externalHorizontalVelocity += velocity;
+    }
 
 }

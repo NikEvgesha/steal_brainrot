@@ -726,6 +726,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FieldManager
   _fieldParent: {fileID: 1703214613983061709}
+  _useDistanceBasedUnlockPrice: 1
+  _baseUnlockPrice: 900
+  _distancePriceMultiplier: 2.9
+  _priceRoundStep: 100
+  _fallbackFieldStep: 4
+  _latePriceStartRing: 5
+  _latePriceMultiplier: 60
 --- !u!1 &7914265613199763939
 GameObject:
   m_ObjectHideFlags: 0
@@ -9100,6 +9107,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 8272624732424102932}
     m_Modifications:
+    - target: {fileID: -8669465112260205375, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8490861255496033794, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -4918283707304314329, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -4409988214542401341, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: -2643007460883844664, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.1175
@@ -9156,9 +9179,21 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -2015776412543568754, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -723137499756610913, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3747256654317758927, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
       propertyPath: m_Name
       value: Zoo 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7794928128407150287, guid: 7964ca5fa81dd7249bdf7f209502dc7b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
