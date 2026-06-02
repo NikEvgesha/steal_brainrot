@@ -13,10 +13,12 @@ public class ElementTypeMultiplaer : MonoBehaviour
 { 
     [SerializeField]private List<ElementMultiplier> _elementMultipliers = new List<ElementMultiplier>();
 
-    // кэши
+    // РєСЌС€Рё
     private Dictionary<ElementType, float> _incomeByType;
     private readonly List<(ElementType type, float cum)> _cdf = new(); // cumulative weights
     private float _totalWeight;
+    private float _noElementWeight;
+    private float _elementOnlyWeight;
 
     private void Awake()
     {
@@ -35,24 +37,31 @@ public class ElementTypeMultiplaer : MonoBehaviour
         _incomeByType = new Dictionary<ElementType, float>(_elementMultipliers.Count);
         _cdf.Clear();
         _totalWeight = 0f;
+        _noElementWeight = 0f;
+        _elementOnlyWeight = 0f;
 
         foreach (var e in _elementMultipliers)
         {
-            // кэш множителей дохода
+            // РєСЌС€ РјРЅРѕР¶РёС‚РµР»РµР№ РґРѕС…РѕРґР°
             _incomeByType[e.Type] = e.IncomeMultiplier;
 
-            // кэш CDF по положительным весам
+            // РєСЌС€ CDF РїРѕ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹Рј РІРµСЃР°Рј
             if (e.Weight > 0f)
             {
                 _totalWeight += e.Weight;
                 _cdf.Add((e.Type, _totalWeight));
+
+                if (e.Type == ElementType.NoElement)
+                    _noElementWeight += e.Weight;
+                else
+                    _elementOnlyWeight += e.Weight;
             }
         }
 
-        // защита от пустого/нулевого набора весов
+        // Р·Р°С‰РёС‚Р° РѕС‚ РїСѓСЃС‚РѕРіРѕ/РЅСѓР»РµРІРѕРіРѕ РЅР°Р±РѕСЂР° РІРµСЃРѕРІ
         if (_totalWeight <= 0f && _elementMultipliers.Count > 0)
         {
-            // если весов нет — сделаем равновероятно
+            // РµСЃР»Рё РІРµСЃРѕРІ РЅРµС‚ вЂ” СЃРґРµР»Р°РµРј СЂР°РІРЅРѕРІРµСЂРѕСЏС‚РЅРѕ
             float step = 1f / _elementMultipliers.Count;
             _cdf.Clear();
             _totalWeight = 1f;
@@ -61,6 +70,11 @@ public class ElementTypeMultiplaer : MonoBehaviour
             {
                 acc += step;
                 _cdf.Add((e.Type, acc));
+
+                if (e.Type == ElementType.NoElement)
+                    _noElementWeight += step;
+                else
+                    _elementOnlyWeight += step;
             }
         }
     }
@@ -69,28 +83,68 @@ public class ElementTypeMultiplaer : MonoBehaviour
     {
         return _incomeByType != null && _incomeByType.TryGetValue(type, out var mult)
             ? mult
-            : 1f; // дефолт
+            : 1f; // РґРµС„РѕР»С‚
     }
     /// <summary>
-    /// Случайный тип согласно весам из _elementMultipliers.
+    /// РЎР»СѓС‡Р°Р№РЅС‹Р№ С‚РёРї СЃРѕРіР»Р°СЃРЅРѕ РІРµСЃР°Рј РёР· _elementMultipliers.
     /// </summary>
     public ElementType GetRandomWeighted()
     {
-        if (_cdf.Count == 0) // нет данных
+        float noElementChanceBonus = G.Luck != null ? G.Luck.NoElementChanceBonus01 : 0f;
+        if (noElementChanceBonus > 0f)
+            return GetRandomWeighted(noElementChanceBonus);
+
+        return GetRandomWeightedWithoutLuck();
+    }
+
+    public ElementType GetRandomWeighted(float noElementChanceBonus01)
+    {
+        if (_cdf.Count == 0) // РЅРµС‚ РґР°РЅРЅС‹С…
+            return default;
+
+        if (noElementChanceBonus01 <= 0f || _noElementWeight <= 0f || _elementOnlyWeight <= 0f)
+            return GetRandomWeightedWithoutLuck();
+
+        float baseNoElementChance = _noElementWeight / _totalWeight;
+        float boostedNoElementChance = Mathf.Clamp01(baseNoElementChance + noElementChanceBonus01);
+
+        if (UnityEngine.Random.value <= boostedNoElementChance)
+            return ElementType.NoElement;
+
+        float elementRoll = UnityEngine.Random.value * _elementOnlyWeight;
+        float elementAcc = 0f;
+
+        for (int i = 0; i < _elementMultipliers.Count; i++)
+        {
+            var element = _elementMultipliers[i];
+            if (element.Type == ElementType.NoElement || element.Weight <= 0f)
+                continue;
+
+            elementAcc += element.Weight;
+            if (elementRoll <= elementAcc)
+                return element.Type;
+        }
+
+        return GetRandomWeightedWithoutLuck();
+    }
+
+    private ElementType GetRandomWeightedWithoutLuck()
+    {
+        if (_cdf.Count == 0) // РЅРµС‚ РґР°РЅРЅС‹С…
             return default;
 
         float r = UnityEngine.Random.value * _totalWeight;
 
-        // линейный проход (для малых списков ок). Можно заменить на бинарный поиск.
+        // Р»РёРЅРµР№РЅС‹Р№ РїСЂРѕС…РѕРґ (РґР»СЏ РјР°Р»С‹С… СЃРїРёСЃРєРѕРІ РѕРє). РњРѕР¶РЅРѕ Р·Р°РјРµРЅРёС‚СЊ РЅР° Р±РёРЅР°СЂРЅС‹Р№ РїРѕРёСЃРє.
         for (int i = 0; i < _cdf.Count; i++)
         {
             if (r <= _cdf[i].cum)
                 return _cdf[i].type;
         }
-        return _cdf[_cdf.Count - 1].type; // на всякий случай
+        return _cdf[_cdf.Count - 1].type; // РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№
     }
     /// <summary>
-    /// Если нужно равномерно по enum (пропуская "ElementType/None" на 0).
+    /// Р•СЃР»Рё РЅСѓР¶РЅРѕ СЂР°РІРЅРѕРјРµСЂРЅРѕ РїРѕ enum (РїСЂРѕРїСѓСЃРєР°СЏ "ElementType/None" РЅР° 0).
     /// </summary>
     public static ElementType GetRandomUniformEnum()
     {

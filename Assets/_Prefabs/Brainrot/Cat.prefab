@@ -52,6 +52,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
+      propertyPath: _rareType
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
+      propertyPath: _data.MaxWeightMult
+      value: 3
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -156,15 +164,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
       propertyPath: _baseSellPrice
-      value: 50
+      value: 80
       objectReference: {fileID: 0}
     - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
       propertyPath: _data.MinWeight
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
       propertyPath: _data.StartIncome
-      value: 5
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
       propertyPath: _data.MaxWeightMult
@@ -172,7 +180,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4302534137556060119, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
       propertyPath: _data.StartSellPrice
-      value: 100
+      value: 80
       objectReference: {fileID: 0}
     - target: {fileID: 5223786699910816244, guid: c0b4509ad1d22514d9f9166910800c26, type: 3}
       propertyPath: m_AnchorMax.y

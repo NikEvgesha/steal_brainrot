@@ -700,3 +700,49 @@
   - `acceleration`: `12 -> 24`;
   - `jumpForce`: `5 -> 10`.
 - Updated both script defaults and `Assets/_Prefabs/Player.prefab` serialized values.
+
+### 2026-06-02 12:00 MSK (egg element balance + player luck)
+- Reduced improved/elemental egg frequency:
+  - active `Items.prefab` weights now total 10000 with `NoElement=9900`, `Gold=40`, `Diamond=30`, `Electric=20`, `Fire=10`;
+  - mirrored the same weights in `ListManager.prefab` to keep the unused manager prefab consistent.
+- Added player luck plumbing for non-elemental eggs:
+  - `PlayerLuckHub` is created from `GameEntryPoint` and exposed through `G.Luck`;
+  - default conveyor progression bonus adds up to `+0.009` absolute `NoElement` chance at max unlocked conveyor level;
+  - future boosters can register `INoElementLuckBonusSource` and contribute extra absolute `NoElement` chance.
+- Updated `ElementTypeMultiplaer` so luck increases `NoElement` chance while preserving relative proportions inside the remaining elemental pool.
+- Fixed same-session conveyor upgrade state for luck by updating `_lastUnlockedLevel` immediately on purchase.
+- Verification:
+  - `git diff --check` passes.
+  - `dotnet build Assembly-CSharp.csproj --no-dependencies -p:RunAnalyzers=false` is blocked before gameplay compile by missing `.NETFramework,Version=v4.7.1` reference assemblies on this machine.
+
+### 2026-06-02 12:36 MSK (weighted egg drops + overlap balance V1)
+- Added weighted brainrot drops support:
+  - `EggData` now has optional `BrainrotDrops` entries (`Brainrot + Weight`);
+  - if explicit drops are absent, 4-brainrot eggs use default slot weights `55/25/15/5` (`Normal/Good/Strong/Jackpot`);
+  - hatch rolls, conveyor chance UI, and new-egg icon display now use the same drop-list helper.
+- Applied overlap balance V1 to active conveyor eggs:
+  - `EGG_1..EGG_8` now follow the chain where the last two mobs of one egg become the first two mobs of the next;
+  - prices are now approximately: `200`, `2500`, `20000`, `175000`, `1300000`, `10000000`, `75000000`, `575000000`;
+  - `EGG_8` uses `Dog/Penguin/Bee/Chicken` as the late animal-only tier.
+- Updated core animal CPS data:
+  - all balanced animals now use `MinWeight=1`, `MaxWeightMult=3`, so `StartIncome` reads as expected average CPS under the current `WeightMultiplier / 2` formula;
+  - Chicken was promoted into the late-game table with positive income/rarity.
+- Verification:
+  - scoped `git diff --check` passes for `Egg.cs`, `ConveyorUI.cs`, `EGG_1..EGG_8`, and updated brainrot prefabs.
+  - global `git diff --check` is blocked by pre-existing dirty whitespace in `Assets/_Prefabs/strelka doroga.prefab`.
+  - `dotnet build Assembly-CSharp.csproj --no-dependencies -p:RunAnalyzers=false` is still blocked before gameplay compile by missing `.NETFramework,Version=v4.7.1` reference assemblies on this machine.
+
+### 2026-06-02 12:47 MSK (conveyor egg progression weights)
+- Tuned `Assets/_Prefabs/Conveyor.prefab` egg weights so conveyor upgrades produce visible progression spikes instead of equal egg pools:
+  - Common: `egg1=85`, `egg2=15`;
+  - Rare 1000: `egg1=20`, `egg2=60`, `egg3=20`;
+  - Rare 2000: `egg2=20`, `egg3=60`, `egg4=20`;
+  - Epic: `egg3=15`, `egg4=60`, `egg5=25`;
+  - Legendary: `egg3=5`, `egg4=20`, `egg5=55`, `egg6=20`;
+  - Mythic: `egg4=5`, `egg5=15`, `egg6=55`, `egg7=25`;
+  - God: `egg4=2`, `egg5=8`, `egg6=20`, `egg7=50`, `egg8=20`.
+- Expected egg EV by conveyor level now climbs roughly:
+  - `14.1/s -> 71.2/s -> 354.4/s -> 2019.1/s -> 8534.4/s -> 49597.9/s -> 217110.4/s`.
+- Verification:
+  - scoped `git diff --check -- Assets/_Prefabs/Conveyor.prefab` passes.
+  - global `git diff --check` still has unrelated pre-existing whitespace in `Assets/_Prefabs/strelka doroga.prefab`.

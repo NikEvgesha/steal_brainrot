@@ -28,6 +28,7 @@ public class GameEntryPoint : MonoBehaviour
         
         Instantiate(_dailyPlaytimeTracker);
         Instantiate(_hubPrefab).Initialize(G.Currency);
+        PlayerLuckHub.EnsureExists();
         Instantiate(_ui);
         //Instantiate(_remoteBasesApplier);
 

@@ -19,6 +19,7 @@ public static class G
     public static SpecialShop SpecialShop;
     public static PurchasesManager Purchases;
     public static IncomeModifiersHub Income;
+    public static PlayerLuckHub Luck;
     public static ItemPrefabStorage Storage;
     public static ZooBackendClient Backend;
     public static AlbumProgressService Album;

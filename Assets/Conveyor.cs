@@ -30,6 +30,11 @@ public class Conveyor : MonoBehaviour
     public IReadOnlyList<ConveyorLevel> Levels => _levels;
     public ConveyorUI Ui => _ui;
     public bool IsRemoteMode => _remoteMode;
+    public int CurrentLevelIndex => _currentLevel;
+    public int UnlockedLevelIndex => _lastUnlockedLevel;
+    public int MaxLevelIndex => _levels != null ? Mathf.Max(0, _levels.Count - 1) : 0;
+    public float CurrentLevelProgress01 => MaxLevelIndex <= 0 ? 0f : Mathf.Clamp01(CurrentLevelIndex / (float)MaxLevelIndex);
+    public float UnlockedLevelProgress01 => MaxLevelIndex <= 0 ? 0f : Mathf.Clamp01(UnlockedLevelIndex / (float)MaxLevelIndex);
 
     private void Awake()
     {
@@ -234,6 +239,7 @@ public class Conveyor : MonoBehaviour
             G.Save.SaveConveyorCurrentLevel(_currentLevel);
             if (_ui != null)
                 _ui.UpdateActiveLvl(_currentLevel);
+            G.Luck?.NotifyChanged();
             BaseDirtyTracker.MarkDirty();
         }
     }
@@ -244,7 +250,9 @@ public class Conveyor : MonoBehaviour
         int id = _levels.IndexOf(lvl);
         if (id < 0) return;
 
-        G.Save.SaveConveyorUnlockedLevel(id);
+        _lastUnlockedLevel = Mathf.Max(_lastUnlockedLevel, id);
+        G.Save.SaveConveyorUnlockedLevel(_lastUnlockedLevel);
+        G.Luck?.NotifyChanged();
         BaseDirtyTracker.MarkDirty();
         if (id < _levels.Count - 1)
             _levels[id + 1].SetPurchasingAvailable(true);

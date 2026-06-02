@@ -7,12 +7,20 @@ using UnityEngine.Events;
 
 
 [System.Serializable]
+public struct EggBrainrotDrop
+{
+    public Brainrot Brainrot;
+    public float Weight;
+}
+
+[System.Serializable]
 public struct EggData
 {
     public int Luck;
     public float Price;
     public int SecondsToHatching;
     public List<Brainrot> Brainrots;
+    public List<EggBrainrotDrop> BrainrotDrops;
     public BrainrotDinamicData DinamicData;
     //public float Weight;
 }
@@ -414,12 +422,12 @@ public class Egg : InventoryItem
     }
     private Brainrot GetRandomBrainrot()
     {
-        if (_data.Brainrots == null || _data.Brainrots.Count == 0)
-            return null;
-
-        var picked = ConveyorDropChanceCalculator.PickRandomBrainrot(_data.Brainrots, _data.Luck, applyLuckBonus: true);
+        var picked = ConveyorDropChanceCalculator.PickRandomBrainrot(this, applyLuckBonus: true);
         if (picked != null)
             return picked;
+
+        if (_data.Brainrots == null || _data.Brainrots.Count == 0)
+            return null;
 
         int rand = UnityEngine.Random.Range(0, _data.Brainrots.Count);
         return _data.Brainrots[rand];
@@ -434,7 +442,7 @@ public class Egg : InventoryItem
 
     private void SetRouletteModels()
     {
-        foreach (var brainrot in _data.Brainrots)
+        foreach (var brainrot in GetRouletteBrainrots())
         {
             GameObject obj = Instantiate(brainrot.Model, _rouleteModelsParent).gameObject;
             Renderer[] renderer = obj.GetComponentsInChildren<Renderer>();
@@ -445,6 +453,35 @@ public class Egg : InventoryItem
             obj.transform.localRotation = Quaternion.identity;
             _rouleteObjects.Add(obj);
             obj.SetActive(false);
+        }
+    }
+
+    private IEnumerable<Brainrot> GetRouletteBrainrots()
+    {
+        var hasWeightedDrops = false;
+        if (_data.BrainrotDrops != null)
+        {
+            for (int i = 0; i < _data.BrainrotDrops.Count; i++)
+            {
+                var brainrot = _data.BrainrotDrops[i].Brainrot;
+                if (brainrot != null && _data.BrainrotDrops[i].Weight > 0f)
+                {
+                    hasWeightedDrops = true;
+                    yield return brainrot;
+                }
+            }
+        }
+
+        if (hasWeightedDrops)
+            yield break;
+
+        if (_data.Brainrots == null)
+            yield break;
+
+        for (int i = 0; i < _data.Brainrots.Count; i++)
+        {
+            if (_data.Brainrots[i] != null)
+                yield return _data.Brainrots[i];
         }
     }
 
