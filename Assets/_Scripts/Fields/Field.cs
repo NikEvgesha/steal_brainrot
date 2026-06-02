@@ -106,6 +106,13 @@ public class Field : MonoBehaviour
         _id = id;
     }
 
+    public void SetUnlockPrice(float price)
+    {
+        _price = Mathf.Max(0f, price);
+        if (_buyPanel != null)
+            _buyPanel.SetInfo("Разблокировать", _price.ToString("0"));
+    }
+
 
     public void LoadData()
     {

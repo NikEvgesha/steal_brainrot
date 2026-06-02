@@ -746,3 +746,86 @@
 - Verification:
   - scoped `git diff --check -- Assets/_Prefabs/Conveyor.prefab` passes.
   - global `git diff --check` still has unrelated pre-existing whitespace in `Assets/_Prefabs/strelka doroga.prefab`.
+
+### 2026-06-02 (field unlock price balance V1)
+- Added distance-based grass/field unlock prices:
+  - `FieldManager` now finds the unlock center from fields that are open by default;
+  - field distance is measured in the manager's local X/Z plane, so moved/staggered rows still price correctly;
+  - locked fields use ring pricing: `baseUnlockPrice * distancePriceMultiplier^(ring - 1)`, rounded by `priceRoundStep`;
+  - V1 defaults are `baseUnlockPrice=900`, `distancePriceMultiplier=2.9`, `priceRoundStep=100`, `fallbackFieldStep=4`.
+- Added `Field.SetUnlockPrice(...)` so the runtime price and buy panel stay synchronized.
+- Current `SceneAny` field layout has locked cells up to ring 6; expected locked ring prices are roughly:
+  - `2600 -> 7600 -> 22000 -> 63700 -> 184600`.
+- Verification:
+  - scoped `git diff --check` passes for `FieldManager.cs`, `Field.cs`, `TODO_List.md`, and `GPT_JOURNAL.md`.
+  - `dotnet build Assembly-CSharp.csproj --no-dependencies -p:RunAnalyzers=false` is still blocked before gameplay compile by missing `.NETFramework,Version=v4.7.1` reference assemblies on this machine.
+
+### 2026-06-02 (conveyor upgrade price + bonus balance V1)
+- Reworked conveyor upgrade rewards so bonuses are based on the last purchased conveyor level, not the active level and not a sum:
+  - `Conveyor` now implements `IConveyorPercentSource`;
+  - money bonus reads `_lastUnlockedLevel` through `UnlockedIncomeMultiplier`;
+  - element luck reads `_lastUnlockedLevel` through `UnlockedElementChanceBonus01`.
+- Changed player elemental luck semantics:
+  - `PlayerLuckHub` now exposes `ElementChanceBonus01`;
+  - `ElementTypeMultiplaer` uses that value to increase the elemental egg chance while preserving relative weights inside the elemental pool;
+  - the old conveyor luck direction toward `NoElement` was removed.
+- Added automatic conveyor money modifier registration:
+  - `IncomeModifiersHub` auto-adds `ConveyorUpgradeBonusModifierMB`;
+  - the modifier lazily resolves the local non-remote `Conveyor`.
+- Conveyor upgrade V1 table:
+  - Common: `0 coins`, `x1.00 income`, `+0.0% element chance`;
+  - Rare I: `75,000 coins`, `+100% income`, `+50% element luck` (`+0.5% absolute element chance`);
+  - Rare II: `500,000 coins`, `+150% income`, `+100% element luck` (`+1.0% absolute element chance`);
+  - Epic: `3,500,000 coins`, `+250% income`, `+175% element luck` (`+1.75% absolute element chance`);
+  - Legendary: `25,000,000 coins`, `+400% income`, `+250% element luck` (`+2.5% absolute element chance`);
+  - Mythic: `175,000,000 coins`, `+650% income`, `+350% element luck` (`+3.5% absolute element chance`);
+  - God: `1,000,000,000 coins`, `+1000% income`, `+500% element luck` (`+5.0% absolute element chance`).
+- Notes:
+  - with the current base element setup (`NoElement=99%`), God reaches about `6.0%` total elemental egg chance before future boosters.
+- Verification:
+  - scoped `git diff --check` passes for the conveyor/luck/income files, `Conveyor.prefab`, `TODO_List.md`, and `GPT_JOURNAL.md`.
+  - `dotnet build Assembly-CSharp.csproj --no-dependencies -p:RunAnalyzers=false` is still blocked before gameplay compile by missing `.NETFramework,Version=v4.7.1` reference assemblies on this machine.
+
+### 2026-06-02 (conveyor auto-activate + balance pass notes)
+- Conveyor purchases now auto-activate the purchased level immediately:
+  - `Conveyor.OnLevelPurchase(...)` calls `SetLevel(lvl)` after saving `_lastUnlockedLevel`;
+  - previous purchased conveyor levels remain manually selectable through the existing activation UI.
+- Holistic balance estimate:
+  - with 24 default-open starting slots, 60s hatch time, and active slot replacement, the currently implemented economy reaches God conveyor in roughly `2.4h`;
+  - simply raising egg/conveyor prices is not enough to extend this much because the new conveyor income multipliers make the next upgrade affordable during the 24-slot hatch cycle;
+  - to target a longer run, field/slot gating, hatch pacing, or per-level unlock requirements need to carry more of the progression load.
+
+### 2026-06-02 (late progression stretch after Epic)
+- Kept the first four conveyor levels fast:
+  - Common `0`, Rare I `75,000`, Rare II `500,000`, Epic `3,500,000`.
+- Stretched the post-Epic economy tail:
+  - Legendary now costs `1,500,000,000 coins / 270,000 gems`;
+  - Mythic now costs `10,500,000,000 coins / 600,000 gems`;
+  - God now costs `60,000,000,000 coins / 1,500,000 gems`.
+- Late egg prices were raised after the Epic-unlocked tier:
+  - `EGG_6 = 600,000,000`;
+  - `EGG_7 = 4,500,000,000`;
+  - `EGG_8 = 34,500,000,000`.
+- Late grass pricing now uses `_latePriceMultiplier=60` from ring 5 onward:
+  - current expected ring prices: `2600`, `7600`, `22000`, `3,819,300`, `11,076,000`.
+- Balance note:
+  - a simple active-slot simulation with 24 starting slots and 60s hatch time estimates roughly `13h` to God conveyor after this pass;
+  - casual play should land longer because the estimate assumes constant optimal buying/replacing.
+
+### 2026-06-02 (current economy V1 confirmed)
+- Confirmed the current balance target without adding the two hypothetical extra conveyors.
+- Current conveyor ladder:
+  - Common: `0 coins / 0 gems`, `+0% income`, `+0% element luck`;
+  - Rare I: `75,000 coins / 150 gems`, `+100% income`, `+50% element luck`;
+  - Rare II: `500,000 coins / 500 gems`, `+150% income`, `+100% element luck`;
+  - Epic: `3,500,000 coins / 1,500 gems`, `+250% income`, `+175% element luck`;
+  - Legendary: `1,500,000,000 coins / 270,000 gems`, `+400% income`, `+250% element luck`;
+  - Mythic: `10,500,000,000 coins / 600,000 gems`, `+650% income`, `+350% element luck`;
+  - God: `60,000,000,000 coins / 1,500,000 gems`, `+1000% income`, `+500% element luck`.
+- Current active egg prices:
+  - `EGG_1=200`, `EGG_2=2,500`, `EGG_3=20,000`, `EGG_4=175,000`;
+  - `EGG_5=1,300,000`, `EGG_6=600,000,000`, `EGG_7=4,500,000,000`, `EGG_8=34,500,000,000`.
+- Current grass unlock target:
+  - early rings stay readable (`2,600`, `7,600`, `22,000`);
+  - late rings jump to `3,819,300` and `11,076,000`.
+- The two extra conveyors remain a future late-game expansion idea, not part of V1.

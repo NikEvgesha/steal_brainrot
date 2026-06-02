@@ -18,6 +18,7 @@ public class ConveyorLevel : MonoBehaviour
     [SerializeField] private double _priceGems;
     [SerializeField] private Sprite _icon;
     [SerializeField] private float _incomeMultiplier;
+    [SerializeField] private float _elementChanceBonus;
     [SerializeField] private List<LevelEggs> _eggs;
     [SerializeField] private Egg _newEgg;
     [SerializeField] private bool _purchased;
@@ -28,6 +29,7 @@ public class ConveyorLevel : MonoBehaviour
     public UnityEvent<ConveyorLevel> LevelPurchased;
 
     public float IncomeMultiplier => _incomeMultiplier;
+    public float ElementChanceBonus01 => Mathf.Max(0f, _elementChanceBonus);
     public List<LevelEggs> Eggs => _eggs;
     public Egg NewEgg => _newEgg;
 

@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Conveyor : MonoBehaviour
+public class Conveyor : MonoBehaviour, IConveyorPercentSource
 {
     [SerializeField] private bool _remoteMode;
     [SerializeField] private bool _openUiOnConveyorTrigger = true;
@@ -35,6 +35,8 @@ public class Conveyor : MonoBehaviour
     public int MaxLevelIndex => _levels != null ? Mathf.Max(0, _levels.Count - 1) : 0;
     public float CurrentLevelProgress01 => MaxLevelIndex <= 0 ? 0f : Mathf.Clamp01(CurrentLevelIndex / (float)MaxLevelIndex);
     public float UnlockedLevelProgress01 => MaxLevelIndex <= 0 ? 0f : Mathf.Clamp01(UnlockedLevelIndex / (float)MaxLevelIndex);
+    public float UnlockedIncomeMultiplier => GetUnlockedLevel() != null ? GetUnlockedLevel().IncomeMultiplier : 1f;
+    public float UnlockedElementChanceBonus01 => GetUnlockedLevel() != null ? GetUnlockedLevel().ElementChanceBonus01 : 0f;
 
     private void Awake()
     {
@@ -196,6 +198,20 @@ public class Conveyor : MonoBehaviour
         _eggs.Remove(egg);
     }
 
+    public float GetPercentBonus()
+    {
+        return Mathf.Max(0f, UnlockedIncomeMultiplier - 1f);
+    }
+
+    private ConveyorLevel GetUnlockedLevel()
+    {
+        if (_levels == null || _levels.Count == 0)
+            return null;
+
+        int index = Mathf.Clamp(_lastUnlockedLevel, 0, _levels.Count - 1);
+        return _levels[index];
+    }
+
     private void HideRemoteUI()
     {
         if (_ui == null) return;
@@ -252,6 +268,7 @@ public class Conveyor : MonoBehaviour
 
         _lastUnlockedLevel = Mathf.Max(_lastUnlockedLevel, id);
         G.Save.SaveConveyorUnlockedLevel(_lastUnlockedLevel);
+        SetLevel(lvl);
         G.Luck?.NotifyChanged();
         BaseDirtyTracker.MarkDirty();
         if (id < _levels.Count - 1)

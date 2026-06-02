@@ -105,7 +105,7 @@ public class ConveyorUI : MonoBehaviour
             icon.GetComponentInChildren<Image>().sprite = pet.Icon;
         }
 
-        _incomeMultiplier.text = "+" + ((level.IncomeMultiplier - 1) * 100).ToString() + "%";
+        _incomeMultiplier.text = "+" + Mathf.RoundToInt((level.IncomeMultiplier - 1f) * 100f) + "%";
         UpdateDropChances(level);
 
         SetButtons();

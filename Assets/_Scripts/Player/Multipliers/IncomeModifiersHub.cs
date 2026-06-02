@@ -5,6 +5,7 @@ using UnityEngine.Events;
 public sealed class IncomeModifiersHub : MonoBehaviour
 {
     [SerializeField] private bool _autoCollectFromChildren = true;
+    [SerializeField] private bool _autoAddConveyorUpgradeBonus = true;
     [SerializeField] private List<IncomeModifierBehaviour> _modifiers = new();
 
     private CurrencyManager _currencyManager;
@@ -27,9 +28,16 @@ public sealed class IncomeModifiersHub : MonoBehaviour
         }
         G.Income = this;
 
-        if (_autoCollectFromChildren && _modifiers.Count == 0)
+        EnsureAutoModifiers();
+
+        if (_autoCollectFromChildren)
         {
-            _modifiers.AddRange(GetComponentsInChildren<IncomeModifierBehaviour>(includeInactive: true));
+            var childModifiers = GetComponentsInChildren<IncomeModifierBehaviour>(includeInactive: true);
+            for (int i = 0; i < childModifiers.Length; i++)
+            {
+                if (childModifiers[i] != null && !_modifiers.Contains(childModifiers[i]))
+                    _modifiers.Add(childModifiers[i]);
+            }
         }
 
         for (int i = 0; i < _modifiers.Count; i++)
@@ -51,6 +59,17 @@ public sealed class IncomeModifiersHub : MonoBehaviour
     private void OnAnyModifierChanged()
     {
         Changed?.Invoke();
+    }
+
+    private void EnsureAutoModifiers()
+    {
+        if (!_autoAddConveyorUpgradeBonus)
+            return;
+
+        if (GetComponentInChildren<ConveyorUpgradeBonusModifierMB>(includeInactive: true) != null)
+            return;
+
+        gameObject.AddComponent<ConveyorUpgradeBonusModifierMB>();
     }
 
     public void Register(IncomeModifierBehaviour modifier)

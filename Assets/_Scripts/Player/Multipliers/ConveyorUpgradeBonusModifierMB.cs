@@ -7,7 +7,7 @@ public interface IConveyorPercentSource
 
 public sealed class ConveyorUpgradeBonusModifierMB : IncomeModifierBehaviour
 {
-    [SerializeField] private MonoBehaviour _source; // должен реализовать IConveyorPercentSource
+    [SerializeField] private MonoBehaviour _source;
 
     private IConveyorPercentSource _typedSource;
 
@@ -16,22 +16,43 @@ public sealed class ConveyorUpgradeBonusModifierMB : IncomeModifierBehaviour
 
     private void Awake()
     {
-        _typedSource = _source as IConveyorPercentSource;
+        ResolveSource();
     }
 
     public override float Value
     {
         get
         {
+            if (_typedSource == null)
+                ResolveSource();
+
             if (_typedSource == null) return 0f;
             return Mathf.Max(0f, _typedSource.GetPercentBonus());
         }
     }
 
-    public override string Description => "Бонус зависит от уровня конвейера";
+    public override string Description => "Conveyor upgrade money bonus";
 
     public void NotifyConveyorChanged()
     {
         NotifyChanged();
+    }
+
+    private void ResolveSource()
+    {
+        _typedSource = _source as IConveyorPercentSource;
+        if (_typedSource != null)
+            return;
+
+        var conveyors = FindObjectsByType<Conveyor>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < conveyors.Length; i++)
+        {
+            if (conveyors[i] != null && !conveyors[i].IsRemoteMode)
+            {
+                _source = conveyors[i];
+                _typedSource = conveyors[i];
+                return;
+            }
+        }
     }
 }

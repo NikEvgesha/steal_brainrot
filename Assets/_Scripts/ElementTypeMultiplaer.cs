@@ -90,25 +90,25 @@ public class ElementTypeMultiplaer : MonoBehaviour
     /// </summary>
     public ElementType GetRandomWeighted()
     {
-        float noElementChanceBonus = G.Luck != null ? G.Luck.NoElementChanceBonus01 : 0f;
-        if (noElementChanceBonus > 0f)
-            return GetRandomWeighted(noElementChanceBonus);
+        float elementChanceBonus = G.Luck != null ? G.Luck.ElementChanceBonus01 : 0f;
+        if (elementChanceBonus > 0f)
+            return GetRandomWeighted(elementChanceBonus);
 
         return GetRandomWeightedWithoutLuck();
     }
 
-    public ElementType GetRandomWeighted(float noElementChanceBonus01)
+    public ElementType GetRandomWeighted(float elementChanceBonus01)
     {
         if (_cdf.Count == 0) // нет данных
             return default;
 
-        if (noElementChanceBonus01 <= 0f || _noElementWeight <= 0f || _elementOnlyWeight <= 0f)
+        if (elementChanceBonus01 <= 0f || _noElementWeight <= 0f || _elementOnlyWeight <= 0f)
             return GetRandomWeightedWithoutLuck();
 
-        float baseNoElementChance = _noElementWeight / _totalWeight;
-        float boostedNoElementChance = Mathf.Clamp01(baseNoElementChance + noElementChanceBonus01);
+        float baseElementChance = _elementOnlyWeight / _totalWeight;
+        float boostedElementChance = Mathf.Clamp01(baseElementChance + elementChanceBonus01);
 
-        if (UnityEngine.Random.value <= boostedNoElementChance)
+        if (UnityEngine.Random.value > boostedElementChance)
             return ElementType.NoElement;
 
         float elementRoll = UnityEngine.Random.value * _elementOnlyWeight;

@@ -2,26 +2,24 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
-public interface INoElementLuckBonusSource
+public interface IElementLuckBonusSource
 {
-    float GetNoElementChanceBonus01();
+    float GetElementChanceBonus01();
 }
 
 public sealed class PlayerLuckHub : MonoBehaviour
 {
-    [SerializeField] private bool _useConveyorProgressBonus = true;
-    [SerializeField] private bool _useUnlockedConveyorLevel = true;
-    [SerializeField] private float _maxConveyorNoElementBonus = 0.009f;
+    [SerializeField] private bool _useConveyorUpgradeBonus = true;
     [SerializeField] private MonoBehaviour _conveyorSource;
 
-    private readonly List<INoElementLuckBonusSource> _bonusSources = new();
+    private readonly List<IElementLuckBonusSource> _bonusSources = new();
     private Conveyor _conveyor;
 
     public event UnityAction Changed;
 
-    public float NoElementChanceBonus01 => CalculateNoElementChanceBonus();
-    public float ConveyorNoElementChanceBonus01 => CalculateConveyorBonus();
-    public float BoosterNoElementChanceBonus01 => CalculateBonusSourceBonus();
+    public float ElementChanceBonus01 => CalculateElementChanceBonus();
+    public float ConveyorElementChanceBonus01 => CalculateConveyorBonus();
+    public float BoosterElementChanceBonus01 => CalculateBonusSourceBonus();
 
     public static PlayerLuckHub EnsureExists()
     {
@@ -54,7 +52,7 @@ public sealed class PlayerLuckHub : MonoBehaviour
             G.Luck = null;
     }
 
-    public void Register(INoElementLuckBonusSource source)
+    public void Register(IElementLuckBonusSource source)
     {
         if (source == null) return;
         if (_bonusSources.Contains(source)) return;
@@ -63,7 +61,7 @@ public sealed class PlayerLuckHub : MonoBehaviour
         Changed?.Invoke();
     }
 
-    public void Unregister(INoElementLuckBonusSource source)
+    public void Unregister(IElementLuckBonusSource source)
     {
         if (source == null) return;
         if (!_bonusSources.Remove(source)) return;
@@ -76,25 +74,21 @@ public sealed class PlayerLuckHub : MonoBehaviour
         Changed?.Invoke();
     }
 
-    private float CalculateNoElementChanceBonus()
+    private float CalculateElementChanceBonus()
     {
         return Mathf.Clamp01(CalculateConveyorBonus() + CalculateBonusSourceBonus());
     }
 
     private float CalculateConveyorBonus()
     {
-        if (!_useConveyorProgressBonus)
+        if (!_useConveyorUpgradeBonus)
             return 0f;
 
         var conveyor = GetConveyor();
         if (conveyor == null)
             return 0f;
 
-        float progress = _useUnlockedConveyorLevel
-            ? conveyor.UnlockedLevelProgress01
-            : conveyor.CurrentLevelProgress01;
-
-        return Mathf.Clamp01(progress) * Mathf.Max(0f, _maxConveyorNoElementBonus);
+        return Mathf.Clamp01(conveyor.UnlockedElementChanceBonus01);
     }
 
     private float CalculateBonusSourceBonus()
@@ -110,7 +104,7 @@ public sealed class PlayerLuckHub : MonoBehaviour
                 continue;
             }
 
-            bonus += Mathf.Max(0f, source.GetNoElementChanceBonus01());
+            bonus += Mathf.Max(0f, source.GetElementChanceBonus01());
         }
 
         return bonus;
