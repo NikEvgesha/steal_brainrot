@@ -4,6 +4,11 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class MovingRoadVisualScroller : MonoBehaviour
 {
+    private const string LeftContainerName = "strelka_left";
+    private const string RightContainerName = "strelka_right";
+
+    private static readonly List<SharedGroup> Groups = new();
+
     [SerializeField] private Renderer[] renderers;
     [SerializeField] private Vector2 uvDirection = Vector2.right;
     [SerializeField] private float scrollSpeed = 5f;
@@ -12,33 +17,34 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
     [SerializeField] private float stripLengthOverride;
     [SerializeField] private float visualSpacing;
 
-    private Entry[] _entries;
-    private float _stripMin;
-    private float _stripMax;
-    private float _stripLength;
+    private SharedGroup _group;
+    private bool _registered;
 
     public float ScrollSpeed
     {
         get => scrollSpeed;
-        set => scrollSpeed = value;
+        set
+        {
+            scrollSpeed = value;
+            _group?.RequestRebuild();
+        }
     }
 
     public void Configure(Renderer[] targetRenderers, Vector2 direction, float speed)
     {
-        RestoreOriginalPositions();
+        UnregisterFromGroup();
 
         renderers = targetRenderers;
         uvDirection = direction.sqrMagnitude > 0.0001f ? direction : Vector2.right;
         scrollSpeed = speed;
 
-        if (isActiveAndEnabled)
-            RebuildEntries();
+        if (isActiveAndEnabled && Application.isPlaying)
+            RegisterToGroup();
     }
 
     private void Reset()
     {
         renderers = GetComponentsInChildren<Renderer>(true);
-        _entries = null;
     }
 
     private void OnValidate()
@@ -48,103 +54,101 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
 
         stripLengthOverride = Mathf.Max(0f, stripLengthOverride);
         visualSpacing = Mathf.Max(0f, visualSpacing);
-        _entries = null;
+
+        if (Application.isPlaying)
+            _group?.RequestRebuild();
     }
 
     private void OnEnable()
     {
-        RebuildEntries();
+        if (Application.isPlaying)
+            RegisterToGroup();
     }
 
     private void LateUpdate()
     {
-        if (_entries == null)
-            RebuildEntries();
-
-        if (_entries.Length == 0 || Mathf.Approximately(scrollSpeed, 0f))
+        if (!Application.isPlaying || !_registered)
             return;
 
-        Vector3 axis = GetLocalAxis();
-        float worldUnitsPerLocalUnit = transform.TransformVector(axis).magnitude;
-        if (worldUnitsPerLocalUnit <= 0.0001f)
-            return;
-
-        float scrollStep = scrollSpeed * Time.deltaTime / worldUnitsPerLocalUnit;
-        ApplyPositions(axis, scrollStep);
+        _group?.Tick(Time.deltaTime);
     }
 
     private void OnDisable()
     {
-        RestoreOriginalPositions();
+        UnregisterFromGroup();
+    }
+
+    private void OnDestroy()
+    {
+        UnregisterFromGroup();
     }
 
     private void OnTransformChildrenChanged()
     {
-        RestoreOriginalPositions();
-    }
-
-    private void ApplyPositions(Vector3 axis, float scrollStep)
-    {
-        for (int i = 0; i < _entries.Length; i++)
-        {
-            Entry entry = _entries[i];
-            if (entry.Original == null || _stripLength <= 0.0001f)
-                continue;
-
-            float center = entry.CurrentCenter + scrollStep;
-            while (center - entry.HalfLength > _stripMax)
-                center -= _stripLength;
-            while (center + entry.HalfLength < _stripMin)
-                center += _stripLength;
-
-            entry.CurrentCenter = center;
-            float visualOffset = entry.CurrentCenter - entry.StartCenter;
-            entry.Original.localPosition = entry.StartLocalPosition + GetParentLocalDelta(entry.Original, axis, visualOffset);
-            _entries[i] = entry;
-        }
-    }
-
-    private void RebuildEntries()
-    {
-        RestoreOriginalPositions();
-
-        Renderer[] targetRenderers = ResolveRenderers();
-        if (targetRenderers == null || targetRenderers.Length == 0)
-        {
-            _entries = new Entry[0];
+        if (!Application.isPlaying || !_registered)
             return;
-        }
 
-        Vector3 axis = GetLocalAxis();
-        List<Entry> entries = new List<Entry>();
-        for (int rendererIndex = 0; rendererIndex < targetRenderers.Length; rendererIndex++)
-        {
-            Renderer targetRenderer = targetRenderers[rendererIndex];
-            if (!IsUsableRenderer(targetRenderer))
-                continue;
-
-            Projection projection = MeasureProjection(targetRenderer, axis);
-            Transform targetTransform = targetRenderer.transform;
-            entries.Add(new Entry
-            {
-                Original = targetTransform,
-                StartLocalPosition = targetTransform.localPosition,
-                StartCenter = projection.Center,
-                CurrentCenter = projection.Center,
-                HalfLength = projection.Length * 0.5f
-            });
-        }
-
-        entries.Sort((a, b) => a.StartCenter.CompareTo(b.StartCenter));
-        CacheStripBounds(entries);
-        _entries = entries.ToArray();
-        ApplyPositions(axis, 0f);
+        _group?.RequestRebuild();
     }
 
-    private Vector3 GetLocalAxis()
+    private void RegisterToGroup()
     {
-        Vector3 axis = new Vector3(uvDirection.x, 0f, uvDirection.y);
-        return axis.sqrMagnitude > 0.0001f ? axis.normalized : Vector3.right;
+        if (_registered)
+            return;
+
+        Transform sharedRoot = ResolveSharedRoot();
+        string containerName = ResolveContainerName();
+        CleanupLegacyLocalContainer(containerName);
+
+        _group = GetOrCreateGroup(sharedRoot, containerName);
+        _group.Register(this);
+        _registered = true;
+    }
+
+    private void UnregisterFromGroup()
+    {
+        if (!_registered)
+            return;
+
+        SharedGroup group = _group;
+        _registered = false;
+        _group = null;
+
+        if (group != null)
+            group.Unregister(this);
+    }
+
+    private Transform ResolveSharedRoot()
+    {
+        Transform prefabRoot = transform.parent;
+        if (prefabRoot != null && prefabRoot.parent != null)
+            return prefabRoot.parent;
+
+        return prefabRoot != null ? prefabRoot : transform;
+    }
+
+    private string ResolveContainerName()
+    {
+        string laneName = gameObject.name.ToLowerInvariant();
+        if (laneName.Contains("left"))
+            return LeftContainerName;
+
+        if (laneName.Contains("right"))
+            return RightContainerName;
+
+        return uvDirection.x >= 0f ? LeftContainerName : RightContainerName;
+    }
+
+    private Vector3 GetSharedAxis(Transform sharedRoot)
+    {
+        Vector3 localAxis = new Vector3(uvDirection.x, 0f, uvDirection.y);
+        if (localAxis.sqrMagnitude < 0.0001f)
+            localAxis = Vector3.right;
+
+        Vector3 worldAxis = transform.TransformVector(localAxis.normalized);
+        Vector3 sharedAxis = sharedRoot.InverseTransformVector(worldAxis);
+        sharedAxis.y = 0f;
+        return sharedAxis.sqrMagnitude > 0.0001f ? sharedAxis.normalized : Vector3.right;
     }
 
     private Renderer[] ResolveRenderers()
@@ -155,7 +159,7 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
         return GetComponentsInChildren<Renderer>(includeInactiveChildRenderers);
     }
 
-    private bool IsUsableRenderer(Renderer targetRenderer)
+    private bool IsTemplateArrowRenderer(Renderer targetRenderer)
     {
         if (targetRenderer == null || !targetRenderer.transform.IsChildOf(transform))
             return false;
@@ -163,95 +167,501 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
         if (!includeInactiveChildRenderers && !targetRenderer.gameObject.activeInHierarchy)
             return false;
 
-        return includeInactiveChildRenderers || targetRenderer.enabled;
+        if (IsAssignedRenderer(targetRenderer))
+            return true;
+
+        return targetRenderer.gameObject.name.IndexOf("strelka", System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private void RestoreOriginalPositions()
+    private bool IsAssignedRenderer(Renderer targetRenderer)
     {
-        if (_entries == null)
+        if (renderers == null)
+            return false;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] == targetRenderer)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void CleanupLegacyLocalContainer(string containerName)
+    {
+        Transform prefabRoot = transform.parent;
+        if (prefabRoot == null)
             return;
 
-        for (int entryIndex = 0; entryIndex < _entries.Length; entryIndex++)
-        {
-            Entry entry = _entries[entryIndex];
-            if (entry.Original != null)
-                entry.Original.localPosition = entry.StartLocalPosition;
-        }
-
-        _entries = null;
+        Transform oldContainer = prefabRoot.Find(containerName);
+        if (oldContainer != null)
+            DestroyRuntimeObject(oldContainer.gameObject);
     }
 
-    private void CacheStripBounds(List<Entry> entries)
+    private static SharedGroup GetOrCreateGroup(Transform root, string containerName)
     {
-        if (entries.Count == 0)
+        for (int i = Groups.Count - 1; i >= 0; i--)
         {
-            _stripMin = 0f;
-            _stripMax = 0f;
-            _stripLength = 0f;
-            return;
-        }
-
-        _stripMin = float.MaxValue;
-        _stripMax = float.MinValue;
-        for (int i = 0; i < entries.Count; i++)
-        {
-            Entry entry = entries[i];
-            _stripMin = Mathf.Min(_stripMin, entry.StartCenter - entry.HalfLength);
-            _stripMax = Mathf.Max(_stripMax, entry.StartCenter + entry.HalfLength);
-        }
-
-        _stripLength = stripLengthOverride > 0.0001f
-            ? stripLengthOverride
-            : Mathf.Max(0.0001f, _stripMax - _stripMin + visualSpacing);
-    }
-
-    private Vector3 GetParentLocalDelta(Transform target, Vector3 axis, float offset)
-    {
-        if (target.parent == null)
-            return transform.TransformVector(axis * offset);
-
-        Vector3 worldDelta = transform.TransformVector(axis * offset);
-        return target.parent.InverseTransformVector(worldDelta);
-    }
-
-    private Projection MeasureProjection(Renderer targetRenderer, Vector3 axis)
-    {
-        Bounds bounds = targetRenderer.localBounds;
-        Vector3 center = bounds.center;
-        Vector3 extents = bounds.extents;
-        float min = float.MaxValue;
-        float max = float.MinValue;
-
-        for (int x = -1; x <= 1; x += 2)
-        {
-            for (int y = -1; y <= 1; y += 2)
+            SharedGroup group = Groups[i];
+            if (group.Root == null)
             {
-                for (int z = -1; z <= 1; z += 2)
-                {
-                    Vector3 localPoint = center + Vector3.Scale(extents, new Vector3(x, y, z));
-                    Vector3 laneLocalPoint = transform.InverseTransformPoint(targetRenderer.transform.TransformPoint(localPoint));
-                    float projection = Vector3.Dot(laneLocalPoint, axis);
-                    min = Mathf.Min(min, projection);
-                    max = Mathf.Max(max, projection);
-                }
+                group.Cleanup();
+                Groups.RemoveAt(i);
+                continue;
+            }
+
+            if (group.Root == root && group.ContainerName == containerName)
+                return group;
+        }
+
+        SharedGroup newGroup = new SharedGroup(root, containerName);
+        Groups.Add(newGroup);
+        return newGroup;
+    }
+
+    private sealed class SharedGroup
+    {
+        private readonly List<MovingRoadVisualScroller> _contributors = new();
+        private readonly List<SourceRendererState> _sourceStates = new();
+        private readonly List<RuntimeArrow> _runtimeArrows = new();
+
+        private Transform _visualRoot;
+        private Vector3 _axis;
+        private float _stripStart;
+        private float _stripLength;
+        private float _scrollSpeed;
+        private int _lastTickFrame = -1;
+        private bool _needsRebuild = true;
+        private bool _isRebuilding;
+
+        public SharedGroup(Transform root, string containerName)
+        {
+            Root = root;
+            ContainerName = containerName;
+        }
+
+        public Transform Root { get; }
+        public string ContainerName { get; }
+
+        public void Register(MovingRoadVisualScroller contributor)
+        {
+            if (contributor == null || _contributors.Contains(contributor))
+                return;
+
+            _contributors.Add(contributor);
+            RequestRebuild();
+        }
+
+        public void Unregister(MovingRoadVisualScroller contributor)
+        {
+            _contributors.Remove(contributor);
+
+            if (_contributors.Count == 0)
+            {
+                Cleanup();
+                Groups.Remove(this);
+            }
+            else
+            {
+                RequestRebuild();
             }
         }
 
-        float length = Mathf.Max(0.0001f, max - min);
-        return new Projection
+        public void RequestRebuild()
         {
-            Center = (min + max) * 0.5f,
-            Length = length
-        };
+            _needsRebuild = true;
+        }
+
+        public void Tick(float deltaTime)
+        {
+            if (_lastTickFrame == Time.frameCount)
+                return;
+
+            _lastTickFrame = Time.frameCount;
+
+            if (_needsRebuild)
+                Rebuild();
+
+            if (_visualRoot == null || _runtimeArrows.Count == 0 || _stripLength <= 0.0001f || Mathf.Approximately(_scrollSpeed, 0f))
+                return;
+
+            float worldUnitsPerRootUnit = Root.TransformVector(_axis).magnitude;
+            if (worldUnitsPerRootUnit <= 0.0001f)
+                return;
+
+            MoveRuntimeArrows(_scrollSpeed * deltaTime / worldUnitsPerRootUnit);
+        }
+
+        public void Cleanup()
+        {
+            RestoreSourceRenderers();
+            _runtimeArrows.Clear();
+
+            if (_visualRoot != null)
+            {
+                DestroyRuntimeObject(_visualRoot.gameObject);
+                _visualRoot = null;
+            }
+
+            _stripLength = 0f;
+            _stripStart = 0f;
+            _needsRebuild = true;
+        }
+
+        private void Rebuild()
+        {
+            if (_isRebuilding)
+                return;
+
+            _isRebuilding = true;
+            try
+            {
+                Cleanup();
+
+                List<TemplateArrow> templates = CollectTemplates();
+                if (templates.Count == 0)
+                {
+                    _needsRebuild = false;
+                    return;
+                }
+
+                templates.Sort((a, b) => a.ProjectionCenter.CompareTo(b.ProjectionCenter));
+                ResolveScrollPath(templates);
+                if (_stripLength <= 0.0001f)
+                {
+                    _needsRebuild = false;
+                    return;
+                }
+
+                CreateVisualRoot();
+                CreateRuntimeArrows(templates);
+                ApplyFrontArrowVisibility();
+                HideSourceRenderers(templates);
+                _visualRoot.localPosition = Vector3.zero;
+                _needsRebuild = false;
+            }
+            finally
+            {
+                _isRebuilding = false;
+            }
+        }
+
+        private List<TemplateArrow> CollectTemplates()
+        {
+            List<TemplateArrow> templates = new List<TemplateArrow>();
+            MovingRoadVisualScroller firstContributor = null;
+
+            for (int i = 0; i < _contributors.Count; i++)
+            {
+                MovingRoadVisualScroller contributor = _contributors[i];
+                if (contributor == null || !contributor.isActiveAndEnabled)
+                    continue;
+
+                if (firstContributor == null)
+                {
+                    firstContributor = contributor;
+                    _axis = firstContributor.GetSharedAxis(Root);
+                    _scrollSpeed = firstContributor.scrollSpeed;
+                }
+
+                Renderer[] candidates = contributor.ResolveRenderers();
+                if (candidates == null)
+                    continue;
+
+                for (int candidateIndex = 0; candidateIndex < candidates.Length; candidateIndex++)
+                {
+                    Renderer candidate = candidates[candidateIndex];
+                    if (!contributor.IsTemplateArrowRenderer(candidate))
+                        continue;
+
+                    templates.Add(CreateTemplate(contributor, candidate));
+                }
+            }
+
+            return templates;
+        }
+
+        private TemplateArrow CreateTemplate(MovingRoadVisualScroller contributor, Renderer sourceRenderer)
+        {
+            Transform sourceTransform = sourceRenderer.transform;
+            Projection projection = MeasureProjection(sourceRenderer);
+            return new TemplateArrow
+            {
+                SourceRenderer = sourceRenderer,
+                SourceTransform = sourceTransform,
+                RootLocalPosition = Root.InverseTransformPoint(sourceTransform.position),
+                RootLocalRotation = Quaternion.Inverse(Root.rotation) * sourceTransform.rotation,
+                RootLocalScale = GetRelativeScale(sourceTransform, Root),
+                ProjectionCenter = projection.Center,
+                ProjectionLength = projection.Length,
+                StripLengthOverride = contributor.stripLengthOverride,
+                VisualSpacing = contributor.visualSpacing
+            };
+        }
+
+        private void CreateVisualRoot()
+        {
+            Transform oldRoot = Root.Find(ContainerName);
+            if (oldRoot != null)
+                DestroyRuntimeObject(oldRoot.gameObject);
+
+            GameObject rootObject = new GameObject(ContainerName);
+            rootObject.hideFlags = HideFlags.DontSave;
+            _visualRoot = rootObject.transform;
+            _visualRoot.SetParent(Root, false);
+            _visualRoot.localPosition = Vector3.zero;
+            _visualRoot.localRotation = Quaternion.identity;
+            _visualRoot.localScale = Vector3.one;
+        }
+
+        private void CreateRuntimeArrows(List<TemplateArrow> templates)
+        {
+            for (int templateIndex = 0; templateIndex < templates.Count; templateIndex++)
+            {
+                TemplateArrow template = templates[templateIndex];
+                GameObject clone = Instantiate(template.SourceTransform.gameObject, _visualRoot);
+                clone.name = "strelka_visual_" + templateIndex;
+                clone.hideFlags = HideFlags.DontSave;
+
+                Transform cloneTransform = clone.transform;
+                cloneTransform.localPosition = template.RootLocalPosition;
+                cloneTransform.localRotation = template.RootLocalRotation;
+                cloneTransform.localScale = template.RootLocalScale;
+
+                DisableColliders(cloneTransform);
+                EnableRenderers(cloneTransform, true);
+
+                _runtimeArrows.Add(new RuntimeArrow
+                {
+                    Root = cloneTransform,
+                    BaseLocalPosition = template.RootLocalPosition,
+                    BaseProjection = template.ProjectionCenter,
+                    CurrentProjection = template.ProjectionCenter
+                });
+            }
+        }
+
+        private void HideSourceRenderers(List<TemplateArrow> templates)
+        {
+            for (int i = 0; i < templates.Count; i++)
+            {
+                Renderer sourceRenderer = templates[i].SourceRenderer;
+                if (sourceRenderer == null)
+                    continue;
+
+                _sourceStates.Add(new SourceRendererState
+                {
+                    Renderer = sourceRenderer,
+                    Enabled = sourceRenderer.enabled
+                });
+
+                sourceRenderer.enabled = false;
+            }
+        }
+
+        private void RestoreSourceRenderers()
+        {
+            for (int i = 0; i < _sourceStates.Count; i++)
+            {
+                SourceRendererState state = _sourceStates[i];
+                if (state.Renderer != null)
+                    state.Renderer.enabled = state.Enabled;
+            }
+
+            _sourceStates.Clear();
+        }
+
+        private void MoveRuntimeArrows(float delta)
+        {
+            float stripEnd = _stripStart + _stripLength;
+
+            for (int i = 0; i < _runtimeArrows.Count; i++)
+            {
+                RuntimeArrow arrow = _runtimeArrows[i];
+                arrow.CurrentProjection += delta;
+
+                while (arrow.CurrentProjection >= stripEnd)
+                    arrow.CurrentProjection -= _stripLength;
+
+                while (arrow.CurrentProjection < _stripStart)
+                    arrow.CurrentProjection += _stripLength;
+
+                arrow.Root.localPosition = arrow.BaseLocalPosition + _axis * (arrow.CurrentProjection - arrow.BaseProjection);
+                _runtimeArrows[i] = arrow;
+            }
+
+            ApplyFrontArrowVisibility();
+        }
+
+        private void ApplyFrontArrowVisibility()
+        {
+            int hiddenIndex = FindFrontArrowIndex();
+            for (int i = 0; i < _runtimeArrows.Count; i++)
+            {
+                RuntimeArrow arrow = _runtimeArrows[i];
+                if (arrow.Root == null)
+                    continue;
+
+                bool shouldBeActive = i != hiddenIndex;
+                if (arrow.Root.gameObject.activeSelf != shouldBeActive)
+                    arrow.Root.gameObject.SetActive(shouldBeActive);
+            }
+        }
+
+        private int FindFrontArrowIndex()
+        {
+            if (_runtimeArrows.Count <= 1)
+                return -1;
+
+            int frontIndex = -1;
+            float frontProjection = float.MinValue;
+            for (int i = 0; i < _runtimeArrows.Count; i++)
+            {
+                RuntimeArrow arrow = _runtimeArrows[i];
+                if (arrow.Root == null || arrow.CurrentProjection <= frontProjection)
+                    continue;
+
+                frontProjection = arrow.CurrentProjection;
+                frontIndex = i;
+            }
+
+            return frontIndex;
+        }
+
+        private void ResolveScrollPath(List<TemplateArrow> templates)
+        {
+            float stripOverride = 0f;
+            float spacing = 0f;
+            for (int i = 0; i < templates.Count; i++)
+            {
+                TemplateArrow template = templates[i];
+                stripOverride = Mathf.Max(stripOverride, template.StripLengthOverride);
+                spacing = Mathf.Max(spacing, template.VisualSpacing);
+            }
+
+            _stripStart = templates[0].ProjectionCenter;
+            if (stripOverride > 0.0001f)
+            {
+                _stripLength = stripOverride;
+                return;
+            }
+
+            if (templates.Count == 1)
+            {
+                _stripLength = Mathf.Max(0.0001f, templates[0].ProjectionLength + spacing);
+                return;
+            }
+
+            float totalGap = 0f;
+            for (int i = 1; i < templates.Count; i++)
+                totalGap += Mathf.Max(0.0001f, templates[i].ProjectionCenter - templates[i - 1].ProjectionCenter);
+
+            float averageGap = totalGap / (templates.Count - 1);
+            _stripLength = Mathf.Max(0.0001f, averageGap * templates.Count + spacing);
+        }
+
+        private Projection MeasureProjection(Renderer targetRenderer)
+        {
+            Bounds bounds = targetRenderer.localBounds;
+            Vector3 center = bounds.center;
+            Vector3 extents = bounds.extents;
+            float min = float.MaxValue;
+            float max = float.MinValue;
+
+            for (int x = -1; x <= 1; x += 2)
+            {
+                for (int y = -1; y <= 1; y += 2)
+                {
+                    for (int z = -1; z <= 1; z += 2)
+                    {
+                        Vector3 localPoint = center + Vector3.Scale(extents, new Vector3(x, y, z));
+                        Vector3 rootLocalPoint = Root.InverseTransformPoint(targetRenderer.transform.TransformPoint(localPoint));
+                        float projection = Vector3.Dot(rootLocalPoint, _axis);
+                        min = Mathf.Min(min, projection);
+                        max = Mathf.Max(max, projection);
+                    }
+                }
+            }
+
+            float length = Mathf.Max(0.0001f, max - min);
+            return new Projection
+            {
+                Center = (min + max) * 0.5f,
+                Length = length
+            };
+        }
     }
 
-    private struct Entry
+    private static void EnableRenderers(Transform root, bool enabled)
     {
-        public Transform Original;
-        public Vector3 StartLocalPosition;
-        public float StartCenter;
-        public float CurrentCenter;
-        public float HalfLength;
+        Renderer[] childRenderers = root.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < childRenderers.Length; i++)
+            childRenderers[i].enabled = enabled;
+    }
+
+    private static void DisableColliders(Transform root)
+    {
+        Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+            colliders[i].enabled = false;
+    }
+
+    private static void DestroyRuntimeObject(GameObject target)
+    {
+        if (target == null)
+            return;
+
+        if (Application.isPlaying)
+        {
+            target.SetActive(false);
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
+    }
+
+    private static Vector3 GetRelativeScale(Transform target, Transform relativeTo)
+    {
+        Vector3 rootScale = relativeTo.lossyScale;
+        Vector3 targetScale = target.lossyScale;
+        return new Vector3(
+            SafeDivide(targetScale.x, rootScale.x),
+            SafeDivide(targetScale.y, rootScale.y),
+            SafeDivide(targetScale.z, rootScale.z));
+    }
+
+    private static float SafeDivide(float value, float divisor)
+    {
+        return Mathf.Abs(divisor) > 0.0001f ? value / divisor : value;
+    }
+
+    private struct SourceRendererState
+    {
+        public Renderer Renderer;
+        public bool Enabled;
+    }
+
+    private struct TemplateArrow
+    {
+        public Renderer SourceRenderer;
+        public Transform SourceTransform;
+        public Vector3 RootLocalPosition;
+        public Quaternion RootLocalRotation;
+        public Vector3 RootLocalScale;
+        public float ProjectionCenter;
+        public float ProjectionLength;
+        public float StripLengthOverride;
+        public float VisualSpacing;
+    }
+
+    private struct RuntimeArrow
+    {
+        public Transform Root;
+        public Vector3 BaseLocalPosition;
+        public float BaseProjection;
+        public float CurrentProjection;
     }
 
     private struct Projection
