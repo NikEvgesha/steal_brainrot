@@ -35,7 +35,7 @@ public class Field : MonoBehaviour
         G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
         _touchHandler = GetComponentInChildren<BuyTouchHandler>();
         _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
-        _buyPanel.SetInfo("Разблокировать", _price.ToString());
+        _buyPanel.SetInfo(LocalizationUtils.T("UnlockLevel", "Разблокировать"), _price.ToString());
 
         if (_unblocked)
         {
@@ -110,7 +110,7 @@ public class Field : MonoBehaviour
     {
         _price = Mathf.Max(0f, price);
         if (_buyPanel != null)
-            _buyPanel.SetInfo("Разблокировать", _price.ToString("0"));
+            _buyPanel.SetInfo(LocalizationUtils.T("UnlockLevel", "Разблокировать"), _price.ToString("0"));
     }
 
 

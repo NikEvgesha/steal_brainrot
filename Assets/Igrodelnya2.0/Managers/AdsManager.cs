@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System;
 
 
-// Главный менеджер рекламы
+// Р“Р»Р°РІРЅС‹Р№ РјРµРЅРµРґР¶РµСЂ СЂРµРєР»Р°РјС‹
 public class AdsManager : MonoBehaviour
 {
     //private static AdsManager _instance;
@@ -21,9 +21,10 @@ public class AdsManager : MonoBehaviour
     //    }
     //}
 
-    [SerializeField] private List<AdsProvider> adsProviders = new List<AdsProvider>(); // Список активных провайдеров
+    [SerializeField] private List<AdsProvider> adsProviders = new List<AdsProvider>(); // РЎРїРёСЃРѕРє Р°РєС‚РёРІРЅС‹С… РїСЂРѕРІР°Р№РґРµСЂРѕРІ
 
     public Action AdClosed;
+    private readonly HashSet<AdsProvider> subscribedProviders = new HashSet<AdsProvider>();
 
     void Awake()
     {
@@ -37,7 +38,7 @@ public class AdsManager : MonoBehaviour
             Destroy(gameObject);
         }
 
-        // Инициализация всех провайдеров
+        // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РІСЃРµС… РїСЂРѕРІР°Р№РґРµСЂРѕРІ
         InitializeProviders();
     }
 
@@ -46,7 +47,7 @@ public class AdsManager : MonoBehaviour
     {
         foreach (var provider in adsProviders)
         {
-            provider.AdClosed += OnAdClosed;
+            SubscribeProvider(provider);
         }
     }
 
@@ -54,7 +55,7 @@ public class AdsManager : MonoBehaviour
     {
         foreach (var provider in adsProviders)
         {
-            provider.AdClosed -= OnAdClosed;
+            UnsubscribeProvider(provider);
         }
     }
 
@@ -67,12 +68,15 @@ public class AdsManager : MonoBehaviour
     {
         foreach (var provider in adsProviders)
         {
+            if (provider == null)
+                continue;
+
             provider.Initialize();
             //Debug.Log($"Initialized ads provider: {provider.GetType().Name}");
         }
     }
 
-    // Проверка готовности rewarded-рекламы
+    // РџСЂРѕРІРµСЂРєР° РіРѕС‚РѕРІРЅРѕСЃС‚Рё rewarded-СЂРµРєР»Р°РјС‹
     public bool IsRewardedAdReady()
     {
         if (adsProviders.Count == 0)
@@ -83,7 +87,7 @@ public class AdsManager : MonoBehaviour
 
         foreach (var provider in adsProviders)
         {
-            if (provider.IsRewardedAdReady())
+            if (provider != null && provider.IsInitialized && provider.IsRewardedAdReady())
             {
                 return true;
             }
@@ -91,7 +95,7 @@ public class AdsManager : MonoBehaviour
         return false;
     }
 
-    // Показ rewarded-рекламы через первый готовый провайдер
+    // РџРѕРєР°Р· rewarded-СЂРµРєР»Р°РјС‹ С‡РµСЂРµР· РїРµСЂРІС‹Р№ РіРѕС‚РѕРІС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ
     public void ShowRewardedAd(string rewardId, Action<bool> onComplete)
     {
         if (adsProviders.Count == 0)
@@ -103,7 +107,7 @@ public class AdsManager : MonoBehaviour
 
         foreach (var provider in adsProviders)
         {
-            if (provider.IsRewardedAdReady())
+            if (provider != null && provider.IsInitialized && provider.IsRewardedAdReady())
             {
                 provider.ShowRewardedAd(rewardId, onComplete);
                 return;
@@ -113,7 +117,7 @@ public class AdsManager : MonoBehaviour
         onComplete?.Invoke(false);
     }
 
-    // Показ interstitial-рекламы через первый доступный провайдер
+    // РџРѕРєР°Р· interstitial-СЂРµРєР»Р°РјС‹ С‡РµСЂРµР· РїРµСЂРІС‹Р№ РґРѕСЃС‚СѓРїРЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ
     public void ShowInterstitialAd()
     {
         if (adsProviders.Count == 0)
@@ -124,19 +128,42 @@ public class AdsManager : MonoBehaviour
 
         foreach (var provider in adsProviders)
         {
-            provider.ShowInterstitialAd();
-            return;
+            if (provider != null && provider.IsInitialized && provider.IsInterstitialAdReady())
+            {
+                provider.ShowInterstitialAd();
+                return;
+            }
         }
         Debug.LogWarning("No interstitial ads available!");
     }
 
-    // Метод для добавления провайдера в рантайме
+    // РњРµС‚РѕРґ РґР»СЏ РґРѕР±Р°РІР»РµРЅРёСЏ РїСЂРѕРІР°Р№РґРµСЂР° РІ СЂР°РЅС‚Р°Р№РјРµ
     public void AddProvider(AdsProvider provider)
     {
+        if (provider == null)
+            return;
+
         if (!adsProviders.Contains(provider))
         {
             adsProviders.Add(provider);
             provider.Initialize();
+            SubscribeProvider(provider);
         }
+    }
+
+    private void SubscribeProvider(AdsProvider provider)
+    {
+        if (provider == null || !subscribedProviders.Add(provider))
+            return;
+
+        provider.AdClosed += OnAdClosed;
+    }
+
+    private void UnsubscribeProvider(AdsProvider provider)
+    {
+        if (provider == null || !subscribedProviders.Remove(provider))
+            return;
+
+        provider.AdClosed -= OnAdClosed;
     }
 }

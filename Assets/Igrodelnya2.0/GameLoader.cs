@@ -24,7 +24,7 @@ public class GameLoader : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("GameLoader уже существует! Удаляем дубликат.");
+            Debug.LogWarning("GameLoader СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚! РЈРґР°Р»СЏРµРј РґСѓР±Р»РёРєР°С‚.");
             Destroy(gameObject);
         }
         
@@ -35,7 +35,7 @@ public class GameLoader : MonoBehaviour
     {
         //_currentSceneName = _gameOptions.LobbySceneName;
         //SceneManager.LoadScene(_currentSceneName);
-        if (G.Purchases.PurchasesAvailable())
+        if (G.Purchases != null && G.Purchases.PurchasesAvailable())
         {
             _startLoadingFinished = true;
         }

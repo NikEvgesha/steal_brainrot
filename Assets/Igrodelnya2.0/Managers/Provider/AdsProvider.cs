@@ -1,13 +1,15 @@
 using System;
 using UnityEngine;
 
-// Интерфейс для рекламных провайдеров
+// РРЅС‚РµСЂС„РµР№СЃ РґР»СЏ СЂРµРєР»Р°РјРЅС‹С… РїСЂРѕРІР°Р№РґРµСЂРѕРІ
 public abstract class AdsProvider : MonoBehaviour
 {
-    public abstract void Initialize(); // Инициализация провайдера
-    public abstract bool IsRewardedAdReady(); // Проверка готовности rewarded-рекламы
-    public abstract void ShowRewardedAd(string rewardId, Action<bool> onComplete); // Показ rewarded-рекламы с коллбэком
-    public abstract void ShowInterstitialAd(); // Показ interstitial-рекламы
+    public abstract bool IsInitialized { get; }
+    public abstract void Initialize(); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїСЂРѕРІР°Р№РґРµСЂР°
+    public abstract bool IsRewardedAdReady(); // РџСЂРѕРІРµСЂРєР° РіРѕС‚РѕРІРЅРѕСЃС‚Рё rewarded-СЂРµРєР»Р°РјС‹
+    public abstract bool IsInterstitialAdReady(); // РџСЂРѕРІРµСЂРєР° РіРѕС‚РѕРІРЅРѕСЃС‚Рё interstitial-СЂРµРєР»Р°РјС‹
+    public abstract void ShowRewardedAd(string rewardId, Action<bool> onComplete); // РџРѕРєР°Р· rewarded-СЂРµРєР»Р°РјС‹ СЃ РєРѕР»Р»Р±СЌРєРѕРј
+    public abstract void ShowInterstitialAd(); // РџРѕРєР°Р· interstitial-СЂРµРєР»Р°РјС‹
 
     public Action AdClosed;
 }

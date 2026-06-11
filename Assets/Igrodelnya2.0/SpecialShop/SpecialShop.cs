@@ -11,14 +11,19 @@ public class SpecialShop : MonoBehaviour
     [SerializeField] private SpecialShopSlot _slotPrefab;
     [SerializeField] private ShopRow _rowPrefab;
     [SerializeField] private int _maxItemsPerRow = 3;
-    private Dictionary<PurchaseData, ShopPackData> _purchaseData;
+    private Dictionary<string, ShopPackData> _purchaseData;
     private List<ShopRow> _rows;
+    private readonly List<string> _pendingRestoredPurchaseIds = new List<string>();
     private bool _isOpen;
+    private bool _slotsInitialized;
     //private bool _inAppAvailable;
     public bool Opened => _isOpen;
 
     private void Awake()
     {
+        _purchaseData = new Dictionary<string, ShopPackData>();
+        _rows = new List<ShopRow>();
+
         if (G.SpecialShop == null)
         {
             G.SpecialShop = this;
@@ -33,11 +38,9 @@ public class SpecialShop : MonoBehaviour
 
     private void Start()
     {
-        _purchaseData = new Dictionary<PurchaseData, ShopPackData>();
         //_inAppAvailable = true; //G.Purchases.PurchasesAvailable();
-        _rows = new List<ShopRow>();
         InitSlots();
-        G.Purchases.RestorePurchases();
+        G.Purchases?.RestorePurchases();
         G.Currency.NoGems.AddListener(ToggleOpen);
     }
 
@@ -49,14 +52,22 @@ public class SpecialShop : MonoBehaviour
 
     public void InitSlots()
     {
+        _slotsInitialized = false;
+        _purchaseData.Clear();
+
         foreach (ShopPackData item in _packs)
         {
             Transform row = GetOrCreateAvailableRow(item.SlotType==ShopSlotType.Big);
             SpecialShopSlot slot = Instantiate(_slotPrefab, row); // TODO
-            PurchaseData data = G.Purchases.GetPurchaseData("Pack_" + item.Id);
-            _purchaseData.Add(data, item);
+            string purchaseId = GetPurchaseId(item);
+            PurchaseData data = G.Purchases != null ? G.Purchases.GetPurchaseData(purchaseId) : PurchaseData.Fallback(purchaseId);
+            if (!_purchaseData.ContainsKey(data.Id))
+                _purchaseData.Add(data.Id, item);
             slot.Init(item, data);
         }
+
+        _slotsInitialized = true;
+        FlushPendingRestores();
     }
 
     private Transform GetOrCreateAvailableRow(bool big)
@@ -97,20 +108,25 @@ public class SpecialShop : MonoBehaviour
 
     public void OnPurchaseRestore(string id)
     {
-        foreach (PurchaseData purchase in _purchaseData.Keys)
+        if (!_slotsInitialized)
         {
-            if (purchase.Id == id)
-            {
-                GiveReward(purchase);
-                break;
-            }
+            if (!string.IsNullOrWhiteSpace(id) && !_pendingRestoredPurchaseIds.Contains(id))
+                _pendingRestoredPurchaseIds.Add(id);
+            return;
         }
+
+        GiveReward(id);
     }
 
 
     public void TryBuy(PurchaseData purchaseData, ShopPackData packData)
     {
         //GiveReward(purchaseData);
+        if (G.Purchases == null || purchaseData == null || string.IsNullOrWhiteSpace(purchaseData.Id))
+        {
+            Debug.LogWarning("[SpecialShop] Cannot buy pack: purchases are not ready.");
+            return;
+        }
 
         G.IsPaused = true;
         G.Purchases.BuyPurchase(
@@ -119,19 +135,18 @@ public class SpecialShop : MonoBehaviour
             {
                 if (success)
                 {
-                    GiveReward(purchaseData);
+                    GiveReward(purchaseData.Id);
                 }
                 G.IsPaused = false;
             });
     }
 
-    private void GiveReward(PurchaseData purchaseData)
+    private void GiveReward(string purchaseId)
     {
-        ShopPackData packData = null;
-        _purchaseData.TryGetValue(purchaseData, out packData);
-        if (packData == null) return;
+        if (string.IsNullOrWhiteSpace(purchaseId) || !_purchaseData.TryGetValue(purchaseId, out var packData) || packData == null)
+            return;
 
-        foreach (ShopReward reward in _purchaseData[purchaseData].Rewards)
+        foreach (ShopReward reward in packData.Rewards)
         {
             if (reward.Type == ShopRewardType.Item)
             {
@@ -146,5 +161,21 @@ public class SpecialShop : MonoBehaviour
                 G.Currency.AddCurrency(reward.RewardCurrencyType, reward.Amount);
             }
         }
+    }
+
+    private static string GetPurchaseId(ShopPackData pack)
+    {
+        return "Pack_" + (pack != null ? pack.Id : "");
+    }
+
+    private void FlushPendingRestores()
+    {
+        if (_pendingRestoredPurchaseIds.Count == 0)
+            return;
+
+        for (int i = 0; i < _pendingRestoredPurchaseIds.Count; i++)
+            GiveReward(_pendingRestoredPurchaseIds[i]);
+
+        _pendingRestoredPurchaseIds.Clear();
     }
 }

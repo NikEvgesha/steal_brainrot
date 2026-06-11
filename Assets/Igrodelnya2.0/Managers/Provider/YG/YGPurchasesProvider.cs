@@ -1,5 +1,5 @@
 #if YG_SDK_ENABLED
-// Реализация для YG плагина
+// Р РµР°Р»РёР·Р°С†РёСЏ РґР»СЏ YG РїР»Р°РіРёРЅР°
 using System;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -8,6 +8,7 @@ using YG;
 public class YGPurchasesProvider : PurchasesProvider
 {
     private bool isInitialized = false;
+    public override bool IsInitialized => isInitialized;
 
     public override void Initialize()
     {
@@ -40,7 +41,7 @@ public class YGPurchasesProvider : PurchasesProvider
             return;
         }
 
-        YG.YG2.ConsumePurchases(true); // Автоматически вызывает onPurchaseSuccess для необработанных покупок
+        YG.YG2.ConsumePurchases(true); // РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РІС‹Р·С‹РІР°РµС‚ onPurchaseSuccess РґР»СЏ РЅРµРѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… РїРѕРєСѓРїРѕРє
         Debug.Log("YG Consuming pending purchases");
     }
 
@@ -64,7 +65,14 @@ public class YGPurchasesProvider : PurchasesProvider
     private void OnPurchaseSuccess(string id)
     {
         Debug.Log($"YG Purchase successful: {id}");
-        Shop.Instance.OnRestorePurchases(id);
+        if (currentCallback == null)
+        {
+            if (G.SpecialShop != null)
+                G.SpecialShop.OnPurchaseRestore(id);
+            else
+                Debug.LogWarning($"YG Purchase '{id}' restored before SpecialShop was ready.");
+        }
+
         currentCallback?.Invoke(true);
         currentCallback = null;
     }

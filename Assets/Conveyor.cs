@@ -1,9 +1,17 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class Conveyor : MonoBehaviour, IConveyorPercentSource
 {
+    private const string BaseMapProperty = "_BaseMap";
+    private const string MainTexProperty = "_MainTex";
+    private static readonly int BaseMapStProperty = Shader.PropertyToID("_BaseMap_ST");
+    private static readonly int MainTexStProperty = Shader.PropertyToID("_MainTex_ST");
+    private static readonly int BeltOffsetProperty = Shader.PropertyToID("_BeltOffset");
+    private static readonly int BeltAxisProperty = Shader.PropertyToID("_BeltAxis");
+
     [SerializeField] private bool _remoteMode;
     [SerializeField] private bool _openUiOnConveyorTrigger = true;
     [SerializeField] private float _spawnInterval;
@@ -25,6 +33,9 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     private bool _initialized;
     private bool _localConfigured;
     private Coroutine _spawnRoutine;
+    private float _beltScrollOffset;
+    private MaterialPropertyBlock _beltPropertyBlock;
+    private readonly List<BeltRendererBinding> _beltRendererBindings = new List<BeltRendererBinding>();
 
     public float IncomeMultiplier => _level != null ? _level.IncomeMultiplier : 1f;
     public IReadOnlyList<ConveyorLevel> Levels => _levels;
@@ -41,8 +52,15 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     private void Awake()
     {
         EnsureEggStorage();
+        CacheBeltRenderers();
         if (!_remoteMode)
             G.Initialized.AddListener(Init);
+    }
+
+    private void OnEnable()
+    {
+        if (_initialized)
+            StartSpawnLoop();
     }
 
     private void OnDisable()
@@ -92,12 +110,21 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
             _ui = _ui != null ? _ui : GetComponentInChildren<ConveyorUI>(true);
             if (_ui == null)
             {
-                Debug.LogWarning("[Conveyor] ConveyorUI not found.");
-                return;
+                Debug.LogWarning("[Conveyor] ConveyorUI not found. Conveyor gameplay will continue without local UI.", this);
+            }
+            else
+            {
+                try
+                {
+                    _ui.Init(_levels);
+                    _ui.LevelActivated.AddListener(SetLevel);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex, this);
+                }
             }
 
-            _ui.Init(_levels);
-            _ui.LevelActivated.AddListener(SetLevel);
             _localConfigured = true;
         }
 
@@ -119,10 +146,10 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     private void FixedUpdate()
     {
         if (!_initialized) return;
-        if (_destroyPoint == null || _eggs == null) return;
 
-        if (_mt != null)
-            _mt.mainTextureOffset = new Vector2(0, Time.time * _speed * _matSpeedMultiplier * Time.fixedDeltaTime);
+        ScrollBeltMaterial();
+
+        if (_destroyPoint == null || _eggs == null) return;
 
         List<Egg> toRemove = null;
         foreach (Egg egg in _eggs)
@@ -254,7 +281,16 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         {
             G.Save.SaveConveyorCurrentLevel(_currentLevel);
             if (_ui != null)
-                _ui.UpdateActiveLvl(_currentLevel);
+            {
+                try
+                {
+                    _ui.UpdateActiveLvl(_currentLevel);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex, this);
+                }
+            }
             G.Luck?.NotifyChanged();
             BaseDirtyTracker.MarkDirty();
         }
@@ -342,6 +378,170 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
             ShowLocalUI();
             EnableInteractionListeners(true);
             EnsureLocalInit();
+        }
+    }
+
+    private void CacheBeltRenderers()
+    {
+        _beltRendererBindings.Clear();
+
+        _beltPropertyBlock ??= new MaterialPropertyBlock();
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+            if (!IsBeltRenderer(renderer))
+                continue;
+
+            Material[] materials = renderer.sharedMaterials;
+            for (int j = 0; j < materials.Length; j++)
+            {
+                _beltRendererBindings.Add(new BeltRendererBinding(
+                    renderer,
+                    j,
+                    GetTextureScaleOffset(materials[j], BaseMapProperty),
+                    GetTextureScaleOffset(materials[j], MainTexProperty),
+                    GetBeltAxis(renderer)));
+            }
+        }
+
+        if (_beltRendererBindings.Count > 0 || _mt == null)
+            return;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+
+            Material[] materials = renderer.sharedMaterials;
+            for (int j = 0; j < materials.Length; j++)
+            {
+                if (!IsSameMaterial(materials[j], _mt))
+                    continue;
+
+                _beltRendererBindings.Add(new BeltRendererBinding(
+                    renderer,
+                    j,
+                    GetTextureScaleOffset(materials[j], BaseMapProperty),
+                    GetTextureScaleOffset(materials[j], MainTexProperty),
+                    GetBeltAxis(renderer)));
+            }
+        }
+    }
+
+    private void ScrollBeltMaterial()
+    {
+        if (_beltRendererBindings.Count == 0)
+            CacheBeltRenderers();
+        if (_beltRendererBindings.Count == 0)
+            return;
+
+        float scrollSpeed = _speed * _matSpeedMultiplier * Time.fixedDeltaTime;
+        if (Mathf.Approximately(scrollSpeed, 0f))
+            return;
+
+        _beltScrollOffset = Mathf.Repeat(_beltScrollOffset + scrollSpeed * Time.fixedDeltaTime, 1f);
+
+        for (int i = _beltRendererBindings.Count - 1; i >= 0; i--)
+        {
+            BeltRendererBinding binding = _beltRendererBindings[i];
+            if (binding.Renderer == null)
+            {
+                _beltRendererBindings.RemoveAt(i);
+                continue;
+            }
+
+            Vector4 baseMap = binding.BaseMapScaleOffset;
+            Vector4 mainTex = binding.MainTexScaleOffset;
+            baseMap.w += _beltScrollOffset;
+            mainTex.w += _beltScrollOffset;
+
+            binding.Renderer.GetPropertyBlock(_beltPropertyBlock, binding.MaterialIndex);
+            _beltPropertyBlock.SetFloat(BeltOffsetProperty, _beltScrollOffset);
+            _beltPropertyBlock.SetVector(BeltAxisProperty, binding.Axis);
+            _beltPropertyBlock.SetVector(BaseMapStProperty, baseMap);
+            _beltPropertyBlock.SetVector(MainTexStProperty, mainTex);
+            binding.Renderer.SetPropertyBlock(_beltPropertyBlock, binding.MaterialIndex);
+        }
+    }
+
+    private static Vector4 GetTextureScaleOffset(Material material, string textureProperty)
+    {
+        if (material == null || !material.HasProperty(textureProperty))
+            return new Vector4(1f, 1f, 0f, 0f);
+
+        Vector2 scale = material.GetTextureScale(textureProperty);
+        Vector2 offset = material.GetTextureOffset(textureProperty);
+        return new Vector4(scale.x, scale.y, offset.x, offset.y);
+    }
+
+    private static bool IsSameMaterial(Material candidate, Material reference)
+    {
+        if (candidate == null || reference == null)
+            return false;
+        if (candidate == reference)
+            return true;
+
+        return string.Equals(candidate.name, reference.name, StringComparison.Ordinal);
+    }
+
+    private static bool IsBeltRenderer(Renderer renderer)
+    {
+        if (renderer == null)
+            return false;
+        if (!string.Equals(renderer.gameObject.name, "belt", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        Transform parent = renderer.transform.parent;
+        while (parent != null)
+        {
+            if (string.Equals(parent.name, "belt", StringComparison.OrdinalIgnoreCase))
+                return true;
+            parent = parent.parent;
+        }
+
+        return false;
+    }
+
+    private static Vector4 GetBeltAxis(Renderer renderer)
+    {
+        MeshFilter meshFilter = renderer != null ? renderer.GetComponent<MeshFilter>() : null;
+        Vector3 size = meshFilter != null && meshFilter.sharedMesh != null
+            ? meshFilter.sharedMesh.bounds.size
+            : Vector3.one;
+
+        if (size.y >= size.x && size.y >= size.z)
+            return new Vector4(0f, 1f, 0f, 0f);
+        if (size.z >= size.x && size.z >= size.y)
+            return new Vector4(0f, 0f, 1f, 0f);
+
+        return new Vector4(1f, 0f, 0f, 0f);
+    }
+
+    private readonly struct BeltRendererBinding
+    {
+        public readonly Renderer Renderer;
+        public readonly int MaterialIndex;
+        public readonly Vector4 BaseMapScaleOffset;
+        public readonly Vector4 MainTexScaleOffset;
+        public readonly Vector4 Axis;
+
+        public BeltRendererBinding(
+            Renderer renderer,
+            int materialIndex,
+            Vector4 baseMapScaleOffset,
+            Vector4 mainTexScaleOffset,
+            Vector4 axis)
+        {
+            Renderer = renderer;
+            MaterialIndex = materialIndex;
+            BaseMapScaleOffset = baseMapScaleOffset;
+            MainTexScaleOffset = mainTexScaleOffset;
+            Axis = axis;
         }
     }
 }

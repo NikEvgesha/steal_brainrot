@@ -34,6 +34,7 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private Text _foodTimeBarText;
     [SerializeField] private float _foodScaler;
     [SerializeField] private float _petScaler;
+    [SerializeField] private float _petGroundOffset;
     [SerializeField] private int _lvlsPerPet = 5;
     [SerializeField] private BrainrotInfoUI _petInfoUI;
     [SerializeField] private AudioSource _audio;
@@ -83,6 +84,7 @@ public class BigPetPoint : MonoBehaviour
         if (_setPetUI == null)
         {
             Debug.LogWarning("[BigPetPoint] BigPetSetUI not found.");
+            PrepareLockedState();
             return;
         }
 
@@ -90,6 +92,7 @@ public class BigPetPoint : MonoBehaviour
         if (!ResolvePetList())
         {
             Debug.LogWarning("[BigPetPoint] Pets list is empty.");
+            PrepareLockedState();
             return;
         }
 
@@ -116,8 +119,7 @@ public class BigPetPoint : MonoBehaviour
         }
         else
         {
-            if (_buyPanel != null)
-                _buyPanel.gameObject.SetActive(true);
+            ApplyLockedUiState(true);
         }
 
         PlayerEnter?.Invoke();
@@ -137,8 +139,7 @@ public class BigPetPoint : MonoBehaviour
         }
         else
         {
-            if (_buyPanel != null)
-                _buyPanel.gameObject.SetActive(false);
+            ApplyLockedUiState(false);
         }
 
         _playerInArea = false;
@@ -298,6 +299,8 @@ public class BigPetPoint : MonoBehaviour
             float t = (((_currentLvl - 1) % levelsPerPet) + 1) / (float)levelsPerPet;
             _currentPet.transform.localScale = Vector3.Lerp(Vector3.one, Vector3.one * _petScaler, t);
         }
+
+        AlignCurrentPetToGround();
     }
 
     private void SetPet(int idx)
@@ -317,12 +320,49 @@ public class BigPetPoint : MonoBehaviour
             BaseDirtyTracker.MarkDirty();
 
         if (_petPoint != null)
-            _currentPet = Instantiate(_activePets[idx].Model, _petPoint);
+        {
+            _currentPet = Instantiate(_activePets[idx].Model, _petPoint, false);
+            _currentPet.transform.localPosition = Vector3.zero;
+        }
 
         if (_setPetUI != null)
             _setPetUI.ChangeActivePet(_activePets[idx]);
 
         CheckScale();
+    }
+
+    private void AlignCurrentPetToGround()
+    {
+        if (_currentPet == null)
+            return;
+
+        Renderer[] renderers = _currentPet.GetComponentsInChildren<Renderer>(true);
+        bool hasBounds = false;
+        Bounds bounds = default;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+            return;
+
+        float targetBottom = (_petPoint != null ? _petPoint.position.y : transform.position.y) + _petGroundOffset;
+        float deltaY = targetBottom - bounds.min.y;
+        if (Mathf.Abs(deltaY) > 0.001f)
+            _currentPet.transform.position += Vector3.up * deltaY;
     }
 
     private void ChangeActivePet(Brainrot pet)
@@ -572,6 +612,11 @@ public class BigPetPoint : MonoBehaviour
         if (_changePetArea != null)
             _changePetArea.SetActive(true);
 
+        if (_xpProgressBar != null)
+            _xpProgressBar.gameObject.SetActive(true);
+        if (_xpProgressText != null)
+            _xpProgressText.gameObject.SetActive(true);
+
         SetPet(_currentPetIdx);
         CheckLvl();
 
@@ -584,6 +629,8 @@ public class BigPetPoint : MonoBehaviour
 
         if (_foodTimeBar != null)
             _foodTimeBar.gameObject.SetActive(false);
+        if (_foodTimeBarText != null)
+            _foodTimeBarText.gameObject.SetActive(false);
 
         if (_buyPanel != null)
             _buyPanel.gameObject.SetActive(false);
@@ -727,11 +774,6 @@ public class BigPetPoint : MonoBehaviour
             _currentPet = null;
         }
 
-        if (_feedButton != null)
-            _feedButton.SetActive(false);
-        if (_foodTimeBar != null)
-            _foodTimeBar.gameObject.SetActive(false);
-
         if (_setPetUI != null)
         {
             _setPetUI.OpenUI(false);
@@ -747,10 +789,34 @@ public class BigPetPoint : MonoBehaviour
         if (_changePetArea != null)
             _changePetArea.SetActive(false);
 
+        ApplyLockedUiState(false);
+    }
+
+    private void ApplyLockedUiState(bool showBuyPanel)
+    {
+        SetQuickAccessBinding(false);
+
+        if (_feedButton != null)
+            _feedButton.SetActive(false);
+        if (_foodTimeBar != null)
+            _foodTimeBar.gameObject.SetActive(false);
+        if (_foodTimeBarText != null)
+            _foodTimeBarText.gameObject.SetActive(false);
+        if (_xpProgressBar != null)
+            _xpProgressBar.gameObject.SetActive(false);
+        if (_xpProgressText != null)
+            _xpProgressText.gameObject.SetActive(false);
+        if (_setPetUI != null)
+            _setPetUI.gameObject.SetActive(false);
+        if (_petInfoUI != null)
+            _petInfoUI.gameObject.SetActive(false);
+        if (_changePetArea != null)
+            _changePetArea.SetActive(false);
+
         if (_buyPanel != null)
         {
-            _buyPanel.SetInfo("Activate", Math.Round(_unlockPrice).ToString("0", CultureInfo.InvariantCulture));
-            _buyPanel.gameObject.SetActive(false);
+            _buyPanel.SetInfo(LocalizationUtils.T("Buy", "Купить"), Math.Round(_unlockPrice).ToString("0", CultureInfo.InvariantCulture));
+            _buyPanel.gameObject.SetActive(showBuyPanel);
         }
     }
 

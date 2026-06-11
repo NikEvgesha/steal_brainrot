@@ -49,14 +49,26 @@ public class ConveyorUI : MonoBehaviour
 
     public void Init(List<ConveyorLevel> levels)
     {
-        _tabs = new();
-        foreach (ConveyorLevel level in levels) {
-            ConveyorLevelTab tab = Instantiate(_tabPrefab, _tansParent);
-            tab.Init(level);
-            tab.OnClick.AddListener(SetInfo);
-            _tabs.Add(tab);
+        _tabs = new List<ConveyorLevelTab>();
+        if (levels == null || levels.Count == 0)
+            return;
+
+        if (_tabPrefab != null && _tansParent != null)
+        {
+            foreach (ConveyorLevel level in levels)
+            {
+                if (level == null)
+                    continue;
+
+                ConveyorLevelTab tab = Instantiate(_tabPrefab, _tansParent);
+                tab.Init(level);
+                tab.OnClick.AddListener(SetInfo);
+                _tabs.Add(tab);
+            }
         }
-        _tabs[_currentActiveIdx].SetLvlActive(true);
+
+        if (_tabs.Count > _currentActiveIdx && _tabs[_currentActiveIdx] != null)
+            _tabs[_currentActiveIdx].SetLvlActive(true);
         //_currentLevelInfo = levels[0];
         SetInfo(levels[0]);
     }
@@ -72,7 +84,7 @@ public class ConveyorUI : MonoBehaviour
         EnsurePanel();
         if (_panel == null) return;
         _panel.SetActive(open);
-        _chancesPanel.Close();
+        _chancesPanel?.Close();
         if (open)
             RefreshCurrentDropChances();
     }
@@ -87,25 +99,45 @@ public class ConveyorUI : MonoBehaviour
 
     public void SetInfo(ConveyorLevel level)
     {
+        if (level == null)
+            return;
         if (_currentLevelInfo == level) return;
 
         _currentLevelInfo = level;
-        _levelName.text = level.Name;
-        _icon.sprite = level.Icon;
-        _newEggIcon.sprite = level.NewEgg.Icon;
+        if (_levelName != null)
+            _levelName.text = level.Name;
+        if (_icon != null)
+            _icon.sprite = level.Icon;
 
-        for (int i = _newEggPetsPanel.childCount - 1; i >= 0; i--)
+        var newEgg = level.NewEgg;
+        if (_newEggIcon != null)
         {
-            Destroy(_newEggPetsPanel.GetChild(i).gameObject);
+            _newEggIcon.sprite = newEgg != null ? newEgg.Icon : null;
+            _newEggIcon.gameObject.SetActive(newEgg != null && newEgg.Icon != null);
         }
 
-        foreach (Brainrot pet in ConveyorDropChanceCalculator.GetBrainrotsForDisplay(level.NewEgg))
+        if (_newEggPetsPanel != null)
         {
-            GameObject icon = Instantiate(_newEggPetIcon, _newEggPetsPanel);
-            icon.GetComponentInChildren<Image>().sprite = pet.Icon;
+            for (int i = _newEggPetsPanel.childCount - 1; i >= 0; i--)
+                Destroy(_newEggPetsPanel.GetChild(i).gameObject);
+
+            if (newEgg != null && _newEggPetIcon != null)
+            {
+                foreach (Brainrot pet in ConveyorDropChanceCalculator.GetBrainrotsForDisplay(newEgg))
+                {
+                    if (pet == null)
+                        continue;
+
+                    GameObject icon = Instantiate(_newEggPetIcon, _newEggPetsPanel);
+                    var image = icon.GetComponentInChildren<Image>();
+                    if (image != null)
+                        image.sprite = pet.Icon;
+                }
+            }
         }
 
-        _incomeMultiplier.text = "+" + Mathf.RoundToInt((level.IncomeMultiplier - 1f) * 100f) + "%";
+        if (_incomeMultiplier != null)
+            _incomeMultiplier.text = "+" + Mathf.RoundToInt((level.IncomeMultiplier - 1f) * 100f) + "%";
         UpdateDropChances(level);
 
         SetButtons();
@@ -113,23 +145,36 @@ public class ConveyorUI : MonoBehaviour
 
     private void SetButtons()
     {
-        _activeText.gameObject.SetActive(_currentLevelInfo.IsActive);
-        _notAvailableText.gameObject.SetActive(!_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsAvailable);
-        _buttonActivate.gameObject.SetActive(_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsActive);
-        _buttonBuyCoins.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
-        _buttonBuyGems.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
+        if (_currentLevelInfo == null)
+            return;
+
+        if (_activeText != null)
+            _activeText.SetActive(_currentLevelInfo.IsActive);
+        if (_notAvailableText != null)
+            _notAvailableText.SetActive(!_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsAvailable);
+        if (_buttonActivate != null)
+            _buttonActivate.gameObject.SetActive(_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsActive);
+        if (_buttonBuyCoins != null)
+            _buttonBuyCoins.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
+        if (_buttonBuyGems != null)
+            _buttonBuyGems.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
         
 
         if (!_currentLevelInfo.IsPurchased)
         {
-            _priceCoins.text = _currentLevelInfo.PriceCoin.ToString();
-            _priceGems.text = _currentLevelInfo.PriceGems.ToString();
+            if (_priceCoins != null)
+                _priceCoins.text = _currentLevelInfo.PriceCoin.ToString();
+            if (_priceGems != null)
+                _priceGems.text = _currentLevelInfo.PriceGems.ToString();
         }
     }
 
 
     public void _OnBuyCoinsClick()
     {
+        if (_currentLevelInfo == null)
+            return;
+
         _currentLevelInfo.TryBuy(forGems:false);
 
         if (_currentLevelInfo.IsPurchased)
@@ -140,6 +185,9 @@ public class ConveyorUI : MonoBehaviour
 
     public void _OnBuyGemsClick()
     {
+        if (_currentLevelInfo == null)
+            return;
+
         _currentLevelInfo.TryBuy(forGems: true);
 
         if (_currentLevelInfo.IsPurchased)
@@ -150,15 +198,29 @@ public class ConveyorUI : MonoBehaviour
 
     public void _OnBuyActivateClick()
     {
+        if (_currentLevelInfo == null)
+            return;
+
         LevelActivated?.Invoke(_currentLevelInfo);
         SetButtons();
     }
 
     public void UpdateActiveLvl(int idx)
     {
-        _tabs[_currentActiveIdx].SetLvlActive(false);
+        if (_tabs == null || _tabs.Count == 0)
+            return;
+
+        if (_currentActiveIdx >= 0 && _currentActiveIdx < _tabs.Count && _tabs[_currentActiveIdx] != null)
+            _tabs[_currentActiveIdx].SetLvlActive(false);
+
         _currentActiveIdx = idx;
-        _tabs[_currentActiveIdx].SetLvlActive(true);
+        if (_currentActiveIdx < 0)
+            _currentActiveIdx = 0;
+        if (_currentActiveIdx >= _tabs.Count)
+            _currentActiveIdx = _tabs.Count - 1;
+
+        if (_tabs[_currentActiveIdx] != null)
+            _tabs[_currentActiveIdx].SetLvlActive(true);
     }
 
     public IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> GetCurrentDropChances()
@@ -383,26 +445,19 @@ public static class ConveyorDropChanceCalculator
     public static List<ChanceEntry> BuildEggChances(ConveyorLevel level)
     {
         var result = new List<ChanceEntry>();
-        if (level == null || level.Eggs == null || level.Eggs.Count == 0)
+        var eggs = BuildValidLevelEggs(level);
+        if (eggs.Count == 0)
             return result;
 
-        var totalWeight = 0d;
-        for (int i = 0; i < level.Eggs.Count; i++)
-            totalWeight += Math.Max(0d, level.Eggs[i].weight);
-        if (totalWeight <= 0d)
-            return result;
+        var eggChance = 1d / eggs.Count;
 
         var aggregate = new Dictionary<string, ChanceEntry>(StringComparer.Ordinal);
-        for (int i = 0; i < level.Eggs.Count; i++)
+        for (int i = 0; i < eggs.Count; i++)
         {
-            var source = level.Eggs[i];
-            if (source.egg == null || source.weight <= 0f)
-                continue;
-
-            var chance = Math.Max(0d, source.weight) / totalWeight;
-            var id = GetId(source.egg.name, source.egg.Name);
-            var name = string.IsNullOrWhiteSpace(source.egg.Name) ? source.egg.name : source.egg.Name;
-            AddOrAccumulate(aggregate, id, name, chance);
+            var egg = eggs[i];
+            var id = GetId(egg.name, egg.Name);
+            var name = string.IsNullOrWhiteSpace(egg.Name) ? egg.name : egg.Name;
+            AddOrAccumulate(aggregate, id, name, eggChance);
         }
 
         result.AddRange(aggregate.Values);
@@ -418,24 +473,16 @@ public static class ConveyorDropChanceCalculator
     public static List<EggBreakdownEntry> BuildEggBreakdown(ConveyorLevel level)
     {
         var result = new List<EggBreakdownEntry>();
-        if (level == null || level.Eggs == null || level.Eggs.Count == 0)
+        var eggs = BuildValidLevelEggs(level);
+        if (eggs.Count == 0)
             return result;
 
-        var totalWeight = 0d;
-        for (int i = 0; i < level.Eggs.Count; i++)
-            totalWeight += Math.Max(0d, level.Eggs[i].weight);
-        if (totalWeight <= 0d)
-            return result;
+        var eggChance = 1d / eggs.Count;
 
         var aggregate = new Dictionary<string, EggBreakdownEntry>(StringComparer.Ordinal);
-        for (int i = 0; i < level.Eggs.Count; i++)
+        for (int i = 0; i < eggs.Count; i++)
         {
-            var source = level.Eggs[i];
-            var egg = source.egg;
-            if (egg == null || source.weight <= 0f)
-                continue;
-
-            var chance = Math.Max(0d, source.weight) / totalWeight;
+            var egg = eggs[i];
             var id = GetId(egg.name, egg.Name);
             var name = string.IsNullOrWhiteSpace(egg.Name) ? egg.name : egg.Name;
             if (!aggregate.TryGetValue(id, out var entry))
@@ -454,7 +501,7 @@ public static class ConveyorDropChanceCalculator
                 entry.egg = egg;
             }
 
-            entry.chance += chance;
+            entry.chance += eggChance;
         }
 
         result.AddRange(aggregate.Values);
@@ -465,27 +512,18 @@ public static class ConveyorDropChanceCalculator
     public static List<ChanceEntry> BuildBrainrotChances(ConveyorLevel level, bool applyLuckBonus)
     {
         var result = new List<ChanceEntry>();
-        if (level == null || level.Eggs == null || level.Eggs.Count == 0)
+        var eggs = BuildValidLevelEggs(level);
+        if (eggs.Count == 0)
             return result;
 
-        var totalEggWeight = 0d;
-        for (int i = 0; i < level.Eggs.Count; i++)
-            totalEggWeight += Math.Max(0d, level.Eggs[i].weight);
-        if (totalEggWeight <= 0d)
-            return result;
-
+        var eggChance = 1d / eggs.Count;
         var aggregate = new Dictionary<string, ChanceEntry>(StringComparer.Ordinal);
-        for (int i = 0; i < level.Eggs.Count; i++)
+        for (int i = 0; i < eggs.Count; i++)
         {
-            var source = level.Eggs[i];
-            var egg = source.egg;
-            if (egg == null || source.weight <= 0f)
-                continue;
+            var egg = eggs[i];
             var drops = BuildDropList(egg);
             if (drops.Count == 0)
                 continue;
-
-            var eggChance = Math.Max(0d, source.weight) / totalEggWeight;
 
             var weightSum = 0d;
             for (int j = 0; j < drops.Count; j++)
@@ -509,6 +547,22 @@ public static class ConveyorDropChanceCalculator
 
         result.AddRange(aggregate.Values);
         result.Sort((a, b) => b.chance.CompareTo(a.chance));
+        return result;
+    }
+
+    private static List<Egg> BuildValidLevelEggs(ConveyorLevel level)
+    {
+        var result = new List<Egg>();
+        if (level == null || level.Eggs == null)
+            return result;
+
+        for (int i = 0; i < level.Eggs.Count; i++)
+        {
+            var egg = level.Eggs[i].egg;
+            if (egg != null)
+                result.Add(egg);
+        }
+
         return result;
     }
 

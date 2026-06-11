@@ -1,13 +1,14 @@
 using System;
 using UnityEngine;
 using MirraGames.SDK;
-using MirraGames.SDK.Common;  // пространство имён SDK
+using MirraGames.SDK.Common;  // РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ РёРјС‘РЅ SDK
 
 //#if MIRRA_SDK_ENABLED
 public class MirraSDKPurchaseProvider : PurchasesProvider
 {
     private bool isInitialized = false;
     //private Action<bool> currentCallback;
+    public override bool IsInitialized => isInitialized;
 
     public override void Initialize()
     {
@@ -35,7 +36,6 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
             onSuccess: () =>
             {
                 Debug.Log($"MirraSDK: Purchase successful: {purchaseId}");
-                //Shop.Instance.OnRestorePurchases(purchaseId);
                 onComplete?.Invoke(true);/*
                 PauseManager.Instance?.SetPause(false);
                 G.Control.CursorActive = false;*/
@@ -70,21 +70,15 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
 
                 restoreData.RestoreProduct(id, onProductRestore: () => {
 
-                    G.SpecialShop.OnPurchaseRestore(id);
-                    Debug.Log($"Товар '{id}' восстановлен");
+                    if (G.SpecialShop != null)
+                        G.SpecialShop.OnPurchaseRestore(id);
+                    else
+                        Debug.LogWarning($"MirraSDK: Purchase '{id}' restored before SpecialShop was ready.");
+
+                    Debug.Log($"РўРѕРІР°СЂ '{id}' РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ");
 
                 });
 
-                // Delegate Method: SupplyProduct(string, Action onSuccess, bool incrementSupply)
-                /*                MirraSDK.Payments.SupplyProduct(
-                                    id,
-                                    () =>
-                                    {
-                                        Debug.Log($"MirraSDK: Supplied product: {id}");
-                                        //Shop.Instance.OnRestorePurchases(id);
-                                    },
-                                    true
-                                );*/  // :contentReference[oaicite:2]{index=2}
             }
         });  // :contentReference[oaicite:3]{index=3}
 
@@ -102,7 +96,7 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
         ProductData data = MirraSDK.Payments.GetProductData(purchaseId);
         if (data == null)
         {
-            Debug.LogError($"MirraSDK: No product data for ID «{purchaseId}»");
+            Debug.LogError($"MirraSDK: No product data for ID '{purchaseId}'");
             return null;
         }
 
@@ -122,7 +116,7 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
 
     private void OnDestroy()
     {
-        // Никаких глобальных событий не подписывали, всё в делегатах.
+        // РќРёРєР°РєРёС… РіР»РѕР±Р°Р»СЊРЅС‹С… СЃРѕР±С‹С‚РёР№ РЅРµ РїРѕРґРїРёСЃС‹РІР°Р»Рё, РІСЃС‘ РІ РґРµР»РµРіР°С‚Р°С….
     }
 }
 //#endif

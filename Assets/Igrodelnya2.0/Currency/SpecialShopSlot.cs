@@ -23,10 +23,17 @@ public class SpecialShopSlot : MonoBehaviour
     }
     public void Init(ShopPackData pack, PurchaseData purchaseData)
     {
+        if (pack == null)
+        {
+            Debug.LogWarning("[SpecialShopSlot] Cannot init slot: pack is missing.");
+            gameObject.SetActive(false);
+            return;
+        }
+
         _shopPackData = pack;
         _productData = purchaseData;
-        _name.text = pack.Name; //LocalizationManager.Instance.LocalizationData.GetTranslation(itemData.Name, LocalizationManager.Instance.CurrentLanguage, LocalizationKeyType.Item.ToString());
-        _price.text = pack.Price.ToString(); //purchaseData.GetFullPriceInteger();
+        _name.text = LocalizationUtils.T(pack.Name, pack.Name);
+        _price.text = purchaseData != null && !string.IsNullOrWhiteSpace(purchaseData.Price) ? purchaseData.Price : pack.Price.ToString();
         _currencyIcon.sprite = G.Currency.GetCurrencyIcon(pack.PriceCurrencyType);
 
         foreach (ShopReward reward in pack.Rewards)
@@ -43,11 +50,17 @@ public class SpecialShopSlot : MonoBehaviour
         //MirraSDK.Payments.Purchase(
         //    productTag: "exampleProduct",
         //    onSuccess: () => {
-        //        Debug.Log("Товар успешно куплен");
-        //        // Выдать товар игроку
+        //        Debug.Log("РўРѕРІР°СЂ СѓСЃРїРµС€РЅРѕ РєСѓРїР»РµРЅ");
+        //        // Р’С‹РґР°С‚СЊ С‚РѕРІР°СЂ РёРіСЂРѕРєСѓ
         //    },
-        //    onError: () => Debug.Log("Товар не был куплен"),
+        //    onError: () => Debug.Log("РўРѕРІР°СЂ РЅРµ Р±С‹Р» РєСѓРїР»РµРЅ"),
         //);
+
+        if (G.SpecialShop == null)
+        {
+            Debug.LogWarning("[SpecialShopSlot] Cannot buy pack: SpecialShop is not ready.");
+            return;
+        }
 
         G.SpecialShop.TryBuy(_productData, _shopPackData);
     }

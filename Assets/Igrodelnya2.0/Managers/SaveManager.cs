@@ -7,9 +7,9 @@ using Newtonsoft.Json;
 
 public class SaveManager : MonoBehaviour
 {
-    [SerializeField] private SaveProvider saveProvider; // Назначаем в инспекторе нужный провайдер (YG2SaveProvider, DebugSaveProvider и т.д.)
+    [SerializeField] private SaveProvider saveProvider; // РќР°Р·РЅР°С‡Р°РµРј РІ РёРЅСЃРїРµРєС‚РѕСЂРµ РЅСѓР¶РЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ (YG2SaveProvider, DebugSaveProvider Рё С‚.Рґ.)
     [SerializeField] private bool _newPlayer;
-    public bool IsNewPlayer => saveProvider.CheckProgress() == false;
+    public bool IsNewPlayer => saveProvider == null || !saveProvider.IsInitialized || saveProvider.CheckProgress() == false;
     public bool IsReady => saveProvider != null && saveProvider.IsInitialized;
 
     private bool _pendingSaveFlagSet;
@@ -32,6 +32,12 @@ public class SaveManager : MonoBehaviour
         {
             G.Save = this;
             DontDestroyOnLoad(gameObject);
+            if (saveProvider == null)
+            {
+                Debug.LogError("[SaveManager] Save provider is not assigned.");
+                return;
+            }
+
             saveProvider.Initialize();
             StartCoroutine(ProgressSavingRoutine());
         }
@@ -48,19 +54,19 @@ public class SaveManager : MonoBehaviour
         {
             yield return new WaitForSeconds(1);
 
-            if (saveProvider != null && saveProvider.IsInitialized)
-            {
-                if (_pendingSaveFlagSet)
-                {
-                    saveProvider.SetSave(_pendingSaveFlagValue);
-                    _pendingSaveFlagSet = false;
-                }
+            if (saveProvider == null || !saveProvider.IsInitialized)
+                continue;
 
-                if (_pendingBackendProfilePersist && _hasCachedBackendProfile)
-                {
-                    saveProvider.SaveBackendProfile(_cachedBackendPlayerId, _cachedBackendFriendCode, _cachedBackendDisplayName);
-                    _pendingBackendProfilePersist = false;
-                }
+            if (_pendingSaveFlagSet)
+            {
+                saveProvider.SetSave(_pendingSaveFlagValue);
+                _pendingSaveFlagSet = false;
+            }
+
+            if (_pendingBackendProfilePersist && _hasCachedBackendProfile)
+            {
+                saveProvider.SaveBackendProfile(_cachedBackendPlayerId, _cachedBackendFriendCode, _cachedBackendDisplayName);
+                _pendingBackendProfilePersist = false;
             }
 
             saveProvider.SaveProgress();
@@ -80,7 +86,7 @@ public class SaveManager : MonoBehaviour
         _pendingSaveFlagValue = haveSave;
     }
 
-    // Пример методов, которые делегируют работу провайдеру:
+    // РџСЂРёРјРµСЂ РјРµС‚РѕРґРѕРІ, РєРѕС‚РѕСЂС‹Рµ РґРµР»РµРіРёСЂСѓСЋС‚ СЂР°Р±РѕС‚Сѓ РїСЂРѕРІР°Р№РґРµСЂСѓ:
     public float[] GetVolume()
     {
         return saveProvider.LoadVolume();

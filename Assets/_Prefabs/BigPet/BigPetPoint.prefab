@@ -276,6 +276,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!65 &3086896996924864941
 BoxCollider:
@@ -1152,6 +1153,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &3548240489592788386
 GameObject:
@@ -1373,6 +1375,7 @@ MonoBehaviour:
   _foodTimeBarText: {fileID: 7781815867382186344}
   _foodScaler: 5
   _petScaler: 5
+  _petGroundOffset: 0
   _lvlsPerPet: 5
   _petInfoUI: {fileID: 139247941860127438}
   _audio: {fileID: 2864573618113148850}
@@ -1680,14 +1683,14 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4331093394947074878}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dd4151974eac4ae4ba8ed7bcb9cf28ae, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalizedText
-  localizationData: {fileID: 0}
-  selectedKey: 
-  currentLanguage: 
+  localizationData: {fileID: 11400000, guid: 247e385684679874b849f4c64cf8b6fc, type: 2}
+  selectedKey: UI/BigPet/ChoosePet
+  currentLanguage: Ru
 --- !u!1 &4420898388570036778
 GameObject:
   m_ObjectHideFlags: 0
@@ -2670,12 +2673,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1920, y: 1080}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 0.5
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -3312,7 +3315,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1616276020131332627, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -15.6
+      value: 0.29852104
       objectReference: {fileID: 0}
     - target: {fileID: 1744071900872315965, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_Name
@@ -3337,7 +3340,7 @@ PrefabInstance:
     - target: {fileID: 3451988354512230703, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: _actionText
       value: 
-      objectReference: {fileID: 2162605287358824847}
+      objectReference: {fileID: 8841277086431545251}
     - target: {fileID: 3451988354512230703, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: InteractionComplete.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
@@ -3364,19 +3367,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7335872997800112316, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0.9542421
+      value: 0.9821802
       objectReference: {fileID: 0}
     - target: {fileID: 7335872997800112316, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0.7254585
+      value: 0.38085777
       objectReference: {fileID: 0}
     - target: {fileID: 7335872997800112316, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_AnchorMin.x
-      value: 0.28573966
+      value: 0.34580562
       objectReference: {fileID: 0}
     - target: {fileID: 7335872997800112316, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0.132
+      value: 0.102679245
       objectReference: {fileID: 0}
     - target: {fileID: 7335872997800112316, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_SizeDelta.x
@@ -3392,7 +3395,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7335872997800112316, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: 6.3
       objectReference: {fileID: 0}
     - target: {fileID: 8211507372318841139, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_IsActive
@@ -3400,7 +3403,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8697329808662788968, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
       propertyPath: m_Text
-      value: "\u041A\u043E\u0440\u043C\u0438\u0442\u044C"
+      value: "\u041A\u0443\u043F\u0438\u0442\u044C"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3434,6 +3437,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5274bc02e20a8a459b241576f90b6ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &8841277086431545251 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8697329808662788968, guid: cbc3d495f2f83a44dbdc537ee02aad11, type: 3}
+  m_PrefabInstance: {fileID: 144565763067313355}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1001 &3632255625531877672
 PrefabInstance:
   m_ObjectHideFlags: 0

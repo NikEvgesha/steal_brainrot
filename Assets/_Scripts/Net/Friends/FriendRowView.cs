@@ -14,7 +14,7 @@ public class FriendRowView : MonoBehaviour
 
     public void Bind(FriendsApi.FriendItem item, Action onRemove, Action onView)
     {
-        nameText.text = string.IsNullOrEmpty(item.displayName) ? "Player" : item.displayName;
+        nameText.text = string.IsNullOrEmpty(item.displayName) ? LocalizationUtils.T("UI/Common/Player", "Player") : item.displayName;
         codeText.text = item.friendCode;
 
         onlineText.gameObject.SetActive(item.isOnline);

@@ -1,7 +1,8 @@
 using MirraGames.SDK;
 using Newtonsoft.Json;
-using System;  // доступ к MirraSDK.Data
+using System;  // РґРѕСЃС‚СѓРї Рє MirraSDK.Data
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 [System.Serializable]
@@ -10,7 +11,7 @@ public class ListSaver
     public List<string> list = new();
 }
 [Serializable]
-public class SavedItem //Положение, статус, 
+public class SavedItem //РџРѕР»РѕР¶РµРЅРёРµ, СЃС‚Р°С‚СѓСЃ,
 {
     public string prefabName;
     public Vector3 position;
@@ -29,7 +30,7 @@ public class MirraSDKSaveProvider : SaveProvider
     private bool isInitialize;
     public override void Initialize()
     {
-        // Дождёмся полной готовности системы сохранений
+        // Р”РѕР¶РґС‘РјСЃСЏ РїРѕР»РЅРѕР№ РіРѕС‚РѕРІРЅРѕСЃС‚Рё СЃРёСЃС‚РµРјС‹ СЃРѕС…СЂР°РЅРµРЅРёР№
         MirraSDK.WaitForProviders(() =>
         {
             //Debug.Log("MirraSDKSaveProvider initialized");
@@ -41,7 +42,7 @@ public class MirraSDKSaveProvider : SaveProvider
     {
         if (!isInitialize)
             return new float[] { 0.5f, 0.5f };
-        // Достаём значения, с дефолтом 0.5f
+        // Р”РѕСЃС‚Р°С‘Рј Р·РЅР°С‡РµРЅРёСЏ, СЃ РґРµС„РѕР»С‚РѕРј 0.5f
         float music = MirraSDK.Data.GetFloat(SaveKey.MusicVolume.ToString(), 0.5f);
         float sound = MirraSDK.Data.GetFloat(SaveKey.SoundVolume.ToString(), 0.5f);
         return new float[] { music, sound };
@@ -74,7 +75,7 @@ public class MirraSDKSaveProvider : SaveProvider
     public override void SaveScore(float score, int levelId)
     {
         if (!isInitialize) return;
-        // Ключ «Score_1», «Score_2» и т.д.
+        // РљР»СЋС‡ В«Score_1В», В«Score_2В» Рё С‚.Рґ.
         MirraSDK.Data.SetFloat($"{SaveKey.Score_}{levelId}", score);
         Changed = true;
     }
@@ -125,7 +126,7 @@ public class MirraSDKSaveProvider : SaveProvider
     {
         if (!isInitialize) return;
         Changed = true;
-        MirraSDK.Data.SetString(SaveKey.Gems.ToString(), amount.ToString());
+        MirraSDK.Data.SetString(SaveKey.Gems.ToString(), amount.ToString(CultureInfo.InvariantCulture));
     }
 
     public override double LoadGems()
@@ -135,7 +136,8 @@ public class MirraSDKSaveProvider : SaveProvider
         if (isInitialize)
         {
             string resStr = MirraSDK.Data.GetString(SaveKey.Gems.ToString(), "0");
-            res = Double.Parse(resStr);
+            if (!double.TryParse(resStr, NumberStyles.Float, CultureInfo.InvariantCulture, out res))
+                double.TryParse(resStr, out res);
         }
         return res;
     }
@@ -143,7 +145,7 @@ public class MirraSDKSaveProvider : SaveProvider
     public override void SaveProgress()
     {
         if (!isInitialize) return;
-        // Синхронизировать все изменения с провайдером (локальным или облачным)
+        // РЎРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°С‚СЊ РІСЃРµ РёР·РјРµРЅРµРЅРёСЏ СЃ РїСЂРѕРІР°Р№РґРµСЂРѕРј (Р»РѕРєР°Р»СЊРЅС‹Рј РёР»Рё РѕР±Р»Р°С‡РЅС‹Рј)
         if (Changed)
         {
             MirraSDK.Data.Save();
@@ -154,7 +156,7 @@ public class MirraSDKSaveProvider : SaveProvider
     public override bool CheckProgress()
     {
         if (!isInitialize) return false;
-        // Есть ли хоть что-то из основных ключей?
+        // Р•СЃС‚СЊ Р»Рё С…РѕС‚СЊ С‡С‚Рѕ-С‚Рѕ РёР· РѕСЃРЅРѕРІРЅС‹С… РєР»СЋС‡РµР№?
         return MirraSDK.Data.GetBool(SaveKey.Save.ToString(), false);
     }
 
@@ -230,7 +232,7 @@ public class MirraSDKSaveProvider : SaveProvider
     {
         if (!isInitialize) return;
         Changed = true;
-        MirraSDK.Data.SetString(SaveKey.Coins.ToString(), coin.ToString());
+        MirraSDK.Data.SetString(SaveKey.Coins.ToString(), coin.ToString(CultureInfo.InvariantCulture));
     }
     public override void SavePlayerHealth(float health)
     {
@@ -259,7 +261,8 @@ public class MirraSDKSaveProvider : SaveProvider
         if (isInitialize)
         {
             string coinsStr = MirraSDK.Data.GetString(SaveKey.Coins.ToString(), "-1");
-            Double.TryParse(coinsStr, out res);
+            if (!double.TryParse(coinsStr, NumberStyles.Float, CultureInfo.InvariantCulture, out res))
+                double.TryParse(coinsStr, out res);
         }
         return res;
     }
@@ -348,7 +351,7 @@ public class MirraSDKSaveProvider : SaveProvider
     {
         if (!isInitialize) return;
         Changed = true;
-        MirraSDK.Data.SetString(SaveKey.RouletteLastDate.ToString(), date.Date.ToString());
+        MirraSDK.Data.SetString(SaveKey.RouletteLastDate.ToString(), date.ToString("O", CultureInfo.InvariantCulture));
         Debug.Log("Date saved: " + date.ToString());
     }
 
@@ -362,7 +365,11 @@ public class MirraSDKSaveProvider : SaveProvider
         {
             return DateTime.Today.AddDays(-1);
         }
-        return DateTime.Parse(date);
+        if (DateTime.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDate))
+            return parsedDate;
+        if (DateTime.TryParse(date, out parsedDate))
+            return parsedDate;
+        return DateTime.Today.AddDays(-1);
     }
 
 
@@ -515,8 +522,19 @@ public class MirraSDKSaveProvider : SaveProvider
     {
         if (!isInitialize) return new List<ItemSaveData>();
         string json = MirraSDK.Data.GetString(SaveKey.InventoryList + type.ToString(), "");
-        List<ItemSaveData> res = JsonConvert.DeserializeObject<List<ItemSaveData>>(json);
-        return res != null ? res : new List<ItemSaveData>();
+        if (string.IsNullOrWhiteSpace(json))
+            return new List<ItemSaveData>();
+
+        try
+        {
+            List<ItemSaveData> res = JsonConvert.DeserializeObject<List<ItemSaveData>>(json);
+            return res != null ? res : new List<ItemSaveData>();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[MirraSDKSaveProvider] Failed to load inventory '{type}': {ex.Message}");
+            return new List<ItemSaveData>();
+        }
     }
     public override void SaveBackendProfile(string playerId, string friendCode, string displayName)
     {

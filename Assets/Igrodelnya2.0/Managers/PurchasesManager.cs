@@ -1,7 +1,8 @@
 using UnityEngine;
 using System;
+using System.Collections;
 
-// Данные о покупке (универсальная структура)
+// Р”Р°РЅРЅС‹Рµ Рѕ РїРѕРєСѓРїРєРµ (СѓРЅРёРІРµСЂСЃР°Р»СЊРЅР°СЏ СЃС‚СЂСѓРєС‚СѓСЂР°)
 public class PurchaseData
 {
     public string Id { get; private set; }
@@ -10,17 +11,22 @@ public class PurchaseData
     public string Price { get; private set; }
     public string CurrencyImageURL { get; private set; }
 
-    public PurchaseData(string id, string title, string description, string price,string currencyImageURL)
+    public PurchaseData(string id, string title, string description, string price, string currencyImageURL)
     {
-        Id = id;
-        Title = title;
-        Description = description;
-        Price = price;
-        CurrencyImageURL = currencyImageURL;
+        Id = id ?? "";
+        Title = title ?? "";
+        Description = description ?? "";
+        Price = price ?? "";
+        CurrencyImageURL = currencyImageURL ?? "";
+    }
+
+    public static PurchaseData Fallback(string id)
+    {
+        return new PurchaseData(id, "", "", "", "");
     }
 }
 
-// Главный менеджер покупок
+// Р“Р»Р°РІРЅС‹Р№ РјРµРЅРµРґР¶РµСЂ РїРѕРєСѓРїРѕРє
 public class PurchasesManager : MonoBehaviour
 {
     //private static PurchasesManager _instance;
@@ -38,8 +44,10 @@ public class PurchasesManager : MonoBehaviour
     //    }
     //}
 
-    [SerializeField] private MonoBehaviour activeProvider; // Активный провайдер в инспекторе
+    [SerializeField] private MonoBehaviour activeProvider; // РђРєС‚РёРІРЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ РІ РёРЅСЃРїРµРєС‚РѕСЂРµ
     private PurchasesProvider provider;
+    private bool pendingRestore;
+    private Coroutine restoreWhenReadyRoutine;
 
     void Awake()
     {
@@ -51,7 +59,7 @@ public class PurchasesManager : MonoBehaviour
         G.Purchases = this;
         DontDestroyOnLoad(gameObject);
 
-        // Проверка и инициализация провайдера
+        // РџСЂРѕРІРµСЂРєР° Рё РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїСЂРѕРІР°Р№РґРµСЂР°
         if (activeProvider == null || !activeProvider.TryGetComponent(out provider))
         {
             Debug.LogError("No valid purchases provider assigned!");
@@ -64,12 +72,34 @@ public class PurchasesManager : MonoBehaviour
 
     public void RestorePurchases()
     {
-        provider.ConsumePendingPurchases();
+        if (provider == null)
+        {
+            Debug.LogWarning("[PurchasesManager] Cannot restore purchases: provider is not initialized.");
+            return;
+        }
+
+        if (provider.IsInitialized)
+        {
+            provider.ConsumePendingPurchases();
+            pendingRestore = false;
+            return;
+        }
+
+        pendingRestore = true;
+        if (restoreWhenReadyRoutine == null)
+            restoreWhenReadyRoutine = StartCoroutine(RestoreWhenReady());
     }
 
-    // Вызов покупки
+    // Р’С‹Р·РѕРІ РїРѕРєСѓРїРєРё
     public void BuyPurchase(string purchaseId, Action<bool> onComplete)
     {
+        if (string.IsNullOrWhiteSpace(purchaseId))
+        {
+            Debug.LogError("[PurchasesManager] Cannot buy purchase: purchase id is empty.");
+            onComplete?.Invoke(false);
+            return;
+        }
+
         if (provider == null)
         {
             Debug.LogError("Purchases provider not initialized!");
@@ -77,31 +107,58 @@ public class PurchasesManager : MonoBehaviour
             return;
         }
 
+        if (!provider.IsInitialized)
+        {
+            Debug.LogWarning("[PurchasesManager] Cannot buy purchase: provider is not ready yet.");
+            onComplete?.Invoke(false);
+            return;
+        }
+
         provider.BuyPurchase(purchaseId, onComplete);
     }
 
-    // Получение данных о покупке
+    // РџРѕР»СѓС‡РµРЅРёРµ РґР°РЅРЅС‹С… Рѕ РїРѕРєСѓРїРєРµ
     public PurchaseData GetPurchaseData(string purchaseId)
     {
-        if (provider == null)
+        if (provider == null || !provider.IsInitialized)
         {
-            Debug.LogError("Purchases provider not initialized!");
-            return null;
+            Debug.LogWarning($"[PurchasesManager] Purchase data for '{purchaseId}' requested before provider was ready. Using fallback data.");
+            return PurchaseData.Fallback(purchaseId);
         }
 
-        return provider.GetPurchaseData(purchaseId);
+        return provider.GetPurchaseData(purchaseId) ?? PurchaseData.Fallback(purchaseId);
     }
 
-    // Установка нового провайдера в рантайме (опционально)
+    // РЈСЃС‚Р°РЅРѕРІРєР° РЅРѕРІРѕРіРѕ РїСЂРѕРІР°Р№РґРµСЂР° РІ СЂР°РЅС‚Р°Р№РјРµ (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
     public void SetProvider(PurchasesProvider newProvider)
     {
+        if (newProvider == null)
+        {
+            Debug.LogError("[PurchasesManager] Cannot set null purchases provider.");
+            return;
+        }
+
         provider = newProvider;
         provider.Initialize();
-        provider.ConsumePendingPurchases();
+        RestorePurchases();
     }
 
     public bool PurchasesAvailable()
     {
-        return provider.PurchasesAvailable();
+        return provider != null && provider.IsInitialized && provider.PurchasesAvailable();
+    }
+
+    private IEnumerator RestoreWhenReady()
+    {
+        while (provider != null && !provider.IsInitialized)
+            yield return null;
+
+        restoreWhenReadyRoutine = null;
+
+        if (!pendingRestore || provider == null)
+            yield break;
+
+        provider.ConsumePendingPurchases();
+        pendingRestore = false;
     }
 }

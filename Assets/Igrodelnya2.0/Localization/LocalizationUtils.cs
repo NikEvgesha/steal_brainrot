@@ -1,0 +1,41 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+public static class LocalizationUtils
+{
+    private static readonly HashSet<string> MissingKeys = new HashSet<string>();
+
+    public static string T(string key, string fallback = null)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return fallback ?? string.Empty;
+
+        var manager = LocalizationManager.Instance;
+        var data = manager != null ? manager.LocalizationData : null;
+        if (data == null)
+            return fallback ?? key;
+
+        var translated = data.GetTranslation(key);
+        if (!string.IsNullOrWhiteSpace(translated) && translated != key)
+            return translated;
+
+        if (!string.IsNullOrEmpty(fallback))
+        {
+            var warningKey = key + "|" + manager.CurrentLanguage;
+            if (MissingKeys.Add(warningKey))
+                Debug.LogWarning($"[Localization] Missing key '{key}', using fallback '{fallback}'.");
+            return fallback;
+        }
+
+        return string.IsNullOrWhiteSpace(translated) ? key : translated;
+    }
+
+    public static string Format(string key, string fallback, params object[] args)
+    {
+        var format = T(key, fallback);
+        if (args == null || args.Length == 0)
+            return format;
+
+        return string.Format(format, args);
+    }
+}

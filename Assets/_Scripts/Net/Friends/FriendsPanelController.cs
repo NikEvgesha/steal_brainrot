@@ -163,8 +163,8 @@ public class FriendsPanelController : MonoBehaviour
         yield return api.EnsureGuest();
 
         var p = api.LocalProfile();
-        myNameText.text = $"Nickname: {p.displayName}";
-        myCodeText.text = $"ID: {p.friendCode}";
+        myNameText.text = LocalizationUtils.Format("UI/Friends/NicknameFormat", "Nickname: {0}", p.displayName);
+        myCodeText.text = LocalizationUtils.Format("UI/Friends/IdFormat", "ID: {0}", p.friendCode);
 
         // вЂњРѕРЅР»Р°Р№РЅвЂќ вЂ” РїРёРЅРіСѓРµРј РїСЂРё РѕС‚РєСЂС‹С‚РёРё Рё РїРѕС‚РѕРј РјРѕР¶РЅРѕ СЂР°Р· РІ 20 СЃРµРє РІ РѕС‚РґРµР»СЊРЅРѕРј РјРµСЃС‚Рµ
         yield return api.PresencePing();
@@ -182,13 +182,13 @@ public class FriendsPanelController : MonoBehaviour
         switch (code)
         {
             case 400:
-                addStatusText.text = "Failed to load friends list";
+                addStatusText.text = LocalizationUtils.T("UI/Friends/FailedLoadList", "Failed to load friends list");
                 break;
             case 404:
-                addStatusText.text = "Failed to load friends list";
+                addStatusText.text = LocalizationUtils.T("UI/Friends/FailedLoadList", "Failed to load friends list");
                 break;
             default:
-                addStatusText.text = "Failed to load friends list";
+                addStatusText.text = LocalizationUtils.T("UI/Friends/FailedLoadList", "Failed to load friends list");
                 break;
         }
     });
@@ -244,7 +244,7 @@ public class FriendsPanelController : MonoBehaviour
         yield return api.GetFriendRequests(items => list = items, (code, err) =>
         {
             if (requestsStatusText != null)
-                requestsStatusText.text = "Failed to load requests";
+                requestsStatusText.text = LocalizationUtils.T("UI/Friends/FailedLoadRequests", "Failed to load requests");
         });
 
         if (list == null) yield break;
@@ -273,7 +273,7 @@ public class FriendsPanelController : MonoBehaviour
 
         if (!ok)
         {
-            addStatusText.text = "Failed to add friend (check ID)";
+            addStatusText.text = LocalizationUtils.T("UI/Friends/FailedAddFriend", "Failed to add friend (check ID)");
             yield break;
         }
 
@@ -314,7 +314,7 @@ public class FriendsPanelController : MonoBehaviour
     {
         renameStatusText.text = "";
         var name = (renameInput.text ?? "").Trim();
-        if (name.Length < 3) { renameStatusText.text = "Minimum 3 characters"; yield break; }
+        if (name.Length < 3) { renameStatusText.text = LocalizationUtils.T("UI/Friends/MinNameLength", "Minimum 3 characters"); yield break; }
 
         bool ok = false;
         string fail = null;
@@ -324,14 +324,14 @@ public class FriendsPanelController : MonoBehaviour
 
         if (!ok)
         {
-            renameStatusText.text = fail ?? "Failed to rename";
+            renameStatusText.text = fail ?? LocalizationUtils.T("UI/Friends/FailedRename", "Failed to rename");
             yield break;
         }
 
         renameInput.text = "";
         var p = api.LocalProfile();
-        myNameText.text = $"Nickname: {p.displayName}";
-        renameStatusText.text = "Nickname updated";
+        myNameText.text = LocalizationUtils.Format("UI/Friends/NicknameFormat", "Nickname: {0}", p.displayName);
+        renameStatusText.text = LocalizationUtils.T("UI/Friends/NicknameUpdated", "Nickname updated");
     }
 
     IEnumerator ViewFriendBaseStub(string friendCode)
@@ -341,7 +341,7 @@ public class FriendsPanelController : MonoBehaviour
         FriendBaseResponse resp = null;
         yield return backend.GetFriendBase(friendCode,
             ok => resp = ok,
-            (code, err) => addStatusText.text = "Failed to load friend's base");
+            (code, err) => addStatusText.text = LocalizationUtils.T("UI/Friends/FailedLoadBase", "Failed to load friend's base"));
 
         if (resp == null)
             yield break;

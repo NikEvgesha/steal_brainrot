@@ -85,8 +85,18 @@ public sealed class WaterSurface : MonoBehaviour
     {
         if (boundsRenderer != null)
             return boundsRenderer.bounds;
-        if (boundsCollider != null)
+        if (boundsCollider != null && boundsCollider.enabled)
             return boundsCollider.bounds;
+
+        var meshFilter = GetComponent<MeshFilter>();
+        if (meshFilter != null && meshFilter.sharedMesh != null)
+        {
+            Bounds localBounds = meshFilter.sharedMesh.bounds;
+            Vector3 center = transform.TransformPoint(localBounds.center);
+            Vector3 size = Vector3.Scale(localBounds.size, transform.lossyScale);
+            size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
+            return new Bounds(center, size);
+        }
 
         return new Bounds(transform.position, Vector3.one);
     }
@@ -99,8 +109,16 @@ public sealed class WaterSurface : MonoBehaviour
         for (int i = 0; i < collidersToTrigger.Length; i++)
         {
             Collider col = collidersToTrigger[i];
-            if (col != null)
-                col.isTrigger = true;
+            if (col == null)
+                continue;
+
+            if (col is MeshCollider meshCollider && !meshCollider.convex)
+            {
+                meshCollider.enabled = false;
+                continue;
+            }
+
+            col.isTrigger = true;
         }
     }
 }

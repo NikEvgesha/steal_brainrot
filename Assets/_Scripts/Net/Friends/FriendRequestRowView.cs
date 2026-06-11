@@ -12,7 +12,7 @@ public class FriendRequestRowView : MonoBehaviour
 
     public void Bind(FriendsApi.FriendRequestItem item, Action onAccept, Action onDecline)
     {
-        nameText.text = string.IsNullOrEmpty(item.displayName) ? "Player" : item.displayName;
+        nameText.text = string.IsNullOrEmpty(item.displayName) ? LocalizationUtils.T("UI/Common/Player", "Player") : item.displayName;
         codeText.text = item.friendCode;
 
         acceptButton.onClick.RemoveAllListeners();

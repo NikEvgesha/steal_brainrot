@@ -2,13 +2,14 @@ using System;
 using UnityEngine;
 
 
-// Интерфейс для провайдеров покупок
+// РРЅС‚РµСЂС„РµР№СЃ РґР»СЏ РїСЂРѕРІР°Р№РґРµСЂРѕРІ РїРѕРєСѓРїРѕРє
 public abstract class PurchasesProvider : MonoBehaviour
 {
-    public abstract void Initialize(); // Инициализация провайдера
-    public abstract void BuyPurchase(string purchaseId, Action<bool> onComplete); // Вызов покупки с коллбэком
-    public abstract void ConsumePendingPurchases(); // Обработка необработанных покупок
-    public abstract PurchaseData GetPurchaseData(string purchaseId); // Получение данных о покупке
+    public abstract bool IsInitialized { get; }
+    public abstract void Initialize(); // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РїСЂРѕРІР°Р№РґРµСЂР°
+    public abstract void BuyPurchase(string purchaseId, Action<bool> onComplete); // Р’С‹Р·РѕРІ РїРѕРєСѓРїРєРё СЃ РєРѕР»Р»Р±СЌРєРѕРј
+    public abstract void ConsumePendingPurchases(); // РћР±СЂР°Р±РѕС‚РєР° РЅРµРѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… РїРѕРєСѓРїРѕРє
+    public abstract PurchaseData GetPurchaseData(string purchaseId); // РџРѕР»СѓС‡РµРЅРёРµ РґР°РЅРЅС‹С… Рѕ РїРѕРєСѓРїРєРµ
 
     public abstract bool PurchasesAvailable();
 }

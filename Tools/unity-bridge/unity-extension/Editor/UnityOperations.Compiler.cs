@@ -104,6 +104,8 @@ namespace UnityBridge
                 
                 AddAssemblyIfNotExists(references, typeof(object).Assembly.Location);
                 AddAssemblyIfNotExists(references, typeof(Uri).Assembly.Location);
+                AddAssemblyIfNotExists(references, FindAssemblyPath("System.Core.dll"));
+                AddAssemblyIfNotExists(references, FindAssemblyPath("netstandard.dll"));
                 
                 AddAssemblyIfNotExists(references, typeof(UnityEngine.GameObject).Assembly.Location);
                 if (needUnityEditor)
@@ -112,7 +114,7 @@ namespace UnityBridge
                 var allowedUnityAssemblies = new[] {
                     "UnityEngine.CoreModule", "UnityEngine.IMGUIModule", "UnityEngine.PhysicsModule",
                     "UnityEngine.AnimationModule", "UnityEngine.AudioModule", "UnityEngine.ParticleSystemModule",
-                    "UnityEngine.TerrainModule", "UnityEngine.UIModule", "UnityEngine.TextRenderingModule",
+                    "UnityEngine.TerrainModule", "UnityEngine.UIModule", "UnityEngine.UI", "Unity.TextMeshPro", "UnityEngine.TextRenderingModule",
                     "UnityEngine.UIElementsModule", "UnityEngine.ImageConversionModule"
                 };
 

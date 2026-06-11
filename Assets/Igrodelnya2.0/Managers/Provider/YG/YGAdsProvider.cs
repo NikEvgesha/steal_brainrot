@@ -1,14 +1,15 @@
 #if YG_SDK_ENABLED
 using System;
 using UnityEngine;
-// Реализация для YG плагина
+// Р РµР°Р»РёР·Р°С†РёСЏ РґР»СЏ YG РїР»Р°РіРёРЅР°
 public class YGAdsProvider : AdsProvider
 {
     private bool isInitialized = false;
+    public override bool IsInitialized => isInitialized;
 
     public override void Initialize()
     {
-        // Подписка на событие вознаграждения
+        // РџРѕРґРїРёСЃРєР° РЅР° СЃРѕР±С‹С‚РёРµ РІРѕР·РЅР°РіСЂР°Р¶РґРµРЅРёСЏ
         YG.YG2.onRewardAdv += OnReward;
         YG.YG2.onOpenRewardedAdv += OnRewardedAdOpened;
         YG.YG2.onErrorRewardedAdv += OnRewardedAdClosed;
@@ -18,7 +19,12 @@ public class YGAdsProvider : AdsProvider
 
     public override bool IsRewardedAdReady()
     {
-        // YG не предоставляет явного метода проверки готовности, предполагаем, что реклама доступна после инициализации
+        // YG РЅРµ РїСЂРµРґРѕСЃС‚Р°РІР»СЏРµС‚ СЏРІРЅРѕРіРѕ РјРµС‚РѕРґР° РїСЂРѕРІРµСЂРєРё РіРѕС‚РѕРІРЅРѕСЃС‚Рё, РїСЂРµРґРїРѕР»Р°РіР°РµРј, С‡С‚Рѕ СЂРµРєР»Р°РјР° РґРѕСЃС‚СѓРїРЅР° РїРѕСЃР»Рµ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё
+        return isInitialized;
+    }
+
+    public override bool IsInterstitialAdReady()
+    {
         return isInitialized;
     }
 
@@ -31,11 +37,11 @@ public class YGAdsProvider : AdsProvider
             return;
         }
 
-        // Сохраняем коллбэк для обработки результата
+        // РЎРѕС…СЂР°РЅСЏРµРј РєРѕР»Р»Р±СЌРє РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё СЂРµР·СѓР»СЊС‚Р°С‚Р°
         currentRewardCallback = onComplete;
         currentRewardId = rewardId;
 
-        // Вызов rewarded-рекламы с ID
+        // Р’С‹Р·РѕРІ rewarded-СЂРµРєР»Р°РјС‹ СЃ ID
         YG.YG2.RewardedAdvShow(rewardId);
         Debug.Log($"YG Rewarded Ad requested with ID: {rewardId}");
     }
@@ -49,6 +55,8 @@ public class YGAdsProvider : AdsProvider
         {
             Debug.Log($"YG Rewarded Ad completed with ID: {id}");
             currentRewardCallback?.Invoke(true);
+            currentRewardCallback = null;
+            currentRewardId = null;
         }
     }
 
@@ -60,11 +68,12 @@ public class YGAdsProvider : AdsProvider
     private void OnRewardedAdClosed()
     {
         Debug.Log("YG Rewarded Ad closed");
-        // Если пользователь закрыл рекламу до получения награды
+        // Р•СЃР»Рё РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ Р·Р°РєСЂС‹Р» СЂРµРєР»Р°РјСѓ РґРѕ РїРѕР»СѓС‡РµРЅРёСЏ РЅР°РіСЂР°РґС‹
         if (currentRewardCallback != null)
         {
             currentRewardCallback?.Invoke(false);
             currentRewardCallback = null;
+            currentRewardId = null;
         }
     }
 
@@ -78,9 +87,10 @@ public class YGAdsProvider : AdsProvider
 
         YG.YG2.InterstitialAdvShow();
         Debug.Log("YG Interstitial Ad requested");
+        AdClosed?.Invoke();
     }
 
-    // Очистка подписок
+    // РћС‡РёСЃС‚РєР° РїРѕРґРїРёСЃРѕРє
     public void OnDestroy()
     {
         YG.YG2.onRewardAdv -= OnReward;

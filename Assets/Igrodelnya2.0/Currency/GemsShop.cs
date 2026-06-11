@@ -30,7 +30,7 @@ public class GemsShop : MonoBehaviour
     //    }
     //    else
     //    {
-    //        Debug.LogWarning("GemsShop уже существует! Удаляем дубликат.");
+    //        Debug.LogWarning("GemsShop СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚! РЈРґР°Р»СЏРµРј РґСѓР±Р»РёРєР°С‚.");
     //        Destroy(gameObject);
     //    }
     //}
@@ -43,7 +43,6 @@ public class GemsShop : MonoBehaviour
         if (_inAppAvailable)
         {
             InitSlots();
-            G.Purchases.RestorePurchases();
         }
             
         G.Currency.NoGems.AddListener(ToggleOpen);
@@ -155,7 +154,7 @@ public class GemsShop : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Ошибка загрузки: " + request.error);
+            Debug.LogError("РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё: " + request.error);
         }
     }*/
 }

@@ -7,7 +7,6 @@ using UnityEngine.Events;
 public struct LevelEggs
 {
     public Egg egg;
-    public float weight;
 }
 
 public class ConveyorLevel : MonoBehaviour
@@ -22,7 +21,6 @@ public class ConveyorLevel : MonoBehaviour
     [SerializeField] private List<LevelEggs> _eggs;
     [SerializeField] private Egg _newEgg;
     [SerializeField] private bool _purchased;
-    private float _totalWeight;
     private bool _active;
     private bool _availableForPurchase;
 
@@ -47,28 +45,34 @@ public class ConveyorLevel : MonoBehaviour
 
     
 
-    private void Awake()
-    {
-        _totalWeight = 0f;
-        foreach(LevelEggs egg in _eggs)
-        {
-            _totalWeight += egg.weight;
-        }
-    }
-
     public Egg GetRandomEgg()
     {
-        float rand = UnityEngine.Random.Range(0, _totalWeight);
-        float current = 0f;
+        if (_eggs == null || _eggs.Count == 0)
+            return null;
+
+        int validCount = 0;
         for (int i = 0; i < _eggs.Count; i++)
         {
-            current += _eggs[i].weight;
-            if (current >= rand) 
-                return _eggs[i].egg;
+            if (_eggs[i].egg != null)
+                validCount++;
         }
 
-        return _eggs[0].egg;
+        if (validCount == 0)
+            return null;
 
+        int selectedValidIndex = UnityEngine.Random.Range(0, validCount);
+        for (int i = 0; i < _eggs.Count; i++)
+        {
+            if (_eggs[i].egg == null)
+                continue;
+
+            if (selectedValidIndex == 0)
+                return _eggs[i].egg;
+
+            selectedValidIndex--;
+        }
+
+        return null;
     }
 
     public void TryBuy(bool forGems)

@@ -2,9 +2,11 @@ using System;
 using UnityEngine;
 
 
-// Отладочный провайдер
+// РћС‚Р»Р°РґРѕС‡РЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ
 public class DebugPurchasesProvider : PurchasesProvider
 {
+    public override bool IsInitialized => true;
+
     public override void Initialize()
     {
         Debug.Log("Debug Purchases initialized");
@@ -13,7 +15,7 @@ public class DebugPurchasesProvider : PurchasesProvider
     public override void BuyPurchase(string purchaseId, Action<bool> onComplete)
     {
         Debug.Log($"Debug Purchase requested: {purchaseId}");
-        onComplete?.Invoke(true); // Симулируем успешную покупку
+        onComplete?.Invoke(true); // РЎРёРјСѓР»РёСЂСѓРµРј СѓСЃРїРµС€РЅСѓСЋ РїРѕРєСѓРїРєСѓ
     }
 
     public override void ConsumePendingPurchases()
