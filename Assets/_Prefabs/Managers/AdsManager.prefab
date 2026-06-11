@@ -47,6 +47,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AdsManager
   adsProviders:
   - {fileID: 4162030901523556965}
+  waitForRewardedProvider: 1
+  rewardedReadyTimeoutSeconds: 3
+  rewardedReadyPollSeconds: 0.15
+  timedInterstitialEnabled: 1
+  interstitialIntervalSeconds: 60
+  interstitialCountdownSeconds: 3
+  interstitialIncomeRewardMultiplier: 2
 --- !u!114 &4162030901523556965
 MonoBehaviour:
   m_ObjectHideFlags: 0

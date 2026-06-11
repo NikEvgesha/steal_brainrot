@@ -208,6 +208,7 @@ public class UniversalDecisionPopup : MonoBehaviour
         ApplyLabel(descriptionText, _descriptionLocalized, request.description);
         ApplyLabel(confirmButtonText, _confirmLocalized, request.confirm);
         ApplyLabel(cancelButtonText, _cancelLocalized, request.cancel);
+        AdButtonIconDecorator.SetAdIcon(confirmButton, ShouldShowAdIcon(request.confirm));
     }
 
     private void EnsureDefaults(Request request)
@@ -228,6 +229,28 @@ public class UniversalDecisionPopup : MonoBehaviour
     private static bool IsEmpty(LocalizedTextPayload payload)
     {
         return string.IsNullOrWhiteSpace(payload.key) && string.IsNullOrWhiteSpace(payload.fallback);
+    }
+
+    private static bool ShouldShowAdIcon(LocalizedTextPayload payload)
+    {
+        return ContainsAdToken(payload.key) || ContainsAdToken(payload.fallback);
+    }
+
+    private static bool ContainsAdToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        string lower = value.ToLowerInvariant();
+        return lower.Contains("реклам")
+            || lower.Contains("(ad)")
+            || lower.Contains("watchad")
+            || lower.Contains("rewardedad")
+            || lower.Contains("adreward")
+            || lower.Contains("x2ad")
+            || lower.EndsWith("ad")
+            || lower.Contains(" ad")
+            || lower.Contains("ad ");
     }
 
     private static Request BuildDefaultRequest()

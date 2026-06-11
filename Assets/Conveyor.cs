@@ -7,10 +7,13 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
 {
     private const string BaseMapProperty = "_BaseMap";
     private const string MainTexProperty = "_MainTex";
+    private const string LevelsAreaName = "LevelsArea";
     private static readonly int BaseMapStProperty = Shader.PropertyToID("_BaseMap_ST");
     private static readonly int MainTexStProperty = Shader.PropertyToID("_MainTex_ST");
     private static readonly int BeltOffsetProperty = Shader.PropertyToID("_BeltOffset");
     private static readonly int BeltAxisProperty = Shader.PropertyToID("_BeltAxis");
+    private static readonly int BeltSideAxisProperty = Shader.PropertyToID("_BeltSideAxis");
+    private static readonly int BeltHalfWidthProperty = Shader.PropertyToID("_BeltHalfWidth");
 
     [SerializeField] private bool _remoteMode;
     [SerializeField] private bool _openUiOnConveyorTrigger = true;
@@ -24,6 +27,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     [SerializeField] private float _destroyDistance;
     [SerializeField] private ConveyorLevel _startLevel;
     [SerializeField] private ConveyorUI _ui;
+    [SerializeField] private GameObject _levelsArea;
     [SerializeField] private List<ConveyorLevel> _levels;
 
     private HashSet<Egg> _eggs;
@@ -52,9 +56,12 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     private void Awake()
     {
         EnsureEggStorage();
+        ResolveLevelsArea();
         CacheBeltRenderers();
         if (!_remoteMode)
             G.Initialized.AddListener(Init);
+        else
+            HideRemoteUI();
     }
 
     private void OnEnable()
@@ -241,22 +248,73 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
 
     private void HideRemoteUI()
     {
-        if (_ui == null) return;
-        _ui.ToggleOpen(false);
-        _ui.gameObject.SetActive(false);
+        if (_ui != null)
+        {
+            _ui.ToggleOpen(false);
+            _ui.gameObject.SetActive(false);
+        }
+
+        SetLevelsAreaVisible(false);
     }
 
     private void ShowLocalUI()
     {
-        if (_ui == null) return;
-        _ui.gameObject.SetActive(true);
+        if (_ui != null)
+            _ui.gameObject.SetActive(true);
+
+        SetLevelsAreaVisible(true);
+    }
+
+    private void SetLevelsAreaVisible(bool visible)
+    {
+        GameObject levelsArea = ResolveLevelsArea();
+        if (levelsArea != null)
+            levelsArea.SetActive(visible);
+    }
+
+    private GameObject ResolveLevelsArea()
+    {
+        if (_levelsArea != null)
+            return _levelsArea;
+
+        Transform levelsAreaTransform = FindChildByName(transform, LevelsAreaName);
+        if (levelsAreaTransform != null)
+            _levelsArea = levelsAreaTransform.gameObject;
+
+        return _levelsArea;
+    }
+
+    private static Transform FindChildByName(Transform root, string childName)
+    {
+        if (root == null)
+            return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (string.Equals(child.name, childName, StringComparison.Ordinal))
+                return child;
+
+            Transform nested = FindChildByName(child, childName);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
     }
 
     private void EnableInteractionListeners(bool enabled)
     {
         var listeners = GetComponentsInChildren<InteractionRaycastListener>(true);
         foreach (var listener in listeners)
+        {
+            listener.SetZoneVisualSuppressed(!enabled);
             listener.enabled = enabled;
+        }
+
+        var visuals = GetComponentsInChildren<InteractionZoneVisual>(true);
+        foreach (var visual in visuals)
+            visual.SetVisible(enabled);
     }
 
     public void SetLevel(ConveyorLevel lvl)
@@ -293,6 +351,10 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
             }
             G.Luck?.NotifyChanged();
             BaseDirtyTracker.MarkDirty();
+        }
+        else
+        {
+            EnableInteractionListeners(false);
         }
     }
 
@@ -338,6 +400,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
 
         level = Mathf.Clamp(level, 0, _levels.Count - 1);
         SetLevel(_levels[level]);
+        EnableInteractionListeners(false);
         StartSpawnLoop();
     }
 
@@ -359,6 +422,11 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         {
             if (!_remoteMode)
                 EnsureLocalInit();
+            else
+            {
+                HideRemoteUI();
+                EnableInteractionListeners(false);
+            }
             return;
         }
 
@@ -386,6 +454,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         _beltRendererBindings.Clear();
 
         _beltPropertyBlock ??= new MaterialPropertyBlock();
+        Vector3 beltMoveDirection = GetBeltMoveDirection();
 
         Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
         for (int i = 0; i < renderers.Length; i++)
@@ -399,12 +468,15 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
             Material[] materials = renderer.sharedMaterials;
             for (int j = 0; j < materials.Length; j++)
             {
+                Vector4 axis = GetBeltAxis(renderer, beltMoveDirection);
                 _beltRendererBindings.Add(new BeltRendererBinding(
                     renderer,
                     j,
                     GetTextureScaleOffset(materials[j], BaseMapProperty),
                     GetTextureScaleOffset(materials[j], MainTexProperty),
-                    GetBeltAxis(renderer)));
+                    axis,
+                    GetBeltSideAxis(axis),
+                    GetBeltHalfWidth(renderer, axis)));
             }
         }
 
@@ -423,14 +495,30 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
                 if (!IsSameMaterial(materials[j], _mt))
                     continue;
 
+                Vector4 axis = GetBeltAxis(renderer, beltMoveDirection);
                 _beltRendererBindings.Add(new BeltRendererBinding(
                     renderer,
                     j,
                     GetTextureScaleOffset(materials[j], BaseMapProperty),
                     GetTextureScaleOffset(materials[j], MainTexProperty),
-                    GetBeltAxis(renderer)));
+                    axis,
+                    GetBeltSideAxis(axis),
+                    GetBeltHalfWidth(renderer, axis)));
             }
         }
+    }
+
+    private Vector3 GetBeltMoveDirection()
+    {
+        Vector3 direction = _spawnPoint != null ? _spawnPoint.forward : Vector3.zero;
+
+        if (direction.sqrMagnitude < 0.0001f && _spawnPoint != null && _destroyPoint != null)
+            direction = _destroyPoint.position - _spawnPoint.position;
+
+        if (direction.sqrMagnitude < 0.0001f)
+            direction = transform.right;
+
+        return direction.normalized;
     }
 
     private void ScrollBeltMaterial()
@@ -440,11 +528,11 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         if (_beltRendererBindings.Count == 0)
             return;
 
-        float scrollSpeed = _speed * _matSpeedMultiplier * Time.fixedDeltaTime;
-        if (Mathf.Approximately(scrollSpeed, 0f))
+        float scrollStep = _speed * _matSpeedMultiplier * Time.fixedDeltaTime;
+        if (Mathf.Approximately(scrollStep, 0f))
             return;
 
-        _beltScrollOffset = Mathf.Repeat(_beltScrollOffset + scrollSpeed * Time.fixedDeltaTime, 1f);
+        _beltScrollOffset = Mathf.Repeat(_beltScrollOffset + scrollStep, 1f);
 
         for (int i = _beltRendererBindings.Count - 1; i >= 0; i--)
         {
@@ -463,6 +551,8 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
             binding.Renderer.GetPropertyBlock(_beltPropertyBlock, binding.MaterialIndex);
             _beltPropertyBlock.SetFloat(BeltOffsetProperty, _beltScrollOffset);
             _beltPropertyBlock.SetVector(BeltAxisProperty, binding.Axis);
+            _beltPropertyBlock.SetVector(BeltSideAxisProperty, binding.SideAxis);
+            _beltPropertyBlock.SetFloat(BeltHalfWidthProperty, binding.HalfWidth);
             _beltPropertyBlock.SetVector(BaseMapStProperty, baseMap);
             _beltPropertyBlock.SetVector(MainTexStProperty, mainTex);
             binding.Renderer.SetPropertyBlock(_beltPropertyBlock, binding.MaterialIndex);
@@ -507,19 +597,54 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         return false;
     }
 
-    private static Vector4 GetBeltAxis(Renderer renderer)
+    private static Vector4 GetBeltAxis(Renderer renderer, Vector3 desiredWorldDirection)
     {
         MeshFilter meshFilter = renderer != null ? renderer.GetComponent<MeshFilter>() : null;
         Vector3 size = meshFilter != null && meshFilter.sharedMesh != null
             ? meshFilter.sharedMesh.bounds.size
             : Vector3.one;
 
+        Vector3 localAxis;
         if (size.y >= size.x && size.y >= size.z)
-            return new Vector4(0f, 1f, 0f, 0f);
-        if (size.z >= size.x && size.z >= size.y)
-            return new Vector4(0f, 0f, 1f, 0f);
+            localAxis = Vector3.up;
+        else if (size.z >= size.x && size.z >= size.y)
+            localAxis = Vector3.forward;
+        else
+            localAxis = Vector3.right;
 
-        return new Vector4(1f, 0f, 0f, 0f);
+        if (renderer != null && desiredWorldDirection.sqrMagnitude > 0.0001f)
+        {
+            Vector3 worldAxis = renderer.transform.TransformDirection(localAxis);
+            if (Vector3.Dot(worldAxis, desiredWorldDirection) < 0f)
+                localAxis = -localAxis;
+        }
+
+        return new Vector4(localAxis.x, localAxis.y, localAxis.z, 0f);
+    }
+
+    private static Vector4 GetBeltSideAxis(Vector4 axis)
+    {
+        Vector3 side = Vector3.Cross(Vector3.up, new Vector3(axis.x, axis.y, axis.z));
+        if (side.sqrMagnitude < 0.0001f)
+            side = Vector3.forward;
+
+        side.Normalize();
+        return new Vector4(side.x, side.y, side.z, 0f);
+    }
+
+    private static float GetBeltHalfWidth(Renderer renderer, Vector4 axis)
+    {
+        MeshFilter meshFilter = renderer != null ? renderer.GetComponent<MeshFilter>() : null;
+        Vector3 size = meshFilter != null && meshFilter.sharedMesh != null
+            ? meshFilter.sharedMesh.bounds.size
+            : Vector3.one;
+
+        if (Mathf.Abs(axis.x) > 0.5f)
+            return Mathf.Max(0.05f, size.z * 0.5f);
+        if (Mathf.Abs(axis.z) > 0.5f)
+            return Mathf.Max(0.05f, size.x * 0.5f);
+
+        return Mathf.Max(0.05f, Mathf.Max(size.x, size.z) * 0.5f);
     }
 
     private readonly struct BeltRendererBinding
@@ -529,19 +654,25 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         public readonly Vector4 BaseMapScaleOffset;
         public readonly Vector4 MainTexScaleOffset;
         public readonly Vector4 Axis;
+        public readonly Vector4 SideAxis;
+        public readonly float HalfWidth;
 
         public BeltRendererBinding(
             Renderer renderer,
             int materialIndex,
             Vector4 baseMapScaleOffset,
             Vector4 mainTexScaleOffset,
-            Vector4 axis)
+            Vector4 axis,
+            Vector4 sideAxis,
+            float halfWidth)
         {
             Renderer = renderer;
             MaterialIndex = materialIndex;
             BaseMapScaleOffset = baseMapScaleOffset;
             MainTexScaleOffset = mainTexScaleOffset;
             Axis = axis;
+            SideAxis = sideAxis;
+            HalfWidth = halfWidth;
         }
     }
 }

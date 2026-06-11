@@ -1,7 +1,6 @@
 using MirraGames.SDK;
 using System;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 [DefaultExecutionOrder(1)]

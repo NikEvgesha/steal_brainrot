@@ -52,6 +52,31 @@ public class ItemPrefabStorage : MonoBehaviour
         return _pets.GetAllOfType<Brainrot>();
     }
 
+    public bool ContainsPetPrefab(Brainrot prefab)
+    {
+        if (prefab == null || _pets == null)
+            return false;
+
+        var pets = _pets.GetAllOfType<Brainrot>();
+        for (int i = 0; i < pets.Count; i++)
+        {
+            Brainrot pet = pets[i];
+            if (pet == null)
+                continue;
+
+            if (pet == prefab)
+                return true;
+
+            if (!string.IsNullOrWhiteSpace(prefab.Name) && string.Equals(pet.Name, prefab.Name, System.StringComparison.Ordinal))
+                return true;
+
+            if (string.Equals(pet.name, prefab.name, System.StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
 
     public Food GetFood(string name)
     {

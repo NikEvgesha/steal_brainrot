@@ -34,8 +34,7 @@ public sealed class InteractionZoneVisual : MonoBehaviour
 
     private void OnDisable()
     {
-        if (_visualRoot != null)
-            _visualRoot.gameObject.SetActive(false);
+        SetVisualRootActive(false);
     }
 
     private void OnDestroy()
@@ -80,6 +79,18 @@ public sealed class InteractionZoneVisual : MonoBehaviour
 
         CreateMeshObject("Fill", CreateDiscMesh(radiusX, radiusZ), _fillMaterial);
         CreateMeshObject("Border", CreateRingMesh(radiusX, radiusZ, borderWidth), _borderMaterial);
+    }
+
+    public void SetVisible(bool visible)
+    {
+        enabled = visible;
+        SetVisualRootActive(visible);
+    }
+
+    private void SetVisualRootActive(bool visible)
+    {
+        if (_visualRoot != null)
+            _visualRoot.gameObject.SetActive(visible);
     }
 
     private void DestroyExistingVisual()

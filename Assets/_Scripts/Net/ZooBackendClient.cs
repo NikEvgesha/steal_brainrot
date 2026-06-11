@@ -277,6 +277,7 @@ public class ZooBackendClient : MonoBehaviour
         if (req.result != UnityWebRequest.Result.Success)
         {
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
+            CompleteInitialLocationsLoad(_lastLocations);
             yield break;
         }
 
@@ -307,18 +308,24 @@ public class ZooBackendClient : MonoBehaviour
         catch
         {
             onErr?.Invoke(500, "Failed to parse locations response");
+            CompleteInitialLocationsLoad(_lastLocations);
             yield break;
         }
 
         _lastLocations.Clear();
         _lastLocations.AddRange(list);
         LocationsUpdated?.Invoke(_lastLocations);
-        if (!IsInitialLocationsLoaded)
-        {
-            IsInitialLocationsLoaded = true;
-            InitialLocationsLoaded?.Invoke(_lastLocations);
-        }
+        CompleteInitialLocationsLoad(_lastLocations);
         onOk?.Invoke(_lastLocations);
+    }
+
+    private void CompleteInitialLocationsLoad(List<ZooLocationItem> locations)
+    {
+        if (IsInitialLocationsLoaded)
+            return;
+
+        IsInitialLocationsLoaded = true;
+        InitialLocationsLoaded?.Invoke(locations);
     }
 
     // ===== FRIEND BASE =====

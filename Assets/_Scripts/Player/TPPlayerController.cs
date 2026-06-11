@@ -21,6 +21,7 @@ public class TPPlayerController : MonoBehaviour
     [Header("Physics")]
     [SerializeField] private float gravity = -20f;
     [SerializeField] private float groundedStick = -2f;
+    [SerializeField] private float maxFrameDeltaTime = 0.05f;
 
     [Header("References")]
     [SerializeField] private Transform cameraTransform; // Камера для направления движения
@@ -36,6 +37,7 @@ public class TPPlayerController : MonoBehaviour
     [Header("Animation")]
     [SerializeField] private Animator animator;
     [SerializeField] private float speedDampTime = 0.08f;  // сглаживание параметра Speed
+    [SerializeField] private float animatorSpeedMultiplier = 2f;
     //[SerializeField] private bool useHoldTriggerOnToggle = true; // жать триггер при смене hold
     //[SerializeField] private bool debugToggleHoldWithKey = false;
     //[SerializeField] private KeyCode debugHoldKey = KeyCode.E;
@@ -58,7 +60,16 @@ public class TPPlayerController : MonoBehaviour
         //    cameraTransform = Camera.main.transform;
 
         // На всякий случай выключим root motion (контроль у CharacterController)
-        if (animator != null) animator.applyRootMotion = false;
+        ApplyAnimatorSettings();
+    }
+
+    private void ApplyAnimatorSettings()
+    {
+        if (animator == null)
+            return;
+
+        animator.applyRootMotion = false;
+        animator.speed = Mathf.Max(0.01f, animatorSpeedMultiplier);
     }
 
     public void SetCamera(Transform camera)
@@ -70,6 +81,7 @@ public class TPPlayerController : MonoBehaviour
 
     private void Update()
     {
+        float dt = Mathf.Min(Time.deltaTime, Mathf.Max(0.001f, maxFrameDeltaTime));
         Vector3 movement;
         float h;
         float v;
@@ -101,7 +113,7 @@ public class TPPlayerController : MonoBehaviour
 
         // ===== Скорость (плавно) =====
         float targetSpeed = (running ? runSpeed : walkSpeed) * moveDir.magnitude;
-        _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, acceleration * Time.deltaTime);
+        _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, acceleration * dt);
 
         Vector3 velocity = moveDir * _currentSpeed;
 
@@ -121,7 +133,7 @@ public class TPPlayerController : MonoBehaviour
         }
         else
         {
-            _verticalVel += gravity * Time.deltaTime;
+            _verticalVel += gravity * dt;
         }
         velocity.y = _verticalVel;
         velocity += _externalHorizontalVelocity;
@@ -130,22 +142,23 @@ public class TPPlayerController : MonoBehaviour
         if (moveDir.sqrMagnitude > 0.0001f)
         {
             Quaternion targetRot = Quaternion.LookRotation(moveDir, Vector3.up);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationLerp * Time.deltaTime);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationLerp * dt);
         }
 
         // ===== Движение =====
-        _cc.Move(velocity * Time.deltaTime);
+        _cc.Move(velocity * dt);
         _externalHorizontalVelocity = Vector3.MoveTowards(
             _externalHorizontalVelocity,
             Vector3.zero,
-            externalVelocityDamping * Time.deltaTime);
+            externalVelocityDamping * dt);
 
         // ===== Анимация =====
         if (animator != null)
         {
+            animator.speed = Mathf.Max(0.01f, animatorSpeedMultiplier);
             // Нормализуем скорость в [0..1] относительно runSpeed (один и тот же BlendTree param для обычного/hold набора)
             float normalized = runSpeed > 0.0001f ? (_currentSpeed / runSpeed) : 0f;
-            animator.SetFloat(AnimParamName.Speed.ToString(), normalized, speedDampTime, Time.deltaTime);
+            animator.SetFloat(AnimParamName.Speed.ToString(), normalized, speedDampTime, dt);
             animator.SetBool(AnimParamName.IsHolding.ToString(), _isHolding);
         }
     }

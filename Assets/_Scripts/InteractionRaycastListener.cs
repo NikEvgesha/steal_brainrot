@@ -9,6 +9,8 @@ public class InteractionRaycastListener : MonoBehaviour
 
     [SerializeField] public float MaxDistance;
 
+    private bool _zoneVisualSuppressed;
+
     private void Awake()
     {
         EnsureEvents();
@@ -36,6 +38,21 @@ public class InteractionRaycastListener : MonoBehaviour
         _noHitEvent?.Invoke();
     }
 
+    public void SetZoneVisualSuppressed(bool suppressed)
+    {
+        _zoneVisualSuppressed = suppressed;
+
+        var visual = GetComponent<InteractionZoneVisual>();
+        if (visual != null)
+        {
+            visual.SetVisible(!suppressed);
+            return;
+        }
+
+        if (!suppressed)
+            EnsureZoneVisual();
+    }
+
     private void EnsureEvents()
     {
         _hitEvent ??= new UnityEvent();
@@ -44,6 +61,8 @@ public class InteractionRaycastListener : MonoBehaviour
 
     private void EnsureZoneVisual()
     {
+        if (_zoneVisualSuppressed)
+            return;
         if (!ShouldCreateZoneVisual())
             return;
         if (GetComponent<InteractionZoneVisual>() != null)
@@ -59,6 +78,10 @@ public class InteractionRaycastListener : MonoBehaviour
 
         for (Transform current = transform; current != null; current = current.parent)
         {
+            var conveyor = current.GetComponent<Conveyor>();
+            if (conveyor != null && conveyor.IsRemoteMode)
+                return false;
+
             string name = current.name;
             if (name.IndexOf("Conveyor", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 name.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0)

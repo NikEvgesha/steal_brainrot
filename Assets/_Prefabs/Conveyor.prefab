@@ -862,6 +862,7 @@ GameObject:
   - component: {fileID: 4369094804913198944}
   - component: {fileID: 3602474444911241035}
   - component: {fileID: 5906192822383697950}
+  - component: {fileID: 8834004519878835418}
   m_Layer: 0
   m_Name: belt
   m_TagString: Untagged
@@ -941,6 +942,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &8834004519878835418
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 985631211376459471}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 208, y: 6, z: 30}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1253622276798615315
 GameObject:
   m_ObjectHideFlags: 0
@@ -2118,7 +2140,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2600000, guid: 315a3433ce26e3c4c94f680c733d2ff5, type: 2}
+  - {fileID: 2100000, guid: 5d1892fd131f43daadfe27a21e43601f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3457,7 +3479,7 @@ MonoBehaviour:
   _spawnInterval: 2
   _mt: {fileID: 2600000, guid: 5f14aa85b9deb224293ef37c465a3667, type: 2}
   _speed: 3.5
-  _matSpeedMultiplier: 4
+  _matSpeedMultiplier: 0.35
   _spawnPoint: {fileID: 6658252062597132955}
   _destroyPoint: {fileID: 4491514882443535430}
   _egglayer:
@@ -3466,6 +3488,7 @@ MonoBehaviour:
   _destroyDistance: 1
   _startLevel: {fileID: 4710975578445986311}
   _ui: {fileID: 7190823713478238486}
+  _levelsArea: {fileID: 3754522814237752477}
   _levels:
   - {fileID: 4710975578445986311}
   - {fileID: 1621267546039600409}

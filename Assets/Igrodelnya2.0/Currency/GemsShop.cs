@@ -39,7 +39,7 @@ public class GemsShop : MonoBehaviour
     private void Start()
     {
         _purchaseData = new Dictionary<PurchaseData, ShopPackData>();
-        _inAppAvailable = true; //G.Purchases.PurchasesAvailable();
+        _inAppAvailable = G.Purchases != null && G.Purchases.PurchasesAvailable();
         if (_inAppAvailable)
         {
             InitSlots();

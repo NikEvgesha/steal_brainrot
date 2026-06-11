@@ -304,7 +304,9 @@ public enum ShopSlotType
 public enum ShopRewardType
 {
     Item,
-    Currency
+    Currency,
+    NoAdsMonth,
+    NoAdsForever
 }
 
 public enum RaycastType

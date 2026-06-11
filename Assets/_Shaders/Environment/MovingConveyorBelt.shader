@@ -6,9 +6,11 @@ Shader "StealBrainrot/Environment/MovingConveyorBelt"
         _StripeColor ("Stripe Color", Color) = (0.22, 0.31, 0.36, 1)
         _BeltOffset ("Belt Offset", Float) = 0
         _BeltAxis ("Belt Axis", Vector) = (1, 0, 0, 0)
-        _StripeDensity ("Stripe Density", Float) = 2.75
-        _StripeWidth ("Stripe Width", Range(0.01, 1)) = 0.28
-        _StripeSoftness ("Stripe Softness", Range(0.001, 0.5)) = 0.08
+        _BeltSideAxis ("Belt Side Axis", Vector) = (0, 0, 1, 0)
+        _BeltHalfWidth ("Belt Half Width", Float) = 1
+        _StripeDensity ("Arrow Density", Float) = 0.045
+        _StripeWidth ("Arrow Thickness", Range(0.01, 0.5)) = 0.075
+        _StripeSoftness ("Arrow Softness", Range(0.001, 0.25)) = 0.02
     }
 
     SubShader
@@ -41,6 +43,8 @@ Shader "StealBrainrot/Environment/MovingConveyorBelt"
                 half4 _StripeColor;
                 float _BeltOffset;
                 float4 _BeltAxis;
+                float4 _BeltSideAxis;
+                float _BeltHalfWidth;
                 float _StripeDensity;
                 half _StripeWidth;
                 half _StripeSoftness;
@@ -73,9 +77,20 @@ Shader "StealBrainrot/Environment/MovingConveyorBelt"
                 float3 axis = _BeltAxis.xyz;
                 axis = dot(axis, axis) > 0.0001 ? normalize(axis) : float3(1, 0, 0);
 
-                float coord = dot(input.positionOS, axis) * _StripeDensity - _BeltOffset;
-                half centered = abs(frac(coord) - 0.5) * 2.0;
-                half stripe = 1.0 - smoothstep(_StripeWidth, _StripeWidth + _StripeSoftness, centered);
+                float3 sideAxis = _BeltSideAxis.xyz;
+                sideAxis = dot(sideAxis, sideAxis) > 0.0001 ? normalize(sideAxis) : normalize(cross(float3(0, 1, 0), axis));
+                sideAxis = dot(sideAxis, sideAxis) > 0.0001 ? sideAxis : float3(0, 0, 1);
+
+                float along = dot(input.positionOS, axis);
+                float side = dot(input.positionOS, sideAxis);
+                float side01 = saturate(abs(side) / max(_BeltHalfWidth, 0.001));
+                float cell = frac(along * _StripeDensity - _BeltOffset);
+                float arrowCenter = lerp(0.76, 0.18, side01);
+                float arrowDistance = abs(cell - arrowCenter);
+                arrowDistance = min(arrowDistance, 1.0 - arrowDistance);
+
+                half edgeFade = 1.0 - smoothstep(0.88, 1.02, side01);
+                half stripe = (1.0 - smoothstep(_StripeWidth, _StripeWidth + _StripeSoftness, arrowDistance)) * edgeFade;
 
                 half3 color = lerp(_BaseColor.rgb, _StripeColor.rgb, stripe);
                 half light = saturate(input.normalWS.y * 0.35 + 0.78);

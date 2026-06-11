@@ -88,7 +88,7 @@ public sealed class WaterSurface : MonoBehaviour
         if (boundsCollider != null && boundsCollider.enabled)
             return boundsCollider.bounds;
 
-        var meshFilter = GetComponent<MeshFilter>();
+        MeshFilter meshFilter = GetComponent<MeshFilter>();
         if (meshFilter != null && meshFilter.sharedMesh != null)
         {
             Bounds localBounds = meshFilter.sharedMesh.bounds;

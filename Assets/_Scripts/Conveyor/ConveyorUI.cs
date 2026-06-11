@@ -711,7 +711,7 @@ public static class ConveyorDropChanceCalculator
             for (int i = 0; i < configuredDrops.Count; i++)
             {
                 var drop = configuredDrops[i];
-                if (drop.Brainrot == null || drop.Weight <= 0f)
+                if (!Egg.IsAnimalDrop(drop.Brainrot) || drop.Weight <= 0f)
                     continue;
 
                 result.Add(new BrainrotDropView(drop.Brainrot, drop.Weight));
@@ -728,7 +728,7 @@ public static class ConveyorDropChanceCalculator
         var useDefaultSlotWeights = legacyBrainrots.Count == 4;
         for (int i = 0; i < legacyBrainrots.Count; i++)
         {
-            if (legacyBrainrots[i] != null)
+            if (Egg.IsAnimalDrop(legacyBrainrots[i]))
                 result.Add(new BrainrotDropView(legacyBrainrots[i], useDefaultSlotWeights ? GetDefaultSlotWeight(i) : 1d));
         }
 

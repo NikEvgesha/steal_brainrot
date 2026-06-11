@@ -1,4 +1,3 @@
-using UnityEditor.Localization.Editor;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -16,9 +15,21 @@ public class ConveyorLevelTab : MonoBehaviour
     public void Init(ConveyorLevel level)
     {
         _name = GetComponentInChildren<Text>();
-        _localization = _name.GetComponent<LocalizedText>();
         _level = level;
-        _localization.SelectedKey = "Boost/RareType/" + _level.RareType.ToString();
+        string localizationKey = "Boost/RareType/" + _level.RareType.ToString();
+        _localization = _name != null ? _name.GetComponent<LocalizedText>() : null;
+        if (_localization != null)
+        {
+            var manager = LocalizationManager.Instance;
+            _localization.Configure(
+                _localization.LocalizationData != null ? _localization.LocalizationData : manager != null ? manager.LocalizationData : null,
+                localizationKey,
+                manager != null ? manager.CurrentLanguage : _localization.CurrentLanguage);
+        }
+        else if (_name != null)
+        {
+            _name.text = _level.RareType.ToString();
+        }
         //_name.text = LocalizationManager.Instance.LocalizationData.GetTranslation(LocalizationKeyType. + _level.RareType, LocalizationManager.Instance.CurrentLanguage);
         //_name.text = _level.RareType.ToString(); // TODO: Localization
     }

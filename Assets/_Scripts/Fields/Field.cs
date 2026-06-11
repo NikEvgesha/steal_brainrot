@@ -199,6 +199,12 @@ public class Field : MonoBehaviour
         _remoteMode = remote;
         if (_buyPanel != null)
             _buyPanel.gameObject.SetActive(false);
+        EnsureCells();
+        foreach (var cell in _cells)
+        {
+            if (cell != null)
+                cell.SetRemoteMode(remote);
+        }
         if (_touchHandler == null)
             _touchHandler = GetComponentInChildren<BuyTouchHandler>(true);
         if (_touchHandler != null)

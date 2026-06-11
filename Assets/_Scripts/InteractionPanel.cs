@@ -6,6 +6,8 @@ using UnityEngine.UI;
 
 public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
+    private const string RewardedAdBadgeName = "AdIconBadge";
+
     [SerializeField] private GameObject _hintDesctop;
     [SerializeField] private GameObject _hintTouch;
     [SerializeField] private Image _fillImg;
@@ -15,6 +17,10 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [SerializeField] private float _inputDropGraceSec = 0.08f;
     [SerializeField] private float _nearCompleteThreshold = 0.99f;
     [SerializeField] private float _resumeAfterDisableWindowSec = 0.35f;
+    [Header("Rewarded Ad Badge")]
+    [SerializeField] private bool _showRewardedAdBadge;
+    [SerializeField] private Vector2 _rewardedAdBadgeSize = new Vector2(36f, 36f);
+    [SerializeField] private Vector2 _rewardedAdBadgeOffset = new Vector2(-7f, -7f);
     [SerializeField] public UnityEvent InteractionStarted;
     [SerializeField] public UnityEvent InteractionComplete;
 
@@ -28,6 +34,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private float _resumeProgress;
     private float _resumeUntilUnscaledTime;
     private bool _awaitReleaseAfterComplete;
+    private Image _rewardedAdBadgeImage;
 
     public bool IsInteracting => _interactionInProgress;
 
@@ -52,6 +59,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             if (_priceLocalizedText != null)
                 _priceLocalizedText.enabled = false;
         }
+
+        ApplyRewardedAdBadgeState();
     }
 
     private void Start()
@@ -60,10 +69,13 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             _hintTouch.SetActive(G.Control.UseTouchControl);
         if (_hintDesctop != null)
             _hintDesctop.SetActive(!G.Control.UseTouchControl);
+        ApplyRewardedAdBadgeState();
     }
 
     private void OnEnable()
     {
+        ApplyRewardedAdBadgeState();
+
         if (_hasResumeProgress &&
             Time.unscaledTime <= _resumeUntilUnscaledTime &&
             (IsHoldPressed() || _pointerHold))
@@ -245,5 +257,75 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             if (price != null)
                 _priceText.text = "$" + price;
         }
+
+        ApplyRewardedAdBadgeState();
+    }
+
+    public void SetRewardedAdBadgeVisible(bool visible)
+    {
+        _showRewardedAdBadge = visible;
+        ApplyRewardedAdBadgeState();
+    }
+
+    public void MarkAsRewardedAdInteraction(bool rewarded = true)
+    {
+        SetRewardedAdBadgeVisible(rewarded);
+    }
+
+    private void ApplyRewardedAdBadgeState()
+    {
+        if (!_showRewardedAdBadge)
+        {
+            if (_rewardedAdBadgeImage != null)
+                _rewardedAdBadgeImage.gameObject.SetActive(false);
+            return;
+        }
+
+        Image badge = EnsureRewardedAdBadge();
+        if (badge != null)
+            badge.gameObject.SetActive(true);
+    }
+
+    private Image EnsureRewardedAdBadge()
+    {
+        if (_rewardedAdBadgeImage != null)
+            return _rewardedAdBadgeImage;
+
+        Transform badgeTransform = transform.Find(RewardedAdBadgeName);
+        if (badgeTransform == null)
+        {
+            var badgeObject = new GameObject(RewardedAdBadgeName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+            badgeObject.transform.SetParent(transform, false);
+            badgeTransform = badgeObject.transform;
+        }
+
+        _rewardedAdBadgeImage = badgeTransform.GetComponent<Image>();
+        if (_rewardedAdBadgeImage == null)
+            _rewardedAdBadgeImage = badgeTransform.gameObject.AddComponent<Image>();
+
+        _rewardedAdBadgeImage.sprite = AdButtonIconDecorator.GetIconSprite();
+        _rewardedAdBadgeImage.type = Image.Type.Simple;
+        _rewardedAdBadgeImage.preserveAspect = true;
+        _rewardedAdBadgeImage.color = Color.white;
+        _rewardedAdBadgeImage.raycastTarget = false;
+
+        var rect = badgeTransform as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = _rewardedAdBadgeOffset;
+            rect.sizeDelta = _rewardedAdBadgeSize;
+            rect.localScale = Vector3.one;
+            rect.SetAsLastSibling();
+        }
+
+        var layoutElement = badgeTransform.GetComponent<LayoutElement>();
+        if (layoutElement == null)
+            layoutElement = badgeTransform.gameObject.AddComponent<LayoutElement>();
+        layoutElement.ignoreLayout = true;
+
+        return _rewardedAdBadgeImage;
     }
 }

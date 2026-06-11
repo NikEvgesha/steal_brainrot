@@ -60,6 +60,9 @@ public class TPCameraController : MonoBehaviour
 
     [SerializeField] private LayerMask collisionMask = ~0; // Выключи тут слой Player
 
+
+    [SerializeField] private bool ignoreEggsInCollision = true;
+
     [Header("Smoothing")]
     [SerializeField] private bool freezeOnSpike = true;
     [SerializeField] private float spikeThreshold = 0.05f;
@@ -71,6 +74,9 @@ public class TPCameraController : MonoBehaviour
     private Camera _cam;
 
     private RaycastHit _hit; // поле, чтобы не аллоцировать в стеке каждый кадр
+
+
+    private readonly RaycastHit[] _collisionHits = new RaycastHit[32];
 
 
 
@@ -238,7 +244,7 @@ public class TPCameraController : MonoBehaviour
         float maxDist = toCam.magnitude;
         Vector3 dir = maxDist > 0.0001f ? toCam / maxDist : Vector3.back;
 
-        bool hitSomething = Physics.SphereCast(pivot, collisionRadius, dir, out _hit, maxDist, collisionMask, QueryTriggerInteraction.Ignore);
+        bool hitSomething = TryGetNearestCameraCollision(pivot, dir, maxDist, out _hit);
         float targetDistance = _desiredDistance;
 
         if (hitSomething)
@@ -255,17 +261,6 @@ public class TPCameraController : MonoBehaviour
 
         // ????????? ????????? ??????
         Vector3 finalPos = pivot - (rot * Vector3.forward) * _currentDistance;
-        float dt = Time.unscaledDeltaTime;
-        if (dt > 0.25f) dt = 0.25f;
-
-        bool spike = dt > spikeThreshold;
-        if (spike && freezeOnSpike)
-        {
-            // Keep roll locked even during spike
-            transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
-            return;
-        }
-
         transform.SetPositionAndRotation(finalPos, rot);
 
         // Safety: prevent roll drift
@@ -274,6 +269,47 @@ public class TPCameraController : MonoBehaviour
             transform.rotation = Quaternion.Euler(e.x, e.y, 0f);
     }
 
+    private bool TryGetNearestCameraCollision(Vector3 pivot, Vector3 dir, float maxDist, out RaycastHit nearestHit)
+    {
+        nearestHit = default(RaycastHit);
+
+        int hitCount = Physics.SphereCastNonAlloc(
+            pivot,
+            collisionRadius,
+            dir,
+            _collisionHits,
+            maxDist,
+            collisionMask,
+            QueryTriggerInteraction.Ignore);
+
+        bool found = false;
+        float nearestDistance = float.PositiveInfinity;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = _collisionHits[i];
+            Collider hitCollider = hit.collider;
+            if (hitCollider == null || hit.distance <= 0.001f || ShouldIgnoreCameraCollision(hitCollider))
+                continue;
+
+            if (hit.distance >= nearestDistance)
+                continue;
+
+            nearestDistance = hit.distance;
+            nearestHit = hit;
+            found = true;
+        }
+
+        return found;
+    }
+
+    private bool ShouldIgnoreCameraCollision(Collider hitCollider)
+    {
+        if (target != null && hitCollider.transform.root == target.root)
+            return true;
+
+        return ignoreEggsInCollision && hitCollider.GetComponentInParent<Egg>() != null;
+    }
 #if UNITY_EDITOR
 
     private void OnDrawGizmosSelected()
@@ -288,12 +324,17 @@ public class TPCameraController : MonoBehaviour
 
     }
 
+#endif
+
     public void ResetCamera()
     {
-        yaw = target.eulerAngles.y;
-    }
+        if (target == null)
+            return;
 
-#endif
+        yaw = target.eulerAngles.y;
+        _desiredDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), minDistance, maxDistance);
+        _currentDistance = _desiredDistance;
+    }
 
 }
 

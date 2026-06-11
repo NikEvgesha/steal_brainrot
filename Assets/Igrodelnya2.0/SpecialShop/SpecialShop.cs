@@ -11,12 +11,13 @@ public class SpecialShop : MonoBehaviour
     [SerializeField] private SpecialShopSlot _slotPrefab;
     [SerializeField] private ShopRow _rowPrefab;
     [SerializeField] private int _maxItemsPerRow = 3;
+
     private Dictionary<string, ShopPackData> _purchaseData;
     private List<ShopRow> _rows;
     private readonly List<string> _pendingRestoredPurchaseIds = new List<string>();
     private bool _isOpen;
     private bool _slotsInitialized;
-    //private bool _inAppAvailable;
+
     public bool Opened => _isOpen;
 
     private void Awake()
@@ -27,7 +28,6 @@ public class SpecialShop : MonoBehaviour
         if (G.SpecialShop == null)
         {
             G.SpecialShop = this;
-            //DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -38,7 +38,6 @@ public class SpecialShop : MonoBehaviour
 
     private void Start()
     {
-        //_inAppAvailable = true; //G.Purchases.PurchasesAvailable();
         InitSlots();
         G.Purchases?.RestorePurchases();
         G.Currency.NoGems.AddListener(ToggleOpen);
@@ -49,7 +48,6 @@ public class SpecialShop : MonoBehaviour
         G.Currency.NoGems.RemoveListener(ToggleOpen);
     }
 
-
     public void InitSlots()
     {
         _slotsInitialized = false;
@@ -57,8 +55,8 @@ public class SpecialShop : MonoBehaviour
 
         foreach (ShopPackData item in _packs)
         {
-            Transform row = GetOrCreateAvailableRow(item.SlotType==ShopSlotType.Big);
-            SpecialShopSlot slot = Instantiate(_slotPrefab, row); // TODO
+            Transform row = GetOrCreateAvailableRow(item.SlotType == ShopSlotType.Big);
+            SpecialShopSlot slot = Instantiate(_slotPrefab, row);
             string purchaseId = GetPurchaseId(item);
             PurchaseData data = G.Purchases != null ? G.Purchases.GetPurchaseData(purchaseId) : PurchaseData.Fallback(purchaseId);
             if (!_purchaseData.ContainsKey(data.Id))
@@ -74,16 +72,13 @@ public class SpecialShop : MonoBehaviour
     {
         if (!big)
         {
-            // Проверяем существующие строки
             foreach (ShopRow row in _rows)
             {
                 if (row.ItemsCount < row.MaxItems)
-                {
                     return row.transform;
-                }
             }
         }
-        // Если нет свободной строки, создаём новую
+
         ShopRow newRow = Instantiate(_rowPrefab, _content);
         newRow.setMaxItems(big ? 1 : _maxItemsPerRow);
         _rows.Add(newRow);
@@ -97,14 +92,10 @@ public class SpecialShop : MonoBehaviour
         G.Control.CursorActive = _isOpen;
         if (_isOpen)
         {
-            //_rewardEarned = false;
             G.Currency.ShowGems?.Invoke(true);
             G.Input.AOpenWindow?.Invoke(this);
         }
-
-
     }
-
 
     public void OnPurchaseRestore(string id)
     {
@@ -118,10 +109,8 @@ public class SpecialShop : MonoBehaviour
         GiveReward(id);
     }
 
-
     public void TryBuy(PurchaseData purchaseData, ShopPackData packData)
     {
-        //GiveReward(purchaseData);
         if (G.Purchases == null || purchaseData == null || string.IsNullOrWhiteSpace(purchaseData.Id))
         {
             Debug.LogWarning("[SpecialShop] Cannot buy pack: purchases are not ready.");
@@ -131,12 +120,11 @@ public class SpecialShop : MonoBehaviour
         G.IsPaused = true;
         G.Purchases.BuyPurchase(
             purchaseData.Id,
-            (success) =>
+            success =>
             {
                 if (success)
-                {
                     GiveReward(purchaseData.Id);
-                }
+
                 G.IsPaused = false;
             });
     }
@@ -148,17 +136,24 @@ public class SpecialShop : MonoBehaviour
 
         foreach (ShopReward reward in packData.Rewards)
         {
-            if (reward.Type == ShopRewardType.Item)
+            switch (reward.Type)
             {
-                for (int i = 0; i < reward.Amount; i++)
-                {
-                    InventoryItem item = Instantiate(reward.Item);
-                    G.Inventory.Add(item);
-                }
-            }
-            else
-            {
-                G.Currency.AddCurrency(reward.RewardCurrencyType, reward.Amount);
+                case ShopRewardType.Item:
+                    for (int i = 0; i < reward.Amount; i++)
+                    {
+                        InventoryItem item = Instantiate(reward.Item);
+                        G.Inventory.Add(item);
+                    }
+                    break;
+                case ShopRewardType.Currency:
+                    G.Currency.AddCurrency(reward.RewardCurrencyType, reward.Amount);
+                    break;
+                case ShopRewardType.NoAdsMonth:
+                    G.Ad?.DisableInterstitialAdsForDays(reward.Amount > 0 ? reward.Amount : 30);
+                    break;
+                case ShopRewardType.NoAdsForever:
+                    G.Ad?.DisableInterstitialAdsForever();
+                    break;
             }
         }
     }

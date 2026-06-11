@@ -1,15 +1,17 @@
 #if YG_SDK_ENABLED
 using System;
 using UnityEngine;
-// Реализация для YG плагина
+
 public class YGAdsProvider : AdsProvider
 {
-    private bool isInitialized = false;
+    private bool isInitialized;
+    private string currentRewardId;
+    private Action<bool> currentRewardCallback;
+
     public override bool IsInitialized => isInitialized;
 
     public override void Initialize()
     {
-        // Подписка на событие вознаграждения
         YG.YG2.onRewardAdv += OnReward;
         YG.YG2.onOpenRewardedAdv += OnRewardedAdOpened;
         YG.YG2.onErrorRewardedAdv += OnRewardedAdClosed;
@@ -19,7 +21,6 @@ public class YGAdsProvider : AdsProvider
 
     public override bool IsRewardedAdReady()
     {
-        // YG не предоставляет явного метода проверки готовности, предполагаем, что реклама доступна после инициализации
         return isInitialized;
     }
 
@@ -37,27 +38,22 @@ public class YGAdsProvider : AdsProvider
             return;
         }
 
-        // Сохраняем коллбэк для обработки результата
         currentRewardCallback = onComplete;
         currentRewardId = rewardId;
-
-        // Вызов rewarded-рекламы с ID
         YG.YG2.RewardedAdvShow(rewardId);
         Debug.Log($"YG Rewarded Ad requested with ID: {rewardId}");
     }
 
-    private string currentRewardId;
-    private Action<bool> currentRewardCallback;
-
     private void OnReward(string id)
     {
-        if (id == currentRewardId)
-        {
-            Debug.Log($"YG Rewarded Ad completed with ID: {id}");
-            currentRewardCallback?.Invoke(true);
-            currentRewardCallback = null;
-            currentRewardId = null;
-        }
+        if (id != currentRewardId)
+            return;
+
+        Debug.Log($"YG Rewarded Ad completed with ID: {id}");
+        currentRewardCallback?.Invoke(true);
+        currentRewardCallback = null;
+        currentRewardId = null;
+        AdClosed?.Invoke();
     }
 
     private void OnRewardedAdOpened()
@@ -68,29 +64,35 @@ public class YGAdsProvider : AdsProvider
     private void OnRewardedAdClosed()
     {
         Debug.Log("YG Rewarded Ad closed");
-        // Если пользователь закрыл рекламу до получения награды
-        if (currentRewardCallback != null)
-        {
-            currentRewardCallback?.Invoke(false);
-            currentRewardCallback = null;
-            currentRewardId = null;
-        }
+        if (currentRewardCallback == null)
+            return;
+
+        currentRewardCallback.Invoke(false);
+        currentRewardCallback = null;
+        currentRewardId = null;
+        AdClosed?.Invoke();
     }
 
     public override void ShowInterstitialAd()
     {
+        ShowInterstitialAd(null);
+    }
+
+    public override void ShowInterstitialAd(Action<bool> onComplete)
+    {
         if (!isInitialized)
         {
             Debug.LogWarning("YG Ads not initialized!");
+            onComplete?.Invoke(false);
             return;
         }
 
         YG.YG2.InterstitialAdvShow();
         Debug.Log("YG Interstitial Ad requested");
         AdClosed?.Invoke();
+        onComplete?.Invoke(true);
     }
 
-    // Очистка подписок
     public void OnDestroy()
     {
         YG.YG2.onRewardAdv -= OnReward;

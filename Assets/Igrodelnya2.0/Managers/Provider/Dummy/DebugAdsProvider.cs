@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 
-// Отладочный провайдер
 public class DebugAdsProvider : AdsProvider
 {
     public override bool IsInitialized => true;
@@ -13,7 +12,7 @@ public class DebugAdsProvider : AdsProvider
 
     public override bool IsRewardedAdReady()
     {
-        return true; // Всегда готов для отладки
+        return true;
     }
 
     public override bool IsInterstitialAdReady()
@@ -24,12 +23,18 @@ public class DebugAdsProvider : AdsProvider
     public override void ShowRewardedAd(string rewardId, Action<bool> onComplete)
     {
         Debug.Log($"Debug Rewarded Ad shown with ID: {rewardId}");
-        onComplete?.Invoke(true); // Симулируем успешное завершение
+        onComplete?.Invoke(true);
     }
 
     public override void ShowInterstitialAd()
     {
+        ShowInterstitialAd(null);
+    }
+
+    public override void ShowInterstitialAd(Action<bool> onComplete)
+    {
         Debug.Log("Debug Interstitial Ad shown");
         AdClosed?.Invoke();
+        onComplete?.Invoke(true);
     }
 }

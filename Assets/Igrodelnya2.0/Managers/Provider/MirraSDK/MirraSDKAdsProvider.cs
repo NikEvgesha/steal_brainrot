@@ -1,36 +1,29 @@
-
-//#if MIRRA_SDK_ENABLED
 using System;
+using MirraGames.SDK;
 using UnityEngine;
-using MirraGames.SDK;  // добавили пространство имён SDK
 
 public class MirraSDKAdsProvider : AdsProvider
 {
     private bool isInitialized;
+
     public override bool IsInitialized => isInitialized;
 
     public override void Initialize()
     {
         MirraSDK.WaitForProviders(() =>
         {
-            // устанавливаем начальное значение
-            isInitialized=true;
-            // В MirraSDK нет явной инициализации Ads-модуля,
-            // но логируем факт подключения провайдера
-            //Debug.Log("MirraSDKAdsProvider initialized");
+            isInitialized = true;
         });
     }
 
     public override bool IsRewardedAdReady()
     {
-        if (!isInitialized) return false;
-        return MirraSDK.Ads.IsRewardedReady;
+        return isInitialized && MirraSDK.Ads.IsRewardedReady;
     }
 
     public override bool IsInterstitialAdReady()
     {
-        if (!isInitialized) return false;
-        return MirraSDK.Ads.IsInterstitialReady;
+        return isInitialized && MirraSDK.Ads.IsInterstitialReady;
     }
 
     public override void ShowRewardedAd(string rewardId, Action<bool> onComplete)
@@ -41,58 +34,58 @@ public class MirraSDKAdsProvider : AdsProvider
             onComplete?.Invoke(false);
             return;
         }
-        G.Control.CursorActive = true;
+
+        if (G.Control != null)
+            G.Control.CursorActive = true;
         PauseManager.Instance?.SetPause(true);
+
         MirraSDK.Ads.InvokeRewarded(
-            onOpen: () =>
-            {
-            },
+            onOpen: () => { },
             rewardTag: rewardId,
-            onClose: (success) =>
+            onClose: success =>
             {
                 PauseManager.Instance?.SetPause(false);
-                G.Control.CursorActive = false;
-                onComplete?.Invoke(success);
+                if (G.Control != null)
+                    G.Control.CursorActive = false;
+
                 AdClosed?.Invoke();
+                onComplete?.Invoke(success);
             }
         );
     }
 
     public override void ShowInterstitialAd()
     {
+        ShowInterstitialAd(null);
+    }
+
+    public override void ShowInterstitialAd(Action<bool> onComplete)
+    {
         if (!IsInterstitialAdReady())
         {
             Debug.LogWarning("MirraSDK: Interstitial ad not ready");
+            onComplete?.Invoke(false);
             return;
         }
 
-
-        //PauseManager.Instance.SetPause(true, true);
-        // Правильные имена параметров: onOpen и onClose
         MirraSDK.Ads.InvokeInterstitial(
             onOpen: () =>
             {
                 PauseManager.Instance?.SetPause(true);
-                G.Control.CursorActive = true;
+                if (G.Control != null)
+                    G.Control.CursorActive = true;
                 Debug.Log("MirraSDK: Interstitial ad opened");
-                //G.Control.CursorActive = true;
             },
-            onClose: (success) =>
+            onClose: success =>
             {
                 Debug.Log("MirraSDK: Interstitial ad closed");
-                //AdClosed?.Invoke();
                 PauseManager.Instance?.SetPause(false);
-                G.Control.CursorActive = false;
+                if (G.Control != null)
+                    G.Control.CursorActive = false;
+
                 AdClosed?.Invoke();
-                //PauseManager.Instance.SetPause(false, true);
-                //G.Control.CursorActive = false;
+                onComplete?.Invoke(success);
             }
         );
     }
-
-    private void OnDestroy()
-    {
-        // Ничего не подписывали — нечего и очищать
-    }
 }
-//#endif

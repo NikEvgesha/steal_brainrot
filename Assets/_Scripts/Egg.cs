@@ -68,6 +68,7 @@ public class Egg : InventoryItem
     private bool _initialized;
     private bool _remoteConveyorPurchase;
     private bool _purchaseInProgress;
+    private bool _speedBoostAdInProgress;
 
     private int _totalDurationSec;      // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
     private DateTimeOffset _endUtc;           // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… (UTC)
@@ -144,6 +145,7 @@ public class Egg : InventoryItem
 
         _infoUI = GetComponentInChildren<EggInfoUI>();
         _buyPanel = GetComponentInChildren<InteractionPanel>();
+        ApplyBuyPanelAdBadge();
         _buyPanel.gameObject.SetActive(false);
         _status = EggStatus.Conveyer;
         _infoUI.SetStatus(_status);
@@ -177,6 +179,7 @@ public class Egg : InventoryItem
     public void SetConveyorPurchaseMode(bool remoteRewardPurchase)
     {
         _remoteConveyorPurchase = remoteRewardPurchase;
+        ApplyBuyPanelAdBadge();
     }
     private void SetTypeVisual()
     {
@@ -200,6 +203,7 @@ public class Egg : InventoryItem
         if (_status != EggStatus.Conveyer) return;
         if (other.CompareTag("Player"))
         {
+            ApplyBuyPanelAdBadge();
             _buyPanel.gameObject.SetActive(true);
         }
     }
@@ -249,8 +253,9 @@ public class Egg : InventoryItem
 
         // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
-        _currentCell.SpeedBoost.AddListener(SpeedBoostInstant);
-        //_currentCell.SpeedBoost.AddListener(SpeedBoostAd);     // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: -30 РїС—Р…РїС—Р…РїС—Р…
+        _currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);
+        _currentCell.SpeedBoost.AddListener(SpeedBoostAd);
+        //_currentCell.SpeedBoost.AddListener(SpeedBoostInstant);     // debug instant hatch
         //_currentCell.InstantHatch.AddListener(SpeedBoostInstant); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
         /* РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
@@ -279,20 +284,45 @@ public class Egg : InventoryItem
     /// </summary>
     public void SpeedBoostAd()
     {
-        const int minusSeconds = 30 * 60;
-        _endUtc = _endUtc.AddSeconds(-minusSeconds);
+        if (_status != EggStatus.Maturing || _speedBoostAdInProgress)
+            return;
 
-        // РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
-        if (_endUtc < DateTime.UtcNow) _endUtc = DateTime.UtcNow;
+        if (G.Ad == null)
+        {
+            Debug.LogWarning("[Egg] Ads manager is missing, speed boost ad skipped.");
+            return;
+        }
 
-        //SaveDeadline();
+        _speedBoostAdInProgress = true;
+        G.Ad.ShowRewardedAd("EggSpeedBoost", success =>
+        {
+            _speedBoostAdInProgress = false;
+            if (!success || _status != EggStatus.Maturing)
+                return;
+
+            ApplySpeedBoostSeconds(30 * 60);
+        });
+    }
+
+    private void ApplySpeedBoostSeconds(int seconds)
+    {
+        _endUtc = _endUtc.AddSeconds(-Mathf.Max(1, seconds));
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (_endUtc < now)
+            _endUtc = now;
+
+        _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+        _currentCell?.SaveData();
     }
     /// <summary>
     /// РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р….
     /// </summary>
     public void SpeedBoostInstant()
     {
-        _endUtc = DateTime.UtcNow;
+        _endUtc = DateTimeOffset.UtcNow;
+        _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+        _currentCell?.SaveData();
         //SaveDeadline();
     }
     public void SpeedBoost()
@@ -305,7 +335,8 @@ public class Egg : InventoryItem
         _status = EggStatus.Maturing;
         _infoUI.SetStatus(_status);
         _currentCell = cell;
-        _currentCell.SpeedBoost.AddListener(SpeedBoostInstant);
+        _currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);
+        _currentCell.SpeedBoost.AddListener(SpeedBoostAd);
 
         _totalDurationSec = Mathf.RoundToInt(
             _data.SecondsToHatching * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)
@@ -369,8 +400,8 @@ public class Egg : InventoryItem
         */
 
         _currentCell.SpeedBoost.RemoveListener(SpeedBoost);
-        //_currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);     // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: -30 РїС—Р…РїС—Р…РїС—Р…
-        //_currentCell.InstantHatch.RemoveListener(SpeedBoostInstant); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
+        _currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);
+        _currentCell.SpeedBoost.RemoveListener(SpeedBoostInstant);
 
 
         _currentCell.LockCell(true);
@@ -429,14 +460,42 @@ public class Egg : InventoryItem
         if (_data.Brainrots == null || _data.Brainrots.Count == 0)
             return null;
 
-        int rand = UnityEngine.Random.Range(0, _data.Brainrots.Count);
-        return _data.Brainrots[rand];
+        var validAnimals = new List<Brainrot>();
+        for (int i = 0; i < _data.Brainrots.Count; i++)
+        {
+            Brainrot candidate = _data.Brainrots[i];
+            if (IsAnimalDrop(candidate))
+                validAnimals.Add(candidate);
+        }
+
+        if (validAnimals.Count == 0)
+            return null;
+
+        int rand = UnityEngine.Random.Range(0, validAnimals.Count);
+        return validAnimals[rand];
+    }
+
+    public static bool IsAnimalDrop(Brainrot candidate)
+    {
+        if (candidate == null)
+            return false;
+
+        if (G.Storage == null)
+            return true;
+
+        return G.Storage.ContainsPetPrefab(candidate);
     }
 
     public override void OnInventoryAdd() {
         _status = EggStatus.Purchased;
         _infoUI.SetStatus(_status);
         Destroy(_buyPanel.gameObject);
+    }
+
+    private void ApplyBuyPanelAdBadge()
+    {
+        if (_buyPanel != null)
+            _buyPanel.SetRewardedAdBadgeVisible(_remoteConveyorPurchase);
     }
 
 
@@ -464,7 +523,7 @@ public class Egg : InventoryItem
             for (int i = 0; i < _data.BrainrotDrops.Count; i++)
             {
                 var brainrot = _data.BrainrotDrops[i].Brainrot;
-                if (brainrot != null && _data.BrainrotDrops[i].Weight > 0f)
+                if (IsAnimalDrop(brainrot) && _data.BrainrotDrops[i].Weight > 0f)
                 {
                     hasWeightedDrops = true;
                     yield return brainrot;
@@ -480,7 +539,7 @@ public class Egg : InventoryItem
 
         for (int i = 0; i < _data.Brainrots.Count; i++)
         {
-            if (_data.Brainrots[i] != null)
+            if (IsAnimalDrop(_data.Brainrots[i]))
                 yield return _data.Brainrots[i];
         }
     }

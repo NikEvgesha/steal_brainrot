@@ -30,10 +30,22 @@ public class FieldCell : MonoBehaviour
     private Egg _currentEgg;
     private Brainrot _currentPet;
     private Coroutine _saveCoroutine;
+    private bool _remoteMode;
 
     private bool _playerOnCell;
     public string Id { get { return _id; } }
     public Brainrot CurrentBrainrot => _currentPet;
+    public bool IsRemoteMode
+    {
+        get
+        {
+            if (_remoteMode)
+                return true;
+
+            var field = GetComponentInParent<Field>();
+            return field != null && field.IsRemoteMode;
+        }
+    }
 
     private void Awake()
     {
@@ -46,7 +58,12 @@ public class FieldCell : MonoBehaviour
 
     public void _OnPlayerEnter()
     {
-        if (_locked) return;
+        if (_locked || IsRemoteMode)
+        {
+            HideInteractionButtons();
+            return;
+        }
+
         //TestBackpackBrainrot.Instance.SwichItem.AddListener(CheckPlayer);
         G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
         //TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
@@ -58,12 +75,8 @@ public class FieldCell : MonoBehaviour
     }
     public void CheckPlayer(InventoryItem item=null)
     {
-        _dropButton.SetActive(false);
-        _addSpeedButton.SetActive(false);
-        _triggerIndicator.SetActive(false);
-        _takeButton.SetActive(false);
-        _hatchButton.SetActive(false);
-        if (!_playerOnCell) return;
+        HideInteractionButtons();
+        if (!_playerOnCell || IsRemoteMode) return;
         switch (_inField)
         {
             case Item.Free:
@@ -74,6 +87,7 @@ public class FieldCell : MonoBehaviour
                 {
                     case EggStatus.Maturing:
                         _addSpeedButton.SetActive(true);
+                        SetPanelRewardedAdBadge(_addSpeedButton, true);
                         break;
                     case EggStatus.ReadyToHatch:
                         _hatchButton.SetActive(true);
@@ -136,10 +150,7 @@ public class FieldCell : MonoBehaviour
     {
         G.QuickAccess.PlaceItem.RemoveListener(UpdateFieldItem);
         G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
-        _dropButton.SetActive(false);
-        _addSpeedButton.SetActive(false);
-        _takeButton.SetActive(false);
-        _triggerIndicator.SetActive(false);
+        HideInteractionButtons();
         _playerOnCell = false;
         PlayerExit?.Invoke();
     }
@@ -167,6 +178,21 @@ public class FieldCell : MonoBehaviour
         _locked = locked;
         //if (_locked)
             _OnPlayerExit();
+    }
+
+    public void SetRemoteMode(bool remote)
+    {
+        _remoteMode = remote;
+        if (_remoteMode)
+        {
+            _playerOnCell = false;
+            HideInteractionButtons();
+        }
+        else
+        {
+            if (_playerOnCell)
+                CheckPlayer();
+        }
     }
 
     public void SaveData()
@@ -276,5 +302,27 @@ public class FieldCell : MonoBehaviour
         _currentEgg = null;
         _currentPet = null;
         _inField = Item.Free;
+    }
+
+    private void HideInteractionButtons()
+    {
+        if (_dropButton != null) _dropButton.SetActive(false);
+        if (_addSpeedButton != null) _addSpeedButton.SetActive(false);
+        if (_triggerIndicator != null) _triggerIndicator.SetActive(false);
+        if (_takeButton != null) _takeButton.SetActive(false);
+        if (_hatchButton != null) _hatchButton.SetActive(false);
+    }
+
+    private static void SetPanelRewardedAdBadge(GameObject buttonRoot, bool visible)
+    {
+        if (buttonRoot == null)
+            return;
+
+        var panel = buttonRoot.GetComponent<InteractionPanel>();
+        if (panel == null)
+            panel = buttonRoot.GetComponentInChildren<InteractionPanel>(true);
+
+        if (panel != null)
+            panel.SetRewardedAdBadgeVisible(visible);
     }
 }

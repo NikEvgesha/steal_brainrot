@@ -1,3 +1,5 @@
+using System.Collections;
+using MirraGames.SDK;
 using UnityEngine;
 
 public class GameEntryPoint : MonoBehaviour
@@ -15,9 +17,11 @@ public class GameEntryPoint : MonoBehaviour
 
     [SerializeField] private Transform _playerSpawnPoint;
     [SerializeField] private RemoteBasesApplier _remoteBasesApplier;
+    [SerializeField] private float _initialLocationsWaitTimeout = 8f;
 
     private ZooBackendClient _runtimeBackend;
     private bool _loadingHidden;
+    private Coroutine _initialLocationsTimeoutCoroutine;
 
     private void Start()
     {
@@ -45,6 +49,9 @@ public class GameEntryPoint : MonoBehaviour
     {
         if (_runtimeBackend != null)
             _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
+
+        if (_initialLocationsTimeoutCoroutine != null)
+            StopCoroutine(_initialLocationsTimeoutCoroutine);
     }
 
     private void WaitForPlayerLocationsBeforeHideLoading()
@@ -64,6 +71,7 @@ public class GameEntryPoint : MonoBehaviour
 
         _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
         _runtimeBackend.InitialLocationsLoaded += OnInitialLocationsLoaded;
+        _initialLocationsTimeoutCoroutine = StartCoroutine(HideLoadingAfterInitialLocationsTimeout());
     }
 
     private void OnInitialLocationsLoaded(System.Collections.Generic.List<ZooLocationItem> _)
@@ -71,6 +79,24 @@ public class GameEntryPoint : MonoBehaviour
         if (_runtimeBackend != null)
             _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
 
+        if (_initialLocationsTimeoutCoroutine != null)
+        {
+            StopCoroutine(_initialLocationsTimeoutCoroutine);
+            _initialLocationsTimeoutCoroutine = null;
+        }
+
+        HideLoadingScreen();
+    }
+
+    private IEnumerator HideLoadingAfterInitialLocationsTimeout()
+    {
+        yield return new WaitForSecondsRealtime(Mathf.Max(1f, _initialLocationsWaitTimeout));
+
+        if (_runtimeBackend != null)
+            _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
+
+        _initialLocationsTimeoutCoroutine = null;
+        Debug.LogWarning($"GameEntryPoint: initial backend locations were not loaded after {_initialLocationsWaitTimeout:0.#}s. Continuing offline.");
         HideLoadingScreen();
     }
 
@@ -81,5 +107,6 @@ public class GameEntryPoint : MonoBehaviour
 
         _loadingHidden = true;
         G.GameLoader.ShowLoadingScreen(false);
+        MirraSDK.WaitForProviders(static () => MirraSDK.Analytics.GameIsReady());
     }
 }

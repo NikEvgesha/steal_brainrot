@@ -16,6 +16,7 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
     [SerializeField] private bool includeInactiveChildRenderers;
     [SerializeField] private float stripLengthOverride;
     [SerializeField] private float visualSpacing;
+    [SerializeField] private bool preferExplicitRendererList = true;
 
     private SharedGroup _group;
     private bool _registered;
@@ -37,6 +38,8 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
         renderers = targetRenderers;
         uvDirection = direction.sqrMagnitude > 0.0001f ? direction : Vector2.right;
         scrollSpeed = speed;
+        autoCollectChildRenderers = false;
+        preferExplicitRendererList = true;
 
         if (isActiveAndEnabled && Application.isPlaying)
             RegisterToGroup();
@@ -153,10 +156,27 @@ public sealed class MovingRoadVisualScroller : MonoBehaviour
 
     private Renderer[] ResolveRenderers()
     {
+        if (preferExplicitRendererList && HasExplicitRendererList())
+            return renderers;
+
         if (!autoCollectChildRenderers)
             return renderers;
 
         return GetComponentsInChildren<Renderer>(includeInactiveChildRenderers);
+    }
+
+    private bool HasExplicitRendererList()
+    {
+        if (renderers == null || renderers.Length == 0)
+            return false;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsTemplateArrowRenderer(Renderer targetRenderer)

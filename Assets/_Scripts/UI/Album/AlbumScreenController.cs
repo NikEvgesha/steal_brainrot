@@ -58,6 +58,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private Button eggsTabButton;
     [SerializeField] private Button animalsTabButton;
     [SerializeField] private Button closeButton;
+    [SerializeField] private Button embeddedOpenButton;
     [SerializeField] private TMP_Text eggsTabText;
     [SerializeField] private TMP_Text animalsTabText;
     [SerializeField] private Image eggsTabBackground;
@@ -172,8 +173,9 @@ public class AlbumScreenController : MonoBehaviour
     private bool _hasEggsTabBaseColor;
     private Color _animalsTabBaseColor = Color.white;
     private bool _hasAnimalsTabBaseColor;
+    private bool _externalOpenButtonRegistered;
 
-    public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
+    public bool IsOpen => panelRoot != null ? panelRoot.activeInHierarchy : gameObject.activeInHierarchy;
 
     private void Awake()
     {
@@ -197,6 +199,12 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnEnable()
     {
+        if (G.Input != null)
+        {
+            G.Input.AOpenWindow -= CloseFromOtherWindow;
+            G.Input.AOpenWindow += CloseFromOtherWindow;
+        }
+
         if (progressService == null)
             progressService = G.Album;
 
@@ -208,6 +216,15 @@ public class AlbumScreenController : MonoBehaviour
 
         EnsureCatalogReady();
         Refresh();
+    }
+
+    private void OnDisable()
+    {
+        if (G.Input != null)
+            G.Input.AOpenWindow -= CloseFromOtherWindow;
+
+        if (progressService != null)
+            progressService.Changed.RemoveListener(OnProgressChanged);
     }
 
     private void Update()
@@ -236,15 +253,82 @@ public class AlbumScreenController : MonoBehaviour
         SetOpen(!IsOpen);
     }
 
+    public void RegisterExternalOpenButton(Button externalButton, GameObject mentionBadge)
+    {
+        _externalOpenButtonRegistered = externalButton != null;
+
+        if (mentionBadge != null)
+        {
+            if (albumIconMention != null && albumIconMention != mentionBadge)
+                albumIconMention.SetActive(false);
+
+            albumIconMention = mentionBadge;
+            albumIconMention.SetActive(false);
+        }
+
+        if (_externalOpenButtonRegistered)
+            HideEmbeddedOpenButton();
+
+        AutoSetupReferences();
+        if (_supportedElementTypes.Count == 0)
+            BuildElementTabs();
+        EnsureCatalogReady();
+        RefreshTabMentions();
+    }
+
     public void SetOpen(bool open)
     {
+        SetOpen(open, true);
+    }
+
+    private void SetOpen(bool open, bool updateCursor)
+    {
+        if (open && !gameObject.activeSelf)
+            gameObject.SetActive(true);
+
+        if (_externalOpenButtonRegistered)
+            HideEmbeddedOpenButton();
+
         if (panelRoot != null)
             panelRoot.SetActive(open);
         else
             gameObject.SetActive(open);
 
         if (open)
+        {
             Refresh();
+
+            if (G.Input != null)
+                G.Input.AOpenWindow?.Invoke(this);
+        }
+
+        if (updateCursor && G.Control != null)
+            G.Control.CursorActive = open;
+    }
+
+    private void HideEmbeddedOpenButton()
+    {
+        var button = ResolveEmbeddedOpenButton();
+        if (button != null)
+            button.gameObject.SetActive(false);
+    }
+
+    private Button ResolveEmbeddedOpenButton()
+    {
+        if (embeddedOpenButton != null)
+            return embeddedOpenButton;
+
+        var buttonTransform = FindChildByName(transform, "ButtonOpen");
+        if (buttonTransform != null)
+            embeddedOpenButton = buttonTransform.GetComponent<Button>();
+
+        return embeddedOpenButton;
+    }
+
+    private void CloseFromOtherWindow(MonoBehaviour ui)
+    {
+        if (ui != this && IsOpen)
+            SetOpen(false, false);
     }
 
     public void SetTabEggs()

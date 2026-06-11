@@ -1965,7 +1965,6 @@ public class RemoteBasesApplier : MonoBehaviour
         G.Player.transform.rotation = target.rotation;
         if (cc != null) cc.enabled = true;
         if (debugLogs) Debug.Log($"[Lobby] Player pos after tp={G.Player.transform.position}");
-        StartCoroutine(TeleportVerify(target.position, target.rotation));
     }
 
     private void TryTeleportLocalPlayer()
@@ -2012,26 +2011,6 @@ public class RemoteBasesApplier : MonoBehaviour
         _lastTeleportedSlotIndex = slotIndex;
         _lastTeleportedPlayerId = playerId;
         _teleportRoutine = null;
-    }
-
-
-    private IEnumerator TeleportVerify(Vector3 targetPos, Quaternion targetRot)
-    {
-        yield return new WaitForSeconds(0.2f);
-        if (G.Player == null) yield break;
-        if ((G.Player.transform.position - targetPos).sqrMagnitude > 0.01f)
-        {
-            if (debugLogs) Debug.Log("[Lobby] Teleport re-apply");
-            var cc = G.Player.GetComponent<CharacterController>();
-            if (cc != null) cc.enabled = false;
-            var rb = G.Player.GetComponent<Rigidbody>();
-            if (rb != null)
-                rb.MovePosition(targetPos);
-            else
-                G.Player.transform.position = targetPos;
-            G.Player.transform.rotation = targetRot;
-            if (cc != null) cc.enabled = true;
-        }
     }
 
     private RemoteFriendBoard GetBoardForSlot(RemoteBaseSlot slot)

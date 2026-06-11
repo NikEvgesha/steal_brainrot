@@ -134,6 +134,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
     [SerializeField] private float webSocketPingIntervalSec = 10f;
     [SerializeField] private float webSocketSyncRequestIntervalSec = 8f;
+    [SerializeField] private int maxWebSocketMessagesPerFrame = 2;
     [SerializeField] private bool webSocketDebugLogs = false;
 
     [Header("Deps (optional)")]
@@ -577,7 +578,8 @@ public class LobbyClient : MonoBehaviour
     private void ProcessWebSocketInbox()
     {
 #if !UNITY_WEBGL || UNITY_EDITOR
-        while (true)
+        var maxMessages = Mathf.Max(1, maxWebSocketMessagesPerFrame);
+        for (var processed = 0; processed < maxMessages; processed++)
         {
             string msg = null;
             lock (_wsInboxLock)
