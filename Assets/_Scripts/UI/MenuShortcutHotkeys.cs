@@ -9,6 +9,8 @@ public class MenuShortcutHotkeys : MonoBehaviour
     [SerializeField] private Button inventoryButton;
     [SerializeField] private Button shopButton;
     [SerializeField] private Button albumButton;
+    [SerializeField] private InventoryUI inventoryScreen;
+    [SerializeField] private SpecialShop shopScreen;
     [SerializeField] private AlbumScreenController albumScreen;
     [SerializeField] private KeyCode inventoryKey = KeyCode.Tab;
     [SerializeField] private KeyCode shopKey = KeyCode.B;
@@ -34,6 +36,8 @@ public class MenuShortcutHotkeys : MonoBehaviour
     private void Start()
     {
         ResolveButtons();
+        EnsureInventoryButton();
+        EnsureShopButton();
         EnsureAlbumButton();
 
         if (styleMenuButtons)
@@ -76,10 +80,40 @@ public class MenuShortcutHotkeys : MonoBehaviour
         }
     }
 
+    private void EnsureInventoryButton()
+    {
+        if (inventoryButton == null)
+            inventoryButton = CreateMenuButton("InventoryButton");
+
+        if (inventoryButton == null)
+            return;
+
+        if (inventoryButton.onClick.GetPersistentEventCount() > 0)
+            return;
+
+        inventoryButton.onClick.RemoveListener(ToggleInventory);
+        inventoryButton.onClick.AddListener(ToggleInventory);
+    }
+
+    private void EnsureShopButton()
+    {
+        if (shopButton == null)
+            shopButton = CreateMenuButton("ShopButton");
+
+        if (shopButton == null)
+            return;
+
+        if (shopButton.onClick.GetPersistentEventCount() > 0)
+            return;
+
+        shopButton.onClick.RemoveListener(ToggleShop);
+        shopButton.onClick.AddListener(ToggleShop);
+    }
+
     private void EnsureAlbumButton()
     {
         if (albumButton == null)
-            albumButton = CreateAlbumButton();
+            albumButton = CreateMenuButton("AlbumButton");
 
         if (albumButton == null)
             return;
@@ -88,15 +122,39 @@ public class MenuShortcutHotkeys : MonoBehaviour
         albumButton.onClick.AddListener(ToggleAlbum);
     }
 
-    private Button CreateAlbumButton()
+    private Button CreateMenuButton(string buttonName)
     {
-        var buttonObject = new GameObject("AlbumButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+        var buttonObject = new GameObject(buttonName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
         buttonObject.transform.SetParent(transform, false);
 
         var button = buttonObject.GetComponent<Button>();
         button.targetGraphic = buttonObject.GetComponent<Image>();
 
         return button;
+    }
+
+    private void ToggleInventory()
+    {
+        var inventory = ResolveInventoryScreen();
+        if (inventory == null)
+        {
+            Debug.LogWarning("[MenuShortcutHotkeys] InventoryUI was not found.");
+            return;
+        }
+
+        inventory._ToggleOpen();
+    }
+
+    private void ToggleShop()
+    {
+        var shop = ResolveShopScreen();
+        if (shop == null)
+        {
+            Debug.LogWarning("[MenuShortcutHotkeys] SpecialShop was not found.");
+            return;
+        }
+
+        shop.ToggleOpen();
     }
 
     private void ToggleAlbum()
@@ -122,6 +180,45 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
         var badge = EnsureMentionBadge(albumButton.transform);
         album.RegisterExternalOpenButton(albumButton, badge);
+    }
+
+    private InventoryUI ResolveInventoryScreen()
+    {
+        if (inventoryScreen != null)
+            return inventoryScreen;
+
+        var canvas = GetComponentInParent<Canvas>();
+        if (canvas != null)
+            inventoryScreen = canvas.GetComponentInChildren<InventoryUI>(true);
+
+        if (inventoryScreen == null)
+            inventoryScreen = transform.root.GetComponentInChildren<InventoryUI>(true);
+
+        if (inventoryScreen == null)
+            inventoryScreen = FindFirstObjectByType<InventoryUI>(FindObjectsInactive.Include);
+
+        return inventoryScreen;
+    }
+
+    private SpecialShop ResolveShopScreen()
+    {
+        if (shopScreen != null)
+            return shopScreen;
+
+        if (G.SpecialShop != null)
+            shopScreen = G.SpecialShop;
+
+        var canvas = GetComponentInParent<Canvas>();
+        if (shopScreen == null && canvas != null)
+            shopScreen = canvas.GetComponentInChildren<SpecialShop>(true);
+
+        if (shopScreen == null)
+            shopScreen = transform.root.GetComponentInChildren<SpecialShop>(true);
+
+        if (shopScreen == null)
+            shopScreen = FindFirstObjectByType<SpecialShop>(FindObjectsInactive.Include);
+
+        return shopScreen;
     }
 
     private AlbumScreenController ResolveAlbumScreen()
