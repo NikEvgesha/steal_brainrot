@@ -1,12 +1,22 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class AlbumRareTabView : MonoBehaviour
 {
+    [Serializable]
+    private struct ElementIconBinding
+    {
+        public ElementType type;
+        public Sprite sprite;
+    }
+
     [SerializeField] private Button button;
     [SerializeField] private TMP_Text titleText;
+    [SerializeField] private Image iconImage;
+    [SerializeField] private List<ElementIconBinding> elementIcons = new();
     [SerializeField] private GameObject lockOverlay;
     [SerializeField] private GameObject mentionBadge;
     [SerializeField] private Image selectedFrame;
@@ -52,6 +62,11 @@ public class AlbumRareTabView : MonoBehaviour
 
     public void Bind(string title, bool unlocked, bool selected, bool hasMention, Action onClick)
     {
+        Bind(ElementType.ElementType, title, unlocked, selected, hasMention, onClick);
+    }
+
+    public void Bind(ElementType elementType, string title, bool unlocked, bool selected, bool hasMention, Action onClick)
+    {
         _onClick = onClick;
 
         if (button != null)
@@ -83,6 +98,7 @@ public class AlbumRareTabView : MonoBehaviour
             }
 
             titleText.text = title;
+            titleText.gameObject.SetActive(!ApplyIcon(elementType, unlocked));
             if (styleRuntimeTextState)
             {
                 titleText.alpha = unlocked ? 1f : 0.9f;
@@ -104,8 +120,6 @@ public class AlbumRareTabView : MonoBehaviour
             mentionBadge.SetActive(hasMention);
             if (mentionBadge.TryGetComponent<Graphic>(out var mentionGraphic))
                 mentionGraphic.raycastTarget = false;
-            if (hasMention)
-                mentionBadge.transform.SetAsLastSibling();
         }
         EnsureMentionBadgeLayout();
 
@@ -113,14 +127,39 @@ public class AlbumRareTabView : MonoBehaviour
         {
             selectedFrame.enabled = selected;
             selectedFrame.raycastTarget = false;
-            if (selected)
-                selectedFrame.transform.SetAsLastSibling();
         }
 
         if (applyRuntimeBlockyStyle && button != null)
             BlockyUITheme.ApplyButton(button, selected ? BlockyUITheme.YellowAccent : BlockyUITheme.BlueHeader);
 
         EnsureButtonPointerPassThrough();
+    }
+
+    private bool ApplyIcon(ElementType elementType, bool unlocked)
+    {
+        if (iconImage == null)
+            return false;
+
+        Sprite icon = GetIcon(elementType);
+        iconImage.sprite = icon;
+        iconImage.enabled = icon != null;
+        iconImage.preserveAspect = true;
+        iconImage.color = unlocked ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+        return icon != null;
+    }
+
+    private Sprite GetIcon(ElementType elementType)
+    {
+        if (elementIcons == null)
+            return null;
+
+        for (var i = 0; i < elementIcons.Count; i++)
+        {
+            if (elementIcons[i].type == elementType)
+                return elementIcons[i].sprite;
+        }
+
+        return null;
     }
 
     private void OnClicked()

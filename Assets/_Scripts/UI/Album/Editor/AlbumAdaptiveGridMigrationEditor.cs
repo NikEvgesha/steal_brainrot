@@ -7,7 +7,9 @@ public static class AlbumAdaptiveGridMigrationEditor
 {
     private const string AlbumScreenPath = "Assets/_Prefabs/UI/Album/AlbumScreen.prefab";
     private const string AlbumEntryViewPath = "Assets/_Prefabs/UI/Album/AlbumEntryView.prefab";
+    private const string AlbumRareTabViewPath = "Assets/_Prefabs/UI/Album/AlbumRareTabView.prefab";
     private const string CardsPath = "panelRoot/Root/cardsRoot/cards";
+    private const string RareTabsPath = "panelRoot/Root/InfoPanel/rareTabsRoot";
 
     [MenuItem("Tools/Album/Migrate AlbumScreen To Adaptive Grid")]
     public static void Apply()
@@ -57,6 +59,32 @@ public static class AlbumAdaptiveGridMigrationEditor
             SetObject(controllerSo, "cardsRoot", cards);
             SetObject(controllerSo, "cardsAdaptiveGrid", grid);
             SetObject(controllerSo, "cardsDynamicGrid", null);
+
+            var rareTabs = root.transform.Find(RareTabsPath);
+            if (rareTabs != null)
+            {
+                RemoveComponent<HorizontalLayoutGroup>(rareTabs.gameObject);
+
+                var rareTabsGrid = rareTabs.GetComponent<AdaptiveGridSpawner>();
+                if (rareTabsGrid == null)
+                    rareTabsGrid = rareTabs.gameObject.AddComponent<AdaptiveGridSpawner>();
+
+                var rareTabPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AlbumRareTabViewPath);
+                rareTabsGrid.SetItemPrefab(rareTabPrefab);
+                rareTabsGrid.ConfigureFixed(
+                    new Vector2(62f, 46f),
+                    new Vector2(6f, 6f),
+                    new RectOffset(4, 4, 4, 0),
+                    hideOverflow: false);
+
+                var rareTabsGridSo = new SerializedObject(rareTabsGrid);
+                SetBool(rareTabsGridSo, "deferRuntimeRebuildOneFrame", false);
+                rareTabsGridSo.ApplyModifiedPropertiesWithoutUndo();
+
+                SetObject(controllerSo, "rareTabsRoot", rareTabs);
+                SetObject(controllerSo, "rareTabsAdaptiveGrid", rareTabsGrid);
+            }
+
             controllerSo.ApplyModifiedPropertiesWithoutUndo();
 
             PrefabUtility.SaveAsPrefabAsset(root, AlbumScreenPath);

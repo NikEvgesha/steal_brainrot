@@ -86,6 +86,32 @@ public static class AlbumScreenAutoWireEditor
         Debug.Log("[AlbumAutoWire] Done. Re-open inspector to verify links.");
     }
 
+    [MenuItem("Tools/Album/Auto Wire AlbumScreen Prefab")]
+    public static void AutoWireAlbumScreenPrefab()
+    {
+        const string prefabPath = "Assets/_Prefabs/UI/Album/AlbumScreen.prefab";
+        var root = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
+        {
+            var controller = root.GetComponent<AlbumScreenController>();
+            if (controller == null)
+            {
+                Debug.LogWarning("[AlbumAutoWire] AlbumScreen prefab has no AlbumScreenController.");
+                return;
+            }
+
+            AutoWireController(controller);
+            AutoWireNestedViews(root.transform);
+            EditorUtility.SetDirty(controller);
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            Debug.Log("[AlbumAutoWire] AlbumScreen prefab auto-wired.");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
     [MenuItem("Tools/Album/Validate Selected AlbumScreen")]
     private static void ValidateSelectedAlbumScreen()
     {
@@ -111,6 +137,7 @@ public static class AlbumScreenAutoWireEditor
         CheckRequiredObjectRef(so, "cardsAdaptiveGrid", missing);
         CheckRequiredObjectRef(so, "cardPrefab", missing);
         CheckRequiredObjectRef(so, "rareTabsRoot", missing);
+        CheckRequiredObjectRef(so, "rareTabsAdaptiveGrid", missing);
         CheckRequiredObjectRef(so, "rareTabPrefab", missing);
         CheckRequiredObjectRef(so, "eggsTabButton", missing);
         CheckRequiredObjectRef(so, "animalsTabButton", missing);
@@ -120,6 +147,7 @@ public static class AlbumScreenAutoWireEditor
         CheckRequiredObjectRef(so, "eggsTabMention", missing);
         CheckRequiredObjectRef(so, "animalsTabMention", missing);
         CheckRequiredObjectRef(so, "albumIconMention", missing);
+        CheckRequiredObjectRef(so, "infoPanelView", missing);
         CheckRequiredObjectRef(so, "infoIcon", missing);
         CheckRequiredObjectRef(so, "infoTitle", missing);
         CheckRequiredObjectRef(so, "infoDescription", missing);
@@ -170,6 +198,10 @@ public static class AlbumScreenAutoWireEditor
 
         var rareTabsRoot = FindByName(root, "rareTabsRoot");
         SetRef(so, "rareTabsRoot", rareTabsRoot as RectTransform);
+        var rareTabsAdaptiveGrid = rareTabsRoot != null ? rareTabsRoot.GetComponent<AdaptiveGridSpawner>() : null;
+        if (rareTabsAdaptiveGrid == null && rareTabsRoot != null)
+            rareTabsAdaptiveGrid = rareTabsRoot.GetComponentInChildren<AdaptiveGridSpawner>(true);
+        SetRef(so, "rareTabsAdaptiveGrid", rareTabsAdaptiveGrid);
         var rareTabPrefab = FindComponentByName<AlbumRareTabView>(root, "AlbumRareTabView");
         if (rareTabPrefab != null)
             SetRef(so, "rareTabPrefab", rareTabPrefab);
@@ -190,6 +222,18 @@ public static class AlbumScreenAutoWireEditor
             FindComponentByName<TMP_Text>(root, "CardName") ??
             FindComponentByName<TMP_Text>(root, "CardsTitle") ??
             FindComponentByName<TMP_Text>(root, "SectionTitle"));
+
+        var infoPanel = FindByName(root, "InfoPanel");
+        AlbumInfoPanelView infoPanelView = null;
+        if (infoPanel != null)
+        {
+            infoPanelView = infoPanel.GetComponent<AlbumInfoPanelView>();
+            if (infoPanelView == null)
+                infoPanelView = infoPanel.gameObject.AddComponent<AlbumInfoPanelView>();
+
+            AutoWireInfoPanelView(infoPanelView, root);
+        }
+        SetRef(so, "infoPanelView", infoPanelView);
 
         SetRef(so, "infoIcon", FindComponentByName<Image>(root, "InfoIcon"));
         SetRef(so, "infoTitle", FindComponentByName<TMP_Text>(root, "InfoTitle"));
@@ -255,6 +299,45 @@ public static class AlbumScreenAutoWireEditor
         EditorUtility.SetDirty(view);
     }
 
+    private static void AutoWireInfoPanelView(AlbumInfoPanelView view, Transform root)
+    {
+        if (view == null)
+            return;
+
+        var so = new SerializedObject(view);
+        SetRef(so, "infoIcon", FindComponentByName<Image>(root, "InfoIcon"));
+        SetRef(so, "titleText", FindComponentByName<TMP_Text>(root, "InfoTitle"));
+        SetRef(so, "lockedOverlay", FindByName(root, "InfoLockedOverlay")?.gameObject);
+        SetRef(so, "lockedText", FindComponentByName<TMP_Text>(root, "InfoLockedText"));
+
+        var infoDescription = FindComponentByName<TMP_Text>(root, "InfoDescription");
+        var infoIncome = FindComponentByName<TMP_Text>(root, "InfoIncome");
+        var infoSources = FindComponentByName<TMP_Text>(root, "InfoSources");
+        SetRef(so, "eggDateText", infoDescription);
+        SetRef(so, "eggPriceText", infoIncome);
+        SetRef(so, "eggSourcesText", infoSources);
+        SetRef(so, "animalDescriptionText", infoDescription);
+        SetRef(so, "animalIncomeText", infoIncome);
+        SetRef(so, "animalSourcesText", infoSources);
+
+        var hatchSection = FindByName(root, "EggHatchSection") ?? FindByName(root, "HatchSection");
+        var hatchIconsRoot = FindByName(root, "EggHatchIconsRoot") ??
+                             FindByName(root, "HatchIconsRoot") ??
+                             FindByName(root, "InfoHatchIcons");
+        Image hatchTemplate = null;
+        if (hatchIconsRoot != null)
+        {
+            hatchTemplate = FindComponentByName<Image>(hatchIconsRoot, "EggHatchIconTemplate") ??
+                            FindComponentByName<Image>(hatchIconsRoot, "HatchIconTemplate");
+        }
+        SetRef(so, "eggHatchSection", hatchSection != null ? hatchSection.gameObject : null);
+        SetRef(so, "eggHatchIconsRoot", hatchIconsRoot as RectTransform);
+        SetRef(so, "eggHatchIconTemplate", hatchTemplate);
+
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(view);
+    }
+
     private static void AutoWireRareTabView(AlbumRareTabView view)
     {
         var so = new SerializedObject(view);
@@ -270,6 +353,7 @@ public static class AlbumScreenAutoWireEditor
 
         SetRef(so, "button", FindComponentByName<Button>(root, "Button"));
         SetRef(so, "titleText", FindComponentByName<TMP_Text>(root, "Text (TMP)") ?? FindComponentByName<TMP_Text>(root, "Text"));
+        SetRef(so, "iconImage", FindComponentByName<Image>(root, "ElementIcon"));
         SetRef(so, "lockOverlay", lockOverlay != null ? lockOverlay.gameObject : null);
         SetRef(so, "mentionBadge", FindByName(root, "Mention")?.gameObject);
         SetRef(so, "selectedFrame", selectedFrame);

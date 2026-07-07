@@ -78,9 +78,11 @@ public class AlbumScreenController : MonoBehaviour
 
     [Header("Element Tabs")]
     [SerializeField] private Transform rareTabsRoot;
+    [SerializeField] private AdaptiveGridSpawner rareTabsAdaptiveGrid;
     [SerializeField] private AlbumRareTabView rareTabPrefab;
 
     [Header("Info Panel")]
+    [SerializeField] private AlbumInfoPanelView infoPanelView;
     [SerializeField] private Image infoIcon;
     [SerializeField] private TMP_Text infoTitle;
     [SerializeField] private TMP_Text infoDescription;
@@ -124,9 +126,9 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string incomeLabelKey = "UI/Album/Income";
     [SerializeField] private string incomeLabelFallback = "Income/sec";
     [SerializeField] private string eggPriceLabelKey = "UI/Album/EggPrice";
-    [SerializeField] private string eggPriceLabelFallback = "Price";
+    [SerializeField] private string eggPriceLabelFallback = "";
     [SerializeField] private string eggFirstRareDateKey = "UI/Album/EggFirstElementDate";
-    [SerializeField] private string eggFirstRareDateFallback = "First element date: {0}";
+    [SerializeField] private string eggFirstRareDateFallback = "{0}";
     [SerializeField] private string animalFirstDateKey = "UI/Album/AnimalFirstDate";
     [SerializeField] private string animalFirstDateFallback = "First obtained: {0}";
     [SerializeField] private string albumDateUnknownKey = "UI/Album/DateUnknown";
@@ -351,6 +353,7 @@ public class AlbumScreenController : MonoBehaviour
     public void Refresh()
     {
         EnsureCatalogReady();
+        RefreshLocalizedDisplayNames();
         RefreshTabMentions();
         RefreshTopTabVisuals();
         RefreshCardsSectionTitle();
@@ -534,6 +537,45 @@ public class AlbumScreenController : MonoBehaviour
         }
     }
 
+    private void RefreshLocalizedDisplayNames()
+    {
+        var changed = false;
+
+        for (var i = 0; i < _eggEntries.Count; i++)
+        {
+            var entry = _eggEntries[i];
+            if (entry?.egg == null)
+                continue;
+
+            var displayName = ResolveDisplayName(entry.egg.Name, entry.egg.name);
+            if (string.Equals(entry.displayName, displayName, StringComparison.Ordinal))
+                continue;
+
+            entry.displayName = displayName;
+            changed = true;
+        }
+
+        for (var i = 0; i < _animalEntries.Count; i++)
+        {
+            var entry = _animalEntries[i];
+            if (entry?.animal == null)
+                continue;
+
+            var displayName = ResolveDisplayName(entry.animal.Name, entry.animal.name);
+            if (string.Equals(entry.displayName, displayName, StringComparison.Ordinal))
+                continue;
+
+            entry.displayName = displayName;
+            changed = true;
+        }
+
+        if (!changed || !sortByName)
+            return;
+
+        _eggEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
+        _animalEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
+    }
+
     private void AddAnimalAlias(string canonicalId, string aliasRaw)
     {
         var alias = AlbumProgressService.NormalizeId(aliasRaw);
@@ -564,32 +606,22 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         _elementViews.Clear();
-        var existingViews = rareTabsRoot.GetComponentsInChildren<AlbumRareTabView>(true)
-            .Where(x => x != null && x.gameObject != rareTabPrefab.gameObject)
-            .ToList();
+        ClearElementTabsRootForRebuild();
 
         for (var i = 0; i < _supportedElementTypes.Count; i++)
         {
             var elementType = _supportedElementTypes[i];
-            AlbumRareTabView view;
-            if (i < existingViews.Count)
-            {
-                view = existingViews[i];
-            }
-            else
-            {
-                view = Instantiate(rareTabPrefab, rareTabsRoot);
-            }
+            var view = SpawnRareTabView();
+            if (view == null)
+                continue;
 
             view.gameObject.SetActive(true);
             _elementViews[elementType] = view;
         }
 
-        for (var i = _supportedElementTypes.Count; i < existingViews.Count; i++)
-            existingViews[i].gameObject.SetActive(false);
+        HideEmbeddedRareTabTemplate();
 
-        if (rareTabPrefab != null)
-            rareTabPrefab.gameObject.SetActive(false);
+        rareTabsAdaptiveGrid?.Rebuild();
     }
 
     private void RefreshElementTabs()
@@ -609,7 +641,7 @@ public class AlbumScreenController : MonoBehaviour
             var selected = _selectedElementFilter.HasValue && _selectedElementFilter.Value == elementType;
             var hasMention = progress != null && HasElementMentionForCurrentTab(elementType);
             var label = L(rareLabelKeyPrefix + elementType, GetElementLabelFallback(elementType));
-            view.Bind(label, unlocked, selected, hasMention, () => OnElementPressed(elementType, unlocked));
+            view.Bind(elementType, label, unlocked, selected, hasMention, () => OnElementPressed(elementType, unlocked));
         }
     }
 
@@ -719,6 +751,13 @@ public class AlbumScreenController : MonoBehaviour
 
     private void SetLockedInfo(EntryData entry)
     {
+        var unknown = L(unknownKey, unknownFallback);
+        if (infoPanelView != null)
+        {
+            infoPanelView.ShowLocked(entry != null ? entry.icon : null, infoLockedColor, unknown);
+            return;
+        }
+
         if (infoIcon != null)
         {
             infoIcon.sprite = entry != null ? entry.icon : null;
@@ -730,7 +769,6 @@ public class AlbumScreenController : MonoBehaviour
         if (infoLockedOverlay != null)
             infoLockedOverlay.SetActive(true);
 
-        var unknown = L(unknownKey, unknownFallback);
         if (infoTitle != null) infoTitle.text = unknown;
         if (infoDescription != null) infoDescription.text = unknown;
         if (infoIncome != null) infoIncome.text = unknown;
@@ -740,6 +778,12 @@ public class AlbumScreenController : MonoBehaviour
 
     private void SetUnlockedInfo(EntryData entry)
     {
+        if (infoPanelView != null)
+        {
+            SetUnlockedInfoView(entry);
+            return;
+        }
+
         if (infoIcon != null)
         {
             infoIcon.sprite = entry.icon;
@@ -768,7 +812,7 @@ public class AlbumScreenController : MonoBehaviour
                 var rewardLine = BuildRewardInfoText(entry);
                 if (hasHatchUi && previews.Count > 0)
                 {
-                    infoSources.text = rewardLine;
+                    infoSources.text = string.Empty;
                 }
                 else
                 {
@@ -792,6 +836,50 @@ public class AlbumScreenController : MonoBehaviour
             if (infoSources != null)
                 infoSources.text = BuildAnimalMetaText(entry);
         }
+    }
+
+    private void SetUnlockedInfoView(EntryData entry)
+    {
+        if (entry == null)
+            return;
+
+        if (entry.type == AlbumEntityType.Egg)
+        {
+            var previews = BuildEggHatchPreviewEntries(entry);
+            var hatchIcons = BuildInfoHatchIcons(previews);
+
+            infoPanelView.ShowEgg(
+                entry.icon,
+                infoUnlockedColor,
+                entry.displayName,
+                BuildEggFirstElementDateText(entry),
+                BuildEggPriceText(entry),
+                string.Empty,
+                hatchIcons,
+                eggHatchUnlockedColor,
+                eggHatchLockedColor);
+            return;
+        }
+
+        infoPanelView.ShowAnimal(
+            entry.icon,
+            infoUnlockedColor,
+            entry.displayName,
+            BuildAnimalDescriptionText(entry),
+            BuildAnimalIncomeText(entry),
+            BuildAnimalMetaText(entry));
+    }
+
+    private static List<AlbumInfoPanelView.HatchIconData> BuildInfoHatchIcons(IReadOnlyList<HatchPreviewEntry> previews)
+    {
+        var result = new List<AlbumInfoPanelView.HatchIconData>();
+        if (previews == null)
+            return result;
+
+        for (var i = 0; i < previews.Count; i++)
+            result.Add(new AlbumInfoPanelView.HatchIconData(previews[i].icon, previews[i].unlocked));
+
+        return result;
     }
 
     private List<HatchPreviewEntry> BuildEggHatchPreviewEntries(EntryData entry)
@@ -908,15 +996,14 @@ public class AlbumScreenController : MonoBehaviour
     private string BuildEggFirstElementDateText(EntryData entry)
     {
         var fallbackDate = L(albumDateUnknownKey, albumDateUnknownFallback);
-        var rawLabel = L(eggFirstRareDateKey, eggFirstRareDateFallback);
         if (entry == null || progressService == null)
-            return string.Format(rawLabel, fallbackDate);
+            return fallbackDate;
 
         var selectedElementType = _selectedElementFilter ?? ResolveDefaultElementForDisplay();
         if (!progressService.TryGetFirstElementDiscoveryDate(entry.type, entry.id, selectedElementType, out var firstSeenDate))
-            return string.Format(rawLabel, fallbackDate);
+            return fallbackDate;
 
-        return string.Format(rawLabel, FormatAlbumDate(firstSeenDate));
+        return FormatAlbumDate(firstSeenDate);
     }
 
     private string BuildAnimalFirstDateText(EntryData entry)
@@ -937,13 +1024,8 @@ public class AlbumScreenController : MonoBehaviour
         if (entry?.egg == null)
             return "-";
 
-        var label = L(eggPriceLabelKey, eggPriceLabelFallback);
         var rawPrice = Math.Max(0d, entry.egg.Data.Price);
-        var priceText = G.Currency != null
-            ? G.Currency.ToString(rawPrice)
-            : Math.Round(rawPrice).ToString("N0", CultureInfo.InvariantCulture);
-
-        return $"{label}: {priceText}";
+        return FormatSoftAmount(rawPrice);
     }
 
     private string BuildAnimalDescriptionText(EntryData entry)
@@ -1562,11 +1644,69 @@ public class AlbumScreenController : MonoBehaviour
 
     private static string ResolveDisplayName(string preferred, string fallbackName)
     {
+        if (TryResolveLocalizedInventoryName(preferred, out var localized))
+            return localized;
+        if (TryResolveLocalizedInventoryName(fallbackName, out localized))
+            return localized;
+
         if (!string.IsNullOrWhiteSpace(preferred))
             return preferred.Trim();
         if (!string.IsNullOrWhiteSpace(fallbackName))
             return fallbackName.Trim();
         return "Unknown";
+    }
+
+    private static bool TryResolveLocalizedInventoryName(string rawName, out string localized)
+    {
+        localized = null;
+        if (string.IsNullOrWhiteSpace(rawName))
+            return false;
+
+        var key = rawName.Trim();
+        if (TryGetLocalization(key, out localized))
+            return true;
+
+        return TryGetLocalization("Item/" + key, out localized);
+    }
+
+    private static bool TryGetLocalization(string key, out string localized)
+    {
+        localized = null;
+        if (string.IsNullOrWhiteSpace(key))
+            return false;
+
+        var manager = LocalizationManager.Instance;
+        var data = manager != null ? manager.LocalizationData : null;
+        if (data == null)
+            return false;
+
+        var language = !string.IsNullOrWhiteSpace(manager.CurrentLanguage)
+            ? manager.CurrentLanguage
+            : null;
+        if (string.IsNullOrWhiteSpace(language))
+            return false;
+
+        if (!data.TryGetTranslation(key, language, out var translated))
+            return false;
+        if (string.IsNullOrWhiteSpace(translated) || string.Equals(translated, key, StringComparison.Ordinal))
+            return false;
+
+        localized = translated.Trim();
+        return true;
+    }
+
+    private static string FormatSoftAmount(double amount)
+    {
+        var value = Math.Max(0d, amount);
+        var text = G.Currency != null
+            ? G.Currency.ToString(value)
+            : Math.Round(value).ToString("N0", CultureInfo.InvariantCulture);
+
+        if (string.IsNullOrWhiteSpace(text))
+            return "$0";
+
+        text = text.Trim();
+        return text.StartsWith("$", StringComparison.Ordinal) ? text : "$" + text;
     }
 
     private void AutoSetupReferences()
@@ -1610,6 +1750,17 @@ public class AlbumScreenController : MonoBehaviour
                 if (cardsDynamicGrid != null && cardsRoot != cardsDynamicGrid.transform)
                     cardsRoot = cardsDynamicGrid.transform;
             }
+        }
+
+        if (rareTabsRoot != null)
+        {
+            if (rareTabsAdaptiveGrid == null)
+                rareTabsAdaptiveGrid = rareTabsRoot.GetComponent<AdaptiveGridSpawner>();
+            if (rareTabsAdaptiveGrid == null)
+                rareTabsAdaptiveGrid = rareTabsRoot.GetComponentInChildren<AdaptiveGridSpawner>(true);
+
+            if (rareTabsAdaptiveGrid != null && rareTabsRoot != rareTabsAdaptiveGrid.transform)
+                rareTabsRoot = rareTabsAdaptiveGrid.transform;
         }
 
         if (panelRoot != null)
@@ -1679,6 +1830,75 @@ public class AlbumScreenController : MonoBehaviour
             return cardsDynamicGrid.SpawnObject<AlbumEntryView>(cardPrefab.gameObject);
 
         return Instantiate(cardPrefab, cardsRoot);
+    }
+
+    private AlbumRareTabView SpawnRareTabView()
+    {
+        if (rareTabsAdaptiveGrid != null)
+            return rareTabsAdaptiveGrid.SpawnObject<AlbumRareTabView>(rareTabPrefab.gameObject);
+
+        return Instantiate(rareTabPrefab, rareTabsRoot);
+    }
+
+    private void ClearElementTabsRootForRebuild()
+    {
+        if (rareTabsAdaptiveGrid != null)
+            rareTabsAdaptiveGrid.ClearSpawnedItems();
+
+        if (rareTabsRoot == null)
+            return;
+
+        var templateTransform = GetEmbeddedRareTabTemplateTransform();
+        var pendingDestroy = new List<GameObject>();
+
+        for (var i = rareTabsRoot.childCount - 1; i >= 0; i--)
+        {
+            var child = rareTabsRoot.GetChild(i);
+            if (templateTransform != null && child == templateTransform)
+            {
+                child.gameObject.SetActive(false);
+                continue;
+            }
+
+            if (child.GetComponent<AlbumRareTabView>() == null)
+                continue;
+
+            child.SetParent(null, false);
+            pendingDestroy.Add(child.gameObject);
+        }
+
+        for (var i = 0; i < pendingDestroy.Count; i++)
+            DestroyAlbumRuntimeObject(pendingDestroy[i]);
+    }
+
+    private Transform GetEmbeddedRareTabTemplateTransform()
+    {
+        if (rareTabPrefab == null || rareTabsRoot == null)
+            return null;
+
+        var template = rareTabPrefab.transform;
+        if (template == null || !template.IsChildOf(rareTabsRoot))
+            return null;
+
+        return template;
+    }
+
+    private void HideEmbeddedRareTabTemplate()
+    {
+        var template = GetEmbeddedRareTabTemplateTransform();
+        if (template != null)
+            template.gameObject.SetActive(false);
+    }
+
+    private static void DestroyAlbumRuntimeObject(GameObject target)
+    {
+        if (target == null)
+            return;
+
+        if (Application.isPlaying)
+            UnityEngine.Object.Destroy(target);
+        else
+            UnityEngine.Object.DestroyImmediate(target);
     }
 
     private void ClearCardsRootForRebuild()

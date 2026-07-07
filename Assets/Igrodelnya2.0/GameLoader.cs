@@ -68,16 +68,25 @@ public class GameLoader : MonoBehaviour
     private IEnumerator SceneLoad(string sceneName)
     {
         float loadingProgress;
+
+        yield return null;
+
         _asyncOperation = SceneManager.LoadSceneAsync(sceneName);
         while (_asyncOperation.progress < 0.95f)
         {
             loadingProgress = Mathf.Clamp01(_asyncOperation.progress / 0.95f);
-            LoadingProgressBarUI.Instance?.Progress(_asyncOperation.progress);
-            yield return true;
+            LoadingProgressBarUI.Instance?.Progress(loadingProgress);
+            yield return null;
         }
 
         if (!PauseManager.Instance.IsInitialize)
             PauseManager.Instance.StartInitialize();
+
+        if (LoadingProgressBarUI.Instance != null)
+        {
+            LoadingProgressBarUI.Instance.EndProgress(0.25f);
+            yield return new WaitForSecondsRealtime(0.25f);
+        }
 
         if (_loadingImage != null) _loadingImage.SetActive(false);
         //G.Ad.ShowInterstitialAd();

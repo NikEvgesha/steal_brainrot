@@ -18,7 +18,12 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         UpperLeft,
         UpperRight,
         LowerLeft,
-        LowerRight
+        LowerRight,
+        UpperCenter,
+        MiddleLeft,
+        MiddleCenter,
+        MiddleRight,
+        LowerCenter
     }
 
     public enum FillDirection
@@ -59,7 +64,9 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
     [SerializeField, Min(0)] private int preferredRows;
     [SerializeField] private bool preserveAspectRatio = true;
     [SerializeField, Min(0.05f)] private float cellAspectRatio = 1f;
+    [SerializeField] private bool useMinCellSize = true;
     [SerializeField] private Vector2 minCellSize = new Vector2(56f, 56f);
+    [SerializeField] private bool useMaxCellSize = true;
     [SerializeField] private Vector2 maxCellSize = new Vector2(180f, 180f);
     [SerializeField] private bool allowBelowMinWhenNeeded = true;
 
@@ -73,6 +80,9 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
     private RectTransform _rectTransform;
     private Coroutine _deferredRebuild;
     private Vector2 _lastRectSize = new Vector2(-1f, -1f);
+#if UNITY_EDITOR
+    private bool _editorRebuildQueued;
+#endif
 
     public int Columns { get; private set; }
     public int Rows { get; private set; }
@@ -109,6 +119,11 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
             StopCoroutine(_deferredRebuild);
             _deferredRebuild = null;
         }
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.delayCall -= RunDelayedEditorRebuild;
+        _editorRebuildQueued = false;
+#endif
     }
 
     private void OnValidate()
@@ -282,6 +297,8 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
             : items.Count;
 
         var metrics = CalculateMetrics(availableSize, Mathf.Max(0, requestedCount), layout.Spacing);
+        var visibleItemCount = ResolveVisibleItemCount(items.Count, requestedCount, metrics);
+        var occupied = CalculateOccupiedMetrics(metrics, visibleItemCount);
         Columns = metrics.columns;
         Rows = metrics.rows;
         Capacity = metrics.capacity;
@@ -304,13 +321,21 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
             if (_hiddenOverflowItems.Remove(item) && !item.gameObject.activeSelf)
                 item.gameObject.SetActive(true);
 
-            ApplyItemRect(item, i, metrics, layout);
+            ApplyItemRect(item, i, metrics, occupied, layout);
         }
     }
 
     private void QueueRebuild()
     {
         EnsureRuntimeState();
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            QueueEditorRebuild();
+            return;
+        }
+#endif
+
         if (!Application.isPlaying)
         {
             Rebuild();
@@ -328,6 +353,28 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
 
         _deferredRebuild = StartCoroutine(RebuildNextFrame());
     }
+
+#if UNITY_EDITOR
+    private void QueueEditorRebuild()
+    {
+        if (_editorRebuildQueued)
+            return;
+
+        _editorRebuildQueued = true;
+        UnityEditor.EditorApplication.delayCall += RunDelayedEditorRebuild;
+    }
+
+    private void RunDelayedEditorRebuild()
+    {
+        UnityEditor.EditorApplication.delayCall -= RunDelayedEditorRebuild;
+        _editorRebuildQueued = false;
+
+        if (this == null || !isActiveAndEnabled)
+            return;
+
+        Rebuild();
+    }
+#endif
 
     private IEnumerator RebuildNextFrame()
     {
@@ -386,7 +433,7 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         {
             var rows = Mathf.CeilToInt(itemCount / (float)columns);
             var candidate = BuildFitMetrics(availableSize, itemCount, columns, rows, resolvedSpacing);
-            var belowMinPenalty = candidate.cellSize.x < minCellSize.x || candidate.cellSize.y < minCellSize.y
+            var belowMinPenalty = useMinCellSize && (candidate.cellSize.x < minCellSize.x || candidate.cellSize.y < minCellSize.y)
                 ? -1000000f
                 : 0f;
             var score = candidate.cellSize.x * candidate.cellSize.y + belowMinPenalty;
@@ -419,11 +466,14 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
                 cell.y = cell.x / aspect;
         }
 
-        var maxSize = NormalizeMaxSize(maxCellSize);
-        cell.x = Mathf.Min(cell.x, maxSize.x);
-        cell.y = Mathf.Min(cell.y, maxSize.y);
+        if (useMaxCellSize)
+        {
+            var maxSize = NormalizeMaxSize(maxCellSize);
+            cell.x = Mathf.Min(cell.x, maxSize.x);
+            cell.y = Mathf.Min(cell.y, maxSize.y);
+        }
 
-        if (!allowBelowMinWhenNeeded || (cell.x >= minCellSize.x && cell.y >= minCellSize.y))
+        if (useMinCellSize && (!allowBelowMinWhenNeeded || (cell.x >= minCellSize.x && cell.y >= minCellSize.y)))
         {
             cell.x = Mathf.Max(cell.x, minCellSize.x);
             cell.y = Mathf.Max(cell.y, minCellSize.y);
@@ -438,7 +488,48 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         };
     }
 
-    private void ApplyItemRect(RectTransform item, int index, LayoutMetrics metrics, ResolvedLayout layout)
+    private int ResolveVisibleItemCount(int itemCount, int requestedCount, LayoutMetrics metrics)
+    {
+        var alignmentCount = sizingMode == CellSizingMode.FitItemCount
+            ? Mathf.Max(itemCount, requestedCount)
+            : itemCount;
+
+        if (sizingMode == CellSizingMode.FixedCellSize && hideFixedOverflow)
+            alignmentCount = Mathf.Min(alignmentCount, metrics.capacity);
+
+        return Mathf.Max(0, alignmentCount);
+    }
+
+    private LayoutMetrics CalculateOccupiedMetrics(LayoutMetrics metrics, int itemCount)
+    {
+        if (itemCount <= 0 || metrics.columns <= 0 || metrics.rows <= 0)
+        {
+            metrics.usedColumns = 0;
+            metrics.usedRows = 0;
+            return metrics;
+        }
+
+        if (fillDirection == FillDirection.VerticalThenHorizontal)
+        {
+            metrics.usedRows = Mathf.Min(metrics.rows, itemCount);
+            metrics.usedColumns = Mathf.CeilToInt(itemCount / (float)Mathf.Max(1, metrics.rows));
+            if (sizingMode == CellSizingMode.FixedCellSize && hideFixedOverflow)
+                metrics.usedColumns = Mathf.Min(metrics.usedColumns, metrics.columns);
+        }
+        else
+        {
+            metrics.usedColumns = Mathf.Min(metrics.columns, itemCount);
+            metrics.usedRows = Mathf.CeilToInt(itemCount / (float)Mathf.Max(1, metrics.columns));
+            if (sizingMode == CellSizingMode.FixedCellSize && hideFixedOverflow)
+                metrics.usedRows = Mathf.Min(metrics.usedRows, metrics.rows);
+        }
+
+        metrics.usedColumns = Mathf.Max(1, metrics.usedColumns);
+        metrics.usedRows = Mathf.Max(1, metrics.usedRows);
+        return metrics;
+    }
+
+    private void ApplyItemRect(RectTransform item, int index, LayoutMetrics metrics, LayoutMetrics occupied, ResolvedLayout layout)
     {
         if (metrics.columns <= 0 || metrics.rows <= 0)
             return;
@@ -458,39 +549,65 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
 
         var cell = metrics.cellSize;
         var step = new Vector2(cell.x + layout.Spacing.x, cell.y + layout.Spacing.y);
-        var anchor = GetAnchorForCorner(startCorner);
+        var anchor = GetAnchorForStartCorner(startCorner);
         item.anchorMin = anchor;
         item.anchorMax = anchor;
         item.pivot = anchor;
         item.sizeDelta = cell;
-        item.anchoredPosition = GetAnchoredPosition(column, row, step, layout);
+        item.anchoredPosition = GetAnchoredPosition(column, row, step, occupied, layout);
     }
 
-    private Vector2 GetAnchoredPosition(int column, int row, Vector2 step, ResolvedLayout layout)
+    private Vector2 GetAnchoredPosition(int column, int row, Vector2 step, LayoutMetrics occupied, ResolvedLayout layout)
     {
+        var cell = occupied.cellSize;
+        var blockWidth = occupied.usedColumns * cell.x + Mathf.Max(0, occupied.usedColumns - 1) * layout.Spacing.x;
+        var blockHeight = occupied.usedRows * cell.y + Mathf.Max(0, occupied.usedRows - 1) * layout.Spacing.y;
+
         switch (startCorner)
         {
             case StartCorner.UpperRight:
                 return new Vector2(-layout.Right - column * step.x, -layout.Top - row * step.y);
+            case StartCorner.UpperCenter:
+                return new Vector2(-blockWidth * 0.5f + cell.x * 0.5f + column * step.x, -layout.Top - row * step.y);
             case StartCorner.LowerLeft:
                 return new Vector2(layout.Left + column * step.x, layout.Bottom + row * step.y);
             case StartCorner.LowerRight:
                 return new Vector2(-layout.Right - column * step.x, layout.Bottom + row * step.y);
+            case StartCorner.LowerCenter:
+                return new Vector2(-blockWidth * 0.5f + cell.x * 0.5f + column * step.x, layout.Bottom + row * step.y);
+            case StartCorner.MiddleLeft:
+                return new Vector2(layout.Left + column * step.x, blockHeight * 0.5f - cell.y * 0.5f - row * step.y);
+            case StartCorner.MiddleRight:
+                return new Vector2(-layout.Right - column * step.x, blockHeight * 0.5f - cell.y * 0.5f - row * step.y);
+            case StartCorner.MiddleCenter:
+                return new Vector2(
+                    -blockWidth * 0.5f + cell.x * 0.5f + column * step.x,
+                    blockHeight * 0.5f - cell.y * 0.5f - row * step.y);
             default:
                 return new Vector2(layout.Left + column * step.x, -layout.Top - row * step.y);
         }
     }
 
-    private static Vector2 GetAnchorForCorner(StartCorner corner)
+    private static Vector2 GetAnchorForStartCorner(StartCorner corner)
     {
         switch (corner)
         {
             case StartCorner.UpperRight:
                 return new Vector2(1f, 1f);
+            case StartCorner.UpperCenter:
+                return new Vector2(0.5f, 1f);
             case StartCorner.LowerLeft:
                 return new Vector2(0f, 0f);
             case StartCorner.LowerRight:
                 return new Vector2(1f, 0f);
+            case StartCorner.LowerCenter:
+                return new Vector2(0.5f, 0f);
+            case StartCorner.MiddleLeft:
+                return new Vector2(0f, 0.5f);
+            case StartCorner.MiddleRight:
+                return new Vector2(1f, 0.5f);
+            case StartCorner.MiddleCenter:
+                return new Vector2(0.5f, 0.5f);
             default:
                 return new Vector2(0f, 1f);
         }
@@ -627,6 +744,8 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
     {
         public int columns;
         public int rows;
+        public int usedColumns;
+        public int usedRows;
         public int capacity;
         public Vector2 cellSize;
     }

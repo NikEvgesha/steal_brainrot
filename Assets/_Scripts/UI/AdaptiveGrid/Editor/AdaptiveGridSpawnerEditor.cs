@@ -28,7 +28,9 @@ public sealed class AdaptiveGridSpawnerEditor : Editor
     private SerializedProperty preferredRows;
     private SerializedProperty preserveAspectRatio;
     private SerializedProperty cellAspectRatio;
+    private SerializedProperty useMinCellSize;
     private SerializedProperty minCellSize;
+    private SerializedProperty useMaxCellSize;
     private SerializedProperty maxCellSize;
     private SerializedProperty allowBelowMinWhenNeeded;
 
@@ -60,7 +62,9 @@ public sealed class AdaptiveGridSpawnerEditor : Editor
         preferredRows = serializedObject.FindProperty("preferredRows");
         preserveAspectRatio = serializedObject.FindProperty("preserveAspectRatio");
         cellAspectRatio = serializedObject.FindProperty("cellAspectRatio");
+        useMinCellSize = serializedObject.FindProperty("useMinCellSize");
         minCellSize = serializedObject.FindProperty("minCellSize");
+        useMaxCellSize = serializedObject.FindProperty("useMaxCellSize");
         maxCellSize = serializedObject.FindProperty("maxCellSize");
         allowBelowMinWhenNeeded = serializedObject.FindProperty("allowBelowMinWhenNeeded");
 
@@ -172,9 +176,17 @@ public sealed class AdaptiveGridSpawnerEditor : Editor
         if (IsMixed(preserveAspectRatio) || preserveAspectRatio.boolValue)
             EditorGUILayout.PropertyField(cellAspectRatio);
 
-        EditorGUILayout.PropertyField(minCellSize);
-        EditorGUILayout.PropertyField(maxCellSize);
-        EditorGUILayout.PropertyField(allowBelowMinWhenNeeded);
+        EditorGUILayout.PropertyField(useMinCellSize);
+        if (IsMixed(useMinCellSize) || useMinCellSize.boolValue)
+        {
+            EditorGUILayout.PropertyField(minCellSize);
+            EditorGUILayout.PropertyField(allowBelowMinWhenNeeded);
+        }
+
+        EditorGUILayout.PropertyField(useMaxCellSize);
+        if (IsMixed(useMaxCellSize) || useMaxCellSize.boolValue)
+            EditorGUILayout.PropertyField(maxCellSize);
+
         EditorGUILayout.Space(8f);
     }
 
