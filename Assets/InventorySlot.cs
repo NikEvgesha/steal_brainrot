@@ -21,6 +21,7 @@ public class InventorySlot : MonoBehaviour
 
         if (item == null)
         {
+            _quickSlotIndicator.SetActive(false);
             _background.gameObject.SetActive(false);
             return;
         }
@@ -28,8 +29,7 @@ public class InventorySlot : MonoBehaviour
         _background.gameObject.SetActive(true);
         _icon.sprite = item.Icon;
         _name.text = item.Name;
-        if (_item.InQuickAccess)
-            _quickSlotIndicator.SetActive(true);
+        _quickSlotIndicator.SetActive(_item.InQuickAccess);
 
 
         // TODO: get color from?
@@ -59,6 +59,7 @@ public class InventorySlot : MonoBehaviour
         _sellButtonLockIcon.SetActive(_item.SellAllowed);
         _sellButtonUnlockIcon.SetActive(!_item.SellAllowed);
         _lockSellIndicator.SetActive(!_item.SellAllowed);
+        BlockyUITheme.StyleCard(gameObject, item.RareType);
     }
 
     public void _OnClick() {

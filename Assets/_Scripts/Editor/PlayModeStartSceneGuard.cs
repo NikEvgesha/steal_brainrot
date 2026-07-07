@@ -8,7 +8,11 @@ using UnityEngine.SceneManagement;
 public static class PlayModeStartSceneGuard
 {
     private const string StartScenePath = "Assets/Scenes/LoadingScene.unity";
-    private const string BypassSceneName = "Foto";
+    private static readonly string[] BypassSceneNames =
+    {
+        "Foto",
+        "AdaptiveGridDemo"
+    };
 
     static PlayModeStartSceneGuard()
     {
@@ -22,10 +26,10 @@ public static class PlayModeStartSceneGuard
             return;
 
         var activeScene = SceneManager.GetActiveScene();
-        if (string.Equals(activeScene.name, BypassSceneName, StringComparison.OrdinalIgnoreCase))
+        if (IsBypassScene(activeScene.name))
         {
             EditorSceneManager.playModeStartScene = null;
-            Debug.Log($"[PlayModeStartSceneGuard] Play from '{activeScene.path}' without redirect (bypass for '{BypassSceneName}').");
+            Debug.Log($"[PlayModeStartSceneGuard] Play from '{activeScene.path}' without redirect.");
             return;
         }
 
@@ -38,6 +42,15 @@ public static class PlayModeStartSceneGuard
 
     private static void EnsurePlayModeStartScene()
     {
+        var activeScene = SceneManager.GetActiveScene();
+        if (IsBypassScene(activeScene.name))
+        {
+            if (EditorSceneManager.playModeStartScene != null)
+                EditorSceneManager.playModeStartScene = null;
+
+            return;
+        }
+
         var startScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(StartScenePath);
         if (startScene == null)
         {
@@ -47,5 +60,16 @@ public static class PlayModeStartSceneGuard
 
         if (EditorSceneManager.playModeStartScene != startScene)
             EditorSceneManager.playModeStartScene = startScene;
+    }
+
+    private static bool IsBypassScene(string sceneName)
+    {
+        for (var i = 0; i < BypassSceneNames.Length; i++)
+        {
+            if (string.Equals(sceneName, BypassSceneNames[i], StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 }

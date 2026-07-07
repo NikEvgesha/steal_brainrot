@@ -59,8 +59,10 @@ public class SettingUI : MonoBehaviour
 
     private void OnDisable()
     {
-        G.Sound.Ready -= SetValues;
-        G.Input.APause -= ToggleOpen;
+        if (G.Sound != null)
+            G.Sound.Ready -= SetValues;
+        if (G.Input != null)
+            G.Input.APause -= ToggleOpen;
         if (_animationsToggle != null)
             _animationsToggle.onValueChanged.RemoveListener(OnAnimationsToggleChange);
     }

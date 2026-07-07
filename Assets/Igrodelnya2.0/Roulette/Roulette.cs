@@ -57,6 +57,7 @@ public class Roulette : MonoBehaviour
     private DateTime _lastSpinTime;
     private IEnumerator _spinCoroutine;
     private IEnumerator _timerCoroutine;
+    private bool _inputBound;
 
 
     private void Awake()
@@ -68,6 +69,7 @@ public class Roulette : MonoBehaviour
 
     private void Start()
     {
+        BindInput();
         //LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
         for (int i = 0; i < _slots.Count; i++)
         {
@@ -88,14 +90,35 @@ public class Roulette : MonoBehaviour
 
     private void OnEnable()
     {
-        G.Input.ARoulette += ToggleOpen;
-        G.Input.AOpenWindow += Close;
+        BindInput();
     }
     private void OnDisable()
     {
-        G.Input.ARoulette -= ToggleOpen;
-        //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
-        G.Input.AOpenWindow -= Close;
+        UnbindInput();
+    }
+
+    private void BindInput()
+    {
+        if (_inputBound || G.Input == null)
+            return;
+
+        G.Input.ARoulette += ToggleOpen;
+        G.Input.AOpenWindow += Close;
+        _inputBound = true;
+    }
+
+    private void UnbindInput()
+    {
+        if (!_inputBound)
+            return;
+
+        if (G.Input != null)
+        {
+            G.Input.ARoulette -= ToggleOpen;
+            //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
+            G.Input.AOpenWindow -= Close;
+        }
+        _inputBound = false;
     }
 
     private IEnumerator Timer()

@@ -17,6 +17,8 @@ public class CurrencyUI : MonoBehaviour
 
     private void OnEnable()
     {
+        BlockyUITheme.StyleCurrencyBadge(gameObject, _type);
+
         if (G.Currency != null && !_subscribed)
         {
             G.Currency.CurrencyChanged.AddListener(OnCurrencyChanged);

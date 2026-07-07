@@ -74,6 +74,17 @@ public class BigPetPoint : MonoBehaviour
         InitLocal();
     }
 
+    private void OnEnable()
+    {
+        if (_initializedLocal && !_remoteMode && _purchased)
+            EnsureIncomeRoutine();
+    }
+
+    private void OnDisable()
+    {
+        StopIncomeRoutine();
+    }
+
     private void InitLocal()
     {
         if (_initializedLocal) return;
@@ -388,7 +399,9 @@ public class BigPetPoint : MonoBehaviour
         if (collected <= 0d)
             return 0d;
 
-        G.Income.AddCoins(collected);
+        if (!TryAddCoins(collected))
+            return 0d;
+
         _accumulatedIncome = 0;
         if (_petInfoUI != null)
             _petInfoUI.UpdateIncome(_accumulatedIncome);
@@ -400,6 +413,24 @@ public class BigPetPoint : MonoBehaviour
             _audio.Play();
 
         return collected;
+    }
+
+    private static bool TryAddCoins(double amount)
+    {
+        if (amount <= 0d)
+            return false;
+
+        if (G.Income != null)
+            return G.Income.TryAddCoins(amount);
+
+        if (G.Currency != null)
+        {
+            G.Currency.AddCurrency(CurrencyType.Coins, amount);
+            return true;
+        }
+
+        Debug.LogWarning("[BigPetPoint] Cannot collect income: income and currency managers are not initialized.");
+        return false;
     }
 
     private IEnumerator ProduceIncome()
@@ -823,6 +854,8 @@ public class BigPetPoint : MonoBehaviour
     private void EnsureIncomeRoutine()
     {
         if (_remoteMode || !_purchased || _incomeRoutine != null)
+            return;
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
             return;
 
         _incomeRoutine = StartCoroutine(ProduceIncome());

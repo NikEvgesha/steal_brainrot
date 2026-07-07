@@ -86,6 +86,11 @@ public class SaveManager : MonoBehaviour
         _pendingSaveFlagValue = haveSave;
     }
 
+    private void MarkProgressExists()
+    {
+        SetSave(true);
+    }
+
     // Пример методов, которые делегируют работу провайдеру:
     public float[] GetVolume()
     {
@@ -93,6 +98,7 @@ public class SaveManager : MonoBehaviour
     }
     public void SaveQuestProgress(int step = 0)
     {
+        MarkProgressExists();
         saveProvider.SaveQuestProgress(step);
     }
     public int LoadQuestProgress() 
@@ -144,10 +150,12 @@ public class SaveManager : MonoBehaviour
     }
     public void SaveTutorialProgress(bool endTutorial)
     {
+        MarkProgressExists();
         saveProvider.SaveTutorialProgress(endTutorial);
     }
     public void SaveGems(double amount)
     {
+        MarkProgressExists();
         saveProvider.SaveGems(amount);
         //LeaderboardManager.Instance.SaveScore(LBName.gems.ToString(), amount);
     }
@@ -207,6 +215,7 @@ public class SaveManager : MonoBehaviour
     }
     public void SaveGameCoin(double coin)
     {
+        MarkProgressExists();
         saveProvider.SaveGameCoin(coin);
     }
     public double LoadGameCoin()
@@ -267,6 +276,7 @@ public class SaveManager : MonoBehaviour
 
     public void SaveBigPetStatus(bool purchased)
     {
+        MarkProgressExists();
         saveProvider.SaveBigPetStatus(purchased);
     }
 
@@ -277,18 +287,22 @@ public class SaveManager : MonoBehaviour
 
     public void SaveBigPetXP(int xp)
     {
+        MarkProgressExists();
         saveProvider.SaveBigPetXP(xp);
     }
     public void SaveBigPetLvl(int lvl)
     {
+        MarkProgressExists();
         saveProvider.SaveBigPetLvl(lvl);
     }
     public void SaveBigPetId(int id)
     {
+        MarkProgressExists();
         saveProvider.SaveBigPetId(id);
     }
     public void SaveBigPetIncomeTime(string incomeTime)
     {
+        MarkProgressExists();
         saveProvider.SaveBigPetIncomeTime(incomeTime);
     }
     public int LoadBigPetXP()
@@ -311,10 +325,12 @@ public class SaveManager : MonoBehaviour
 
     public void SaveConveyorCurrentLevel(int id)
     {
+        MarkProgressExists();
         saveProvider.SaveConveyorCurrentLevel(id);
     }
     public void SaveConveyorUnlockedLevel(int id)
     {
+        MarkProgressExists();
         saveProvider.SaveConveyorUnlockedLevel(id);
     }
 
@@ -330,6 +346,7 @@ public class SaveManager : MonoBehaviour
 
     public void SaveFieldUnblockStatus(int fieldId, bool unblocked)
     {
+        MarkProgressExists();
         saveProvider.SaveFieldUnblockStatus(fieldId, unblocked);
     }
 
@@ -341,6 +358,7 @@ public class SaveManager : MonoBehaviour
 
     public void SaveCellData(string id, CellSaveData data)
     {
+        MarkProgressExists();
         saveProvider.SaveCellData(id, data);
     }
 
@@ -351,6 +369,7 @@ public class SaveManager : MonoBehaviour
 
     public void SaveInventory(Item type, List<ItemSaveData> items)
     {
+        MarkProgressExists();
         saveProvider.SaveItemsList(type, JsonConvert.SerializeObject(items));
     }
 

@@ -8,12 +8,14 @@ using UnityEngine;
 public class RemoteBasesApplier : MonoBehaviour
 {
     private const string EmptySlotMarker = "__empty__";
+    private const string OfflineLocalPlayerId = "__offline_local__";
     private const float MinSyncDistanceMeters = 100f;
     private const int BaselineConveyorLevel = 0;
     private const int BaselineBigPetId = 0;
     private const int BaselineBigPetLevel = 1;
     private const int BaselineBigPetXp = 0;
     private const bool BaselineBigPetPurchased = false;
+    private const bool AllowRandomFallbackBigPetProgress = false;
 
     private class SlotSnapshotCache
     {
@@ -57,11 +59,27 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool smoothSnapshotApply = true;
     [SerializeField] private int snapshotOpsPerFrame = 12;
     [SerializeField] private bool incrementalSnapshotApply = true;
+    [Header("Local Home Marker")]
+    [SerializeField] private bool showLocalHomeMarker = true;
+    [SerializeField] private Vector3 localHomeMarkerOffset = new Vector3(0f, 7f, 0f);
+    [SerializeField] private Vector2 localHomeMarkerIconSize = new Vector2(112f, 112f);
+    [SerializeField] private float localHomeMarkerWorldScale = 0.03f;
+    [SerializeField] private float localHomeMarkerBobAmplitude = 0.18f;
+    [SerializeField] private float localHomeMarkerBobSpeed = 2.2f;
     [Header("Proximity Sync")]
     [SerializeField] private bool syncOnlyNearSlots = true;
     [SerializeField] private float syncDistanceMeters = 100f;
     [SerializeField] private float syncDistanceHysteresisMeters = 2f;
     [SerializeField] private bool renderRemotePlayersOutsideBaseSyncRange = true;
+    [Header("Fallback Remote Progress")]
+    [SerializeField] private bool randomizeEmptyRemoteSlots = true;
+    [SerializeField] private int randomRemoteProgressSeed = 9173;
+    [SerializeField] private int randomRemoteMinCells = 2;
+    [SerializeField] private int randomRemoteMaxCells = 7;
+    [SerializeField, Range(0f, 1f)] private float randomRemoteEggChance = 0.35f;
+    [SerializeField] private int randomRemoteMaxConveyorLevel = 3;
+    [SerializeField] private bool randomRemoteBigPetProgress = false;
+    [SerializeField] private int randomRemoteMaxBigPetLevel = 6;
     [Header("Debug")]
     [SerializeField] private bool debugLogs = false;
     [SerializeField] private bool testCloneLocalToRandomSlot = false;
@@ -78,6 +96,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private BaseSnapshotDto[] _slotSnapshotApplyPending;
     private bool[] _slotHadSnapshot;
     private SlotSnapshotCache[] _slotSnapshotCaches;
+    private BaseSnapshotDto[] _slotFallbackSnapshots;
     private string _lastLocalPlayerId;
     private int _serverLocalSlotIndex = -1;
     private int _lastTeleportedSlotIndex = -2;
@@ -94,6 +113,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private int _pendingLocalRestoreSlotIndex = -1;
     private bool _hasServerResolvedLocalSlot;
     private bool _forceLocalRestoreOnNextResolve = true;
+    private LocalHomeWorldMarker _localHomeMarker;
 
     private void Awake()
     {
@@ -102,6 +122,7 @@ public class RemoteBasesApplier : MonoBehaviour
             testCloneLocalToRandomSlot = false;
         if (backend == null) backend = G.Backend;
         EnsureSlotState();
+        EnsureInitialLocalSlotCandidate();
         MarkRemoteComponents();
     }
 
@@ -125,6 +146,8 @@ public class RemoteBasesApplier : MonoBehaviour
 
     private void Start()
     {
+        EnsureLocalHomeMarker();
+
         if (!applyOnStart || backend == null)
             return;
 
@@ -162,7 +185,9 @@ public class RemoteBasesApplier : MonoBehaviour
         _lobbyModeActive = true;
         _didInitialFullLobbySync = false;
         _hasServerResolvedLocalSlot = false;
-        var localSlotIndex = GetLocalSlotIndex();
+        if (string.IsNullOrEmpty(_lastLocalPlayerId))
+            _lastLocalPlayerId = OfflineLocalPlayerId;
+        var localSlotIndex = ResolveOfflineLocalSlotIndex();
         var keepPreparedLocalVisual =
             localSlotIndex >= 0 &&
             localSlotIndex == _lastPreparedLocalSlotIndex &&
@@ -170,6 +195,8 @@ public class RemoteBasesApplier : MonoBehaviour
             localSlotIndex < _slotModeState.Length &&
             _slotModeState[localSlotIndex] == 0;
         _forceLocalRestoreOnNextResolve = !keepPreparedLocalVisual;
+        if (localSlotIndex >= 0)
+            _lastPreparedLocalSlotIndex = localSlotIndex;
 
         for (int i = 0; i < slots.Count; i++)
         {
@@ -186,9 +213,17 @@ public class RemoteBasesApplier : MonoBehaviour
                 if (!keepPreparedLocalVisual)
                 {
                     if (RestoreLocalSlotFromSave(i))
+                    {
                         _lastPreparedLocalSlotIndex = i;
+                    }
+                    else if (G.Save == null || !G.Save.IsReady)
+                    {
+                        _lastPreparedLocalSlotIndex = i;
+                    }
                     else
+                    {
                         _lastPreparedLocalSlotIndex = -1;
+                    }
                 }
                 if (_slotWithinSyncRange != null && i < _slotWithinSyncRange.Length)
                     _slotWithinSyncRange[i] = true;
@@ -204,6 +239,30 @@ public class RemoteBasesApplier : MonoBehaviour
         }
 
         EnsureLocalSlot();
+    }
+
+    private int ResolveOfflineLocalSlotIndex()
+    {
+        if (slots == null || slots.Count == 0)
+            return -1;
+
+        if (_lastPreparedLocalSlotIndex >= 0 &&
+            _lastPreparedLocalSlotIndex < slots.Count &&
+            slots[_lastPreparedLocalSlotIndex] != null &&
+            slots[_lastPreparedLocalSlotIndex].root != null)
+            return _lastPreparedLocalSlotIndex;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            if (slot == null || slot.root == null)
+                continue;
+
+            if (slot.isLocalSlot)
+                return i;
+        }
+
+        return GetFallbackLocalSlotIndex();
     }
 
     private void ResetSlotRuntimeState(int slotIndex)
@@ -242,7 +301,7 @@ public class RemoteBasesApplier : MonoBehaviour
         ApplySlotMode(slotIndex, true);
         DisableRemotePlayer(slotIndex);
         ClearSlot(slot, disableRoot: false);
-        ApplySlotBaselineState(slot);
+        ApplySlotBaselineState(slotIndex, slot);
 
         if (_slotIsBaselineVisual != null && slotIndex < _slotIsBaselineVisual.Length)
             _slotIsBaselineVisual[slotIndex] = true;
@@ -251,9 +310,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private void MarkRemoteComponents()
     {
         if (slots == null) return;
-        var hasConfiguredLocalSlot = _serverLocalSlotIndex >= 0 || slots.Any(s => s != null && s.isLocalSlot);
-        if (!hasConfiguredLocalSlot)
-            return;
+        EnsureInitialLocalSlotCandidate();
 
         for (int i = 0; i < slots.Count; i++)
         {
@@ -261,6 +318,33 @@ public class RemoteBasesApplier : MonoBehaviour
             if (slot == null || slot.root == null) continue;
             ApplySlotMode(i, !IsLocalSlotIndex(i));
         }
+    }
+
+    private void EnsureInitialLocalSlotCandidate()
+    {
+        if (slots == null || slots.Count == 0)
+            return;
+
+        if (_serverLocalSlotIndex >= 0 && _serverLocalSlotIndex < slots.Count)
+            return;
+
+        if (_lastPreparedLocalSlotIndex >= 0 && _lastPreparedLocalSlotIndex < slots.Count)
+            return;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            if (slot == null || slot.root == null)
+                continue;
+
+            if (slot.isLocalSlot)
+            {
+                _lastPreparedLocalSlotIndex = i;
+                return;
+            }
+        }
+
+        _lastPreparedLocalSlotIndex = GetFallbackLocalSlotIndex();
     }
 
     private void ApplyLocations(List<ZooLocationItem> locations)
@@ -759,7 +843,7 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         ClearSlot(slot, disableRoot: false);
-        ApplySlotBaselineState(slot);
+        ApplySlotBaselineState(slotIndex, slot);
 
         if (_slotIsBaselineVisual != null && slotIndex < _slotIsBaselineVisual.Length)
             _slotIsBaselineVisual[slotIndex] = true;
@@ -772,10 +856,16 @@ public class RemoteBasesApplier : MonoBehaviour
         _slotIsBaselineVisual[slotIndex] = false;
     }
 
-    private void ApplySlotBaselineState(RemoteBaseSlot slot)
+    private void ApplySlotBaselineState(int slotIndex, RemoteBaseSlot slot)
     {
         if (slot == null || slot.root == null)
             return;
+
+        if (TryGetFallbackRemoteSnapshot(slotIndex, slot, out var fallbackSnapshot))
+        {
+            ApplySnapshotToSlot(slotIndex, slot, fallbackSnapshot);
+            return;
+        }
 
         foreach (var conveyor in slot.root.GetComponentsInChildren<Conveyor>(true))
         {
@@ -789,6 +879,288 @@ public class RemoteBasesApplier : MonoBehaviour
 
         foreach (var field in GetFields(slot))
             field.SetUnblockedVisual(false);
+    }
+
+    private bool TryGetFallbackRemoteSnapshot(int slotIndex, RemoteBaseSlot slot, out BaseSnapshotDto snapshot)
+    {
+        snapshot = null;
+        if (!randomizeEmptyRemoteSlots || slotIndex < 0 || slot == null || slot.root == null)
+            return false;
+
+        EnsureSlotState();
+        if (_slotFallbackSnapshots != null &&
+            slotIndex < _slotFallbackSnapshots.Length &&
+            _slotFallbackSnapshots[slotIndex] != null)
+        {
+            snapshot = _slotFallbackSnapshots[slotIndex];
+            return true;
+        }
+
+        snapshot = BuildFallbackRemoteSnapshot(slotIndex, slot);
+        if (_slotFallbackSnapshots != null && slotIndex < _slotFallbackSnapshots.Length)
+            _slotFallbackSnapshots[slotIndex] = snapshot;
+
+        return snapshot != null;
+    }
+
+    private BaseSnapshotDto BuildFallbackRemoteSnapshot(int slotIndex, RemoteBaseSlot slot)
+    {
+        EnsureFieldIds(slot);
+
+        var rng = new System.Random(BuildFallbackSeed(slotIndex, slot));
+        var fields = GetFields(slot)
+            .Where(field => field != null)
+            .OrderBy(field => field.ID)
+            .ToList();
+
+        if (fields.Count == 0)
+            return null;
+
+        var boughtFieldIds = PickFallbackBoughtFieldIds(fields, rng);
+        var availableCells = CollectFallbackCells(slot, fields, boughtFieldIds);
+        var eggs = G.Storage != null ? GetNamedPrefabs(G.Storage.GetAllEggPrefabs()) : new List<Egg>();
+        var pets = G.Storage != null ? GetNamedPrefabs(G.Storage.GetAllPetPrefabs()) : new List<Brainrot>();
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var cells = new List<CellSnapshotDto>();
+        if (availableCells.Count > 0 && (eggs.Count > 0 || pets.Count > 0))
+        {
+            var minCells = Mathf.Clamp(Mathf.Min(randomRemoteMinCells, randomRemoteMaxCells), 0, availableCells.Count);
+            var maxCells = Mathf.Clamp(Mathf.Max(randomRemoteMinCells, randomRemoteMaxCells), minCells, availableCells.Count);
+            var targetCells = maxCells > minCells ? rng.Next(minCells, maxCells + 1) : minCells;
+            if (targetCells == 0)
+                targetCells = 1;
+
+            for (var i = 0; i < targetCells && availableCells.Count > 0; i++)
+            {
+                var cellIndex = rng.Next(availableCells.Count);
+                var cell = availableCells[cellIndex];
+                availableCells.RemoveAt(cellIndex);
+
+                var useEgg = eggs.Count > 0 && (pets.Count == 0 || rng.NextDouble() < randomRemoteEggChance);
+                if (useEgg)
+                {
+                    var prefab = eggs[rng.Next(eggs.Count)];
+                    var hatchDelay = Mathf.Max(60, prefab.Data.SecondsToHatching);
+                    cells.Add(new CellSnapshotDto
+                    {
+                        cell = cell.Id,
+                        kind = "egg",
+                        id = prefab.Name,
+                        dinamic = CreateFallbackDinamic(rng, prefab.Data.Price),
+                        hatchingTimestamp = now + rng.Next(60, hatchDelay + 1)
+                    });
+                }
+                else
+                {
+                    var prefab = pets[rng.Next(pets.Count)];
+                    cells.Add(new CellSnapshotDto
+                    {
+                        cell = cell.Id,
+                        kind = "brainrot",
+                        id = prefab.Name,
+                        dinamic = CreateFallbackDinamic(rng, prefab.Data.StartIncome),
+                        incomeLastTime = now - rng.Next(60, 7200)
+                    });
+                }
+            }
+        }
+
+        cells.Sort((a, b) => string.CompareOrdinal(a.cell, b.cell));
+        var bigPet = BuildFallbackBigPet(rng);
+        var stats = BuildFallbackPlayerStats(cells, bigPet);
+
+        return new BaseSnapshotDto
+        {
+            updatedAt = $"fallback:{randomRemoteProgressSeed}:{slotIndex}",
+            conveyor = new ConveyorDto { lvl = GetFallbackConveyorLevel(slot, rng) },
+            bigPet = bigPet,
+            land = new LandDto { boughtCells = boughtFieldIds.OrderBy(id => id).ToList() },
+            cells = cells,
+            animalsOnCells = new List<AnimalOnCellDto>(),
+            playerStats = stats
+        };
+    }
+
+    private int BuildFallbackSeed(int slotIndex, RemoteBaseSlot slot)
+    {
+        unchecked
+        {
+            var seed = randomRemoteProgressSeed;
+            seed = seed * 397 ^ slotIndex;
+            var raw = slot != null && !string.IsNullOrEmpty(slot.name)
+                ? slot.name
+                : slot?.root != null ? slot.root.name : string.Empty;
+            for (var i = 0; i < raw.Length; i++)
+                seed = seed * 31 + raw[i];
+            return seed;
+        }
+    }
+
+    private HashSet<int> PickFallbackBoughtFieldIds(List<Field> fields, System.Random rng)
+    {
+        var bought = new HashSet<int>();
+        for (var i = 0; i < fields.Count; i++)
+        {
+            if (fields[i].DefaultUnblocked)
+                bought.Add(fields[i].ID);
+        }
+
+        var targetFieldCount = Mathf.Clamp(
+            Mathf.CeilToInt(fields.Count * Mathf.Lerp(0.3f, 0.85f, (float)rng.NextDouble())),
+            1,
+            fields.Count);
+        targetFieldCount = Mathf.Max(targetFieldCount, bought.Count);
+
+        while (bought.Count < targetFieldCount)
+            bought.Add(fields[rng.Next(fields.Count)].ID);
+
+        return bought;
+    }
+
+    private List<FieldCell> CollectFallbackCells(RemoteBaseSlot slot, List<Field> fields, HashSet<int> boughtFieldIds)
+    {
+        var result = new List<FieldCell>();
+        var seen = new HashSet<string>();
+        foreach (var cell in GetCells(slot))
+        {
+            if (cell == null || string.IsNullOrEmpty(cell.Id) || !seen.Add(cell.Id))
+                continue;
+
+            if (!TryGetFieldIdForCell(cell, fields, out var fieldId) || !boughtFieldIds.Contains(fieldId))
+                continue;
+
+            result.Add(cell);
+        }
+
+        return result;
+    }
+
+    private static bool TryGetFieldIdForCell(FieldCell cell, List<Field> fields, out int fieldId)
+    {
+        fieldId = -1;
+        if (cell == null || fields == null)
+            return false;
+
+        for (var i = 0; i < fields.Count; i++)
+        {
+            var field = fields[i];
+            if (field == null)
+                continue;
+
+            if (cell.transform == field.transform || cell.transform.IsChildOf(field.transform))
+            {
+                fieldId = field.ID;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private int GetFallbackConveyorLevel(RemoteBaseSlot slot, System.Random rng)
+    {
+        var maxLevel = Mathf.Max(0, randomRemoteMaxConveyorLevel);
+        var conveyor = slot.root.GetComponentInChildren<Conveyor>(true);
+        if (conveyor != null)
+            maxLevel = Mathf.Min(maxLevel, conveyor.MaxLevelIndex);
+
+        return maxLevel > 0 ? rng.Next(0, maxLevel + 1) : 0;
+    }
+
+    private BigPetDto BuildFallbackBigPet(System.Random rng)
+    {
+        var purchased = AllowRandomFallbackBigPetProgress &&
+                        randomRemoteBigPetProgress &&
+                        rng.NextDouble() < 0.65d;
+        var lvl = purchased ? rng.Next(1, Mathf.Max(1, randomRemoteMaxBigPetLevel) + 1) : BaselineBigPetLevel;
+        var petId = purchased ? rng.Next(0, Mathf.Max(1, lvl)) : BaselineBigPetId;
+        var income = purchased ? Mathf.Max(1, lvl) * 25f : 0f;
+
+        return new BigPetDto
+        {
+            id = petId,
+            lvl = lvl,
+            xp = purchased ? rng.Next(0, 250) : BaselineBigPetXp,
+            income = income,
+            purchased = purchased
+        };
+    }
+
+    private PlayerPublicStatsDto BuildFallbackPlayerStats(List<CellSnapshotDto> cells, BigPetDto bigPet)
+    {
+        var totalPetsIncome = 0d;
+        var bestPetIncome = 0d;
+        var totalHatched = 0;
+
+        if (cells != null)
+        {
+            for (var i = 0; i < cells.Count; i++)
+            {
+                var cell = cells[i];
+                if (cell == null || cell.kind != "brainrot")
+                    continue;
+
+                totalHatched++;
+                var income = Math.Max(0d, cell.dinamic.ResultIncome);
+                totalPetsIncome += income;
+                if (income > bestPetIncome)
+                    bestPetIncome = income;
+            }
+        }
+
+        return new PlayerPublicStatsDto
+        {
+            totalHatched = totalHatched,
+            petsIncomePerSec = totalPetsIncome,
+            bestPetIncomePerSec = bestPetIncome,
+            bigPetIncomePerSec = bigPet != null && bigPet.purchased ? Math.Max(0d, bigPet.income) : 0d
+        };
+    }
+
+    private BrainrotDinamicData CreateFallbackDinamic(System.Random rng, double baseIncome)
+    {
+        var element = PickFallbackElement(rng);
+        var weight = Mathf.Round((1f + (float)rng.NextDouble() * 4f) * 10f) / 10f;
+        var multiplier = G.Elements != null ? G.Elements.GetMultiplaer(element) : 1f;
+
+        return new BrainrotDinamicData
+        {
+            ElementType = element,
+            WeightMultiplier = weight,
+            ResultIncome = Math.Round(Math.Max(0d, baseIncome) * multiplier * (weight / 2f))
+        };
+    }
+
+    private static ElementType PickFallbackElement(System.Random rng)
+    {
+        if (rng.NextDouble() < 0.45d)
+            return ElementType.NoElement;
+
+        var elements = new[]
+        {
+            ElementType.Gold,
+            ElementType.Diamond,
+            ElementType.Electric,
+            ElementType.Fire
+        };
+        return elements[rng.Next(elements.Length)];
+    }
+
+    private static List<T> GetNamedPrefabs<T>(IReadOnlyList<T> prefabs) where T : InventoryItem
+    {
+        var result = new List<T>();
+        if (prefabs == null)
+            return result;
+
+        for (var i = 0; i < prefabs.Count; i++)
+        {
+            var prefab = prefabs[i];
+            if (prefab != null && !string.IsNullOrEmpty(prefab.Name))
+                result.Add(prefab);
+        }
+
+        return result;
     }
 
 
@@ -1361,7 +1733,7 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
 
         if (item.kind == "egg")
-            SpawnEgg(cell, item.id, item.dinamic);
+            SpawnEgg(cell, item.id, item.dinamic, item.hatchingTimestamp);
         else if (item.kind == "brainrot")
             SpawnBrainrot(cell, item.id, item.dinamic, item.incomeLastTime);
     }
@@ -1527,6 +1899,8 @@ public class RemoteBasesApplier : MonoBehaviour
             _slotHadSnapshot = new bool[slots.Count];
         if (_slotSnapshotCaches == null || _slotSnapshotCaches.Length != slots.Count)
             _slotSnapshotCaches = new SlotSnapshotCache[slots.Count];
+        if (_slotFallbackSnapshots == null || _slotFallbackSnapshots.Length != slots.Count)
+            _slotFallbackSnapshots = new BaseSnapshotDto[slots.Count];
         if (_slotModeState == null || _slotModeState.Length != slots.Count)
         {
             _slotModeState = new int[slots.Count];
@@ -1660,7 +2034,7 @@ public class RemoteBasesApplier : MonoBehaviour
         bigPet.ApplyRemoteState(snapshot.bigPet.id, snapshot.bigPet.lvl, snapshot.bigPet.xp, snapshot.bigPet.purchased);
     }
 
-    private void SpawnEgg(FieldCell cell, string id, BrainrotDinamicData dinamic)
+    private void SpawnEgg(FieldCell cell, string id, BrainrotDinamicData dinamic, long hatchingTimestamp)
     {
         if (string.IsNullOrEmpty(id))
             return;
@@ -1678,9 +2052,14 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
         }
 
-        var egg = Instantiate(prefab, cell.transform);
+        var egg = Instantiate(prefab, cell.transform, false);
+        AttachActorToCell(egg.transform, cell, Quaternion.identity);
         egg.SetData(dinamic);
         egg.OnInventoryAdd();
+        AttachActorToCell(egg.transform, cell, Quaternion.identity);
+        var info = egg.GetComponentInChildren<EggInfoUI>(true);
+        if (info != null)
+            info.SetRemoteView(true);
     }
 
     private void SpawnBrainrot(FieldCell cell, string id, BrainrotDinamicData dinamic, long incomeLastTime)
@@ -1701,12 +2080,24 @@ public class RemoteBasesApplier : MonoBehaviour
             return;
         }
 
-        var pet = Instantiate(prefab, cell.transform);
-        pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        var pet = Instantiate(prefab, cell.transform, false);
+        var localRotation = Quaternion.Euler(0f, 180f, 0f);
+        AttachActorToCell(pet.transform, cell, localRotation);
         pet.Init(dinamic, null, incomeLastTime);
+        AttachActorToCell(pet.transform, cell, localRotation);
         var info = pet.GetComponentInChildren<BrainrotInfoUI>(true);
         if (info != null)
             info.SetRemoteView(true);
+    }
+
+    private static void AttachActorToCell(Transform actor, FieldCell cell, Quaternion localRotation)
+    {
+        if (actor == null || cell == null)
+            return;
+
+        actor.SetParent(cell.transform, false);
+        actor.localPosition = Vector3.zero;
+        actor.localRotation = localRotation;
     }
 
     private void EnsureFieldIds(RemoteBaseSlot slot)
@@ -1756,6 +2147,8 @@ public class RemoteBasesApplier : MonoBehaviour
     {
         if (slots == null || slots.Count == 0) return;
         var localId = GetLocalPlayerId();
+        if (string.IsNullOrEmpty(localId) && _lobbyModeActive)
+            localId = OfflineLocalPlayerId;
         if (string.IsNullOrEmpty(localId)) return;
         var idx = GetLocalSlotIndex();
         if (idx < 0 || idx >= slots.Count) return;
@@ -1775,11 +2168,33 @@ public class RemoteBasesApplier : MonoBehaviour
             return _lastTeleportedSlotIndex;
         for (int i = 0; i < slots.Count; i++)
         {
-            if (slots[i].isLocalSlot) return i;
+            if (slots[i] != null && slots[i].isLocalSlot) return i;
         }
         var localId = GetLocalPlayerId();
-        if (string.IsNullOrEmpty(localId)) return -1;
-        return PreferredSlotIndex(localId);
+        if (!string.IsNullOrEmpty(localId) &&
+            !string.Equals(localId, OfflineLocalPlayerId, StringComparison.Ordinal))
+        {
+            var preferred = PreferredSlotIndex(localId);
+            if (preferred >= 0 && preferred < slots.Count)
+                return preferred;
+        }
+
+        return GetFallbackLocalSlotIndex();
+    }
+
+    private int GetFallbackLocalSlotIndex()
+    {
+        if (slots == null || slots.Count == 0)
+            return -1;
+
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            if (slot != null && slot.root != null)
+                return i;
+        }
+
+        return 0;
     }
 
     private bool IsLocalSlotIndex(int index)
@@ -1898,10 +2313,8 @@ public class RemoteBasesApplier : MonoBehaviour
         root = null;
         if (slots == null || slots.Count == 0)
             return false;
-        if (!_hasServerResolvedLocalSlot)
-            return false;
 
-        var idx = _serverLocalSlotIndex;
+        var idx = _hasServerResolvedLocalSlot ? _serverLocalSlotIndex : _lastPreparedLocalSlotIndex;
         if (idx < 0 || idx >= slots.Count)
             return false;
         if (_lastPreparedLocalSlotIndex != idx)
@@ -1925,6 +2338,27 @@ public class RemoteBasesApplier : MonoBehaviour
             return null;
 
         return GetSlotEntryPoint(idx);
+    }
+
+    private void EnsureLocalHomeMarker()
+    {
+        if (!showLocalHomeMarker)
+            return;
+
+        if (_localHomeMarker == null)
+        {
+            var markerObject = new GameObject("LocalHomeWorldMarker", typeof(RectTransform));
+            markerObject.transform.SetParent(transform, false);
+            _localHomeMarker = markerObject.AddComponent<LocalHomeWorldMarker>();
+        }
+
+        _localHomeMarker.Initialize(
+            this,
+            localHomeMarkerOffset,
+            localHomeMarkerIconSize,
+            localHomeMarkerWorldScale,
+            localHomeMarkerBobAmplitude,
+            localHomeMarkerBobSpeed);
     }
 
     public void ApplyFriendBase(BaseSnapshotDto snapshot, int slotIndex = 0)

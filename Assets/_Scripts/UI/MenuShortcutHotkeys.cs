@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -14,15 +15,20 @@ public class MenuShortcutHotkeys : MonoBehaviour
     [SerializeField] private AlbumScreenController albumScreen;
     [SerializeField] private KeyCode inventoryKey = KeyCode.Tab;
     [SerializeField] private KeyCode shopKey = KeyCode.B;
-    [SerializeField] private KeyCode albumKey = KeyCode.None;
+    [SerializeField] private KeyCode albumKey = KeyCode.C;
+    [SerializeField] private bool createMissingButtons;
+    [SerializeField] private bool updateKeyBadges;
     [SerializeField] private bool styleMenuButtons = true;
-    [SerializeField] private Vector2 menuButtonSize = new Vector2(98f, 98f);
-    [SerializeField] private float menuButtonSpacing = 10f;
-    [SerializeField] private Vector2 menuContainerOffset = new Vector2(14f, -125f);
-    [SerializeField] private float menuIconSize = 68f;
+    [SerializeField] private bool applyMenuLayout;
+    [SerializeField] private Vector2 menuButtonSize = new Vector2(124f, 124f);
+    [SerializeField] private float menuButtonSpacing = 12f;
+    [SerializeField] private Vector2 menuContainerOffset = new Vector2(18f, -450f);
+    [SerializeField] private float menuIconSize = 64f;
     [SerializeField] private Sprite inventoryIconSprite;
     [SerializeField] private Sprite shopIconSprite;
     [SerializeField] private Sprite albumIconSprite;
+
+    private int _styleRefreshFrames;
 
     private enum MenuIcon
     {
@@ -31,6 +37,10 @@ public class MenuShortcutHotkeys : MonoBehaviour
         Album
     }
 
+    private const string KeyBadgeName = "KeyBadge";
+    private const string TitleLabelName = "TitleLabel";
+    private const string ShortcutBadgeName = "ShortcutBadge";
+    private const float MenuIconExpandedSize = 92f;
     private static readonly Dictionary<string, Sprite> SpriteCache = new();
 
     private void Start()
@@ -43,7 +53,23 @@ public class MenuShortcutHotkeys : MonoBehaviour
         if (styleMenuButtons)
             StyleMenuButtons();
 
+        if (updateKeyBadges)
+            UpdateKeyBadges();
+
         RegisterAlbumButton();
+        _styleRefreshFrames = 3;
+    }
+
+    private void LateUpdate()
+    {
+        if (_styleRefreshFrames <= 0)
+            return;
+
+        _styleRefreshFrames--;
+        if (styleMenuButtons)
+            StyleMenuButtons();
+        if (updateKeyBadges)
+            UpdateKeyBadges();
     }
 
     private void Update()
@@ -82,11 +108,14 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
     private void EnsureInventoryButton()
     {
-        if (inventoryButton == null)
+        if (inventoryButton == null && createMissingButtons)
             inventoryButton = CreateMenuButton("InventoryButton");
 
         if (inventoryButton == null)
+        {
+            Debug.LogWarning("[MenuShortcutHotkeys] InventoryButton is missing in prefab.");
             return;
+        }
 
         if (inventoryButton.onClick.GetPersistentEventCount() > 0)
             return;
@@ -97,11 +126,14 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
     private void EnsureShopButton()
     {
-        if (shopButton == null)
+        if (shopButton == null && createMissingButtons)
             shopButton = CreateMenuButton("ShopButton");
 
         if (shopButton == null)
+        {
+            Debug.LogWarning("[MenuShortcutHotkeys] ShopButton is missing in prefab.");
             return;
+        }
 
         if (shopButton.onClick.GetPersistentEventCount() > 0)
             return;
@@ -112,11 +144,14 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
     private void EnsureAlbumButton()
     {
-        if (albumButton == null)
+        if (albumButton == null && createMissingButtons)
             albumButton = CreateMenuButton("AlbumButton");
 
         if (albumButton == null)
+        {
+            Debug.LogWarning("[MenuShortcutHotkeys] AlbumButton is missing in prefab.");
             return;
+        }
 
         albumButton.onClick.RemoveListener(ToggleAlbum);
         albumButton.onClick.AddListener(ToggleAlbum);
@@ -241,71 +276,175 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
     private void StyleMenuButtons()
     {
-        var layout = GetComponent<VerticalLayoutGroup>();
-        if (layout != null)
+        bool shouldApplyLayout = applyMenuLayout || createMissingButtons;
+        RectTransform rect = transform as RectTransform;
+
+        if (shouldApplyLayout)
         {
-            layout.spacing = menuButtonSpacing;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
+            var layout = GetComponent<VerticalLayoutGroup>();
+            if (layout != null)
+            {
+                layout.spacing = menuButtonSpacing;
+                layout.enabled = false;
+                layout.childControlWidth = false;
+                layout.childControlHeight = false;
+                layout.childForceExpandWidth = false;
+                layout.childForceExpandHeight = false;
+            }
+
+            if (rect != null)
+            {
+                float height = menuButtonSize.y * 3f + menuButtonSpacing * 2f;
+                Vector2 anchoredPosition = menuContainerOffset;
+                var parentRect = rect.parent as RectTransform;
+                if (parentRect != null)
+                {
+                    Rect parentBounds = parentRect.rect;
+                    if (parentBounds.width > menuButtonSize.x + 16f)
+                        anchoredPosition.x = Mathf.Clamp(anchoredPosition.x, 8f, parentBounds.width - menuButtonSize.x - 8f);
+
+                    if (parentBounds.height > height + 16f)
+                        anchoredPosition.y = Mathf.Clamp(anchoredPosition.y, -parentBounds.height + height + 8f, -8f);
+                }
+
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.sizeDelta = new Vector2(menuButtonSize.x, height);
+                rect.anchoredPosition = anchoredPosition;
+            }
         }
 
-        var rect = transform as RectTransform;
-        if (rect != null)
-        {
-            float height = menuButtonSize.y * 3f + menuButtonSpacing * 2f;
-            rect.sizeDelta = new Vector2(menuButtonSize.x, height);
-            rect.anchoredPosition = menuContainerOffset;
-        }
+        StyleButton(inventoryButton, MenuIcon.Inventory, new Color(0.18f, 0.67f, 0.74f, 1f), inventoryKey, 0, shouldApplyLayout);
+        StyleButton(shopButton, MenuIcon.Shop, new Color(1f, 0.66f, 0.18f, 1f), shopKey, 1, shouldApplyLayout);
+        StyleButton(albumButton, MenuIcon.Album, new Color(0.54f, 0.38f, 0.9f, 1f), albumKey, 2, shouldApplyLayout);
 
-        StyleButton(inventoryButton, MenuIcon.Inventory, new Color(0.18f, 0.67f, 0.74f, 1f));
-        StyleButton(shopButton, MenuIcon.Shop, new Color(1f, 0.66f, 0.18f, 1f));
-        StyleButton(albumButton, MenuIcon.Album, new Color(0.54f, 0.38f, 0.9f, 1f));
+        if (shouldApplyLayout && rect != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
     }
 
-    private void StyleButton(Button button, MenuIcon icon, Color backgroundColor)
+    private void StyleButton(Button button, MenuIcon icon, Color backgroundColor, KeyCode key, int index, bool applyLayout)
     {
         if (button == null)
             return;
 
         var rect = button.transform as RectTransform;
-        if (rect != null)
+        if (applyLayout && rect != null)
         {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -index * (menuButtonSize.y + menuButtonSpacing));
             rect.sizeDelta = menuButtonSize;
             rect.localScale = Vector3.one;
         }
 
-        var layoutElement = GetOrAdd<LayoutElement>(button.gameObject);
-        layoutElement.minWidth = menuButtonSize.x;
-        layoutElement.minHeight = menuButtonSize.y;
-        layoutElement.preferredWidth = menuButtonSize.x;
-        layoutElement.preferredHeight = menuButtonSize.y;
-        layoutElement.flexibleWidth = 0f;
-        layoutElement.flexibleHeight = 0f;
+        if (applyLayout)
+        {
+            var layoutElement = GetOrAdd<LayoutElement>(button.gameObject);
+            layoutElement.ignoreLayout = true;
+            layoutElement.minWidth = menuButtonSize.x;
+            layoutElement.minHeight = menuButtonSize.y;
+            layoutElement.preferredWidth = menuButtonSize.x;
+            layoutElement.preferredHeight = menuButtonSize.y;
+            layoutElement.flexibleWidth = 0f;
+            layoutElement.flexibleHeight = 0f;
+        }
 
         var background = button.targetGraphic as Image;
         if (background == null)
             background = GetOrAdd<Image>(button.gameObject);
 
-        background.sprite = GetButtonBackgroundSprite();
-        background.type = Image.Type.Sliced;
-        background.pixelsPerUnitMultiplier = 2f;
-        background.color = backgroundColor;
+        if (background.sprite == null)
+            BlockyUITheme.ApplyPanel(background, backgroundColor, true);
         background.raycastTarget = true;
         button.targetGraphic = background;
 
-        var shadow = GetOrAdd<Shadow>(button.gameObject);
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
-        shadow.effectDistance = new Vector2(0f, -3f);
+        var shadow = GetOrAddShadow(button.gameObject);
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.36f);
+        shadow.effectDistance = new Vector2(0f, -4f);
+        shadow.useGraphicAlpha = true;
 
         var outline = GetOrAdd<Outline>(button.gameObject);
-        outline.effectColor = new Color(1f, 1f, 1f, 0.32f);
-        outline.effectDistance = new Vector2(2f, -2f);
+        outline.effectColor = BlockyUITheme.BlackStroke;
+        outline.effectDistance = new Vector2(3f, -3f);
+        outline.useGraphicAlpha = true;
 
         ConfigureButtonColors(button);
-        HideTextChildren(button.transform);
-        SetIcon(button.transform, icon, menuIconSize, GetConfiguredIcon(icon));
+        HideNonMenuTextChildren(button.transform);
+        HideMenuLabel(button.transform);
+        SetIcon(button.transform, icon, Mathf.Max(menuIconSize, MenuIconExpandedSize), GetConfiguredIcon(icon));
+        EnsureShortcutBadge(button.transform, GetKeyLabel(key));
+        HideKeyBadge(button.transform);
+
+        if (button.GetComponent<BlockyUIButtonFeedback>() == null)
+            button.gameObject.AddComponent<BlockyUIButtonFeedback>();
+    }
+
+    private void UpdateKeyBadges()
+    {
+        UpdateKeyBadge(inventoryButton, inventoryKey);
+        UpdateKeyBadge(shopButton, shopKey);
+        UpdateKeyBadge(albumButton, albumKey);
+    }
+
+    private static void UpdateKeyBadge(Button button, KeyCode key)
+    {
+        if (button == null)
+            return;
+
+        Transform badge = EnsureKeyBadge(button.transform);
+
+        string label = GetKeyLabel(key);
+        bool visible = !string.IsNullOrEmpty(label);
+        badge.gameObject.SetActive(visible);
+        if (!visible)
+            return;
+
+        badge.SetAsLastSibling();
+
+        Text legacyText = badge.GetComponentInChildren<Text>(true);
+        if (legacyText != null)
+        {
+            legacyText.text = label;
+            legacyText.gameObject.SetActive(true);
+            legacyText.fontStyle = FontStyle.Bold;
+            legacyText.color = Color.white;
+            legacyText.fontSize = Mathf.Max(legacyText.fontSize, 15);
+            legacyText.alignment = TextAnchor.MiddleCenter;
+            legacyText.raycastTarget = false;
+        }
+
+        TMP_Text tmpText = badge.GetComponentInChildren<TMP_Text>(true);
+        if (tmpText != null)
+        {
+            tmpText.text = label;
+            tmpText.gameObject.SetActive(true);
+            tmpText.fontStyle |= FontStyles.Bold;
+            tmpText.color = Color.white;
+            tmpText.fontSize = Mathf.Max(tmpText.fontSize, 15f);
+            tmpText.alignment = TextAlignmentOptions.Center;
+            tmpText.raycastTarget = false;
+        }
+
+        StyleKeyBadge(badge, label);
+    }
+
+    private static string GetKeyLabel(KeyCode key)
+    {
+        if (key == KeyCode.None)
+            return string.Empty;
+
+        if (key == KeyCode.Tab)
+            return "TAB";
+
+        if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9)
+            return ((int)key - (int)KeyCode.Alpha0).ToString(CultureInfo.InvariantCulture);
+
+        if (key >= KeyCode.Keypad0 && key <= KeyCode.Keypad9)
+            return ((int)key - (int)KeyCode.Keypad0).ToString(CultureInfo.InvariantCulture);
+
+        return key.ToString().ToUpperInvariant();
     }
 
     private static GameObject EnsureMentionBadge(Transform buttonTransform)
@@ -325,8 +464,8 @@ public class MenuShortcutHotkeys : MonoBehaviour
         rect.anchorMin = new Vector2(1f, 1f);
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(-12f, -12f);
-        rect.sizeDelta = new Vector2(24f, 24f);
+        rect.anchoredPosition = new Vector2(-13f, -13f);
+        rect.sizeDelta = new Vector2(26f, 26f);
         rect.SetAsLastSibling();
 
         var image = GetOrAdd<Image>(badgeTransform.gameObject);
@@ -368,13 +507,256 @@ public class MenuShortcutHotkeys : MonoBehaviour
         button.transition = Selectable.Transition.ColorTint;
     }
 
-    private static void HideTextChildren(Transform root)
+    private static void HideNonMenuTextChildren(Transform root)
     {
         foreach (var text in root.GetComponentsInChildren<Text>(true))
+        {
+            if (IsMenuText(text.transform))
+                continue;
+
             text.gameObject.SetActive(false);
+        }
 
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (IsMenuText(text.transform))
+                continue;
+
             text.gameObject.SetActive(false);
+        }
+    }
+
+    private static bool IsMenuText(Transform transform)
+    {
+        while (transform != null)
+        {
+            if (transform.name == ShortcutBadgeName)
+                return true;
+
+            transform = transform.parent;
+        }
+
+        return false;
+    }
+
+    private static bool IsInsideKeyBadge(Transform transform)
+    {
+        while (transform != null)
+        {
+            if (transform.name == KeyBadgeName)
+                return true;
+
+            transform = transform.parent;
+        }
+
+        return false;
+    }
+
+    private static Transform EnsureKeyBadge(Transform buttonTransform)
+    {
+        Transform badge = buttonTransform.Find(KeyBadgeName);
+        if (badge != null)
+            return badge;
+
+        var badgeObject = new GameObject(KeyBadgeName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        badgeObject.transform.SetParent(buttonTransform, false);
+        badge = badgeObject.transform;
+
+        var textObject = new GameObject("Text (Legacy)", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        textObject.transform.SetParent(badge, false);
+
+        var textRect = textObject.transform as RectTransform;
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(2f, 1f);
+        textRect.offsetMax = new Vector2(-2f, -1f);
+
+        var text = textObject.GetComponent<Text>();
+        text.font = ResolveFont(buttonTransform);
+        text.alignment = TextAnchor.MiddleCenter;
+        text.fontStyle = FontStyle.Bold;
+        text.fontSize = 15;
+        text.color = Color.white;
+        text.raycastTarget = false;
+        text.supportRichText = true;
+
+        var outline = GetOrAdd<Outline>(textObject);
+        outline.effectColor = Color.black;
+        outline.effectDistance = new Vector2(1f, -1f);
+        outline.useGraphicAlpha = true;
+
+        return badge;
+    }
+
+    private static void HideKeyBadge(Transform buttonTransform)
+    {
+        Transform badge = buttonTransform.Find(KeyBadgeName);
+        if (badge != null)
+            badge.gameObject.SetActive(false);
+    }
+
+    private static void HideMenuLabel(Transform buttonTransform)
+    {
+        Transform label = buttonTransform.Find(TitleLabelName);
+        if (label != null)
+            label.gameObject.SetActive(false);
+    }
+
+    private static void StyleKeyBadge(Transform badge, string label)
+    {
+        if (badge == null)
+            return;
+
+        var rect = badge as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(1f, 0f);
+            rect.anchoredPosition = new Vector2(-7f, 7f);
+            rect.sizeDelta = new Vector2(label.Length >= 3 ? 56f : 38f, 24f);
+            rect.SetAsLastSibling();
+        }
+
+        var image = badge.GetComponent<Image>();
+        if (image != null)
+        {
+            if (image.sprite == null)
+                image.sprite = GetButtonBackgroundSprite();
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = Mathf.Max(1f, image.pixelsPerUnitMultiplier);
+            image.color = new Color(0.10f, 0.08f, 0.065f, 0.92f);
+            image.raycastTarget = false;
+        }
+
+        var outline = GetOrAdd<Outline>(badge.gameObject);
+        outline.effectColor = new Color(0f, 0f, 0f, 1f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        outline.useGraphicAlpha = true;
+    }
+
+    private static void EnsureMenuLabel(Transform buttonTransform, string label)
+    {
+        Transform labelTransform = buttonTransform.Find(TitleLabelName);
+        if (labelTransform == null)
+        {
+            var labelObject = new GameObject(TitleLabelName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            labelObject.transform.SetParent(buttonTransform, false);
+            labelTransform = labelObject.transform;
+        }
+
+        var rect = labelTransform as RectTransform;
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.offsetMin = new Vector2(4f, 27f);
+        rect.offsetMax = new Vector2(-4f, 50f);
+        rect.SetAsLastSibling();
+
+        Text legacyText = labelTransform.GetComponent<Text>();
+        if (legacyText == null)
+            legacyText = labelTransform.gameObject.AddComponent<Text>();
+
+        legacyText.text = label;
+        legacyText.font = legacyText.font != null ? legacyText.font : ResolveFont(buttonTransform);
+        legacyText.fontStyle = FontStyle.Bold;
+        legacyText.fontSize = 16;
+        legacyText.resizeTextForBestFit = true;
+        legacyText.resizeTextMinSize = 10;
+        legacyText.resizeTextMaxSize = 17;
+        legacyText.alignment = TextAnchor.MiddleCenter;
+        legacyText.color = Color.white;
+        legacyText.lineSpacing = 1f;
+        legacyText.raycastTarget = false;
+        legacyText.supportRichText = true;
+        legacyText.alignByGeometry = true;
+
+        var outline = GetOrAdd<Outline>(labelTransform.gameObject);
+        outline.effectColor = Color.black;
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        outline.useGraphicAlpha = true;
+
+        var shadow = GetOrAddShadow(labelTransform.gameObject);
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+        shadow.effectDistance = new Vector2(0f, -1.5f);
+        shadow.useGraphicAlpha = true;
+    }
+
+    private static void EnsureShortcutBadge(Transform buttonTransform, string keyLabel)
+    {
+        Transform badge = buttonTransform.Find(ShortcutBadgeName);
+        if (badge == null)
+        {
+            var badgeObject = new GameObject(ShortcutBadgeName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            badgeObject.transform.SetParent(buttonTransform, false);
+            badge = badgeObject.transform;
+
+            var textObject = new GameObject("Text (Legacy)", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            textObject.transform.SetParent(badge, false);
+
+            var textRect = textObject.transform as RectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(3f, 1f);
+            textRect.offsetMax = new Vector2(-3f, -1f);
+        }
+
+        bool visible = !string.IsNullOrEmpty(keyLabel);
+        badge.gameObject.SetActive(visible);
+        if (!visible)
+            return;
+
+        var rect = badge as RectTransform;
+        rect.anchorMin = new Vector2(0.5f, 0f);
+        rect.anchorMax = new Vector2(0.5f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = new Vector2(0f, 6f);
+        rect.sizeDelta = new Vector2(keyLabel.Length >= 3 ? 58f : 42f, 22f);
+        rect.SetAsLastSibling();
+
+        Image image = badge.GetComponent<Image>();
+        if (image != null)
+        {
+            image.enabled = false;
+            image.raycastTarget = false;
+        }
+
+        Outline outline = badge.GetComponent<Outline>();
+        if (outline != null)
+            outline.enabled = false;
+
+        Text text = badge.GetComponentInChildren<Text>(true);
+        if (text != null)
+        {
+            text.gameObject.SetActive(true);
+            text.text = $"[{keyLabel}]";
+            text.font = text.font != null ? text.font : ResolveFont(buttonTransform);
+            text.fontStyle = FontStyle.Bold;
+            text.fontSize = 15;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 10;
+            text.resizeTextMaxSize = 16;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.raycastTarget = false;
+            text.alignByGeometry = true;
+
+            var textOutline = GetOrAdd<Outline>(text.gameObject);
+            textOutline.effectColor = Color.black;
+            textOutline.effectDistance = new Vector2(1.5f, -1.5f);
+            textOutline.useGraphicAlpha = true;
+        }
+    }
+
+    private static string GetMenuLabel(MenuIcon icon)
+    {
+        return icon switch
+        {
+            MenuIcon.Inventory => "\u0418\u041d\u0412\u0415\u041d\u0422\u0410\u0420\u042c",
+            MenuIcon.Shop => "\u041c\u0410\u0413\u0410\u0417\u0418\u041d",
+            MenuIcon.Album => "\u0410\u041b\u042c\u0411\u041e\u041c",
+            _ => string.Empty
+        };
     }
 
     private static void SetIcon(Transform buttonTransform, MenuIcon icon, float iconSize, Sprite configuredSprite)
@@ -395,7 +777,7 @@ public class MenuShortcutHotkeys : MonoBehaviour
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = Vector2.zero;
+        rect.anchoredPosition = new Vector2(0f, 7f);
         rect.sizeDelta = new Vector2(iconSize, iconSize);
         rect.SetAsLastSibling();
 
@@ -405,9 +787,38 @@ public class MenuShortcutHotkeys : MonoBehaviour
         iconImage.color = Color.white;
         iconImage.raycastTarget = false;
 
-        var shadow = GetOrAdd<Shadow>(iconImage.gameObject);
+        var outline = GetOrAdd<Outline>(iconImage.gameObject);
+        outline.effectColor = new Color(0f, 0f, 0f, 0.92f);
+        outline.effectDistance = new Vector2(2.5f, -2.5f);
+        outline.useGraphicAlpha = true;
+
+        var shadow = GetOrAddShadow(iconImage.gameObject);
         shadow.effectColor = new Color(0f, 0f, 0f, 0.38f);
         shadow.effectDistance = new Vector2(0f, -3f);
+    }
+
+    private static Font ResolveFont(Transform root)
+    {
+        if (root != null)
+        {
+            var text = root.GetComponentInChildren<Text>(true);
+            if (text != null && text.font != null)
+                return text.font;
+        }
+
+        return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    }
+
+    private static Shadow GetOrAddShadow(GameObject gameObject)
+    {
+        var shadows = gameObject.GetComponents<Shadow>();
+        for (int i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] != null && !(shadows[i] is Outline))
+                return shadows[i];
+        }
+
+        return gameObject.AddComponent<Shadow>();
     }
 
     private static T GetOrAdd<T>(GameObject gameObject) where T : Component

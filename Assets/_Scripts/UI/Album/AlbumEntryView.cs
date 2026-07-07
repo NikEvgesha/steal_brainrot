@@ -16,6 +16,7 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Color lockedColor = new Color(0f, 0f, 0f, 0.92f);
     [SerializeField] private bool enforcePreferredSize = true;
     [SerializeField] private Vector2 preferredSize = new Vector2(156f, 156f);
+    [SerializeField] private bool applyRuntimeBlockyStyle = false;
 
     private Action _onClick;
     private int _lastClickFrame = -1;
@@ -42,7 +43,7 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
             button.onClick.RemoveListener(OnClicked);
     }
 
-    public void Bind(Sprite icon, string title, bool unlocked, bool selected, bool hasMention, Action onClick)
+    public void Bind(Sprite icon, string title, bool unlocked, bool selected, bool hasMention, Action onClick, RareType rareType = RareType.Common)
     {
         _onClick = onClick;
 
@@ -78,6 +79,8 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
             selectedFrame.raycastTarget = false;
         }
 
+        if (applyRuntimeBlockyStyle)
+            BlockyUITheme.StyleCard(gameObject, rareType, selected);
         EnsureButtonPointerPassThrough();
     }
 

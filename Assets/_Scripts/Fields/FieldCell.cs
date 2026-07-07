@@ -18,6 +18,10 @@ public class FieldCell : MonoBehaviour
     [SerializeField] private GameObject _dropButton;
     [SerializeField] private GameObject _addSpeedButton;
     [SerializeField] private GameObject _hatchButton;
+    [SerializeField] private Sprite _speedBoostAdIcon;
+    [SerializeField] private string _speedBoostAdLabel = "-30";
+    [SerializeField] private Vector2 _speedBoostAdBadgeSize = new Vector2(42f, 42f);
+    [SerializeField] private Vector2 _speedBoostAdBadgeOffset = new Vector2(10f, -8f);
 
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
@@ -31,10 +35,20 @@ public class FieldCell : MonoBehaviour
     private Brainrot _currentPet;
     private Coroutine _saveCoroutine;
     private bool _remoteMode;
+    private bool _quickAccessBound;
 
     private bool _playerOnCell;
     public string Id { get { return _id; } }
-    public Brainrot CurrentBrainrot => _currentPet;
+    public Brainrot CurrentBrainrot
+    {
+        get
+        {
+            if (_currentPet == null && _inField == Item.Brainrot)
+                _currentPet = GetComponentInChildren<Brainrot>(true);
+
+            return _currentPet;
+        }
+    }
     public bool IsRemoteMode
     {
         get
@@ -56,6 +70,11 @@ public class FieldCell : MonoBehaviour
         //}
     }
 
+    private void OnDisable()
+    {
+        UnbindQuickAccess();
+    }
+
     public void _OnPlayerEnter()
     {
         if (_locked || IsRemoteMode)
@@ -65,10 +84,8 @@ public class FieldCell : MonoBehaviour
         }
 
         //TestBackpackBrainrot.Instance.SwichItem.AddListener(CheckPlayer);
-        G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
+        BindQuickAccess();
         //TestBackpackBrainrot.Instance.PlaceItem.AddListener(UpdateFieldItem);
-        G.QuickAccess.PlaceItem.AddListener(UpdateFieldItem);
-        
         _playerOnCell = true;
         CheckPlayer();
         PlayerEnter?.Invoke();
@@ -76,6 +93,7 @@ public class FieldCell : MonoBehaviour
     public void CheckPlayer(InventoryItem item=null)
     {
         HideInteractionButtons();
+        if (G.QuickAccess == null) return;
         if (!_playerOnCell || IsRemoteMode) return;
         switch (_inField)
         {
@@ -87,7 +105,14 @@ public class FieldCell : MonoBehaviour
                 {
                     case EggStatus.Maturing:
                         _addSpeedButton.SetActive(true);
-                        SetPanelRewardedAdBadge(_addSpeedButton, true);
+                        SetPanelRewardedAdBadge(
+                            _addSpeedButton,
+                            true,
+                            _speedBoostAdIcon,
+                            _speedBoostAdLabel,
+                            _addSpeedButton.transform,
+                            _speedBoostAdBadgeSize,
+                            _speedBoostAdBadgeOffset);
                         break;
                     case EggStatus.ReadyToHatch:
                         _hatchButton.SetActive(true);
@@ -109,6 +134,7 @@ public class FieldCell : MonoBehaviour
     }
     private void FieldFree()
     {
+        if (G.QuickAccess == null) return;
         switch (G.QuickAccess.CheckHand())
         {
             case Item.Egg:
@@ -148,8 +174,7 @@ public class FieldCell : MonoBehaviour
     }
     public void _OnPlayerExit()
     {
-        G.QuickAccess.PlaceItem.RemoveListener(UpdateFieldItem);
-        G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
+        UnbindQuickAccess();
         HideInteractionButtons();
         _playerOnCell = false;
         PlayerExit?.Invoke();
@@ -160,6 +185,7 @@ public class FieldCell : MonoBehaviour
     }
     public void _Drop()
     {
+        if (G.QuickAccess == null) return;
         G.QuickAccess.DropCurrent(this);
         //TestBackpackBrainrot.Instance.Drop(this);
     }
@@ -186,6 +212,7 @@ public class FieldCell : MonoBehaviour
         if (_remoteMode)
         {
             _playerOnCell = false;
+            UnbindQuickAccess();
             HideInteractionButtons();
         }
         else
@@ -193,6 +220,30 @@ public class FieldCell : MonoBehaviour
             if (_playerOnCell)
                 CheckPlayer();
         }
+    }
+
+    private void BindQuickAccess()
+    {
+        if (_quickAccessBound || G.QuickAccess == null)
+            return;
+
+        G.QuickAccess.SwitchActiveItem.AddListener(CheckPlayer);
+        G.QuickAccess.PlaceItem.AddListener(UpdateFieldItem);
+        _quickAccessBound = true;
+    }
+
+    private void UnbindQuickAccess()
+    {
+        if (!_quickAccessBound)
+            return;
+
+        if (G.QuickAccess != null)
+        {
+            G.QuickAccess.PlaceItem.RemoveListener(UpdateFieldItem);
+            G.QuickAccess.SwitchActiveItem.RemoveListener(CheckPlayer);
+        }
+
+        _quickAccessBound = false;
     }
 
     public void SaveData()
@@ -236,6 +287,8 @@ public class FieldCell : MonoBehaviour
     public void SetLoadedData(string id)
     {
         _id = id;
+        ClearLoadedActors();
+
         CellSaveData data = G.Save.LoadCellData(_id);
 
         if (data == null || data.Status == Item.Free) return;
@@ -246,30 +299,38 @@ public class FieldCell : MonoBehaviour
                 if (prefabEgg == null)
                 {
                     Debug.LogWarning($"[FieldCell] Skipping saved egg '{data.ID}' for cell '{_id}': prefab was not found.");
+                    ClearSavedData();
                     return;
                 }
 
-                Egg egg = Instantiate(prefabEgg, transform);
+                Egg egg = Instantiate(prefabEgg, transform, false);
+                AttachLoadedActor(egg.transform, Quaternion.identity);
                 egg.SetData(data.DinamicData);
                 egg.InitTimer(this, DateTimeOffset.FromUnixTimeSeconds(data.HatchingTimestamp));
+                _currentEgg = egg;
+                _currentPet = null;
                 break;
             case Item.Brainrot:
                 Brainrot prefabPet = G.Storage.GetPet(data.ID);
                 if (prefabPet == null)
                 {
                     Debug.LogWarning($"[FieldCell] Skipping saved brainrot '{data.ID}' for cell '{_id}': prefab was not found.");
+                    ClearSavedData();
                     return;
                 }
 
-                Brainrot pet = Instantiate(prefabPet, transform);
-                pet.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                Brainrot pet = Instantiate(prefabPet, transform, false);
+                AttachLoadedActor(pet.transform, Quaternion.Euler(0f, 180f, 0f));
                 pet.Init(data.DinamicData, this, data.IncomeLastTime);
+                AttachLoadedActor(pet.transform, Quaternion.Euler(0f, 180f, 0f));
+                _currentEgg = null;
+                _currentPet = pet;
                 break;
             default:
                 return;
         }
-        UpdateFieldItem(data.Status);
-
+        _inField = data.Status;
+        CheckPlayer();
     }
 
     public void SetId(string id)
@@ -304,6 +365,25 @@ public class FieldCell : MonoBehaviour
         _inField = Item.Free;
     }
 
+    private void AttachLoadedActor(Transform actor, Quaternion localRotation)
+    {
+        if (actor == null)
+            return;
+
+        actor.SetParent(transform, false);
+        actor.localPosition = Vector3.zero;
+        actor.localRotation = localRotation;
+    }
+
+    private void ClearSavedData()
+    {
+        _currentEgg = null;
+        _currentPet = null;
+        _inField = Item.Free;
+        if (G.Save != null)
+            G.Save.SaveCellData(_id, new CellSaveData { Status = Item.Free });
+    }
+
     private void HideInteractionButtons()
     {
         if (_dropButton != null) _dropButton.SetActive(false);
@@ -313,7 +393,14 @@ public class FieldCell : MonoBehaviour
         if (_hatchButton != null) _hatchButton.SetActive(false);
     }
 
-    private static void SetPanelRewardedAdBadge(GameObject buttonRoot, bool visible)
+    private static void SetPanelRewardedAdBadge(
+        GameObject buttonRoot,
+        bool visible,
+        Sprite sprite = null,
+        string label = null,
+        Transform badgeParent = null,
+        Vector2? size = null,
+        Vector2? offset = null)
     {
         if (buttonRoot == null)
             return;
@@ -323,6 +410,6 @@ public class FieldCell : MonoBehaviour
             panel = buttonRoot.GetComponentInChildren<InteractionPanel>(true);
 
         if (panel != null)
-            panel.SetRewardedAdBadgeVisible(visible);
+            panel.ConfigureRewardedAdBadge(visible, sprite, label, badgeParent, size, offset);
     }
 }

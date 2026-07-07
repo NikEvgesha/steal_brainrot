@@ -39,13 +39,15 @@ public class SpecialShop : MonoBehaviour
     private void Start()
     {
         InitSlots();
+        ApplyBlockyStyle();
         G.Purchases?.RestorePurchases();
         G.Currency.NoGems.AddListener(ToggleOpen);
     }
 
     private void OnDisable()
     {
-        G.Currency.NoGems.RemoveListener(ToggleOpen);
+        if (G.Currency != null)
+            G.Currency.NoGems.RemoveListener(ToggleOpen);
     }
 
     public void InitSlots()
@@ -92,6 +94,7 @@ public class SpecialShop : MonoBehaviour
         G.Control.CursorActive = _isOpen;
         if (_isOpen)
         {
+            ApplyBlockyStyle();
             G.Currency.ShowGems?.Invoke(true);
             G.Input.AOpenWindow?.Invoke(this);
         }
@@ -172,5 +175,10 @@ public class SpecialShop : MonoBehaviour
             GiveReward(_pendingRestoredPurchaseIds[i]);
 
         _pendingRestoredPurchaseIds.Clear();
+    }
+
+    private void ApplyBlockyStyle()
+    {
+        BlockyUITheme.StyleShopWindow(_shopCanvas);
     }
 }

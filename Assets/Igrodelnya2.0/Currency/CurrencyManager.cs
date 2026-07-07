@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
@@ -52,14 +53,31 @@ public class CurrencyManager : MonoBehaviour
 
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
+        yield return WaitForSaveReady();
+
+        if (G.Save == null)
+        {
+            Debug.LogWarning("[CurrencyManager] SaveManager is missing; currency will use runtime defaults only.");
+            AddCurrency(CurrencyType.Coins, StartCoinsAmount);
+            yield break;
+        }
+
         double coins = G.Save.LoadGameCoin();
         if (coins == -1)
             AddCurrency(CurrencyType.Coins, StartCoinsAmount);
         else
             AddCurrency(CurrencyType.Coins, coins);
         AddCurrency(CurrencyType.Gems, G.Save.GetGems());
+    }
+
+    private static IEnumerator WaitForSaveReady()
+    {
+        const float timeoutSeconds = 8f;
+        float startedAt = Time.realtimeSinceStartup;
+        while ((G.Save == null || !G.Save.IsReady) && Time.realtimeSinceStartup - startedAt < timeoutSeconds)
+            yield return null;
     }
 
 
@@ -79,9 +97,9 @@ public class CurrencyManager : MonoBehaviour
         _balance[type] = (double.IsInfinity(_balance[type])) ? float.MaxValue : _balance[type];
         CurrencyChanged?.Invoke(type, _balance[type]);
         if (type == CurrencyType.Gems)
-            G.Save.SaveGems(_balance[type]);
+            G.Save?.SaveGems(_balance[type]);
         else
-            G.Save.SaveGameCoin(_balance[type]);
+            G.Save?.SaveGameCoin(_balance[type]);
     }
 
     public bool RemoveCurrency(CurrencyType type, double amount)
@@ -95,9 +113,9 @@ public class CurrencyManager : MonoBehaviour
             _balance[type] -= amount;
             CurrencyChanged?.Invoke(type, _balance[type]);
             if (type == CurrencyType.Gems)
-                G.Save.SaveGems(_balance[type]);
+                G.Save?.SaveGems(_balance[type]);
             else
-                G.Save.SaveGameCoin(_balance[type]);
+                G.Save?.SaveGameCoin(_balance[type]);
             return true;
         }
         if (type == CurrencyType.Gems)

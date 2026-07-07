@@ -1068,10 +1068,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1115898313303547428}
-  - component: {fileID: 1287431387033070787}
-  - component: {fileID: 1120791106242497022}
   - component: {fileID: 8053021798084193882}
   - component: {fileID: 4939283603191690070}
+  - component: {fileID: 4443072530247586859}
   m_Layer: 0
   m_Name: cards
   m_TagString: Untagged
@@ -1098,49 +1097,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0.021240234, y: -0.94400024}
   m_SizeDelta: {x: 0.04248, y: -2.054}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1287431387033070787
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1680082397450902821}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.VerticalLayoutGroup
-  m_Padding:
-    m_Left: 0
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
---- !u!114 &1120791106242497022
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1680082397450902821}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c795bd3b7bc152489293c6243862703, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DynamicGridSpawner
-  maxItemsPerRow: 5
-  rowPrefab: {fileID: 980322484334653940, guid: ee18dc0e9188ffe418c5118a9cf5db9d, type: 3}
-  compactLayout: 0
-  horizontalSpacing: 8
-  verticalSpacing: 8
 --- !u!222 &8053021798084193882
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1179,6 +1135,51 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &4443072530247586859
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1680082397450902821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7833c8ae1a4659408deaca108f64932, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AdaptiveGridSpawner
+  itemPrefab: {fileID: 5682552337085319474, guid: ecee204ce9d1557409a634bbd94ee97d, type: 3}
+  skipPrefabWhenItIsChild: 1
+  includeInactiveChildren: 0
+  sizingMode: 1
+  startCorner: 0
+  fillDirection: 0
+  padding:
+    m_Left: 10
+    m_Right: 10
+    m_Top: 10
+    m_Bottom: 10
+  spacing: {x: 12, y: 12}
+  paddingUnits: 1
+  paddingPercent:
+    Left: 1.2
+    Right: 1.2
+    Top: 1.6
+    Bottom: 1.6
+  spacingUnits: 1
+  spacingPercent: {x: 1.4, y: 1.8}
+  fixedCellSize: {x: 120, y: 120}
+  hideFixedOverflow: 1
+  targetItemCount: 0
+  preferredColumns: 5
+  preferredRows: 0
+  preserveAspectRatio: 1
+  cellAspectRatio: 1
+  minCellSize: {x: 95, y: 95}
+  maxCellSize: {x: 145, y: 145}
+  allowBelowMinWhenNeeded: 1
+  rebuildOnEnable: 1
+  rebuildOnRectChange: 1
+  deferRuntimeRebuildOneFrame: 0
 --- !u!1 &1800135290888220685
 GameObject:
   m_ObjectHideFlags: 0
@@ -3938,14 +3939,21 @@ MonoBehaviour:
   eggsTabButton: {fileID: 5211122856792595663}
   animalsTabButton: {fileID: 5702999342119205201}
   closeButton: {fileID: 6742558514383796159}
+  embeddedOpenButton: {fileID: 0}
   eggsTabText: {fileID: 1897535587426442751}
   animalsTabText: {fileID: 2715975863008740894}
+  eggsTabBackground: {fileID: 0}
+  animalsTabBackground: {fileID: 0}
+  eggsTabSelectedFrame: {fileID: 0}
+  animalsTabSelectedFrame: {fileID: 0}
   eggsTabMention: {fileID: 2495884776000881215}
   animalsTabMention: {fileID: 1241450308432549030}
   albumIconMention: {fileID: 8813880807745798677}
+  cardsSectionTitle: {fileID: 0}
   cardsRoot: {fileID: 1115898313303547428}
   cardPrefab: {fileID: 832617392984061553, guid: ecee204ce9d1557409a634bbd94ee97d, type: 3}
-  cardsDynamicGrid: {fileID: 1120791106242497022}
+  cardsAdaptiveGrid: {fileID: 4443072530247586859}
+  cardsDynamicGrid: {fileID: 0}
   rareTabsRoot: {fileID: 2136141162390847487}
   rareTabPrefab: {fileID: 7724799796249055539, guid: 7f3585c8e224f3e4191d77882b3830b8, type: 3}
   infoIcon: {fileID: 7099518445003682814}
@@ -3953,6 +3961,12 @@ MonoBehaviour:
   infoDescription: {fileID: 7960760391830585939}
   infoIncome: {fileID: 6357519074485808447}
   infoSources: {fileID: 8823893408670157329}
+  eggHatchSection: {fileID: 0}
+  eggHatchIconsRoot: {fileID: 0}
+  eggHatchIconTemplate: {fileID: 0}
+  eggHatchMaxIcons: 4
+  eggHatchUnlockedColor: {r: 1, g: 1, b: 1, a: 1}
+  eggHatchLockedColor: {r: 0, g: 0, b: 0, a: 0.92}
   infoLockedOverlay: {fileID: 5222609213420917443}
   infoLockedText: {fileID: 5819432195121907010}
   infoUnlockedColor: {r: 1, g: 1, b: 1, a: 1}
@@ -3968,6 +3982,10 @@ MonoBehaviour:
   eggsTabFallback: Eggs
   animalsTabKey: UI/Album/TabAnimals
   animalsTabFallback: Animals
+  eggsSectionTitleKey: UI/Album/SectionEggs
+  eggsSectionTitleFallback: Egg
+  animalsSectionTitleKey: UI/Album/SectionAnimals
+  animalsSectionTitleFallback: Pet
   unknownKey: UI/Album/Unknown
   unknownFallback: ???
   eggInfoDescKey: UI/Album/EggInfoDescription
@@ -3976,16 +3994,32 @@ MonoBehaviour:
   animalInfoDescFallback: 'Can hatch from eggs:'
   incomeLabelKey: UI/Album/Income
   incomeLabelFallback: Income/sec
+  eggPriceLabelKey: UI/Album/EggPrice
+  eggPriceLabelFallback: Price
+  eggFirstRareDateKey: UI/Album/EggFirstElementDate
+  eggFirstRareDateFallback: 'First element date: {0}'
+  animalFirstDateKey: UI/Album/AnimalFirstDate
+  animalFirstDateFallback: 'First obtained: {0}'
+  albumDateUnknownKey: UI/Album/DateUnknown
+  albumDateUnknownFallback: Unknown
+  animalDescriptionKeyPrefix: UI/Album/AnimalDescription/
+  animalDescriptionFallback: '-'
+  rewardInfoKey: UI/Album/RewardInfo
+  rewardInfoFallback: 'Reward: +{0} Gems'
   claimRewardKey: UI/Album/ClaimReward
   claimRewardFallback: Claim +{0} Gems
   rewardClaimedKey: UI/Album/RewardClaimed
   rewardClaimedFallback: Claimed
-  rareLockedKey: UI/Album/RareLocked
-  rareLockedFallback: Hold item of this rarity to unlock
   rareLabelKeyPrefix: UI/Album/Rare/
+  albumDateFormat: yyyy.MM.dd
+  animalDescriptionOverrides: []
   applyLuckBonusInChances: 1
   sortByName: 1
   includeLockedInList: 1
+  applyRuntimeBlockyStyle: 0
+  tintSelectedTopTab: 0
+  boldSelectedTopTab: 0
+  activeTopTabLighten: 0.22
 --- !u!1 &8320260172097373319
 GameObject:
   m_ObjectHideFlags: 0

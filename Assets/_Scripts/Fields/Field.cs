@@ -18,6 +18,7 @@ public class Field : MonoBehaviour
     private bool _initialized;
     private bool _defaultCaptured;
     private bool _defaultUnblocked;
+    private bool _quickAccessBound;
 
     public int ID => _id;
     public bool IsRemoteMode => _remoteMode;
@@ -26,16 +27,28 @@ public class Field : MonoBehaviour
     {
         CaptureDefaultStateIfNeeded();
     }
+
+    private void OnEnable()
+    {
+        if (_initialized)
+            BindQuickAccess();
+    }
+
+    private void OnDisable()
+    {
+        UnbindQuickAccess();
+    }
    
 
     public void Init()
     {
         if (_initialized) return;
         CaptureDefaultStateIfNeeded();
-        G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
-        _touchHandler = GetComponentInChildren<BuyTouchHandler>();
-        _cells = _cellsParent.GetComponentsInChildren<FieldCell>().ToList();
-        _buyPanel.SetInfo(LocalizationUtils.T("UnlockLevel", "Разблокировать"), _price.ToString());
+        BindQuickAccess();
+        _touchHandler = GetComponentInChildren<BuyTouchHandler>(true);
+        EnsureCells();
+        if (_buyPanel != null)
+            _buyPanel.SetInfo(LocalizationUtils.T("UnlockLevel", "Разблокировать"), _price.ToString());
 
         if (_unblocked)
         {
@@ -62,8 +75,9 @@ public class Field : MonoBehaviour
         if (_remoteMode) return;
         if (_unblocked) return;
 
+        BindQuickAccess();
         _playerOnField = true;
-        CheckBuy(G.QuickAccess.CurrentActive);
+        CheckBuy(G.QuickAccess != null ? G.QuickAccess.CurrentActive : null);
         
 
     }
@@ -73,7 +87,8 @@ public class Field : MonoBehaviour
         if (_remoteMode) return;
         if (_unblocked) return;
 
-        _buyPanel.gameObject.SetActive(false);
+        if (_buyPanel != null)
+            _buyPanel.gameObject.SetActive(false);
         _playerOnField = false;
     }
 
@@ -82,7 +97,8 @@ public class Field : MonoBehaviour
     {
         if (_remoteMode) return;
         if (_unblocked || !_playerOnField) return;
-        _buyPanel.gameObject.SetActive(currentActive != null && currentActive.Type == Item.Hamer);
+        if (_buyPanel != null)
+            _buyPanel.gameObject.SetActive(currentActive != null && currentActive.Type == Item.Hamer);
     }
 
     public void _TryBuy()
@@ -116,6 +132,7 @@ public class Field : MonoBehaviour
 
     public void LoadData()
     {
+        EnsureCells();
         int id = 0;
         _cells.ForEach(cell => cell.SetLoadedData(SaveKey.Field.ToString() + _id + " " + id++));
     }
@@ -168,8 +185,29 @@ public class Field : MonoBehaviour
     {
         if (_cells == null || _cells.Count == 0)
         {
-            _cells = _cellsParent.GetComponentsInChildren<FieldCell>(true).ToList();
+            _cells = _cellsParent != null
+                ? _cellsParent.GetComponentsInChildren<FieldCell>(true).ToList()
+                : new List<FieldCell>();
         }
+    }
+
+    private void BindQuickAccess()
+    {
+        if (_quickAccessBound || G.QuickAccess == null)
+            return;
+
+        G.QuickAccess.SwitchActiveItem.AddListener(CheckBuy);
+        _quickAccessBound = true;
+    }
+
+    private void UnbindQuickAccess()
+    {
+        if (!_quickAccessBound)
+            return;
+
+        if (G.QuickAccess != null)
+            G.QuickAccess.SwitchActiveItem.RemoveListener(CheckBuy);
+        _quickAccessBound = false;
     }
 
     private void CaptureDefaultStateIfNeeded()

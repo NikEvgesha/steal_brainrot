@@ -589,6 +589,8 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     private Canvas _canvas;
     private GameObject _panel;
     private Text _title;
+    private Text _avatarInitial;
+    private Text _friendCode;
     private Text _body;
     private Text _likes;
     private Text _notice;
@@ -673,6 +675,17 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         if (_title != null)
             _title.text = playerName;
 
+        if (_avatarInitial != null)
+            _avatarInitial.text = string.IsNullOrWhiteSpace(playerName) ? "?" : playerName.Substring(0, 1).ToUpperInvariant();
+
+        if (_friendCode != null)
+        {
+            var hasCode = !string.IsNullOrWhiteSpace(_targetFriendCode);
+            _friendCode.gameObject.SetActive(hasCode);
+            if (hasCode)
+                _friendCode.text = $"{L("UI/Profile/FriendCode", "Code")}: {_targetFriendCode}";
+        }
+
         if (_body != null)
         {
             _body.text =
@@ -729,37 +742,71 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
         _canvas = canvasGo.AddComponent<Canvas>();
         _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        _canvas.overrideSorting = true;
+        _canvas.sortingOrder = 5000;
         canvasGo.AddComponent<GraphicRaycaster>();
 
         var scaler = canvasGo.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
 
-        _panel = new GameObject("Panel");
+        _panel = new GameObject("RemoteProfilePopupRoot");
         _panel.transform.SetParent(canvasGo.transform, false);
 
         var panelImage = _panel.AddComponent<Image>();
-        panelImage.color = new Color(0f, 0f, 0f, 0.82f);
+        panelImage.color = new Color(0f, 0f, 0f, 0.42f);
+        panelImage.raycastTarget = true;
 
         var panelRect = _panel.GetComponent<RectTransform>();
-        panelRect.anchorMin = new Vector2(0.32f, 0.2f);
-        panelRect.anchorMax = new Vector2(0.68f, 0.8f);
+        panelRect.anchorMin = Vector2.zero;
+        panelRect.anchorMax = Vector2.one;
         panelRect.offsetMin = Vector2.zero;
         panelRect.offsetMax = Vector2.zero;
 
-        _title = CreateText("Title", _panel.transform, new Vector2(0.06f, 0.78f), new Vector2(0.82f, 0.95f), TextAnchor.MiddleLeft, 38);
-        _body = CreateText("Body", _panel.transform, new Vector2(0.06f, 0.38f), new Vector2(0.94f, 0.74f), TextAnchor.UpperLeft, 28);
-        _likes = CreateText("Likes", _panel.transform, new Vector2(0.06f, 0.24f), new Vector2(0.6f, 0.34f), TextAnchor.MiddleLeft, 30);
-        _notice = CreateText("Notice", _panel.transform, new Vector2(0.06f, 0.08f), new Vector2(0.94f, 0.16f), TextAnchor.MiddleCenter, 24);
+        var window = CreatePanel("ProfileWindow", _panel.transform, new Vector2(0.29f, 0.2f), new Vector2(0.71f, 0.8f), BlockyUITheme.BrownBody, true);
+        AddOutline(window.gameObject, new Vector2(4f, -4f), BlockyUITheme.BlackStroke);
+        AddShadow(window.gameObject, new Vector2(0f, -5f), new Color(0f, 0f, 0f, 0.45f));
+
+        var header = CreatePanel("ProfileHeader", window.transform, new Vector2(0f, 0.79f), Vector2.one, BlockyUITheme.GreenHeader, true);
+        AddOutline(header.gameObject, new Vector2(2f, -2f), BlockyUITheme.BlackStroke);
+
+        var content = CreatePanel("ProfileContent", window.transform, new Vector2(0.035f, 0.08f), new Vector2(0.965f, 0.745f), BlockyUITheme.DarkBrownPanel, true);
+        AddOutline(content.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+
+        var avatarCard = CreatePanel("AvatarCard", content.transform, new Vector2(0.045f, 0.34f), new Vector2(0.31f, 0.87f), BlockyUITheme.BlueHeader, true);
+        AddOutline(avatarCard.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+
+        _title = CreateText("Title", header.transform, new Vector2(0.055f, 0.08f), new Vector2(0.82f, 0.93f), TextAnchor.MiddleLeft, 46);
+        _avatarInitial = CreateText("AvatarInitial", avatarCard.transform, new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.88f), TextAnchor.MiddleCenter, 86);
+        _friendCode = CreateText("FriendCode", content.transform, new Vector2(0.04f, 0.16f), new Vector2(0.47f, 0.28f), TextAnchor.MiddleLeft, 23);
+        _body = CreateText("Body", content.transform, new Vector2(0.36f, 0.34f), new Vector2(0.95f, 0.88f), TextAnchor.UpperLeft, 27);
+        _body.lineSpacing = 1.15f;
+        _likes = CreateText("Likes", content.transform, new Vector2(0.36f, 0.18f), new Vector2(0.62f, 0.31f), TextAnchor.MiddleLeft, 28);
+        _notice = CreateText("Notice", content.transform, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.13f), TextAnchor.MiddleCenter, 23);
         _notice.color = new Color(1f, 0.92f, 0.48f, 1f);
         _notice.gameObject.SetActive(false);
 
-        _likeButton = CreateButton("LikeButton", _panel.transform, L("UI/Profile/LikeButton", "Like"), new Vector2(0.64f, 0.22f), new Vector2(0.94f, 0.36f));
+        _likeButton = CreateButton("LikeButton", content.transform, L("UI/Profile/LikeButton", "Like"), new Vector2(0.64f, 0.17f), new Vector2(0.94f, 0.31f), BlockyUITheme.GreenHeader);
         _likeButtonLabel = _likeButton.GetComponentInChildren<Text>(true);
         _likeButton.onClick.AddListener(OnLikePressed);
 
-        _closeButton = CreateButton("CloseButton", _panel.transform, "X", new Vector2(0.84f, 0.82f), new Vector2(0.95f, 0.95f));
+        _closeButton = CreateButton("CloseButton", header.transform, "X", new Vector2(0.88f, 0.16f), new Vector2(0.97f, 0.86f), BlockyUITheme.RedHeader);
         _closeButton.onClick.AddListener(Hide);
+    }
+
+    private static Image CreatePanel(string name, Transform parent, Vector2 min, Vector2 max, Color color, bool studs)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var image = go.AddComponent<Image>();
+        BlockyUITheme.ApplyPanel(image, color, studs);
+
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = min;
+        rect.anchorMax = max;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        return image;
     }
 
     private static Text CreateText(string name, Transform parent, Vector2 min, Vector2 max, TextAnchor anchor, int fontSize)
@@ -770,6 +817,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.color = Color.white;
         text.alignment = anchor;
+        text.fontStyle = FontStyle.Bold;
         text.fontSize = fontSize;
         text.resizeTextForBestFit = true;
         text.resizeTextMinSize = 12;
@@ -781,16 +829,17 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         rect.anchorMax = max;
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
+        BlockyUITheme.ApplyText(text, Color.white, fontSize);
         return text;
     }
 
-    private static Button CreateButton(string name, Transform parent, string label, Vector2 min, Vector2 max)
+    private static Button CreateButton(string name, Transform parent, string label, Vector2 min, Vector2 max, Color color)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
         var image = go.AddComponent<Image>();
-        image.color = new Color(1f, 1f, 1f, 0.9f);
         var button = go.AddComponent<Button>();
+        button.targetGraphic = image;
 
         var rect = go.GetComponent<RectTransform>();
         rect.anchorMin = min;
@@ -800,10 +849,49 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
         var labelText = CreateText("Label", go.transform, Vector2.zero, Vector2.one, TextAnchor.MiddleCenter, 34);
         labelText.text = label;
-        labelText.color = Color.black;
+        labelText.color = Color.white;
         labelText.resizeTextMaxSize = 34;
+        BlockyUITheme.ApplyButton(button, color);
 
         return button;
+    }
+
+    private static void AddOutline(GameObject go, Vector2 distance, Color color)
+    {
+        if (go == null)
+            return;
+
+        var outline = go.GetComponent<Outline>();
+        if (outline == null)
+            outline = go.AddComponent<Outline>();
+
+        outline.effectColor = color;
+        outline.effectDistance = distance;
+        outline.useGraphicAlpha = true;
+    }
+
+    private static void AddShadow(GameObject go, Vector2 distance, Color color)
+    {
+        if (go == null)
+            return;
+
+        Shadow shadow = null;
+        var shadows = go.GetComponents<Shadow>();
+        for (int i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] != null && !(shadows[i] is Outline))
+            {
+                shadow = shadows[i];
+                break;
+            }
+        }
+
+        if (shadow == null)
+            shadow = go.AddComponent<Shadow>();
+
+        shadow.effectColor = color;
+        shadow.effectDistance = distance;
+        shadow.useGraphicAlpha = true;
     }
 
     private static string FormatValue(double value)

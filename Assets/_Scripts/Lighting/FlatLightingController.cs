@@ -13,9 +13,9 @@ public class FlatLightingController : MonoBehaviour
     }
 
     [SerializeField] private bool applyOnAwake = true;
-    [SerializeField] private float reapplyIntervalSec = 2f;
+    [SerializeField] private float reapplyIntervalSec = 5f;
     [SerializeField] private bool disableAllShadows = true;
-    [SerializeField] private bool disableFog = true;
+    [SerializeField] private bool disableFog = false;
     [SerializeField] private bool flattenAmbient = true;
     [SerializeField] private bool useTrilightAmbient = true;
     [SerializeField] private Color ambientColor = new Color(0.92f, 0.92f, 0.92f, 1f);
@@ -28,6 +28,13 @@ public class FlatLightingController : MonoBehaviour
     [SerializeField] [Range(0f, 2f)] private float maxDirectionalIntensity = 0.4f;
     [SerializeField] private bool disableReflections = false;
     [SerializeField] private bool forceRendererNoShadows = true;
+    [Header("Fog")]
+    [SerializeField] private bool enableFog = true;
+    [SerializeField] private FogMode fogMode = FogMode.Linear;
+    [SerializeField] private Color fogColor = new Color(0.68f, 0.82f, 0.88f, 1f);
+    [SerializeField] private float fogStartDistance = 55f;
+    [SerializeField] private float fogEndDistance = 155f;
+    [SerializeField] private float fogDensity = 0.008f;
     [Header("Skybox")]
     [SerializeField] private bool overrideSkybox = false;
     [SerializeField] private bool hideSkyboxSunDisk = true;
@@ -47,6 +54,14 @@ public class FlatLightingController : MonoBehaviour
     [SerializeField] private bool allowBloomInWebGL = false;
     [SerializeField] [Range(0f, 2f)] private float bloomIntensity = 0.1f;
     [SerializeField] [Range(0f, 2f)] private float bloomThreshold = 1f;
+    [Header("Runtime Performance")]
+    [SerializeField] private bool disablePostEffectsInWebGL = true;
+    [SerializeField] private bool limitCameraFarClip = true;
+    [SerializeField] private float maxCameraFarClip = 170f;
+    [SerializeField] private bool applyRuntimeQualityLimits = true;
+    [SerializeField] private bool disableVSync = true;
+    [SerializeField] private int targetFrameRate = 60;
+    [SerializeField] private int maxParticleRaycastBudget = 64;
 
     private Coroutine _reapplyRoutine;
     private Material _runtimeSkyboxMaterial;
@@ -113,6 +128,7 @@ public class FlatLightingController : MonoBehaviour
     [ContextMenu("Apply Flat Lighting")]
     public void Apply()
     {
+        ApplyRuntimeQualityLimits();
         ApplySkybox();
         ApplyPostEffects();
 
@@ -122,8 +138,7 @@ public class FlatLightingController : MonoBehaviour
             QualitySettings.shadowDistance = 0f;
         }
 
-        if (disableFog)
-            RenderSettings.fog = false;
+        ApplyFog();
 
         if (flattenAmbient)
         {
@@ -180,6 +195,40 @@ public class FlatLightingController : MonoBehaviour
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             renderer.receiveShadows = false;
         }
+    }
+
+    private void ApplyFog()
+    {
+        if (disableFog || !enableFog)
+        {
+            RenderSettings.fog = false;
+            return;
+        }
+
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = fogMode;
+        RenderSettings.fogColor = fogColor;
+        RenderSettings.fogStartDistance = Mathf.Max(0f, fogStartDistance);
+        RenderSettings.fogEndDistance = Mathf.Max(RenderSettings.fogStartDistance + 1f, fogEndDistance);
+        RenderSettings.fogDensity = Mathf.Max(0f, fogDensity);
+    }
+
+    private void ApplyRuntimeQualityLimits()
+    {
+        if (!applyRuntimeQualityLimits)
+            return;
+
+        if (disableVSync)
+            QualitySettings.vSyncCount = 0;
+
+        if (targetFrameRate > 0)
+            Application.targetFrameRate = targetFrameRate;
+
+        QualitySettings.realtimeReflectionProbes = false;
+        QualitySettings.softParticles = false;
+
+        if (maxParticleRaycastBudget > 0)
+            QualitySettings.particleRaycastBudget = Mathf.Min(QualitySettings.particleRaycastBudget, maxParticleRaycastBudget);
     }
 
     private System.Collections.IEnumerator ReapplyRoutine()
@@ -268,15 +317,19 @@ public class FlatLightingController : MonoBehaviour
 
     private void ApplyPostEffects()
     {
-        if (!enablePostEffects)
+        bool postEffectsAllowed = enablePostEffects
+            && (Application.platform != RuntimePlatform.WebGLPlayer || !disablePostEffectsInWebGL);
+
+        if (!postEffectsAllowed)
         {
             if (_runtimePostVolume != null)
                 _runtimePostVolume.enabled = false;
+            SetPostProcessingOnCameras(false);
             return;
         }
 
         EnsureRuntimePostVolume();
-        EnsurePostProcessingOnCameras();
+        SetPostProcessingOnCameras(true);
 
         if (_runtimePostVolume == null || _runtimePostProfile == null)
             return;
@@ -329,7 +382,7 @@ public class FlatLightingController : MonoBehaviour
             _runtimePostVolume.sharedProfile = _runtimePostProfile;
     }
 
-    private void EnsurePostProcessingOnCameras()
+    private void SetPostProcessingOnCameras(bool enabled)
     {
         var cameras = FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var camera in cameras)
@@ -337,9 +390,12 @@ public class FlatLightingController : MonoBehaviour
             if (camera == null)
                 continue;
 
+            if (limitCameraFarClip && maxCameraFarClip > 0f && camera.farClipPlane > maxCameraFarClip)
+                camera.farClipPlane = maxCameraFarClip;
+
             var cameraData = camera.GetComponent<UniversalAdditionalCameraData>();
             if (cameraData != null)
-                cameraData.renderPostProcessing = true;
+                cameraData.renderPostProcessing = enabled;
         }
     }
 

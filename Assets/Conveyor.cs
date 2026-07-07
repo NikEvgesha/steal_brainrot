@@ -66,6 +66,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
 
     private void OnEnable()
     {
+        EnsureEggStorage();
         if (_initialized)
             StartSpawnLoop();
     }
@@ -201,6 +202,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
             var prefab = _level.GetRandomEgg();
             if (prefab != null)
             {
+                EnsureEggStorage();
                 Egg egg = Instantiate(prefab, _spawnPoint.position, _spawnPoint.rotation);
                 egg.SetRandomData();
                 egg.SetConveyorPurchaseMode(_remoteMode);
@@ -216,6 +218,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     {
         if (!_initialized) return;
         if (_spawnRoutine != null) return;
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy) return;
         _spawnRoutine = StartCoroutine(Spawn());
     }
 

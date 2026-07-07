@@ -87,10 +87,12 @@ public class Brainrot : InventoryItem
     {
         EnsureAnimationsSubscription();
         ApplyAnimalsAnimationState();
+        StartIncomeRoutineIfNeeded();
     }
 
     private void OnDisable()
     {
+        StopIncomeRoutine();
         StopPendingAnimationsDisable();
         ReleaseAnimationsSubscription();
     }
@@ -143,18 +145,23 @@ public class Brainrot : InventoryItem
         ApplyElementRayDefaultsIfNeeded();
 
         // rarity считается в яйце? 
-        _canvas = GetComponentInChildren<BrainrotInfoUI>();
+        _canvas = GetComponentInChildren<BrainrotInfoUI>(true);
         CacheAnimationComponents();
         EnsureAnimationsSubscription();
         _dinamicData = rarity;
         //_model = Instantiate(_data.,_modelPoint);
-        Vector3 scale = _canvas.transform.localScale;
-        _canvas.transform.SetParent(_modelPoint.transform, false);
+        Vector3 scale = _canvas != null ? _canvas.transform.localScale : Vector3.one;
+        if (_canvas != null && _modelPoint != null)
+            _canvas.transform.SetParent(_modelPoint.transform, false);
         SetSize();
-        _canvas.transform.SetParent(transform, false);
-        _canvas.transform.localScale = scale;
+        if (_canvas != null)
+        {
+            _canvas.transform.SetParent(transform, false);
+            _canvas.transform.localScale = scale;
+        }
 
-        _dinamicData.ResultIncome = Math.Round(_data.StartIncome * G.Elements.GetMultiplaer(_dinamicData.ElementType) * (_dinamicData.WeightMultiplier / 2));
+        var elementMultiplier = G.Elements != null ? G.Elements.GetMultiplaer(_dinamicData.ElementType) : 1f;
+        _dinamicData.ResultIncome = Math.Round(_data.StartIncome * elementMultiplier * (_dinamicData.WeightMultiplier / 2));
         var nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var effectiveLastIncomeTs = lastCollectTimestamp > 0 ? lastCollectTimestamp : nowTs;
         if (effectiveLastIncomeTs > nowTs)
@@ -165,8 +172,9 @@ public class Brainrot : InventoryItem
         _currentIncome = Math.Max(0d, Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome));
         if (floor != null)
             NewPlace(floor);
-        _canvas.SetInfo(_data, _dinamicData);
-        if (incomeAccumulationTime > 0)
+        if (_canvas != null)
+            _canvas.SetInfo(_data, _dinamicData);
+        if (_canvas != null && incomeAccumulationTime > 0)
             _canvas.UpdateOfflineIncome(_currentIncome);
         SetTypeVisual();
         ApplyElementVfx();
@@ -194,6 +202,9 @@ public class Brainrot : InventoryItem
 
     private void SetTypeVisual()
     {
+        if (_modelPoint == null)
+            return;
+
         Renderer[] renderer = _modelPoint.GetComponentsInChildren<Renderer>();
         foreach (Renderer item in renderer)
         {
@@ -220,13 +231,28 @@ public class Brainrot : InventoryItem
     }
     public void NewPlace(FieldCell floor)
     {
+        if (_floorListener != null)
+        {
+            _floorListener.PlayerEnter.RemoveListener(PlayerInPlace);
+            _floorListener.TakeBrainrot.RemoveListener(TakeBrainrot);
+        }
+
         _floorListener = floor;
-        _incomeCorutine = StartCoroutine(ProduceIncome());
+        StartIncomeRoutineIfNeeded();
+
+        if (floor == null)
+            return;
+
+        floor.PlayerEnter.RemoveListener(PlayerInPlace);
+        floor.TakeBrainrot.RemoveListener(TakeBrainrot);
         floor.PlayerEnter.AddListener(PlayerInPlace);
         floor.TakeBrainrot.AddListener(TakeBrainrot);
     }
     private void SetSize()
     {
+        if (_modelPoint == null)
+            return;
+
         var m = Mathf.Max(1f, _dinamicData.WeightMultiplier); // �� ������ ������ �� ������ 1
         float scale = 1f + (m - 1f) * 0.25f;
         _modelPoint.transform.localScale = Vector3.one * scale;
@@ -238,12 +264,14 @@ public class Brainrot : InventoryItem
     }
     private void TakeBrainrot()
     {
-        _floorListener.PlayerEnter.RemoveListener(PlayerInPlace);
-        _floorListener.TakeBrainrot.RemoveListener(TakeBrainrot);
-        _floorListener.UpdateFieldItem(Item.Free);
-        if (_incomeCorutine != null)
-            StopCoroutine(_incomeCorutine);
-        _incomeCorutine = null;
+        if (_floorListener != null)
+        {
+            _floorListener.PlayerEnter.RemoveListener(PlayerInPlace);
+            _floorListener.TakeBrainrot.RemoveListener(TakeBrainrot);
+            _floorListener.UpdateFieldItem(Item.Free);
+        }
+
+        StopIncomeRoutine();
         G.Inventory.Add(this);
         //TestBackpackBrainrot.Instance.TakeBrainrot(this);
     }
@@ -261,7 +289,9 @@ public class Brainrot : InventoryItem
         if (collected <= 0d)
             return 0d;
 
-        G.Income.AddCoins(collected);
+        if (!TryAddCoins(collected))
+            return 0d;
+
         _currentIncome = 0d;
         _lastIncomeTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
@@ -277,11 +307,47 @@ public class Brainrot : InventoryItem
 
     private bool IsCollectibleLocal()
     {
-        if (_floorListener == null)
+        var floor = ResolveFloorListener();
+        if (floor == null)
             return false;
 
-        var field = _floorListener.GetComponentInParent<Field>();
+        var field = floor.GetComponentInParent<Field>();
         return field != null && !field.IsRemoteMode;
+    }
+
+    private FieldCell ResolveFloorListener()
+    {
+        if (_floorListener != null)
+            return _floorListener;
+
+        var floor = GetComponentInParent<FieldCell>();
+        if (floor == null)
+            return null;
+
+        _floorListener = floor;
+        _floorListener.PlayerEnter.RemoveListener(PlayerInPlace);
+        _floorListener.TakeBrainrot.RemoveListener(TakeBrainrot);
+        _floorListener.PlayerEnter.AddListener(PlayerInPlace);
+        _floorListener.TakeBrainrot.AddListener(TakeBrainrot);
+        return _floorListener;
+    }
+
+    private static bool TryAddCoins(double amount)
+    {
+        if (amount <= 0d)
+            return false;
+
+        if (G.Income != null)
+            return G.Income.TryAddCoins(amount);
+
+        if (G.Currency != null)
+        {
+            G.Currency.AddCurrency(CurrencyType.Coins, amount);
+            return true;
+        }
+
+        Debug.LogWarning("[Brainrot] Cannot collect income: income and currency managers are not initialized.");
+        return false;
     }
 
     private IEnumerator ProduceIncome()
@@ -289,11 +355,36 @@ public class Brainrot : InventoryItem
         while (true)
         {
             yield return new WaitForSecondsRealtime(1);
+            if (!IsCollectibleLocal())
+                continue;
+
             _currentIncome += _dinamicData.ResultIncome; //2 is the magic number
             _currentIncome = (double.IsInfinity(_currentIncome)) ? float.MaxValue : _currentIncome;
             _currentIncome = Math.Round(_currentIncome);
-            _canvas.UpdateIncome(_currentIncome);
+            if (_canvas != null)
+                _canvas.UpdateIncome(_currentIncome);
         }
+    }
+
+    private void StartIncomeRoutineIfNeeded()
+    {
+        if (_incomeCorutine != null)
+            return;
+        if (!IsCollectibleLocal())
+            return;
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
+        _incomeCorutine = StartCoroutine(ProduceIncome());
+    }
+
+    private void StopIncomeRoutine()
+    {
+        if (_incomeCorutine == null)
+            return;
+
+        StopCoroutine(_incomeCorutine);
+        _incomeCorutine = null;
     }
 
     private void EnsureAnimationsSubscription()
@@ -339,6 +430,9 @@ public class Brainrot : InventoryItem
 
         if (!isEnabled)
         {
+            if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+                return;
+
             _disableAnimationsRoutine = StartCoroutine(DisableAnimationsAfterCurrentLoop());
             return;
         }

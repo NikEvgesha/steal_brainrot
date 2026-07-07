@@ -123,15 +123,21 @@ public class FriendsPanelController : MonoBehaviour
     private void OnEnable()
     {
         G.Initialized.AddListener(OnGameInitialized);
-        G.Input.AFriends += ToggleOpen;
-        G.Input.AOpenWindow += Close;
+        if (G.Input != null)
+        {
+            G.Input.AFriends += ToggleOpen;
+            G.Input.AOpenWindow += Close;
+        }
     }
     private void OnDisable()
     {
         G.Initialized.RemoveListener(OnGameInitialized);
-        G.Input.AFriends -= ToggleOpen;
-        //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
-        G.Input.AOpenWindow -= Close;
+        if (G.Input != null)
+        {
+            G.Input.AFriends -= ToggleOpen;
+            //LoadingManager.Instance.LocationChanged -= ToggleButtonVisibility;
+            G.Input.AOpenWindow -= Close;
+        }
         if (_externalRefreshFlow != null)
         {
             StopCoroutine(_externalRefreshFlow);

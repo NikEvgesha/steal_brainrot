@@ -14,6 +14,7 @@ public class InventoryUI : MonoBehaviour
     private bool _isOpen;
     private Vector2 _slotSize;
     private int _columns;
+    private Item _selectedTab = Item.Brainrot;
 
 
     public UnityEvent<InventoryItem> QuickAccessSwitched;
@@ -36,6 +37,8 @@ public class InventoryUI : MonoBehaviour
             slot.Init(null);
             _slots.Add(slot);
         }
+
+        ApplyBlockyStyle();
     }
 
 
@@ -43,20 +46,29 @@ public class InventoryUI : MonoBehaviour
     {
         _isOpen = !_isOpen;
         _uiPanel.SetActive(_isOpen);
+        _selectedTab = Item.Brainrot;
         UpdateItems(G.Inventory.GetItems(Item.Brainrot));
+        if (_isOpen)
+            ApplyBlockyStyle();
     }
 
     public void _ShowBrainrots()
     {
+        _selectedTab = Item.Brainrot;
         UpdateItems(G.Inventory.GetItems(Item.Brainrot));
+        ApplyBlockyStyle();
     }
     public void _ShowEggs()
     {
+        _selectedTab = Item.Egg;
         UpdateItems(G.Inventory.GetItems(Item.Egg));
+        ApplyBlockyStyle();
     }
     public void _ShowFood()
     {
+        _selectedTab = Item.Food;
         UpdateItems(G.Inventory.GetItems(Item.Food));
+        ApplyBlockyStyle();
     }
 
 
@@ -98,6 +110,11 @@ public class InventoryUI : MonoBehaviour
             _slots.Add(slot);
         }
 
-    } 
+    }
+
+    private void ApplyBlockyStyle()
+    {
+        BlockyUITheme.StyleInventoryWindow(_uiPanel, _selectedTab);
+    }
 
 }

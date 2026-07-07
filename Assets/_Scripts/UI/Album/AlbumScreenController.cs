@@ -73,6 +73,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private TMP_Text cardsSectionTitle;
     [SerializeField] private Transform cardsRoot;
     [SerializeField] private AlbumEntryView cardPrefab;
+    [SerializeField] private AdaptiveGridSpawner cardsAdaptiveGrid;
     [SerializeField] private DynamicGridSpawner cardsDynamicGrid;
 
     [Header("Element Tabs")]
@@ -146,6 +147,11 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private bool applyLuckBonusInChances = true;
     [SerializeField] private bool sortByName = true;
     [SerializeField] private bool includeLockedInList = true;
+
+    [Header("Runtime Visual Overrides")]
+    [SerializeField] private bool applyRuntimeBlockyStyle = false;
+    [SerializeField] private bool tintSelectedTopTab = false;
+    [SerializeField] private bool boldSelectedTopTab = false;
     [SerializeField, Range(0f, 1f)] private float activeTopTabLighten = 0.22f;
 
     private readonly List<EntryData> _eggEntries = new();
@@ -185,6 +191,7 @@ public class AlbumScreenController : MonoBehaviour
         BindButtons();
         RefreshStaticTexts();
         SetTab(AlbumEntityType.Egg, preserveSelection: false);
+        ApplyBlockyStyle();
 
         if (hideOnStart)
             SetOpen(false);
@@ -350,6 +357,7 @@ public class AlbumScreenController : MonoBehaviour
         RebuildCards();
         RefreshElementTabs();
         RefreshInfoPanel();
+        ApplyBlockyStyle();
     }
 
     private void SetTab(AlbumEntityType tab, bool preserveSelection)
@@ -669,7 +677,7 @@ public class AlbumScreenController : MonoBehaviour
                               HasAnyElementMention(entry));
             var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
 
-            view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry));
+            view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry), entry.rareType);
             _spawnedCardViews.Add(view);
         }
 
@@ -1257,7 +1265,7 @@ public class AlbumScreenController : MonoBehaviour
         if (selectedFrame == null)
             selectedFrame = ResolveTopTabSelectedFrame(button);
 
-        if (background != null)
+        if (tintSelectedTopTab && background != null)
         {
             if (!hasBaseColor)
             {
@@ -1271,7 +1279,7 @@ public class AlbumScreenController : MonoBehaviour
             targetColor.a = baseColor.a;
             background.color = targetColor;
         }
-        else if (button.targetGraphic != null)
+        else if (tintSelectedTopTab && button.targetGraphic != null)
         {
             if (!hasBaseColor)
             {
@@ -1294,8 +1302,9 @@ public class AlbumScreenController : MonoBehaviour
                 hasDefaultStyle = true;
             }
 
-            label.fontStyle = selected ? (defaultStyle | FontStyles.Bold) : defaultStyle;
-            label.alpha = selected ? 1f : 0.95f;
+            if (boldSelectedTopTab)
+                label.fontStyle = selected ? (defaultStyle | FontStyles.Bold) : defaultStyle;
+            label.alpha = 1f;
         }
 
         if (selectedFrame != null)
@@ -1580,14 +1589,27 @@ public class AlbumScreenController : MonoBehaviour
 
         if (cardsRoot != null)
         {
-            if (cardsDynamicGrid == null)
-                cardsDynamicGrid = cardsRoot.GetComponent<DynamicGridSpawner>();
-            if (cardsDynamicGrid == null)
-                cardsDynamicGrid = cardsRoot.GetComponentInChildren<DynamicGridSpawner>(true);
+            if (cardsAdaptiveGrid == null)
+                cardsAdaptiveGrid = cardsRoot.GetComponent<AdaptiveGridSpawner>();
+            if (cardsAdaptiveGrid == null)
+                cardsAdaptiveGrid = cardsRoot.GetComponentInChildren<AdaptiveGridSpawner>(true);
 
-            // If inspector references a wrapper root, prefer the actual grid root.
-            if (cardsDynamicGrid != null && cardsRoot != cardsDynamicGrid.transform)
-                cardsRoot = cardsDynamicGrid.transform;
+            if (cardsAdaptiveGrid != null)
+            {
+                // If inspector references a wrapper root, prefer the actual grid root.
+                if (cardsRoot != cardsAdaptiveGrid.transform)
+                    cardsRoot = cardsAdaptiveGrid.transform;
+            }
+            else
+            {
+                if (cardsDynamicGrid == null)
+                    cardsDynamicGrid = cardsRoot.GetComponent<DynamicGridSpawner>();
+                if (cardsDynamicGrid == null)
+                    cardsDynamicGrid = cardsRoot.GetComponentInChildren<DynamicGridSpawner>(true);
+
+                if (cardsDynamicGrid != null && cardsRoot != cardsDynamicGrid.transform)
+                    cardsRoot = cardsDynamicGrid.transform;
+            }
         }
 
         if (panelRoot != null)
@@ -1640,8 +1662,19 @@ public class AlbumScreenController : MonoBehaviour
         }
     }
 
+    private void ApplyBlockyStyle()
+    {
+        if (!applyRuntimeBlockyStyle)
+            return;
+
+        BlockyUITheme.StyleWindow(panelRoot != null ? panelRoot : gameObject, BlockyUITheme.Tone.Green);
+    }
+
     private AlbumEntryView SpawnCardView()
     {
+        if (cardsAdaptiveGrid != null)
+            return cardsAdaptiveGrid.SpawnObject<AlbumEntryView>(cardPrefab.gameObject);
+
         if (cardsDynamicGrid != null)
             return cardsDynamicGrid.SpawnObject<AlbumEntryView>(cardPrefab.gameObject);
 
@@ -1652,6 +1685,9 @@ public class AlbumScreenController : MonoBehaviour
     {
         var templateTransform = GetEmbeddedCardTemplateTransform();
         _spawnedCardViews.Clear();
+        if (cardsAdaptiveGrid != null)
+            cardsAdaptiveGrid.ClearSpawnedItems();
+
         var pendingDestroy = new List<GameObject>();
 
         for (var i = cardsRoot.childCount - 1; i >= 0; i--)

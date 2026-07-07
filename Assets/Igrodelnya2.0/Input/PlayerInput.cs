@@ -131,6 +131,8 @@ public class PlayerInput : MonoBehaviour
     private bool _friends;
     private bool _playtime;
 
+    private bool UseTouchControls => G.Control != null && G.Control.UseTouchControl;
+
 
     public Action AJump;
     public Action ASprint;
@@ -191,7 +193,7 @@ public class PlayerInput : MonoBehaviour
             G.Control.CursorActive = !G.Control.CursorActive;
         }*/
 
-        if (G.Control.UseTouchControl)
+        if (UseTouchControls)
         {
             //_jump = _touchControls.jumpButton.IsTriggered;
             //_pickUp = _touchControls.pickUpButton.IsTriggered;
@@ -253,7 +255,7 @@ public class PlayerInput : MonoBehaviour
     private void UpdateMovement()
     {
 
-        if (G.Control.UseTouchControl)
+        if (UseTouchControls)
         {
             Movement = new Vector3(_touchControls.moveJoystick.Horizontal(), 0f, _touchControls.moveJoystick.Vertical());
         } else
@@ -272,7 +274,7 @@ public class PlayerInput : MonoBehaviour
 
     public void UpdateRotation()
     {
-        if (G.Control.UseTouchControl)
+        if (UseTouchControls)
         {
             //Rotation = _touchControls.cameraTouchController.GetRotationInput();
             Rotation = TCKInput.GetAxis("Touchpad");

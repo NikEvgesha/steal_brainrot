@@ -10,6 +10,9 @@ public class AlbumRareTabView : MonoBehaviour
     [SerializeField] private GameObject lockOverlay;
     [SerializeField] private GameObject mentionBadge;
     [SerializeField] private Image selectedFrame;
+    [SerializeField] private bool tintRuntimeButton = false;
+    [SerializeField] private bool styleRuntimeTextState = false;
+    [SerializeField] private bool applyRuntimeBlockyStyle = false;
 
     private Action _onClick;
     private FontStyles _defaultTitleStyle = FontStyles.Normal;
@@ -54,7 +57,7 @@ public class AlbumRareTabView : MonoBehaviour
         if (button != null)
             button.interactable = true;
 
-        if (button != null && button.targetGraphic != null)
+        if (tintRuntimeButton && button != null && button.targetGraphic != null)
         {
             if (!_hasBaseButtonColor)
             {
@@ -80,8 +83,11 @@ public class AlbumRareTabView : MonoBehaviour
             }
 
             titleText.text = title;
-            titleText.alpha = unlocked ? 1f : 0.9f;
-            titleText.fontStyle = selected ? (_defaultTitleStyle | FontStyles.Bold) : _defaultTitleStyle;
+            if (styleRuntimeTextState)
+            {
+                titleText.alpha = unlocked ? 1f : 0.9f;
+                titleText.fontStyle = selected ? (_defaultTitleStyle | FontStyles.Bold) : _defaultTitleStyle;
+            }
         }
 
         if (lockOverlay != null)
@@ -110,6 +116,9 @@ public class AlbumRareTabView : MonoBehaviour
             if (selected)
                 selectedFrame.transform.SetAsLastSibling();
         }
+
+        if (applyRuntimeBlockyStyle && button != null)
+            BlockyUITheme.ApplyButton(button, selected ? BlockyUITheme.YellowAccent : BlockyUITheme.BlueHeader);
 
         EnsureButtonPointerPassThrough();
     }

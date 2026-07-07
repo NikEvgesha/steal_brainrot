@@ -108,6 +108,7 @@ public static class AlbumScreenAutoWireEditor
 
         CheckRequiredObjectRef(so, "panelRoot", missing);
         CheckRequiredObjectRef(so, "cardsRoot", missing);
+        CheckRequiredObjectRef(so, "cardsAdaptiveGrid", missing);
         CheckRequiredObjectRef(so, "cardPrefab", missing);
         CheckRequiredObjectRef(so, "rareTabsRoot", missing);
         CheckRequiredObjectRef(so, "rareTabPrefab", missing);
@@ -153,8 +154,13 @@ public static class AlbumScreenAutoWireEditor
         var cardsRoot = cardsContainer != null ? cardsContainer : FindByName(root, "cardsRoot");
         SetRef(so, "cardsRoot", cardsRoot as RectTransform);
 
-        var cardsDynamicGrid = cardsRoot != null ? cardsRoot.GetComponent<DynamicGridSpawner>() : null;
-        if (cardsDynamicGrid == null && cardsRoot != null)
+        var cardsAdaptiveGrid = cardsRoot != null ? cardsRoot.GetComponent<AdaptiveGridSpawner>() : null;
+        if (cardsAdaptiveGrid == null && cardsRoot != null)
+            cardsAdaptiveGrid = cardsRoot.GetComponentInChildren<AdaptiveGridSpawner>(true);
+        SetRef(so, "cardsAdaptiveGrid", cardsAdaptiveGrid);
+
+        var cardsDynamicGrid = cardsAdaptiveGrid == null && cardsRoot != null ? cardsRoot.GetComponent<DynamicGridSpawner>() : null;
+        if (cardsDynamicGrid == null && cardsAdaptiveGrid == null && cardsRoot != null)
             cardsDynamicGrid = cardsRoot.GetComponentInChildren<DynamicGridSpawner>(true);
         SetRef(so, "cardsDynamicGrid", cardsDynamicGrid);
 

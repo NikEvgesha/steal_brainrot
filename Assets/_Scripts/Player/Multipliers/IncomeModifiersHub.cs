@@ -112,25 +112,54 @@ public sealed class IncomeModifiersHub : MonoBehaviour
 
     public void AddCoins(double baseIncome)
     {
-        if (_currencyManager == null)
+        TryAddCoins(baseIncome);
+    }
+
+    public bool TryAddCoins(double baseIncome)
+    {
+        var currencyManager = ResolveCurrencyManager();
+        if (currencyManager == null)
         {
             Debug.LogError($"{nameof(IncomeModifiersHub)}: CurrencyManager is not initialized.");
-            return;
+            return false;
         }
 
         double final = Apply(baseIncome);
-        _currencyManager.AddCurrency(CurrencyType.Coins, final);
+        currencyManager.AddCurrency(CurrencyType.Coins, final);
+        return true;
     }
 
     public void AddCurrency(CurrencyType type, double baseIncome)
     {
-        if (_currencyManager == null)
+        TryAddCurrency(type, baseIncome);
+    }
+
+    public bool TryAddCurrency(CurrencyType type, double baseIncome)
+    {
+        var currencyManager = ResolveCurrencyManager();
+        if (currencyManager == null)
         {
             Debug.LogError($"{nameof(IncomeModifiersHub)}: CurrencyManager is not initialized.");
-            return;
+            return false;
         }
 
         double final = Apply(baseIncome);
-        _currencyManager.AddCurrency(type, final);
+        currencyManager.AddCurrency(type, final);
+        return true;
+    }
+
+    private CurrencyManager ResolveCurrencyManager()
+    {
+        if (_currencyManager != null)
+            return _currencyManager;
+
+        if (G.Currency != null)
+        {
+            _currencyManager = G.Currency;
+            return _currencyManager;
+        }
+
+        _currencyManager = FindAnyObjectByType<CurrencyManager>();
+        return _currencyManager;
     }
 }

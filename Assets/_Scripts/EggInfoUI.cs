@@ -13,14 +13,24 @@ public class EggInfoUI : MonoBehaviour
     [SerializeField] private Text _time;
     [SerializeField] private Slider _progress;
     [SerializeField] private Text _percent;
+    [SerializeField] private float _remoteVisibleDistance = 30f;
+    [SerializeField] private float _remoteVisibleDistanceHysteresis = 4f;
 
     private EggStatus _status;
+    private bool _remoteView;
 
     public void SetInfo(Egg egg)
     {
-        _name.text = egg.Name;
-        _luck.text = FormatAmount(egg.Data.Luck) + "X";
-        _price.text = "$" + FormatAmount(egg.Data.Price * G.Elements.GetMultiplaer(egg.Data.DinamicData.ElementType));
+        if (egg == null)
+            return;
+
+        float elementMultiplier = G.Elements != null ? G.Elements.GetMultiplaer(egg.Data.DinamicData.ElementType) : 1f;
+        if (_name != null)
+            _name.text = LocalizationUtils.T("Item/" + egg.Name, egg.Name);
+        if (_luck != null)
+            _luck.text = FormatAmount(egg.Data.Luck) + "X";
+        if (_price != null)
+            _price.text = "$" + FormatAmount(egg.Data.Price * elementMultiplier);
     }
 
     private static string FormatAmount(double amount)
@@ -37,37 +47,78 @@ public class EggInfoUI : MonoBehaviour
     public void SetStatus(EggStatus status)
     {
 
-        _buy.SetActive(false);
-        _hutching.SetActive(false);
+        if (_buy != null)
+            _buy.SetActive(false);
+        if (_hutching != null)
+            _hutching.SetActive(false);
 
         _status = status;
         switch (_status)
         {
             case EggStatus.Conveyer:
-                _buy.SetActive(true);
+                if (_buy != null)
+                    _buy.SetActive(true);
                 break;
                 
             case EggStatus.Maturing:
-                _hutching.SetActive(true);
+                if (!_remoteView && _hutching != null)
+                    _hutching.SetActive(true);
                 break;
             default:
                 break;
         }
     }
+    public void SetRemoteView(bool remote)
+    {
+        _remoteView = remote;
+        if (_remoteView && _hutching != null)
+            _hutching.SetActive(false);
+
+        var distanceVisibility = WorldUiDistanceVisibility.Ensure(gameObject);
+        if (distanceVisibility != null)
+            distanceVisibility.Configure(remote, ResolveDistanceTarget(), _remoteVisibleDistance, _remoteVisibleDistanceHysteresis);
+    }
     public void ShowTimeUI(int remainingSec, float progress01)
     {
+        if (_remoteView)
+        {
+            if (_hutching != null)
+                _hutching.SetActive(false);
+            return;
+        }
+
         // �����: ����� ��������� ����� X ��� Y �
+        bool isReady = remainingSec <= 0;
         TimeSpan t = TimeSpan.FromSeconds(Mathf.Max(remainingSec, 0));
-        _time.text = $"���� ��������� ����� {FormatRus(t)}";
+        if (_hutching != null && !_hutching.activeSelf)
+            _hutching.SetActive(true);
+        if (_time != null)
+        {
+            _time.gameObject.SetActive(!isReady);
+            _time.text = isReady
+                ? string.Empty
+                : LocalizationUtils.Format("UI/Egg/ReadyIn", "Ready in {0}", FormatTime(t));
+        }
 
         // ��������: 0..1
-        _progress.value = progress01;
+        if (_progress != null)
+            _progress.value = progress01;
 
         // �������� � �������: 34,1%
         float percent = progress01 * 100f;
-        _percent.text = percent.ToString("0.0") + "%";
+        if (_percent != null)
+            _percent.text = percent.ToString("0.0") + "%";
 
     }
+
+    private static string FormatTime(TimeSpan t)
+    {
+        if (t.TotalHours >= 1d)
+            return string.Format(CultureInfo.InvariantCulture, "{0:0}:{1:00}:{2:00}", (int)t.TotalHours, t.Minutes, t.Seconds);
+
+        return string.Format(CultureInfo.InvariantCulture, "{0:0}:{1:00}", (int)t.TotalMinutes, t.Seconds);
+    }
+
     private string FormatRus(TimeSpan t)
     {
         // ���������: ���������� ��� + ��� (����� ��������� �� �����/����)
@@ -95,6 +146,12 @@ public class EggInfoUI : MonoBehaviour
         if (n1 > 1 && n1 < 5) return form2;
         if (n1 == 1) return form1;
         return form5;
+    }
+
+    private Transform ResolveDistanceTarget()
+    {
+        var egg = GetComponentInParent<Egg>();
+        return egg != null ? egg.transform : transform;
     }
 
 }

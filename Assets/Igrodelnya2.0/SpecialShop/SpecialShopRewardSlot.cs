@@ -11,5 +11,6 @@ public class SpecialShopRewardSlot : MonoBehaviour
     {
         _icon.sprite = icon;
         _amount.text = "x" +  amount.ToString();
+        BlockyUITheme.StyleCard(gameObject, RareType.Rare);
     }
 }

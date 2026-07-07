@@ -43,6 +43,8 @@ public class SpecialShopSlot : MonoBehaviour
             r.SetReward(icon, reward.Amount);
         }
 
+        BlockyUITheme.StyleShopProductCard(gameObject);
+
     }
 
     public void OnClick()

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -5,33 +6,82 @@ using UnityEngine.UI;
 public class ConveyorLevelTab : MonoBehaviour
 {
     [SerializeField] GameObject _activeIndicator;
+    [SerializeField] private Color _inactiveTextColor = Color.white;
+    [SerializeField] private Color _activeTextColor = new Color(0.16f, 0.04f, 0.08f, 1f);
+
     private LocalizedText _localization;
     private Text _name;
     private ConveyorLevel _level;
+    private string _fallbackName;
+    private bool _active;
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> OnClick = new();
 
     public void Init(ConveyorLevel level)
     {
-        _name = GetComponentInChildren<Text>();
+        _name = GetComponentInChildren<Text>(true);
         _level = level;
-        string localizationKey = "Boost/RareType/" + _level.RareType.ToString();
+        _fallbackName = GetFallbackName(_level);
+
         _localization = _name != null ? _name.GetComponent<LocalizedText>() : null;
-        if (_localization != null)
+        ApplyName();
+        ApplyVisualState();
+    }
+
+    private void ApplyName()
+    {
+        if (_name == null)
+            return;
+
+        _name.text = _fallbackName;
+        _name.transform.SetAsLastSibling();
+
+        if (_localization == null)
+            return;
+
+        string localizationKey = GetLocalizationKey(_fallbackName);
+        if (string.IsNullOrEmpty(localizationKey))
         {
-            var manager = LocalizationManager.Instance;
-            _localization.Configure(
-                _localization.LocalizationData != null ? _localization.LocalizationData : manager != null ? manager.LocalizationData : null,
-                localizationKey,
-                manager != null ? manager.CurrentLanguage : _localization.CurrentLanguage);
+            _localization.enabled = false;
+            _name.text = _fallbackName;
+            return;
         }
-        else if (_name != null)
+
+        var manager = LocalizationManager.Instance;
+        LocalizationData data = _localization.LocalizationData != null
+            ? _localization.LocalizationData
+            : manager != null ? manager.LocalizationData : null;
+
+        if (data == null)
         {
-            _name.text = _level.RareType.ToString();
+            _localization.enabled = false;
+            _name.text = _fallbackName;
+            return;
         }
-        //_name.text = LocalizationManager.Instance.LocalizationData.GetTranslation(LocalizationKeyType. + _level.RareType, LocalizationManager.Instance.CurrentLanguage);
-        //_name.text = _level.RareType.ToString(); // TODO: Localization
+
+        if (!_localization.enabled)
+            _localization.enabled = true;
+
+        string language = manager != null && !string.IsNullOrEmpty(manager.CurrentLanguage)
+            ? manager.CurrentLanguage
+            : _localization.CurrentLanguage;
+
+        _localization.Configure(data, localizationKey, language);
+        if (string.IsNullOrWhiteSpace(_name.text) || string.Equals(_name.text, localizationKey, StringComparison.Ordinal))
+            _name.text = _fallbackName;
+    }
+
+    private void ApplyVisualState()
+    {
+        if (_activeIndicator != null)
+            _activeIndicator.SetActive(_active);
+
+        if (_name != null)
+        {
+            _name.color = _active ? _activeTextColor : _inactiveTextColor;
+            _name.transform.SetAsLastSibling();
+        }
     }
 
     public void _OnClick()
@@ -41,6 +91,28 @@ public class ConveyorLevelTab : MonoBehaviour
 
     public void SetLvlActive(bool active)
     {
-        _activeIndicator.SetActive(active);
+        _active = active;
+        ApplyVisualState();
+    }
+
+    private static string GetFallbackName(ConveyorLevel level)
+    {
+        if (level == null)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(level.Name))
+            return level.Name.Trim();
+
+        return level.RareType != RareType.RareType ? level.RareType.ToString() : string.Empty;
+    }
+
+    private static string GetLocalizationKey(string fallbackName)
+    {
+        if (string.IsNullOrWhiteSpace(fallbackName))
+            return null;
+
+        return Enum.TryParse(fallbackName, true, out RareType rareType) && rareType != RareType.RareType
+            ? "Boost/RareType/" + rareType
+            : null;
     }
 }

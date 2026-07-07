@@ -14,6 +14,7 @@ public class TeleportButton : MonoBehaviour
     private void Awake()
     {
         _button = GetComponent<Button>();
+        BlockyUITheme.StyleTopNavigationButton(_button);
         _button.onClick.AddListener(OnClick);
     }
 

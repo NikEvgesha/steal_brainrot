@@ -90,6 +90,17 @@ public class Egg : InventoryItem
         }
     }
 
+    private void OnEnable()
+    {
+        if (_initialized && _status == EggStatus.Maturing && _currentCell != null && _ticker == null)
+            StartTicker();
+    }
+
+    private void OnDisable()
+    {
+        StopTicker();
+    }
+
     private void OnValidate()
     {
         ApplyElementVfxDefaultsIfNeeded();
@@ -160,9 +171,9 @@ public class Egg : InventoryItem
         {
             Init();
         }
-        _data.DinamicData.ElementType = G.Elements.GetRandomWeighted();
+        _data.DinamicData.ElementType = G.Elements != null ? G.Elements.GetRandomWeighted() : ElementType.NoElement;
         SetTypeVisual();
-        _infoUI.SetInfo(this);
+        _infoUI?.SetInfo(this);
     }
 
     public void SetData(BrainrotDinamicData data)
@@ -173,7 +184,7 @@ public class Egg : InventoryItem
         }
         _data.DinamicData = data;
         SetTypeVisual();
-        _infoUI.SetInfo(this);
+        _infoUI?.SetInfo(this);
     }
 
     public void SetConveyorPurchaseMode(bool remoteRewardPurchase)
@@ -236,7 +247,7 @@ public class Egg : InventoryItem
             return;
         }
 
-        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)))
+        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * GetElementMultiplier()))
         {
             G.Inventory.Add(this);
             EggPurchased.Invoke(this);
@@ -245,10 +256,11 @@ public class Egg : InventoryItem
     public void InitTimer(FieldCell field)
     {
         _status = EggStatus.Maturing;
-        _infoUI.SetStatus(_status);
+        _infoUI?.SetInfo(this);
+        _infoUI?.SetStatus(_status);
         _currentCell = field;
         _totalDurationSec = Mathf.RoundToInt(
-            _data.SecondsToHatching * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)
+            _data.SecondsToHatching * GetElementMultiplier()
         );
 
         // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
@@ -275,8 +287,7 @@ public class Egg : InventoryItem
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
 
 
-        if (_ticker != null) StopCoroutine(_ticker);
-        _ticker = StartCoroutine(Ticker());
+        StartTicker();
 
     }
     /// <summary>
@@ -333,19 +344,42 @@ public class Egg : InventoryItem
     public void InitTimer(FieldCell cell, DateTimeOffset endTime)
     {
         _status = EggStatus.Maturing;
-        _infoUI.SetStatus(_status);
+        _infoUI?.SetInfo(this);
+        _infoUI?.SetStatus(_status);
         _currentCell = cell;
         _currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);
         _currentCell.SpeedBoost.AddListener(SpeedBoostAd);
 
         _totalDurationSec = Mathf.RoundToInt(
-            _data.SecondsToHatching * G.Elements.GetMultiplaer(_data.DinamicData.ElementType)
+            _data.SecondsToHatching * GetElementMultiplier()
         );
         DateTimeOffset now = DateTimeOffset.UtcNow;
-        _endUtc = endTime < now ? now : endTime;
+        _endUtc = endTime.ToUnixTimeSeconds() > 0 ? endTime : now.AddSeconds(_totalDurationSec);
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
-        if (_ticker != null) StopCoroutine(_ticker);
+        StartTicker();
+    }
+
+    private float GetElementMultiplier()
+    {
+        return G.Elements != null ? G.Elements.GetMultiplaer(_data.DinamicData.ElementType) : 1f;
+    }
+
+    private void StartTicker()
+    {
+        StopTicker();
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
         _ticker = StartCoroutine(Ticker());
+    }
+
+    private void StopTicker()
+    {
+        if (_ticker == null)
+            return;
+
+        StopCoroutine(_ticker);
+        _ticker = null;
     }
 
     private IEnumerator Ticker()
@@ -359,15 +393,17 @@ public class Egg : InventoryItem
 
             if (remainingSec <= 0)
             {
-                _infoUI.ShowTimeUI(0, 1f); // 100% РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
+                _infoUI?.ShowTimeUI(0, 1f); // 100% РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
+                _currentCell.HatchEgg.RemoveListener(Hatching);
                 _currentCell.HatchEgg.AddListener(Hatching);
                 _status = EggStatus.ReadyToHatch;
+                _ticker = null;
                 _currentCell.CheckPlayer();
                 //Hatching();
                 yield break;
             }
-            float progress01 = 1f - Mathf.Clamp01((float)(remainingSec / _totalDurationSec));
-            _infoUI.ShowTimeUI((int)Math.Ceiling(remainingSec), progress01);
+            float progress01 = _totalDurationSec <= 0 ? 1f : 1f - Mathf.Clamp01((float)(remainingSec / _totalDurationSec));
+            _infoUI?.ShowTimeUI((int)Math.Ceiling(remainingSec), progress01);
 
             yield return wait;
         }
@@ -438,9 +474,13 @@ public class Egg : InventoryItem
         }
 
         _data.DinamicData.WeightMultiplier = UnityEngine.Random.Range(1, brainrotPrefab.Data.MaxWeightMult);
-        Brainrot brainrot = Instantiate(brainrotPrefab, _currentCell.transform);
+        Brainrot brainrot = Instantiate(brainrotPrefab, _currentCell.transform, false);
+        brainrot.transform.localPosition = Vector3.zero;
         brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         brainrot.Init(_data.DinamicData, _currentCell);
+        brainrot.transform.SetParent(_currentCell.transform, false);
+        brainrot.transform.localPosition = Vector3.zero;
+        brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
         // Album progress should track hatched pets even before they are picked up.
         if (G.Album != null)
@@ -488,8 +528,9 @@ public class Egg : InventoryItem
 
     public override void OnInventoryAdd() {
         _status = EggStatus.Purchased;
-        _infoUI.SetStatus(_status);
-        Destroy(_buyPanel.gameObject);
+        _infoUI?.SetStatus(_status);
+        if (_buyPanel != null)
+            Destroy(_buyPanel.gameObject);
     }
 
     private void ApplyBuyPanelAdBadge()

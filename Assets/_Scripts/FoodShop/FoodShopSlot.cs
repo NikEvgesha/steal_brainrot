@@ -29,6 +29,7 @@ public class FoodShopSlot : MonoBehaviour
         //_amountText.text = _food..ToString();
         _coinPrice.text = G.Currency.ToString(_food.Data.MoneyPrice);
         _gemPrice.text = G.Currency.ToString(_food.Data.GemPrice);
+        BlockyUITheme.StyleFoodSlot(gameObject, true);
     }
 
     public void SetAvailability(bool available)
@@ -36,6 +37,7 @@ public class FoodShopSlot : MonoBehaviour
         _coinButton.gameObject.SetActive(available);
         _gemButton.gameObject.SetActive(available);
         _unavailablePanel.SetActive(!available);
+        BlockyUITheme.StyleFoodSlot(gameObject, available);
     }
 
     public void SetAmount(int amount)

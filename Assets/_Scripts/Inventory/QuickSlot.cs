@@ -14,12 +14,14 @@ public class QuickSlot : MonoBehaviour
     {
         _index.text = idx.ToString();
         _idx = idx;
+        BlockyUITheme.StyleQuickSlot(gameObject, _activeFrame);
     }
 
 
     public void Init(InventoryItem item = null)
     {
         _item = item;
+        BlockyUITheme.StyleQuickSlot(gameObject, _activeFrame);
         if (item == null)
         {
             _img.sprite = null;

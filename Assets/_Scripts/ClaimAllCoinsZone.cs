@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class ClaimAllCoinsZone : MonoBehaviour
 {
@@ -21,6 +23,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [Header("Scene Refs")]
     [SerializeField] private InteractionPanel interactionPanel;
     [SerializeField] private UniversalDecisionPopup decisionPopup;
+    [SerializeField] private UniversalDecisionPopup decisionPopupPrefab;
+    [SerializeField] private Transform popupRuntimeParent;
     [SerializeField] private GameObject readyIndicator;
     [SerializeField] private AudioSource collectAudio;
     [SerializeField] private RemoteBasesApplier remoteBases;
@@ -48,6 +52,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [SerializeField] private bool hideZoneWhenNotLocal = true;
     [SerializeField] private bool disableTriggerWhenNotLocal = true;
     [SerializeField] private float slotResolutionRefreshSec = 0.5f;
+    [SerializeField] private bool openPopupOnEnter = true;
+    [SerializeField] private bool hidePopupOnExit = true;
 
     [Header("Permanent Unlock")]
     [SerializeField] private CurrencyType unlockPriceCurrency = CurrencyType.Gems;
@@ -68,6 +74,20 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [SerializeField] private string popupBuyForeverLocalizationKey = "UI/ClaimAll/PopupBuyForever";
     [SerializeField] private string popupBuyForeverText = "Buy forever";
 
+    [Header("Popup Presentation")]
+    [SerializeField] private bool applyClaimPopupPresentation = true;
+    [SerializeField] private Vector2 claimPopupAnchorMin = new Vector2(0.14f, 0.18f);
+    [SerializeField] private Vector2 claimPopupAnchorMax = new Vector2(0.86f, 0.72f);
+    [SerializeField] private Vector2 claimPopupPosition = new Vector2(0f, -22f);
+    [SerializeField] private Vector2 claimPopupPadding = new Vector2(42f, 34f);
+    [SerializeField] private Color claimPopupPanelColor = new Color(0.20f, 0.02f, 0.09f, 0.96f);
+    [SerializeField] private Color claimPopupConfirmColor = new Color(0.08f, 0.46f, 0.29f, 1f);
+    [SerializeField] private Color claimPopupCancelColor = new Color(0.50f, 0.13f, 0.34f, 1f);
+    [SerializeField] private Color claimPopupTextColor = Color.white;
+    [SerializeField] private float claimPopupTitleFontSize = 44f;
+    [SerializeField] private float claimPopupDescriptionFontSize = 25f;
+    [SerializeField] private float claimPopupButtonFontSize = 28f;
+
     [Header("Debug")]
     [SerializeField] private bool debugLogs;
 
@@ -83,6 +103,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
     private readonly List<FieldCell> _cachedIncomeCells = new();
     private readonly List<BigPetPoint> _cachedBigPetPoints = new();
     private bool _incomeSourcesCached;
+    private UniversalDecisionPopup _activePopup;
+    private bool _popupOpenedByZone;
+    private Canvas _runtimePopupCanvas;
 
     private void Awake()
     {
@@ -155,6 +178,10 @@ public class ClaimAllCoinsZone : MonoBehaviour
             if (collectImmediatelyOnEnterAfterUnlock)
                 TryCollectWithoutAd("enter");
         }
+        else if (openPopupOnEnter)
+        {
+            ShowOfferPopup();
+        }
         RefreshVisualState();
     }
 
@@ -166,6 +193,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
         _playerInside = false;
         StopStateRoutine();
         StopAutoCollectRoutine();
+        HidePopupIfOpenedByZone();
         HideInteraction();
         RefreshVisualState();
     }
@@ -320,6 +348,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
             return;
         }
 
+        ApplyPopupPresentation(popup);
+
         if (popup.IsOpen)
             return;
 
@@ -331,6 +361,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
             cancel = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, BuildBuyForeverButtonText()),
             onConfirm = () =>
             {
+                _activePopup = null;
+                _popupOpenedByZone = false;
                 if (_actionInFlight || !_playerInside)
                     return;
                 StartCoroutine(ClaimWithAdX2Flow());
@@ -344,6 +376,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
                     return;
 
                 popup.Hide();
+                _activePopup = null;
+                _popupOpenedByZone = false;
                 if (collectImmediatelyOnEnterAfterUnlock)
                     TryCollectWithoutAd("unlock");
                 StartAutoCollectRoutine();
@@ -354,6 +388,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
             closeButtonActsAsCancel = false
         };
 
+        _activePopup = popup;
+        _popupOpenedByZone = true;
         popup.Show(request);
     }
 
@@ -608,7 +644,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
         }
 
         var hasIncome = HasCollectibleIncome();
-        var showInteraction = !_permanentUnlocked && _playerInside && !_actionInFlight;
+        var showInteraction = !openPopupOnEnter && !_permanentUnlocked && _playerInside && !_actionInFlight;
 
         if (interactionPanel != null)
         {
@@ -630,6 +666,18 @@ public class ClaimAllCoinsZone : MonoBehaviour
     {
         if (interactionPanel != null)
             interactionPanel.gameObject.SetActive(false);
+    }
+
+    private void HidePopupIfOpenedByZone()
+    {
+        if (!hidePopupOnExit || !_popupOpenedByZone)
+            return;
+
+        if (_activePopup != null && _activePopup.IsOpen)
+            _activePopup.Hide();
+
+        _activePopup = null;
+        _popupOpenedByZone = false;
     }
 
     private RemoteBasesApplier GetRemoteBases()
@@ -700,6 +748,13 @@ public class ClaimAllCoinsZone : MonoBehaviour
     {
         if (decisionPopup != null)
             return decisionPopup;
+
+        if (decisionPopupPrefab != null)
+        {
+            decisionPopup = CreateDecisionPopupInstance();
+            return decisionPopup;
+        }
+
         if (!autoDiscoverPopup)
             return null;
 
@@ -722,10 +777,266 @@ public class ClaimAllCoinsZone : MonoBehaviour
         return decisionPopup;
     }
 
+    private UniversalDecisionPopup CreateDecisionPopupInstance()
+    {
+        var parent = ResolvePopupRuntimeParent();
+        var popup = parent != null
+            ? Instantiate(decisionPopupPrefab, parent, false)
+            : Instantiate(decisionPopupPrefab);
+
+        popup.name = decisionPopupPrefab.name + "_ClaimAllRuntime";
+
+        var rect = popup.transform as RectTransform;
+        if (rect != null)
+            Stretch(rect, Vector2.zero, Vector2.zero);
+
+        popup.Hide();
+        return popup;
+    }
+
+    private Transform ResolvePopupRuntimeParent()
+    {
+        if (popupRuntimeParent != null)
+            return popupRuntimeParent;
+
+        return EnsureRuntimePopupCanvas();
+    }
+
+    private static Transform FindCanvasUnder(Transform root, bool requireActive)
+    {
+        if (root == null)
+            return null;
+
+        var canvases = root.GetComponentsInChildren<Canvas>(true);
+        if (canvases == null)
+            return null;
+
+        for (var i = 0; i < canvases.Length; i++)
+        {
+            if (IsUsablePopupCanvas(canvases[i], requireActive))
+                return canvases[i].transform;
+        }
+
+        return null;
+    }
+
+    private static Transform FindCanvasInParents(Transform root, bool requireActive)
+    {
+        var current = root;
+        while (current != null)
+        {
+            var canvas = current.GetComponent<Canvas>();
+            if (IsUsablePopupCanvas(canvas, requireActive))
+                return canvas.transform;
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private static Transform FindSceneCanvas(bool requireActive)
+    {
+        var canvases = Resources.FindObjectsOfTypeAll<Canvas>();
+        if (canvases == null)
+            return null;
+
+        for (var i = 0; i < canvases.Length; i++)
+        {
+            if (IsUsablePopupCanvas(canvases[i], requireActive))
+                return canvases[i].transform;
+        }
+
+        return null;
+    }
+
+    private static bool IsUsablePopupCanvas(Canvas canvas, bool requireActive)
+    {
+        if (canvas == null)
+            return false;
+        if (canvas.renderMode == RenderMode.WorldSpace)
+            return false;
+        if (requireActive && !canvas.gameObject.activeInHierarchy)
+            return false;
+#if UNITY_EDITOR
+        if (UnityEditor.EditorUtility.IsPersistent(canvas))
+            return false;
+#endif
+        return canvas.gameObject.scene.IsValid();
+    }
+
+    private Transform EnsureRuntimePopupCanvas()
+    {
+        if (_runtimePopupCanvas != null)
+            return _runtimePopupCanvas.transform;
+
+        var canvasObject = new GameObject("ClaimAllPopupCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        canvasObject.transform.SetParent(transform.root, false);
+
+        _runtimePopupCanvas = canvasObject.GetComponent<Canvas>();
+        _runtimePopupCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        _runtimePopupCanvas.overrideSorting = true;
+        _runtimePopupCanvas.sortingOrder = 2000;
+
+        var scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280f, 720f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        return _runtimePopupCanvas.transform;
+    }
+
     private string BuildPopupDescription()
     {
         var baseText = L(popupDescriptionLocalizationKey, popupDescriptionText);
         return $"{baseText}\n{BuildBuyForeverButtonText()}";
+    }
+
+    private void ApplyPopupPresentation(UniversalDecisionPopup popup)
+    {
+        if (!applyClaimPopupPresentation || popup == null)
+            return;
+
+        var popupTransform = popup.transform;
+        var container = popupTransform.Find("container") as RectTransform;
+        if (container != null)
+        {
+            container.anchorMin = claimPopupAnchorMin;
+            container.anchorMax = claimPopupAnchorMax;
+            container.pivot = new Vector2(0.5f, 0.5f);
+            container.anchoredPosition = claimPopupPosition;
+            container.sizeDelta = Vector2.zero;
+            container.localScale = Vector3.one;
+
+            var fitter = container.GetComponent<AspectRatioFitter>();
+            if (fitter != null)
+                fitter.enabled = false;
+        }
+
+        var panel = popupTransform.Find("container/panel") as RectTransform;
+        if (panel != null)
+        {
+            Stretch(panel, Vector2.zero, Vector2.zero);
+            var fitter = panel.GetComponent<AspectRatioFitter>();
+            if (fitter != null)
+                fitter.enabled = false;
+
+            var panelImage = panel.GetComponent<Image>();
+            if (panelImage != null)
+                panelImage.color = claimPopupPanelColor;
+        }
+
+        var elements = popupTransform.Find("container/panel/Elements") as RectTransform;
+        if (elements != null)
+            Stretch(elements, claimPopupPadding, -claimPopupPadding);
+
+        var title = popupTransform.Find("container/panel/Elements/Title") as RectTransform;
+        if (title != null)
+            SetTopBand(title, 0f, 80f);
+
+        var description = popupTransform.Find("container/panel/Elements/Discription") as RectTransform;
+        if (description != null)
+        {
+            description.anchorMin = new Vector2(0.04f, 0.34f);
+            description.anchorMax = new Vector2(0.96f, 0.72f);
+            description.pivot = new Vector2(0.5f, 0.5f);
+            description.anchoredPosition = Vector2.zero;
+            description.sizeDelta = Vector2.zero;
+            description.localScale = Vector3.one;
+        }
+
+        var buttons = popupTransform.Find("container/panel/Elements/Buttons") as RectTransform;
+        if (buttons != null)
+        {
+            buttons.anchorMin = new Vector2(0.06f, 0.06f);
+            buttons.anchorMax = new Vector2(0.94f, 0.28f);
+            buttons.pivot = new Vector2(0.5f, 0.5f);
+            buttons.anchoredPosition = Vector2.zero;
+            buttons.sizeDelta = Vector2.zero;
+            buttons.localScale = Vector3.one;
+        }
+
+        var confirm = popupTransform.Find("container/panel/Elements/Buttons/Ok") as RectTransform;
+        if (confirm != null)
+        {
+            SetSplitButton(confirm, 0f, 0.48f);
+            SetImageColor(confirm, claimPopupConfirmColor);
+        }
+
+        var cancel = popupTransform.Find("container/panel/Elements/Buttons/Cancel") as RectTransform;
+        if (cancel != null)
+        {
+            SetSplitButton(cancel, 0.52f, 1f);
+            SetImageColor(cancel, claimPopupCancelColor);
+        }
+
+        var close = popupTransform.Find("container/panel/Button (Legacy)") as RectTransform;
+        if (close != null)
+        {
+            close.anchorMin = new Vector2(1f, 1f);
+            close.anchorMax = new Vector2(1f, 1f);
+            close.pivot = new Vector2(1f, 1f);
+            close.anchoredPosition = new Vector2(-10f, -10f);
+            close.sizeDelta = new Vector2(58f, 58f);
+            close.localScale = Vector3.one;
+        }
+
+        ConfigureText(popupTransform.Find("container/panel/Elements/Title/Text (TMP)"), claimPopupTitleFontSize);
+        ConfigureText(popupTransform.Find("container/panel/Elements/Discription/Text (TMP) (1)"), claimPopupDescriptionFontSize);
+        ConfigureText(popupTransform.Find("container/panel/Elements/Buttons/Ok/Text (TMP)"), claimPopupButtonFontSize);
+        ConfigureText(popupTransform.Find("container/panel/Elements/Buttons/Cancel/Text (TMP)"), claimPopupButtonFontSize);
+    }
+
+    private static void Stretch(RectTransform rect, Vector2 offsetMin, Vector2 offsetMax)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = offsetMin;
+        rect.offsetMax = offsetMax;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void SetTopBand(RectTransform rect, float topOffset, float height)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -topOffset);
+        rect.sizeDelta = new Vector2(0f, height);
+        rect.localScale = Vector3.one;
+    }
+
+    private static void SetSplitButton(RectTransform rect, float anchorMinX, float anchorMaxX)
+    {
+        rect.anchorMin = new Vector2(anchorMinX, 0f);
+        rect.anchorMax = new Vector2(anchorMaxX, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void SetImageColor(Component component, Color color)
+    {
+        var image = component != null ? component.GetComponent<Image>() : null;
+        if (image != null)
+            image.color = color;
+    }
+
+    private void ConfigureText(Transform textTransform, float fontSize)
+    {
+        var text = textTransform != null ? textTransform.GetComponent<TMP_Text>() : null;
+        if (text == null)
+            return;
+
+        text.color = claimPopupTextColor;
+        text.fontSize = fontSize;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = Mathf.Max(12f, fontSize * 0.65f);
+        text.fontSizeMax = fontSize;
+        text.alignment = TextAlignmentOptions.Center;
+        text.overflowMode = TextOverflowModes.Ellipsis;
     }
 
     private string BuildBuyForeverButtonText()

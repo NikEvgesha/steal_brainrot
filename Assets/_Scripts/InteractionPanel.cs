@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     private const string RewardedAdBadgeName = "AdIconBadge";
+    private const string RewardedAdBadgeLabelName = "AdIconBadgeLabel";
 
     [SerializeField] private GameObject _hintDesctop;
     [SerializeField] private GameObject _hintTouch;
@@ -19,8 +20,15 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [SerializeField] private float _resumeAfterDisableWindowSec = 0.35f;
     [Header("Rewarded Ad Badge")]
     [SerializeField] private bool _showRewardedAdBadge;
+    [SerializeField] private Sprite _rewardedAdBadgeSprite;
+    [SerializeField] private string _rewardedAdBadgeLabel;
     [SerializeField] private Vector2 _rewardedAdBadgeSize = new Vector2(36f, 36f);
     [SerializeField] private Vector2 _rewardedAdBadgeOffset = new Vector2(-7f, -7f);
+    [SerializeField] private Vector2 _rewardedAdBadgeLabelSize = new Vector2(72f, 24f);
+    [SerializeField] private Vector2 _rewardedAdBadgeLabelOffset = new Vector2(0f, -31f);
+    [SerializeField] private int _rewardedAdBadgeLabelFontSize = 18;
+    [SerializeField] private Color _rewardedAdBadgeLabelColor = Color.white;
+    [SerializeField] private Color _rewardedAdBadgeLabelOutlineColor = new Color(0f, 0f, 0f, 0.82f);
     [SerializeField] public UnityEvent InteractionStarted;
     [SerializeField] public UnityEvent InteractionComplete;
 
@@ -35,6 +43,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private float _resumeUntilUnscaledTime;
     private bool _awaitReleaseAfterComplete;
     private Image _rewardedAdBadgeImage;
+    private Text _rewardedAdBadgeLabelText;
+    private Transform _rewardedAdBadgeParent;
 
     public bool IsInteracting => _interactionInProgress;
 
@@ -267,6 +277,27 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         ApplyRewardedAdBadgeState();
     }
 
+    public void ConfigureRewardedAdBadge(
+        bool visible,
+        Sprite sprite,
+        string label,
+        Transform badgeParent = null,
+        Vector2? size = null,
+        Vector2? offset = null)
+    {
+        _showRewardedAdBadge = visible;
+        _rewardedAdBadgeSprite = sprite;
+        _rewardedAdBadgeLabel = label;
+        _rewardedAdBadgeParent = badgeParent;
+
+        if (size.HasValue)
+            _rewardedAdBadgeSize = size.Value;
+        if (offset.HasValue)
+            _rewardedAdBadgeOffset = offset.Value;
+
+        ApplyRewardedAdBadgeState();
+    }
+
     public void MarkAsRewardedAdInteraction(bool rewarded = true)
     {
         SetRewardedAdBadgeVisible(rewarded);
@@ -278,24 +309,35 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         {
             if (_rewardedAdBadgeImage != null)
                 _rewardedAdBadgeImage.gameObject.SetActive(false);
+            if (_rewardedAdBadgeLabelText != null)
+                _rewardedAdBadgeLabelText.gameObject.SetActive(false);
             return;
         }
 
         Image badge = EnsureRewardedAdBadge();
         if (badge != null)
+        {
             badge.gameObject.SetActive(true);
+            ApplyRewardedAdBadgeLabel(badge.transform);
+        }
     }
 
     private Image EnsureRewardedAdBadge()
     {
+        Transform badgeParent = _rewardedAdBadgeParent != null ? _rewardedAdBadgeParent : transform;
         if (_rewardedAdBadgeImage != null)
+        {
+            if (_rewardedAdBadgeImage.transform.parent != badgeParent)
+                _rewardedAdBadgeImage.transform.SetParent(badgeParent, false);
+            ConfigureRewardedAdBadgeImage(_rewardedAdBadgeImage);
             return _rewardedAdBadgeImage;
+        }
 
-        Transform badgeTransform = transform.Find(RewardedAdBadgeName);
+        Transform badgeTransform = badgeParent.Find(RewardedAdBadgeName);
         if (badgeTransform == null)
         {
             var badgeObject = new GameObject(RewardedAdBadgeName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
-            badgeObject.transform.SetParent(transform, false);
+            badgeObject.transform.SetParent(badgeParent, false);
             badgeTransform = badgeObject.transform;
         }
 
@@ -303,13 +345,28 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         if (_rewardedAdBadgeImage == null)
             _rewardedAdBadgeImage = badgeTransform.gameObject.AddComponent<Image>();
 
-        _rewardedAdBadgeImage.sprite = AdButtonIconDecorator.GetIconSprite();
-        _rewardedAdBadgeImage.type = Image.Type.Simple;
-        _rewardedAdBadgeImage.preserveAspect = true;
-        _rewardedAdBadgeImage.color = Color.white;
-        _rewardedAdBadgeImage.raycastTarget = false;
+        ConfigureRewardedAdBadgeImage(_rewardedAdBadgeImage);
 
-        var rect = badgeTransform as RectTransform;
+        var layoutElement = badgeTransform.GetComponent<LayoutElement>();
+        if (layoutElement == null)
+            layoutElement = badgeTransform.gameObject.AddComponent<LayoutElement>();
+        layoutElement.ignoreLayout = true;
+
+        return _rewardedAdBadgeImage;
+    }
+
+    private void ConfigureRewardedAdBadgeImage(Image badgeImage)
+    {
+        if (badgeImage == null)
+            return;
+
+        badgeImage.sprite = _rewardedAdBadgeSprite != null ? _rewardedAdBadgeSprite : AdButtonIconDecorator.GetIconSprite();
+        badgeImage.type = Image.Type.Simple;
+        badgeImage.preserveAspect = true;
+        badgeImage.color = Color.white;
+        badgeImage.raycastTarget = false;
+
+        var rect = badgeImage.transform as RectTransform;
         if (rect != null)
         {
             rect.anchorMin = new Vector2(1f, 1f);
@@ -320,12 +377,75 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             rect.localScale = Vector3.one;
             rect.SetAsLastSibling();
         }
+    }
 
-        var layoutElement = badgeTransform.GetComponent<LayoutElement>();
-        if (layoutElement == null)
-            layoutElement = badgeTransform.gameObject.AddComponent<LayoutElement>();
-        layoutElement.ignoreLayout = true;
+    private void ApplyRewardedAdBadgeLabel(Transform badgeTransform)
+    {
+        if (badgeTransform == null)
+            return;
 
-        return _rewardedAdBadgeImage;
+        if (string.IsNullOrWhiteSpace(_rewardedAdBadgeLabel))
+        {
+            if (_rewardedAdBadgeLabelText != null)
+                _rewardedAdBadgeLabelText.gameObject.SetActive(false);
+            return;
+        }
+
+        Text label = EnsureRewardedAdBadgeLabel(badgeTransform);
+        if (label == null)
+            return;
+
+        label.text = _rewardedAdBadgeLabel;
+        label.gameObject.SetActive(true);
+    }
+
+    private Text EnsureRewardedAdBadgeLabel(Transform badgeTransform)
+    {
+        if (_rewardedAdBadgeLabelText != null)
+            return _rewardedAdBadgeLabelText;
+
+        Transform labelTransform = badgeTransform.Find(RewardedAdBadgeLabelName);
+        if (labelTransform == null)
+        {
+            var labelObject = new GameObject(RewardedAdBadgeLabelName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(Outline));
+            labelObject.transform.SetParent(badgeTransform, false);
+            labelTransform = labelObject.transform;
+        }
+
+        _rewardedAdBadgeLabelText = labelTransform.GetComponent<Text>();
+        if (_rewardedAdBadgeLabelText == null)
+            _rewardedAdBadgeLabelText = labelTransform.gameObject.AddComponent<Text>();
+
+        _rewardedAdBadgeLabelText.font = _actionText != null && _actionText.font != null
+            ? _actionText.font
+            : Font.CreateDynamicFontFromOSFont("Arial", _rewardedAdBadgeLabelFontSize);
+        _rewardedAdBadgeLabelText.alignment = TextAnchor.MiddleCenter;
+        _rewardedAdBadgeLabelText.color = _rewardedAdBadgeLabelColor;
+        _rewardedAdBadgeLabelText.fontSize = _rewardedAdBadgeLabelFontSize;
+        _rewardedAdBadgeLabelText.fontStyle = FontStyle.Bold;
+        _rewardedAdBadgeLabelText.raycastTarget = false;
+        _rewardedAdBadgeLabelText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        _rewardedAdBadgeLabelText.verticalOverflow = VerticalWrapMode.Overflow;
+
+        var outline = labelTransform.GetComponent<Outline>();
+        if (outline != null)
+        {
+            outline.effectColor = _rewardedAdBadgeLabelOutlineColor;
+            outline.effectDistance = new Vector2(1.4f, -1.4f);
+            outline.useGraphicAlpha = true;
+        }
+
+        var rect = labelTransform as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = _rewardedAdBadgeLabelOffset;
+            rect.sizeDelta = _rewardedAdBadgeLabelSize;
+            rect.localScale = Vector3.one;
+        }
+
+        return _rewardedAdBadgeLabelText;
     }
 }

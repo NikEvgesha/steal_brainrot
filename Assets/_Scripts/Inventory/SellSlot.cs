@@ -43,6 +43,7 @@ public class SellSlot : MonoBehaviour
             default:
                 break;
         }
+        BlockyUITheme.StyleCard(gameObject, item.RareType);
     }
 
     public void _OnSellButtonClick()

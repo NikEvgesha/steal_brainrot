@@ -9,6 +9,10 @@ public class ItemsList : ScriptableObject
     private Dictionary<string, InventoryItem> _dict;
     public IReadOnlyList<InventoryItem> Items => _items;
 
+    private void OnEnable()
+    {
+        _dict = null;
+    }
 
     public void Init()
     {
@@ -49,6 +53,11 @@ public class ItemsList : ScriptableObject
         if (_dict == null) Init();
 
         InventoryItem item = null;
+        if (_dict.TryGetValue(name, out item))
+            return item;
+
+        // Asset references can be edited while the ScriptableObject instance stays loaded in the Editor.
+        Init();
         _dict.TryGetValue(name, out item);
         return item;
     }

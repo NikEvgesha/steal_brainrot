@@ -996,7 +996,7 @@ Canvas:
   serializedVersion: 3
   m_RenderMode: 0
   m_Camera: {fileID: 0}
-  m_PlaneDistance: 100
+  m_PlaneDistance: 1
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
   m_OverrideSorting: 0
@@ -1006,7 +1006,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 100
   m_TargetDisplay: 0
 --- !u!114 &1680360446249317205
 MonoBehaviour:
@@ -1446,11 +1446,11 @@ RectTransform:
   - {fileID: 891210100000000201}
   m_Father: {fileID: 3722542219611796201}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.5}
-  m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 14, y: -125}
-  m_SizeDelta: {x: 98, y: 314}
-  m_Pivot: {x: 0, y: 0.5}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 18, y: -450}
+  m_SizeDelta: {x: 124, y: 396}
+  m_Pivot: {x: 0, y: 1}
 --- !u!114 &891210100000000001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1458,7 +1458,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7598834529119209628}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
   m_Name:
@@ -1469,11 +1469,11 @@ MonoBehaviour:
     m_Top: 0
     m_Bottom: 0
   m_ChildAlignment: 0
-  m_Spacing: 10
+  m_Spacing: 12
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 0
-  m_ChildControlWidth: 1
-  m_ChildControlHeight: 1
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
@@ -1497,12 +1497,14 @@ MonoBehaviour:
   albumScreen: {fileID: 0}
   inventoryKey: 9
   shopKey: 98
-  albumKey: 0
+  albumKey: 99
+  createMissingButtons: 0
+  updateKeyBadges: 0
   styleMenuButtons: 1
-  menuButtonSize: {x: 98, y: 98}
-  menuButtonSpacing: 10
-  menuContainerOffset: {x: 14, y: -125}
-  menuIconSize: 68
+  menuButtonSize: {x: 124, y: 124}
+  menuButtonSpacing: 12
+  menuContainerOffset: {x: 18, y: -450}
+  menuIconSize: 64
   inventoryIconSprite: {fileID: 21300000, guid: 6a0b2ed6245273d40b527a92c7f81993, type: 3}
   shopIconSprite: {fileID: 21300000, guid: 88e503bf92f91d6488b8a3d3ed402b2c, type: 3}
   albumIconSprite: {fileID: 21300000, guid: 2cde8d842124ab94784cdd7dfacc2779, type: 3}
@@ -1696,11 +1698,11 @@ RectTransform:
   - {fileID: 891210100000000041}
   m_Father: {fileID: 1565513516480712035}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 98, y: 98}
-  m_Pivot: {x: 0.5, y: 1}
+  m_SizeDelta: {x: 124, y: 124}
+  m_Pivot: {x: 0, y: 1}
 --- !u!222 &7002663422416564025
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1841,11 +1843,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
-  m_IgnoreLayout: 0
-  m_MinWidth: 98
-  m_MinHeight: 98
-  m_PreferredWidth: 98
-  m_PreferredHeight: 98
+  m_IgnoreLayout: 1
+  m_MinWidth: 124
+  m_MinHeight: 124
+  m_PreferredWidth: 124
+  m_PreferredHeight: 124
   m_FlexibleWidth: 0
   m_FlexibleHeight: 0
   m_LayoutPriority: 1
@@ -1915,7 +1917,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 68, y: 68}
+  m_SizeDelta: {x: 70, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &891210100000000042
 CanvasRenderer:
@@ -2007,11 +2009,11 @@ RectTransform:
   - {fileID: 891210100000000111}
   m_Father: {fileID: 1565513516480712035}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 98, y: 98}
-  m_Pivot: {x: 0.5, y: 1}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 0, y: -136}
+  m_SizeDelta: {x: 124, y: 124}
+  m_Pivot: {x: 0, y: 1}
 --- !u!222 &891210100000000102
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2106,11 +2108,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
-  m_IgnoreLayout: 0
-  m_MinWidth: 98
-  m_MinHeight: 98
-  m_PreferredWidth: 98
-  m_PreferredHeight: 98
+  m_IgnoreLayout: 1
+  m_MinWidth: 124
+  m_MinHeight: 124
+  m_PreferredWidth: 124
+  m_PreferredHeight: 124
   m_FlexibleWidth: 0
   m_FlexibleHeight: 0
   m_LayoutPriority: 1
@@ -2180,7 +2182,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 68, y: 68}
+  m_SizeDelta: {x: 70, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &891210100000000112
 CanvasRenderer:
@@ -2273,11 +2275,11 @@ RectTransform:
   - {fileID: 891210100000000221}
   m_Father: {fileID: 1565513516480712035}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 98, y: 98}
-  m_Pivot: {x: 0.5, y: 1}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 0, y: -272}
+  m_SizeDelta: {x: 124, y: 124}
+  m_Pivot: {x: 0, y: 1}
 --- !u!222 &891210100000000202
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2372,11 +2374,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
   m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
-  m_IgnoreLayout: 0
-  m_MinWidth: 98
-  m_MinHeight: 98
-  m_PreferredWidth: 98
-  m_PreferredHeight: 98
+  m_IgnoreLayout: 1
+  m_MinWidth: 124
+  m_MinHeight: 124
+  m_PreferredWidth: 124
+  m_PreferredHeight: 124
   m_FlexibleWidth: 0
   m_FlexibleHeight: 0
   m_LayoutPriority: 1
@@ -2446,7 +2448,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 68, y: 68}
+  m_SizeDelta: {x: 70, y: 70}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &891210100000000212
 CanvasRenderer:

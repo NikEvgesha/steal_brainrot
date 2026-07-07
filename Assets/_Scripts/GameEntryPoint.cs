@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using MirraGames.SDK;
 using UnityEngine;
 
@@ -59,12 +60,14 @@ public class GameEntryPoint : MonoBehaviour
         _runtimeBackend = G.Backend;
         if (_runtimeBackend == null)
         {
+            PrepareOfflineLocalBase();
             HideLoadingScreen();
             return;
         }
 
         if (_runtimeBackend.IsInitialLocationsLoaded)
         {
+            PrepareOfflineLocalBaseIfNeeded(_runtimeBackend.LastLocations);
             HideLoadingScreen();
             return;
         }
@@ -74,7 +77,7 @@ public class GameEntryPoint : MonoBehaviour
         _initialLocationsTimeoutCoroutine = StartCoroutine(HideLoadingAfterInitialLocationsTimeout());
     }
 
-    private void OnInitialLocationsLoaded(System.Collections.Generic.List<ZooLocationItem> _)
+    private void OnInitialLocationsLoaded(List<ZooLocationItem> locations)
     {
         if (_runtimeBackend != null)
             _runtimeBackend.InitialLocationsLoaded -= OnInitialLocationsLoaded;
@@ -85,6 +88,7 @@ public class GameEntryPoint : MonoBehaviour
             _initialLocationsTimeoutCoroutine = null;
         }
 
+        PrepareOfflineLocalBaseIfNeeded(locations);
         HideLoadingScreen();
     }
 
@@ -97,7 +101,29 @@ public class GameEntryPoint : MonoBehaviour
 
         _initialLocationsTimeoutCoroutine = null;
         Debug.LogWarning($"GameEntryPoint: initial backend locations were not loaded after {_initialLocationsWaitTimeout:0.#}s. Continuing offline.");
+        PrepareOfflineLocalBase();
         HideLoadingScreen();
+    }
+
+    private void PrepareOfflineLocalBaseIfNeeded(IReadOnlyList<ZooLocationItem> locations)
+    {
+        if (LobbyClient.Instance != null && LobbyClient.Instance.IsOnline)
+            return;
+
+        if (locations != null && locations.Count > 0)
+            return;
+
+        PrepareOfflineLocalBase();
+    }
+
+    private void PrepareOfflineLocalBase()
+    {
+        var remoteBases = _remoteBasesApplier != null
+            ? _remoteBasesApplier
+            : FindAnyObjectByType<RemoteBasesApplier>();
+
+        if (remoteBases != null)
+            remoteBases.ApplyOfflineLocalOnly();
     }
 
     private void HideLoadingScreen()

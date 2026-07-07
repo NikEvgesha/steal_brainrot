@@ -26,6 +26,8 @@ public class FoodShopUI : MonoBehaviour
             slot.Init(this, food);
             _slots.Add(slot);
         }
+
+        ApplyBlockyStyle();
     }
 
 
@@ -52,5 +54,10 @@ public class FoodShopUI : MonoBehaviour
     public void OnResupplyButtonClicked()
     {
         ResupplyButtonClicked.Invoke();
+    }
+
+    private void ApplyBlockyStyle()
+    {
+        BlockyUITheme.StyleWindow(gameObject, BlockyUITheme.Tone.Orange);
     }
 }
