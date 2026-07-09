@@ -40,6 +40,7 @@ public static class AlbumScreenAutoWireEditor
         EnsureChild(panelRoot, "rareTabsRoot");
 
         var infoPanel = EnsureChild(panelRoot, "InfoPanel");
+        EnsureImageObject(infoPanel, "InfoIconFx");
         EnsureImageObject(infoPanel, "InfoIcon");
         EnsureTextObject(infoPanel, "InfoTitle", "Title");
         EnsureTextObject(infoPanel, "InfoDescription", "Description");
@@ -48,6 +49,10 @@ public static class AlbumScreenAutoWireEditor
         var hatchSection = EnsureChild(infoPanel, "EggHatchSection");
         var hatchIconsRoot = EnsureChild(hatchSection, "EggHatchIconsRoot");
         var hatchTemplate = EnsureImageObject(hatchIconsRoot, "EggHatchIconTemplate");
+        var hatchTemplateView = hatchTemplate.GetComponent<AlbumHatchIconView>();
+        if (hatchTemplateView == null)
+            hatchTemplateView = hatchTemplate.gameObject.AddComponent<AlbumHatchIconView>();
+        hatchTemplateView.AutoWire();
         hatchTemplate.gameObject.SetActive(false);
         EnsureOverlayChild(infoPanel, "InfoLockedOverlay", new Color(0f, 0f, 0f, 0.55f));
         EnsureTextObject(infoPanel, "InfoLockedText", "???");
@@ -244,15 +249,22 @@ public static class AlbumScreenAutoWireEditor
         var hatchSection = FindByName(root, "EggHatchSection") ?? FindByName(root, "HatchSection");
         var hatchIconsRoot = FindByName(root, "EggHatchIconsRoot") ??
                              FindByName(root, "HatchIconsRoot") ??
-                             FindByName(root, "InfoHatchIcons");
+                             FindByName(root, "InfoHatchIcons") ??
+                             FindByName(root, "InfoSources");
         Image hatchTemplate = null;
+        AlbumHatchIconView hatchIconPrefab = null;
         if (hatchIconsRoot != null)
         {
+            hatchIconPrefab = FindComponentByName<AlbumHatchIconView>(hatchIconsRoot, "EggHatchIconTemplate") ??
+                              FindComponentByName<AlbumHatchIconView>(hatchIconsRoot, "HatchIconTemplate") ??
+                              FindComponentByName<AlbumHatchIconView>(hatchIconsRoot, "EggHatchIcon");
             hatchTemplate = FindComponentByName<Image>(hatchIconsRoot, "EggHatchIconTemplate") ??
                             FindComponentByName<Image>(hatchIconsRoot, "HatchIconTemplate");
         }
         SetRef(so, "eggHatchSection", hatchSection != null ? hatchSection.gameObject : null);
         SetRef(so, "eggHatchIconsRoot", hatchIconsRoot as RectTransform);
+        if (hatchIconPrefab != null)
+            SetRef(so, "eggHatchIconPrefab", hatchIconPrefab);
         SetRef(so, "eggHatchIconTemplate", hatchTemplate);
 
         SetRef(so, "infoLockedOverlay", FindByName(root, "InfoLockedOverlay")?.gameObject);
@@ -306,6 +318,10 @@ public static class AlbumScreenAutoWireEditor
 
         var so = new SerializedObject(view);
         SetRef(so, "infoIcon", FindComponentByName<Image>(root, "InfoIcon"));
+        SetRef(so, "infoIconFxImage",
+            FindComponentByName<Image>(root, "InfoIconFx") ??
+            FindComponentByName<Image>(root, "InfoIconFX") ??
+            FindComponentByName<Image>(root, "InfoIconRays"));
         SetRef(so, "titleText", FindComponentByName<TMP_Text>(root, "InfoTitle"));
         SetRef(so, "lockedOverlay", FindByName(root, "InfoLockedOverlay")?.gameObject);
         SetRef(so, "lockedText", FindComponentByName<TMP_Text>(root, "InfoLockedText"));
@@ -323,15 +339,22 @@ public static class AlbumScreenAutoWireEditor
         var hatchSection = FindByName(root, "EggHatchSection") ?? FindByName(root, "HatchSection");
         var hatchIconsRoot = FindByName(root, "EggHatchIconsRoot") ??
                              FindByName(root, "HatchIconsRoot") ??
-                             FindByName(root, "InfoHatchIcons");
+                             FindByName(root, "InfoHatchIcons") ??
+                             FindByName(root, "InfoSources");
         Image hatchTemplate = null;
+        AlbumHatchIconView hatchIconPrefab = null;
         if (hatchIconsRoot != null)
         {
+            hatchIconPrefab = FindComponentByName<AlbumHatchIconView>(hatchIconsRoot, "EggHatchIconTemplate") ??
+                              FindComponentByName<AlbumHatchIconView>(hatchIconsRoot, "HatchIconTemplate") ??
+                              FindComponentByName<AlbumHatchIconView>(hatchIconsRoot, "EggHatchIcon");
             hatchTemplate = FindComponentByName<Image>(hatchIconsRoot, "EggHatchIconTemplate") ??
                             FindComponentByName<Image>(hatchIconsRoot, "HatchIconTemplate");
         }
         SetRef(so, "eggHatchSection", hatchSection != null ? hatchSection.gameObject : null);
         SetRef(so, "eggHatchIconsRoot", hatchIconsRoot as RectTransform);
+        if (hatchIconPrefab != null)
+            SetRef(so, "eggHatchIconPrefab", hatchIconPrefab);
         SetRef(so, "eggHatchIconTemplate", hatchTemplate);
 
         so.ApplyModifiedPropertiesWithoutUndo();

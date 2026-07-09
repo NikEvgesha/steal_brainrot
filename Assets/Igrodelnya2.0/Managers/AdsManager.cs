@@ -26,8 +26,10 @@ public class AdsManager : MonoBehaviour
     [SerializeField] private float interstitialIntervalSeconds = 60f;
     [SerializeField] private int interstitialCountdownSeconds = 3;
     [SerializeField] private double interstitialIncomeRewardMultiplier = 2d;
-    [SerializeField] private string timedInterstitialCountdownText = "Реклама через {0}";
-    [SerializeField] private string timedInterstitialRewardText = "Награда: +{0}";
+    [SerializeField] private string timedInterstitialCountdownLocalizationKey = "UI/Ads/TimedInterstitialCountdown";
+    [SerializeField] private string timedInterstitialCountdownText = "Ad in {0}";
+    [SerializeField] private string timedInterstitialRewardLocalizationKey = "UI/Ads/TimedInterstitialReward";
+    [SerializeField] private string timedInterstitialRewardText = "Reward: +{0}";
 
     public Action AdClosed;
 
@@ -643,11 +645,13 @@ public class AdsManager : MonoBehaviour
         EnsureAdOverlay();
         _adOverlayCanvas.gameObject.SetActive(true);
         _countdownPanel.gameObject.SetActive(true);
-        _countdownText.text = string.Format(CultureInfo.InvariantCulture, timedInterstitialCountdownText, seconds);
+        var countdownFormat = LocalizationUtils.T(timedInterstitialCountdownLocalizationKey, timedInterstitialCountdownText);
+        _countdownText.text = string.Format(CultureInfo.InvariantCulture, countdownFormat, seconds);
         if (_countdownRewardText != null)
         {
             double finalReward = CalculateFinalRewardAmount(baseReward);
-            _countdownRewardText.text = string.Format(CultureInfo.InvariantCulture, timedInterstitialRewardText, FormatCoins(finalReward));
+            var rewardFormat = LocalizationUtils.T(timedInterstitialRewardLocalizationKey, timedInterstitialRewardText);
+            _countdownRewardText.text = string.Format(CultureInfo.InvariantCulture, rewardFormat, FormatCoins(finalReward));
             _countdownRewardText.gameObject.SetActive(true);
         }
     }

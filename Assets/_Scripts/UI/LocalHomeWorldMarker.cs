@@ -4,9 +4,10 @@ using UnityEngine.UI;
 public sealed class LocalHomeWorldMarker : MonoBehaviour
 {
     private const int IconTextureSize = 64;
+    private const string HomeSpriteResourcePath = "WorldMarkers/home_marker_icon";
 
     [SerializeField] private RemoteBasesApplier _remoteBases;
-    [SerializeField] private Vector3 _worldOffset = new Vector3(0f, 7f, 0f);
+    [SerializeField] private Vector3 _worldOffset = new Vector3(0f, 20f, 0f);
     [SerializeField] private Vector2 _iconSize = new Vector2(112f, 112f);
     [SerializeField] private float _worldScale = 0.03f;
     [SerializeField] private float _targetRefreshInterval = 0.35f;
@@ -74,7 +75,8 @@ public sealed class LocalHomeWorldMarker : MonoBehaviour
                 _canvas = gameObject.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.WorldSpace;
             _canvas.overrideSorting = true;
-            _canvas.sortingOrder = 500;
+            // Keep the world marker below screen-space menus (GameCanvas uses order 100).
+            _canvas.sortingOrder = 50;
         }
 
         if (_rectTransform == null)
@@ -142,6 +144,10 @@ public sealed class LocalHomeWorldMarker : MonoBehaviour
 
     private static Sprite GetHomeSprite()
     {
+        if (_homeSprite != null)
+            return _homeSprite;
+
+        _homeSprite = Resources.Load<Sprite>(HomeSpriteResourcePath);
         if (_homeSprite != null)
             return _homeSprite;
 

@@ -11,39 +11,23 @@ public class BigPetSetSlot : MonoBehaviour
     private Brainrot _pet;
     private bool _active;
 
-    public void Init(BigPetSetUI ui, Brainrot pet) { 
+    public void Init(BigPetSetUI ui, Brainrot pet)
+    {
         _ui = ui;
-        _ui.ActiveChanged.AddListener(CheckActiveSlot);
-        _icon.sprite = pet.Icon;
         _pet = pet;
-        switch (_pet.RareType)
-        {
-            case RareType.Common:
-                _background.color = Color.gray;
-                break;
-            case RareType.Uncommon:
-                _background.color = Color.green;
-                break;
-            case RareType.Rare:
-                _background.color = Color.blue;
-                break;
-            case RareType.Epic:
-                _background.color = Color.yellow;
-                break;
-            case RareType.Legendary:
-                _background.color = Color.magenta;
-                break;
-            case RareType.Mythic:
-                _background.color = Color.red;
-                break;
-            default:
-                break;
-        }
+        EnsureClickTarget();
+
+        if (_ui != null)
+            _ui.ActiveChanged.AddListener(CheckActiveSlot);
+        if (_icon != null)
+            _icon.sprite = pet != null ? pet.Icon : null;
+        if (_background == null)
+            Debug.LogWarning("[BigPetSetSlot] Background is not assigned.", this);
     }
 
     public void OnClick()
     {
-        if (_active) return;
+        if (_active || _ui == null || _pet == null) return;
         _ui.OnPetClicked(_pet);
     }
 
@@ -55,9 +39,29 @@ public class BigPetSetSlot : MonoBehaviour
 
     private void CheckActiveSlot(Brainrot activePet)
     {
-        _active = activePet == _pet;
-        _activeIndicator.SetActive(activePet == _pet);
+        _active = activePet != null && activePet == _pet;
+        if (_activeIndicator != null)
+            _activeIndicator.SetActive(_active);
     }
 
+    private void EnsureClickTarget()
+    {
+        var button = GetComponent<Button>();
+        var targetGraphic = button != null ? button.targetGraphic : _background;
+        if (button != null && targetGraphic == null && _background != null)
+        {
+            targetGraphic = _background;
+            button.targetGraphic = _background;
+        }
 
+        var graphics = GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            var graphic = graphics[i];
+            if (graphic == null)
+                continue;
+
+            graphic.raycastTarget = graphic == targetGraphic;
+        }
+    }
 }

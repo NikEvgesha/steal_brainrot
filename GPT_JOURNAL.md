@@ -849,3 +849,22 @@
   - generated texture visually inspected;
   - `git diff --check` passes;
   - full `dotnet build Assembly-CSharp.csproj --no-dependencies -p:RunAnalyzers=false` is still blocked before gameplay compile by missing `.NETFramework,Version=v4.7.1` reference assemblies.
+
+### 2026-07-09 (release UI windows + SpecialShop V2)
+- Raised the local home marker world offset and lowered its canvas sorting order below `GameCanvas`, so it remains visible in the world without covering open menus.
+- Rebuilt the `L` playtime rewards and `K` roulette source prefabs in the shared blocky UI style:
+  - green tiled header, brown body, dark content area, black outlines and red close button;
+  - all generated views are persisted in prefabs and remain editable in Inspector;
+  - checked at `1280x720` and `800x600` through Unity Bridge.
+- Reworked `SpecialShop` into a category-driven, scrollable shop with static editable card/row prefabs:
+  - categories: Featured, Boosts, Permanent, Currency;
+  - new consumables: x2 income for 10 minutes, +15% elemental chance for 10 minutes, and -30 minutes for active egg timers;
+  - new permanent upgrades: +25% income and +10% elemental chance;
+  - permanent ownership uses local fallback immediately and synchronizes to `SaveManager` when it becomes ready;
+  - timed effects persist by UTC expiry and register in the existing income/luck modifier hubs.
+- Added localized RU/EN shop/window strings and a fallback localization source for direct scene launches where `LocalizationManager` is absent.
+- Verification:
+  - Unity compilation completed successfully;
+  - Play Mode smoke found no new exceptions from the changed systems;
+  - shop effect smoke returned `owned 1 -> use true -> owned 0`, active income multiplier `x2`;
+  - remaining Console noise is missing pre-existing animal localization keys.

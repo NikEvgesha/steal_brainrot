@@ -6,21 +6,17 @@ using UnityEngine.UI;
 public class LobbyDebugPanel : MonoBehaviour
 {
     [SerializeField] private float refreshSec = 1f;
-    [SerializeField] private bool startCollapsed = true;
-    [SerializeField] private KeyCode toggleKey = KeyCode.F3;
+    [SerializeField] private KeyCode toggleKey = KeyCode.None;
 
-    private const string CollapsedPrefKey = "lobby_debug_collapsed";
     private static LobbyDebugPanel _instance;
 
-    private Canvas _canvas;
+    private Transform _menuParent;
     private GameObject _panel;
     private Text _text;
-    private Button _toggleButton;
-    private Text _toggleText;
     private Button _offlineToggleButton;
     private Text _offlineToggleText;
     private LobbyClient _lobby;
-    private bool _collapsed;
+    private bool _menuOpen;
 
     public static LobbyDebugPanel EnsureExists()
     {
@@ -57,7 +53,10 @@ public class LobbyDebugPanel : MonoBehaviour
     private void Update()
     {
         if (toggleKey != KeyCode.None && Input.GetKeyDown(toggleKey))
-            ToggleCollapsed();
+            SetMenuOpen(!_menuOpen);
+
+        if (_menuParent == null || _panel == null)
+            TryBindToExistingMenu();
 
         if (_lobby == null)
             _lobby = LobbyClient.Instance;
@@ -75,9 +74,7 @@ public class LobbyDebugPanel : MonoBehaviour
             yield return null;
         }
 
-        CreateUI();
-        _collapsed = PlayerPrefs.GetInt(CollapsedPrefKey, startCollapsed ? 1 : 0) == 1;
-        ApplyCollapsedState();
+        TryBindToExistingMenu();
         _lobby = LobbyClient.Instance;
         Debug.Log("[LobbyDebugPanel] Created");
         ApplyOfflineToggleState();
@@ -127,6 +124,44 @@ public class LobbyDebugPanel : MonoBehaviour
         _text.text = string.Join("\n", lines);
     }
 
+    public void BindToMenu(Transform menuParent)
+    {
+        if (menuParent == null)
+            return;
+
+        _menuParent = menuParent;
+        if (_panel == null)
+        {
+            if (!TryBindExistingView(_menuParent))
+                CreateUI(_menuParent);
+        }
+        else if (_panel.transform.parent != _menuParent)
+        {
+            _panel.transform.SetParent(_menuParent, false);
+            ResolveViewReferences();
+        }
+
+        SetMenuOpen(_menuOpen);
+        UpdateText();
+        ApplyOfflineToggleState();
+    }
+
+    public void SetMenuOpen(bool isOpen)
+    {
+        _menuOpen = isOpen;
+        if (_panel != null)
+            _panel.SetActive(isOpen);
+    }
+
+    private void TryBindToExistingMenu()
+    {
+        var settingUi = FindFirstObjectByType<SettingUI>(FindObjectsInactive.Include);
+        if (settingUi == null)
+            return;
+
+        BindToMenu(settingUi.transform);
+    }
+
     private static int CountOnlineMembers(IReadOnlyList<LobbyMemberStateDto> members)
     {
         if (members == null)
@@ -142,44 +177,106 @@ public class LobbyDebugPanel : MonoBehaviour
         return count;
     }
 
-    private void CreateUI()
+    private bool TryBindExistingView(Transform parent)
     {
-        var go = new GameObject("LobbyDebugCanvas");
-        go.transform.SetParent(transform, false);
-        _canvas = go.AddComponent<Canvas>();
-        _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        _canvas.sortingOrder = 1000;
-        var scaler = go.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        go.AddComponent<GraphicRaycaster>();
+        var view = parent.Find("LobbyDebugPanelView");
+        if (view == null)
+        {
+            var allChildren = parent.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < allChildren.Length; i++)
+            {
+                if (allChildren[i] != null && allChildren[i].name == "LobbyDebugPanelView")
+                {
+                    view = allChildren[i];
+                    break;
+                }
+            }
+        }
 
-        _panel = new GameObject("Panel");
-        _panel.transform.SetParent(go.transform, false);
-        var img = _panel.AddComponent<Image>();
-        img.color = new Color(0f, 0f, 0f, 0.6f);
+        if (view == null)
+            return false;
+
+        _panel = view.gameObject;
+        ResolveViewReferences();
+        return true;
+    }
+
+    private void ResolveViewReferences()
+    {
+        if (_panel == null)
+            return;
+
+        _text = FindText(_panel.transform, "DebugText");
+        _offlineToggleButton = FindChildComponent<Button>(_panel.transform, "OfflineToggleButton");
+        _offlineToggleText = _offlineToggleButton != null
+            ? FindText(_offlineToggleButton.transform, "OfflineToggleText")
+            : FindText(_panel.transform, "OfflineToggleText");
+
+        if (_offlineToggleButton != null)
+        {
+            _offlineToggleButton.onClick.RemoveListener(ToggleSimulatedOffline);
+            _offlineToggleButton.onClick.AddListener(ToggleSimulatedOffline);
+        }
+    }
+
+    private void CreateUI(Transform parent)
+    {
+        _panel = new GameObject("LobbyDebugPanelView", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        _panel.transform.SetParent(parent, false);
+        var img = _panel.GetComponent<Image>();
+        img.color = new Color(0.05f, 0.035f, 0.025f, 0.9f);
 
         var rect = _panel.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.6f, 0.75f);
-        rect.anchorMax = new Vector2(0.99f, 0.99f);
+        rect.anchorMin = new Vector2(0.58f, 0.05f);
+        rect.anchorMax = new Vector2(0.96f, 0.32f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        _text = CreateText("DebugText", _panel.transform, new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.98f));
+        var outline = _panel.AddComponent<Outline>();
+        outline.effectColor = Color.black;
+        outline.effectDistance = new Vector2(3f, -3f);
+        outline.useGraphicAlpha = true;
+
+        var title = CreateText("Title", _panel.transform, new Vector2(0.03f, 0.82f), new Vector2(0.97f, 0.98f));
+        title.alignment = TextAnchor.MiddleLeft;
+        title.fontSize = 18;
+        title.fontStyle = FontStyle.Bold;
+        title.text = "Lobby Debug";
+
+        _text = CreateText("DebugText", _panel.transform, new Vector2(0.03f, 0.24f), new Vector2(0.97f, 0.80f));
         _text.alignment = TextAnchor.UpperLeft;
 
-        _toggleButton = CreateButton("ToggleButton", go.transform, new Vector2(0.95f, 0.95f), new Vector2(0.99f, 0.99f));
-        _toggleText = CreateText("ToggleText", _toggleButton.transform, Vector2.zero, Vector2.one);
-        _toggleText.alignment = TextAnchor.MiddleCenter;
-        _toggleText.color = Color.white;
-        _toggleText.text = "DBG";
-        _toggleButton.onClick.AddListener(ToggleCollapsed);
-
-        _offlineToggleButton = CreateButton("OfflineToggleButton", go.transform, new Vector2(0.85f, 0.95f), new Vector2(0.95f, 0.99f));
+        _offlineToggleButton = CreateButton("OfflineToggleButton", _panel.transform, new Vector2(0.03f, 0.04f), new Vector2(0.97f, 0.20f));
         _offlineToggleText = CreateText("OfflineToggleText", _offlineToggleButton.transform, Vector2.zero, Vector2.one);
         _offlineToggleText.alignment = TextAnchor.MiddleCenter;
         _offlineToggleText.color = Color.white;
         _offlineToggleButton.onClick.AddListener(ToggleSimulatedOffline);
+
+        _panel.SetActive(_menuOpen);
+    }
+
+    private static Text FindText(Transform root, string childName)
+    {
+        return FindChildComponent<Text>(root, childName);
+    }
+
+    private static T FindChildComponent<T>(Transform root, string childName) where T : Component
+    {
+        if (root == null)
+            return null;
+
+        var direct = root.Find(childName);
+        if (direct != null && direct.TryGetComponent<T>(out var directComponent))
+            return directComponent;
+
+        var components = root.GetComponentsInChildren<T>(true);
+        for (int i = 0; i < components.Length; i++)
+        {
+            if (components[i] != null && components[i].name == childName)
+                return components[i];
+        }
+
+        return null;
     }
 
     private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
@@ -213,23 +310,6 @@ public class LobbyDebugPanel : MonoBehaviour
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
         return button;
-    }
-
-    private void ToggleCollapsed()
-    {
-        _collapsed = !_collapsed;
-        PlayerPrefs.SetInt(CollapsedPrefKey, _collapsed ? 1 : 0);
-        PlayerPrefs.Save();
-        ApplyCollapsedState();
-    }
-
-    private void ApplyCollapsedState()
-    {
-        if (_panel != null)
-            _panel.SetActive(!_collapsed);
-
-        if (_toggleText != null)
-            _toggleText.text = _collapsed ? "DBG" : "X";
     }
 
     private void ToggleSimulatedOffline()

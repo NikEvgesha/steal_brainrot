@@ -56,6 +56,10 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
 
     [Header("Common")]
     [SerializeField] private Image infoIcon;
+    [SerializeField] private Image infoIconFxImage;
+    [SerializeField] private bool createInfoIconFxIfMissing = true;
+    [SerializeField] private float infoIconFxScale = 1.55f;
+    [SerializeField] private Color lockedInfoIconFxColor = Color.black;
     [SerializeField] private TMP_Text titleText;
     [SerializeField] private GameObject lockedOverlay;
     [SerializeField] private TMP_Text lockedText;
@@ -75,14 +79,18 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
     [Header("Egg Hatch Preview")]
     [SerializeField] private GameObject eggHatchSection;
     [SerializeField] private Transform eggHatchIconsRoot;
+    [SerializeField] private AlbumHatchIconView eggHatchIconPrefab;
     [SerializeField] private Image eggHatchIconTemplate;
     [SerializeField] private int eggHatchMaxIcons = 4;
+    [SerializeField] private float eggHatchIconSpacing = FallbackHatchIconSpacing;
 
-    private readonly List<Image> _eggHatchIconPool = new();
+    private readonly List<AlbumHatchIconView> _eggHatchIconPool = new();
+    private bool _autoCreatedInfoIconFx;
+    private static Sprite _defaultInfoIconFxSprite;
 
-    public void ShowLocked(Sprite icon, Color iconColor, string unknownText)
+    public void ShowLocked(Sprite icon, Color iconColor, string unknownText, ElementType elementType = ElementType.NoElement)
     {
-        SetIcon(icon, iconColor);
+        SetIcon(icon, iconColor, elementType, false);
         SetMode(AlbumEntityType.Egg, false);
         SetText(titleText, unknownText);
         SetText(eggDateText, unknownText);
@@ -95,6 +103,28 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         SetEggHatchIcons(null, false, Color.white, Color.black);
     }
 
+    public void ShowLockedEgg(
+        Sprite icon,
+        Color iconColor,
+        string unknownText,
+        IReadOnlyList<HatchIconData> hatchIcons,
+        Color hatchUnlockedColor,
+        Color hatchLockedColor,
+        ElementType elementType = ElementType.NoElement)
+    {
+        SetIcon(icon, iconColor, elementType, false);
+        SetMode(AlbumEntityType.Egg, false);
+        SetText(titleText, unknownText);
+        SetText(eggDateText, unknownText);
+        SetText(eggPriceText, unknownText);
+        SetText(eggSourcesText, string.Empty);
+        SetText(animalDescriptionText, unknownText);
+        SetText(animalIncomeText, unknownText);
+        SetText(animalSourcesText, unknownText);
+        SetLockedOverlay(true, unknownText);
+        SetEggHatchIcons(hatchIcons, true, hatchUnlockedColor, hatchLockedColor);
+    }
+
     public void ShowEgg(
         Sprite icon,
         Color iconColor,
@@ -104,10 +134,11 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         string sourcesText,
         IReadOnlyList<HatchIconData> hatchIcons,
         Color hatchUnlockedColor,
-        Color hatchLockedColor)
+        Color hatchLockedColor,
+        ElementType elementType = ElementType.NoElement)
     {
         SetMode(AlbumEntityType.Egg, true);
-        SetIcon(icon, iconColor);
+        SetIcon(icon, iconColor, elementType, true);
         SetText(titleText, title);
         SetText(eggDateText, dateText);
         SetText(eggPriceText, priceText);
@@ -122,10 +153,11 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         string title,
         string descriptionText,
         string incomeText,
-        string sourcesText)
+        string sourcesText,
+        ElementType elementType = ElementType.NoElement)
     {
         SetMode(AlbumEntityType.Animal, true);
-        SetIcon(icon, iconColor);
+        SetIcon(icon, iconColor, elementType, true);
         SetText(titleText, title);
         SetText(animalDescriptionText, descriptionText);
         SetText(animalIncomeText, incomeText);
@@ -167,6 +199,8 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         var visible = new HashSet<GameObject>();
 
         SetImageObjectActive(infoIcon, slots.ShowIcon);
+        if (!slots.ShowIcon)
+            SetInfoIconFxVisible(false);
 
         if (slots.ShowTitle)
             AddTextObject(visible, titleText);
@@ -247,13 +281,166 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         }
     }
 
-    private void SetIcon(Sprite icon, Color color)
+    private void SetIcon(Sprite icon, Color color, ElementType elementType = ElementType.NoElement, bool elementUnlocked = true)
     {
         if (infoIcon == null)
+        {
+            SetInfoIconFxVisible(false);
             return;
+        }
 
         infoIcon.sprite = icon;
         infoIcon.color = color;
+        ApplyInfoIconFx(elementType, elementUnlocked, icon != null);
+    }
+
+    private void ApplyInfoIconFx(ElementType elementType, bool unlocked, bool iconVisible)
+    {
+        if (!iconVisible || !IsElementFxVisible(elementType))
+        {
+            SetInfoIconFxVisible(false);
+            return;
+        }
+
+        EnsureInfoIconFxImage();
+        if (infoIconFxImage == null)
+            return;
+
+        infoIconFxImage.sprite = GetDefaultInfoIconFxSprite();
+        infoIconFxImage.enabled = infoIconFxImage.sprite != null;
+        infoIconFxImage.preserveAspect = true;
+        infoIconFxImage.raycastTarget = false;
+        infoIconFxImage.color = unlocked ? GetElementFxColor(elementType) : lockedInfoIconFxColor;
+        if (_autoCreatedInfoIconFx)
+            PlaceInfoIconFxBehindIcon();
+    }
+
+    private void SetInfoIconFxVisible(bool visible)
+    {
+        if (infoIconFxImage != null)
+            infoIconFxImage.enabled = visible;
+    }
+
+    private void EnsureInfoIconFxImage()
+    {
+        if (infoIconFxImage != null || !createInfoIconFxIfMissing || infoIcon == null)
+            return;
+
+        var parent = infoIcon.transform.parent as RectTransform;
+        if (parent == null)
+            parent = transform as RectTransform;
+        if (parent == null)
+            return;
+
+        var go = new GameObject("InfoIconFx", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        var rect = go.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        infoIconFxImage = go.GetComponent<Image>();
+        _autoCreatedInfoIconFx = true;
+        infoIconFxImage.raycastTarget = false;
+        infoIconFxImage.enabled = false;
+        PlaceInfoIconFxBehindIcon();
+    }
+
+    private void PlaceInfoIconFxBehindIcon()
+    {
+        if (infoIconFxImage == null || infoIcon == null)
+            return;
+
+        var fxTransform = infoIconFxImage.rectTransform;
+        var iconTransform = infoIcon.rectTransform;
+        fxTransform.anchorMin = iconTransform.anchorMin;
+        fxTransform.anchorMax = iconTransform.anchorMax;
+        fxTransform.pivot = iconTransform.pivot;
+        fxTransform.anchoredPosition = iconTransform.anchoredPosition;
+        fxTransform.localRotation = iconTransform.localRotation;
+        fxTransform.localScale = Vector3.one;
+
+        var size = iconTransform.rect.size;
+        if (size.x <= 0f || size.y <= 0f)
+            size = iconTransform.sizeDelta;
+        if (size.x <= 0f || size.y <= 0f)
+            size = new Vector2(96f, 96f);
+        fxTransform.sizeDelta = size * Mathf.Max(1f, infoIconFxScale);
+
+        var iconIndex = infoIcon.transform.GetSiblingIndex();
+        infoIconFxImage.transform.SetSiblingIndex(Mathf.Max(0, iconIndex));
+    }
+
+    private static bool IsElementFxVisible(ElementType elementType)
+    {
+        return elementType != ElementType.ElementType && elementType != ElementType.NoElement;
+    }
+
+    private static Sprite GetDefaultInfoIconFxSprite()
+    {
+        if (_defaultInfoIconFxSprite != null)
+            return _defaultInfoIconFxSprite;
+
+        const int size = 160;
+        const float center = (size - 1) * 0.5f;
+        const int rayCount = 20;
+
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            name = "AlbumInfoIconFx_Runtime",
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            hideFlags = HideFlags.HideAndDontSave
+        };
+
+        var pixels = new Color32[size * size];
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var dx = (x - center) / center;
+                var dy = (y - center) / center;
+                var radius = Mathf.Sqrt(dx * dx + dy * dy);
+                var alpha = 0f;
+
+                if (radius <= 1f)
+                {
+                    var angle = Mathf.Atan2(dy, dx);
+                    var wave = Mathf.Abs(Mathf.Cos(angle * rayCount * 0.5f));
+                    var rays = Mathf.Pow(wave, 10f);
+                    var core = Mathf.Clamp01(1f - radius * 3.1f) * 0.35f;
+                    var fade = Mathf.Pow(Mathf.Clamp01(1f - radius), 1.25f);
+                    alpha = Mathf.Clamp01((rays * 0.95f + core) * fade);
+                }
+
+                pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+
+        _defaultInfoIconFxSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, size, size),
+            new Vector2(0.5f, 0.5f),
+            100f);
+        _defaultInfoIconFxSprite.name = "AlbumInfoIconFx_RuntimeSprite";
+        _defaultInfoIconFxSprite.hideFlags = HideFlags.HideAndDontSave;
+        return _defaultInfoIconFxSprite;
+    }
+
+    private static Color GetElementFxColor(ElementType elementType)
+    {
+        switch (elementType)
+        {
+            case ElementType.Gold:
+                return new Color(1f, 0.78f, 0.05f, 0.82f);
+            case ElementType.Diamond:
+                return new Color(0.15f, 0.9f, 1f, 0.82f);
+            case ElementType.Electric:
+                return new Color(0.48f, 0.52f, 1f, 0.82f);
+            case ElementType.Fire:
+                return new Color(1f, 0.32f, 0.05f, 0.82f);
+            default:
+                return new Color(1f, 1f, 1f, 0.72f);
+        }
     }
 
     private void SetLockedOverlay(bool visible, string text)
@@ -295,21 +482,21 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
 
         for (var i = 0; i < _eggHatchIconPool.Count; i++)
         {
-            var icon = _eggHatchIconPool[i];
-            if (icon == null)
+            var iconView = _eggHatchIconPool[i];
+            if (iconView == null)
                 continue;
 
             var show = shouldShowSection && hatchIcons != null && i < hatchIcons.Count;
-            icon.gameObject.SetActive(show);
+            iconView.gameObject.SetActive(show);
             if (!show)
                 continue;
 
             var data = hatchIcons[i];
-            icon.sprite = data.Icon;
-            icon.color = data.Unlocked ? unlockedColor : lockedColor;
+            iconView.SetIcon(data.Icon, data.Unlocked ? unlockedColor : lockedColor);
         }
 
-        LayoutFallbackHatchIcons(iconsRoot, shouldShowSection ? Mathf.Min(hatchIcons.Count, _eggHatchIconPool.Count) : 0);
+        if (!TryRebuildHatchGrid(iconsRoot))
+            LayoutFallbackHatchIcons(iconsRoot, shouldShowSection ? Mathf.Min(hatchIcons.Count, _eggHatchIconPool.Count) : 0);
         return true;
     }
 
@@ -324,23 +511,49 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
             for (var i = 0; i < eggHatchIconsRoot.childCount; i++)
             {
                 var child = eggHatchIconsRoot.GetChild(i);
+                if (eggHatchIconPrefab != null && child == eggHatchIconPrefab.transform)
+                    continue;
                 if (eggHatchIconTemplate != null && child == eggHatchIconTemplate.transform)
                     continue;
 
-                var childImage = child.GetComponent<Image>();
-                if (childImage != null)
-                    _eggHatchIconPool.Add(childImage);
+                var childIcon = child.GetComponent<AlbumHatchIconView>();
+                if (childIcon == null && child.GetComponent<Image>() != null)
+                {
+                    childIcon = child.gameObject.AddComponent<AlbumHatchIconView>();
+                    childIcon.AutoWire();
+                }
+
+                if (childIcon != null)
+                    _eggHatchIconPool.Add(childIcon);
             }
         }
 
+        if (eggHatchIconPrefab != null && eggHatchIconPrefab.transform.parent == iconsRoot)
+            eggHatchIconPrefab.gameObject.SetActive(false);
         if (eggHatchIconTemplate != null)
             eggHatchIconTemplate.gameObject.SetActive(false);
+
+        if (eggHatchIconPrefab != null)
+        {
+            while (_eggHatchIconPool.Count < requiredSlots)
+            {
+                var icon = Instantiate(eggHatchIconPrefab, iconsRoot);
+                icon.name = $"EggHatchIcon {_eggHatchIconPool.Count + 1}";
+                icon.AutoWire();
+                icon.gameObject.SetActive(false);
+                _eggHatchIconPool.Add(icon);
+            }
+        }
 
         if (eggHatchIconTemplate != null)
         {
             while (_eggHatchIconPool.Count < requiredSlots)
             {
-                var icon = Instantiate(eggHatchIconTemplate, iconsRoot);
+                var iconImage = Instantiate(eggHatchIconTemplate, iconsRoot);
+                var icon = iconImage.GetComponent<AlbumHatchIconView>();
+                if (icon == null)
+                    icon = iconImage.gameObject.AddComponent<AlbumHatchIconView>();
+                icon.AutoWire();
                 icon.gameObject.SetActive(false);
                 _eggHatchIconPool.Add(icon);
             }
@@ -348,11 +561,10 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
 
         while (_eggHatchIconPool.Count < requiredSlots)
         {
-            var iconObject = new GameObject("EggHatchIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var iconObject = new GameObject("EggHatchIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(AlbumHatchIconView));
             iconObject.transform.SetParent(iconsRoot, false);
-            var icon = iconObject.GetComponent<Image>();
-            icon.preserveAspect = true;
-            icon.raycastTarget = false;
+            var icon = iconObject.GetComponent<AlbumHatchIconView>();
+            icon.AutoWire();
             icon.gameObject.SetActive(false);
             _eggHatchIconPool.Add(icon);
         }
@@ -364,10 +576,43 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
     {
         if (eggHatchIconsRoot != null)
             return eggHatchIconsRoot;
+
+        eggHatchIconsRoot = FindChildTransform(transform, "EggHatchIconsRoot") ??
+                            FindChildTransform(transform, "HatchIconsRoot") ??
+                            FindChildTransform(transform, "InfoHatchIcons") ??
+                            FindChildTransform(transform, "InfoSources");
+        if (eggHatchIconsRoot != null)
+            return eggHatchIconsRoot;
+
         if (!allowFallback || eggSourcesText == null)
             return null;
 
         return eggSourcesText.transform;
+    }
+
+    private static Transform FindChildTransform(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(childName))
+            return null;
+
+        if (string.Equals(root.name, childName, System.StringComparison.Ordinal))
+            return root;
+
+        for (var i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            if (child == null)
+                continue;
+
+            if (string.Equals(child.name, childName, System.StringComparison.Ordinal))
+                return child;
+
+            var nested = FindChildTransform(child, childName);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
     }
 
     private void LayoutFallbackHatchIcons(Transform iconsRoot, int visibleCount)
@@ -375,10 +620,19 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         if (iconsRoot == null || iconsRoot == eggHatchIconsRoot || visibleCount <= 0)
             return;
 
-        var totalWidth = visibleCount * FallbackHatchIconSize + Mathf.Max(0, visibleCount - 1) * FallbackHatchIconSpacing;
-        var startX = -totalWidth * 0.5f + FallbackHatchIconSize * 0.5f;
+        var totalWidth = 0f;
+        for (var i = 0; i < _eggHatchIconPool.Count; i++)
+        {
+            var icon = _eggHatchIconPool[i];
+            if (icon == null || !icon.gameObject.activeSelf)
+                continue;
 
-        var visibleIndex = 0;
+            totalWidth += ResolveFallbackHatchIconSize(icon).x;
+        }
+
+        var spacing = Mathf.Max(0f, eggHatchIconSpacing);
+        totalWidth += Mathf.Max(0, visibleCount - 1) * spacing;
+        var currentX = -totalWidth * 0.5f;
         for (var i = 0; i < _eggHatchIconPool.Count; i++)
         {
             var icon = _eggHatchIconPool[i];
@@ -387,15 +641,40 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
 
             if (icon.transform is RectTransform rect)
             {
+                var size = ResolveFallbackHatchIconSize(icon);
                 rect.anchorMin = new Vector2(0.5f, 0.5f);
                 rect.anchorMax = new Vector2(0.5f, 0.5f);
                 rect.pivot = new Vector2(0.5f, 0.5f);
-                rect.sizeDelta = new Vector2(FallbackHatchIconSize, FallbackHatchIconSize);
-                rect.anchoredPosition = new Vector2(startX + visibleIndex * (FallbackHatchIconSize + FallbackHatchIconSpacing), 0f);
+                rect.sizeDelta = size;
+                rect.anchoredPosition = new Vector2(currentX + size.x * 0.5f, 0f);
+                currentX += size.x + spacing;
             }
-
-            visibleIndex++;
         }
+    }
+
+    private static bool TryRebuildHatchGrid(Transform iconsRoot)
+    {
+        if (iconsRoot == null)
+            return false;
+
+        var grid = iconsRoot.GetComponent<AdaptiveGridSpawner>();
+        if (grid == null)
+            return false;
+
+        grid.Rebuild();
+        return true;
+    }
+
+    private static Vector2 ResolveFallbackHatchIconSize(AlbumHatchIconView icon)
+    {
+        if (icon != null && icon.transform is RectTransform rect)
+        {
+            var size = rect.sizeDelta;
+            if (size.x > 0.01f && size.y > 0.01f)
+                return size;
+        }
+
+        return new Vector2(FallbackHatchIconSize, FallbackHatchIconSize);
     }
 
     private void ApplyEditorModePreview(AlbumEntityType mode)
@@ -432,6 +711,7 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         SetObjectsActive(eggOnlyObjects, false);
         SetObjectsActive(animalOnlyObjects, false);
         SetLockedOverlay(false, string.Empty);
+        SetInfoIconFxVisible(false);
         SetEggHatchSectionActive(false);
     }
 
@@ -440,6 +720,8 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         if (eggHatchSection != null)
             eggHatchSection.SetActive(active);
 
+        if (eggHatchIconPrefab != null && eggHatchIconPrefab.transform.parent == eggHatchIconsRoot)
+            eggHatchIconPrefab.gameObject.SetActive(false);
         if (eggHatchIconTemplate != null)
             eggHatchIconTemplate.gameObject.SetActive(false);
     }

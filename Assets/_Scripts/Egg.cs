@@ -78,7 +78,13 @@ public class Egg : InventoryItem
     public long HatchingTime => _hatchingTimectamp;
     public EggStatus Status => _status;
     public EggData Data { get { return _data; } }
+    public double EffectivePrice => GetPriceForElement(_data.DinamicData.ElementType);
     [HideInInspector] public UnityEvent<Egg> EggPurchased;
+
+    public double GetPriceForElement(ElementType elementType)
+    {
+        return Math.Max(0d, _data.Price) * GetElementMultiplier(elementType);
+    }
 
     private void Awake()
     {
@@ -247,7 +253,7 @@ public class Egg : InventoryItem
             return;
         }
 
-        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _data.Price * GetElementMultiplier()))
+        if (G.Currency.RemoveCurrency(CurrencyType.Coins, EffectivePrice))
         {
             G.Inventory.Add(this);
             EggPurchased.Invoke(this);
@@ -326,6 +332,15 @@ public class Egg : InventoryItem
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
         _currentCell?.SaveData();
     }
+
+    public bool TryReduceHatchingTime(int seconds)
+    {
+        if (seconds <= 0 || _status != EggStatus.Maturing || _currentCell == null || _currentCell.IsRemoteMode)
+            return false;
+
+        ApplySpeedBoostSeconds(seconds);
+        return true;
+    }
     /// <summary>
     /// РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р….
     /// </summary>
@@ -361,7 +376,12 @@ public class Egg : InventoryItem
 
     private float GetElementMultiplier()
     {
-        return G.Elements != null ? G.Elements.GetMultiplaer(_data.DinamicData.ElementType) : 1f;
+        return GetElementMultiplier(_data.DinamicData.ElementType);
+    }
+
+    private static float GetElementMultiplier(ElementType elementType)
+    {
+        return G.Elements != null ? G.Elements.GetMultiplaer(elementType) : 1f;
     }
 
     private void StartTicker()

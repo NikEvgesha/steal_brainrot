@@ -15,6 +15,7 @@ public class PlaytimeRewardPanel : MonoBehaviour
 {
     [SerializeField] private List<PlaytimeReward> _rewards;
     [SerializeField] private DynamicGridSpawner _grid;
+    [SerializeField] private Transform _content;
     [SerializeField] private PlaytimeRewardSlot _slotPrefab;
     [SerializeField] private GameObject _panel;
     [SerializeField] private GameObject _button;
@@ -31,12 +32,24 @@ public class PlaytimeRewardPanel : MonoBehaviour
     private void Start()
     {
         //LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
+        if (_slotPrefab == null || (_content == null && _grid == null))
+        {
+            Debug.LogError("[PlaytimeRewardPanel] Reward content or slot prefab is missing.");
+            return;
+        }
+
         foreach (PlaytimeReward reward in _rewards)
         {
-            PlaytimeRewardSlot slot = _grid.SpawnObject<PlaytimeRewardSlot>(_slotPrefab.gameObject);
+            PlaytimeRewardSlot slot = _content != null
+                ? Instantiate(_slotPrefab, _content)
+                : _grid.SpawnObject<PlaytimeRewardSlot>(_slotPrefab.gameObject);
             _slots.Add(slot);
             slot.Init(reward, this);
         }
+
+        if (_rewards == null || _rewards.Count == 0)
+            return;
+
         _lastRewardTime = MirraSDK.Time.CurrentDate.ToUniversalTime().Add(TimeSpan.FromMinutes(_rewards[_rewards.Count - 1].playtimeMinutes));
         _availableRewards = new();
         _timerCoroutine = RewardTimer();
@@ -51,7 +64,8 @@ public class PlaytimeRewardPanel : MonoBehaviour
             yield return new WaitForSecondsRealtime(_rewards[i].playtimeMinutes * 60);
             _availableRewards.Add(_rewards[i]);
             i++;
-            _indicator.SetActive(true);
+            if (_indicator != null)
+                _indicator.SetActive(true);
         }
     }
 
@@ -60,7 +74,7 @@ public class PlaytimeRewardPanel : MonoBehaviour
     {
         _availableRewards.Remove(reward);
         if (_availableRewards.Count == 0)
-            _indicator.SetActive(false);
+            _indicator?.SetActive(false);
     }
 
 
@@ -88,8 +102,9 @@ public class PlaytimeRewardPanel : MonoBehaviour
         //    return;
         //} 
         _isOpen = !_isOpen;
-        _panel.SetActive(_isOpen);
-        G.Control.CursorActive = _isOpen;
+        _panel?.SetActive(_isOpen);
+        if (G.Control != null)
+            G.Control.CursorActive = _isOpen;
 
         if (_isOpen)
             G.Input.AOpenWindow?.Invoke(this);

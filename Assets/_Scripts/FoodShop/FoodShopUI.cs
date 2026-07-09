@@ -27,7 +27,8 @@ public class FoodShopUI : MonoBehaviour
             _slots.Add(slot);
         }
 
-        ApplyBlockyStyle();
+        if (_slotParent != null && _slotParent.TryGetComponent<AdaptiveGridSpawner>(out var grid))
+            grid.Rebuild();
     }
 
 
@@ -56,8 +57,4 @@ public class FoodShopUI : MonoBehaviour
         ResupplyButtonClicked.Invoke();
     }
 
-    private void ApplyBlockyStyle()
-    {
-        BlockyUITheme.StyleWindow(gameObject, BlockyUITheme.Tone.Orange);
-    }
 }

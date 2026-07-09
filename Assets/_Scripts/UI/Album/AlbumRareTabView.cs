@@ -108,11 +108,12 @@ public class AlbumRareTabView : MonoBehaviour
 
         if (lockOverlay != null)
         {
-            // Rare tabs should stay visible/clickable even when this rare type
-            // has not been discovered yet.
-            lockOverlay.SetActive(false);
-            if (lockOverlay.TryGetComponent<Graphic>(out var lockGraphic))
-                lockGraphic.raycastTarget = false;
+            lockOverlay.SetActive(!unlocked);
+            if (!unlocked)
+                lockOverlay.transform.SetAsLastSibling();
+            var lockGraphics = lockOverlay.GetComponentsInChildren<Graphic>(true);
+            for (var i = 0; i < lockGraphics.Length; i++)
+                lockGraphics[i].raycastTarget = false;
         }
 
         if (mentionBadge != null)

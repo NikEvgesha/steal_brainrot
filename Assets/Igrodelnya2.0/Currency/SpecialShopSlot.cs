@@ -1,70 +1,211 @@
-using MirraGames.SDK;
 using MirraGames.SDK.Common;
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class SpecialShopSlot : MonoBehaviour
 {
-    [SerializeField] protected TextMeshProUGUI _name;
-    [SerializeField] protected TextMeshProUGUI _price;
+    [Header("Content")]
+    [SerializeField] private TextMeshProUGUI _name;
+    [SerializeField] private TextMeshProUGUI _description;
+    [SerializeField] private TextMeshProUGUI _effectText;
+    [SerializeField] private Image _productIcon;
+    [SerializeField] private Image _cardBackground;
+    [SerializeField] private Transform _rewardParent;
+    [SerializeField] private SpecialShopRewardSlot _rewardPrefab;
+
+    [Header("Purchase")]
+    [SerializeField] private Button _buyButton;
+    [SerializeField] private TextMeshProUGUI _price;
     [SerializeField] protected Image _currencyIcon;
     [SerializeField] protected TextMeshProUGUI _currencyText;
-    [SerializeField] protected SpecialShopRewardSlot _rewardPrefab;
-    [SerializeField] protected Transform _rewardParent;
 
-    ShopPackData _shopPackData;
-    PurchaseData _productData;
+    [Header("Consumable")]
+    [SerializeField] private Button _useButton;
+    [SerializeField] private TextMeshProUGUI _useButtonText;
+    [SerializeField] private TextMeshProUGUI _ownedText;
+    [SerializeField] private TextMeshProUGUI _activeTimerText;
 
-    private void OnEnable()
+    private SpecialShop _shop;
+    private ShopPackData _shopPackData;
+    private PurchaseData _productData;
+    private float _nextTimerRefresh;
+
+    public void Init(SpecialShop shop, ShopPackData pack, PurchaseData purchaseData)
     {
-        /*if (_itemData != null)
-            _name.text = _name.text = LocalizationManager.Instance.LocalizationData.GetTranslation(_itemData.Name, LocalizationManager.Instance.CurrentLanguage, LocalizationKeyType.Item.ToString());*/
-    }
-    public void Init(ShopPackData pack, PurchaseData purchaseData)
-    {
+        _shop = shop;
+        _shopPackData = pack;
+        _productData = purchaseData;
+
         if (pack == null)
         {
-            Debug.LogWarning("[SpecialShopSlot] Cannot init slot: pack is missing.");
             gameObject.SetActive(false);
             return;
         }
 
-        _shopPackData = pack;
-        _productData = purchaseData;
-        _name.text = LocalizationUtils.T(pack.Name, pack.Name);
-        _price.text = purchaseData != null && !string.IsNullOrWhiteSpace(purchaseData.Price) ? purchaseData.Price : pack.Price.ToString();
-        _currencyIcon.sprite = G.Currency.GetCurrencyIcon(pack.PriceCurrencyType);
+        if (_name != null)
+            _name.text = LocalizationUtils.T(pack.Name, pack.Name);
+        if (_description != null)
+            _description.text = LocalizationUtils.T(pack.DescriptionKey, pack.DescriptionFallback);
+        if (_effectText != null)
+            _effectText.text = _shop != null ? _shop.BuildRewardSummary(pack) : string.Empty;
 
-        foreach (ShopReward reward in pack.Rewards)
+        var icon = ResolveProductIcon(pack);
+        if (_productIcon != null)
         {
-            SpecialShopRewardSlot r = Instantiate(_rewardPrefab, _rewardParent);
-            Sprite icon = reward.Type == ShopRewardType.Item ? reward.Item.Icon : reward.Icon;
-            r.SetReward(icon, reward.Amount);
+            _productIcon.sprite = icon;
+            _productIcon.enabled = icon != null;
+            _productIcon.preserveAspect = true;
         }
 
-        BlockyUITheme.StyleShopProductCard(gameObject);
+        if (_cardBackground != null)
+            _cardBackground.color = pack.AccentColor;
 
+        BuildRewardIcons(pack);
+        RefreshPrice();
+        RefreshState();
+    }
+
+    private void Update()
+    {
+        if (_shopPackData == null || !_shopPackData.HasConsumableReward || Time.unscaledTime < _nextTimerRefresh)
+            return;
+
+        _nextTimerRefresh = Time.unscaledTime + 0.5f;
+        RefreshState();
+    }
+
+    public void RefreshState()
+    {
+        if (_shopPackData == null)
+            return;
+
+        var effects = _shop != null ? _shop.Effects : null;
+        bool permanentOwned = effects != null && effects.IsPermanentPackOwned(_shopPackData);
+        int owned = effects != null ? effects.GetOwnedCount(_shopPackData) : 0;
+
+        if (_buyButton != null)
+            _buyButton.interactable = !permanentOwned;
+        if (_price != null && permanentOwned)
+            _price.text = LocalizationUtils.T("UI/Shop/Owned", "Owned");
+        else
+            RefreshPrice();
+
+        if (_useButton != null)
+        {
+            _useButton.gameObject.SetActive(_shopPackData.HasConsumableReward);
+            _useButton.interactable = owned > 0;
+        }
+
+        if (_useButtonText != null)
+            _useButtonText.text = LocalizationUtils.T("UI/Shop/Use", "Use");
+        if (_ownedText != null)
+        {
+            _ownedText.gameObject.SetActive(_shopPackData.HasConsumableReward);
+            _ownedText.text = LocalizationUtils.Format("UI/Shop/OwnedCount", "Owned: {0}", owned);
+        }
+
+        RefreshActiveTimer(effects);
     }
 
     public void OnClick()
     {
-        //MirraSDK.Payments.Purchase(
-        //    productTag: "exampleProduct",
-        //    onSuccess: () => {
-        //        Debug.Log("Товар успешно куплен");
-        //        // Выдать товар игроку
-        //    },
-        //    onError: () => Debug.Log("Товар не был куплен"),
-        //);
-
-        if (G.SpecialShop == null)
-        {
-            Debug.LogWarning("[SpecialShopSlot] Cannot buy pack: SpecialShop is not ready.");
-            return;
-        }
-
-        G.SpecialShop.TryBuy(_productData, _shopPackData);
+        _shop?.TryBuy(_productData, _shopPackData);
     }
 
+    public void OnUseClick()
+    {
+        _shop?.TryUse(_shopPackData);
+    }
+
+    private void RefreshPrice()
+    {
+        if (_shopPackData == null)
+            return;
+
+        bool realPurchase = _shopPackData.PriceCurrencyType == CurrencyType.Real;
+        string providerPrice = _productData != null ? _productData.Price : string.Empty;
+        if (_price != null)
+        {
+            _price.text = realPurchase && !string.IsNullOrWhiteSpace(providerPrice)
+                ? providerPrice
+                : _shopPackData.Price.ToString();
+        }
+
+        if (_currencyIcon != null)
+        {
+            Sprite icon = G.Currency != null ? G.Currency.GetCurrencyIcon(_shopPackData.PriceCurrencyType) : null;
+            _currencyIcon.sprite = icon;
+            _currencyIcon.enabled = icon != null;
+        }
+
+        if (_currencyText != null)
+            _currencyText.text = realPurchase ? string.Empty : _shopPackData.PriceCurrencyType.ToString();
+    }
+
+    private void RefreshActiveTimer(ShopEffectsService effects)
+    {
+        if (_activeTimerText == null)
+            return;
+
+        int seconds = 0;
+        if (effects != null && _shopPackData.Rewards != null)
+        {
+            for (int i = 0; i < _shopPackData.Rewards.Count; i++)
+            {
+                var type = _shopPackData.Rewards[i].Type;
+                if (type == ShopRewardType.ConsumableIncomeBoost || type == ShopRewardType.ConsumableElementLuckBoost)
+                {
+                    seconds = effects.GetRemainingSeconds(type);
+                    break;
+                }
+            }
+        }
+
+        _activeTimerText.gameObject.SetActive(seconds > 0);
+        if (seconds > 0)
+            _activeTimerText.text = LocalizationUtils.Format("UI/Shop/ActiveTimer", "Active: {0}", TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss"));
+    }
+
+    private void BuildRewardIcons(ShopPackData pack)
+    {
+        if (_rewardParent == null || _rewardPrefab == null)
+            return;
+
+        for (int i = _rewardParent.childCount - 1; i >= 0; i--)
+        {
+            var child = _rewardParent.GetChild(i);
+            if (child != _rewardPrefab.transform)
+                Destroy(child.gameObject);
+        }
+
+        _rewardPrefab.gameObject.SetActive(false);
+        if (pack.Rewards == null || pack.Rewards.Count <= 1)
+            return;
+
+        for (int i = 0; i < pack.Rewards.Count; i++)
+        {
+            var reward = pack.Rewards[i];
+            var rewardView = Instantiate(_rewardPrefab, _rewardParent);
+            rewardView.gameObject.SetActive(true);
+            rewardView.SetReward(ResolveRewardIcon(reward), Mathf.Max(1, reward.Amount));
+        }
+    }
+
+    private static Sprite ResolveProductIcon(ShopPackData pack)
+    {
+        if (pack.Icon != null)
+            return pack.Icon;
+        if (pack.Rewards == null || pack.Rewards.Count == 0)
+            return null;
+        return ResolveRewardIcon(pack.Rewards[0]);
+    }
+
+    private static Sprite ResolveRewardIcon(ShopReward reward)
+    {
+        if (reward.Type == ShopRewardType.Item && reward.Item != null)
+            return reward.Item.Icon;
+        return reward.Icon;
+    }
 }

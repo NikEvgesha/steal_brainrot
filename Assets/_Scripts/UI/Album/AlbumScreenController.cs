@@ -138,7 +138,7 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string rewardInfoKey = "UI/Album/RewardInfo";
     [SerializeField] private string rewardInfoFallback = "Reward: +{0} Gems";
     [SerializeField] private string claimRewardKey = "UI/Album/ClaimReward";
-    [SerializeField] private string claimRewardFallback = "Claim +{0} Gems";
+    [SerializeField] private string claimRewardFallback = "+{0}";
     [SerializeField] private string rewardClaimedKey = "UI/Album/RewardClaimed";
     [SerializeField] private string rewardClaimedFallback = "Claimed";
     [SerializeField] private string rareLabelKeyPrefix = "UI/Album/Element/";
@@ -489,11 +489,7 @@ public class AlbumScreenController : MonoBehaviour
 
         BuildAnimalSourcesFromEggs();
 
-        if (sortByName)
-        {
-            _eggEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
-            _animalEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
-        }
+        SortCatalogEntries();
     }
 
     private void BuildAnimalSourcesFromEggs()
@@ -548,6 +544,8 @@ public class AlbumScreenController : MonoBehaviour
                 continue;
 
             var displayName = ResolveDisplayName(entry.egg.Name, entry.egg.name);
+            if (ShouldKeepCurrentDisplayName(entry.displayName, displayName))
+                continue;
             if (string.Equals(entry.displayName, displayName, StringComparison.Ordinal))
                 continue;
 
@@ -562,6 +560,8 @@ public class AlbumScreenController : MonoBehaviour
                 continue;
 
             var displayName = ResolveDisplayName(entry.animal.Name, entry.animal.name);
+            if (ShouldKeepCurrentDisplayName(entry.displayName, displayName))
+                continue;
             if (string.Equals(entry.displayName, displayName, StringComparison.Ordinal))
                 continue;
 
@@ -569,11 +569,59 @@ public class AlbumScreenController : MonoBehaviour
             changed = true;
         }
 
-        if (!changed || !sortByName)
+        if (!changed)
             return;
 
-        _eggEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
-        _animalEntries.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
+        SortCatalogEntries();
+    }
+
+    private void SortCatalogEntries()
+    {
+        _eggEntries.Sort(CompareEggEntriesByPrice);
+
+        _animalEntries.Sort(CompareAnimalEntriesByIncome);
+    }
+
+    private void SortCardEntries(List<EntryData> entries)
+    {
+        if (entries == null || entries.Count <= 1)
+            return;
+
+        if (_currentTab == AlbumEntityType.Egg)
+        {
+            entries.Sort(CompareEggEntriesByPrice);
+            return;
+        }
+
+        entries.Sort(CompareAnimalEntriesByIncome);
+    }
+
+    private static int CompareEggEntriesByPrice(EntryData a, EntryData b)
+    {
+        var priceCompare = GetEggBasePrice(a).CompareTo(GetEggBasePrice(b));
+        if (priceCompare != 0)
+            return priceCompare;
+
+        return string.Compare(ResolveCurrentDisplayName(a), ResolveCurrentDisplayName(b), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static double GetEggBasePrice(EntryData entry)
+    {
+        return Math.Max(0d, entry?.egg != null ? entry.egg.Data.Price : 0d);
+    }
+
+    private static int CompareAnimalEntriesByIncome(EntryData a, EntryData b)
+    {
+        var incomeCompare = GetAnimalIncome(a).CompareTo(GetAnimalIncome(b));
+        if (incomeCompare != 0)
+            return incomeCompare;
+
+        return string.Compare(ResolveCurrentDisplayName(a), ResolveCurrentDisplayName(b), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static double GetAnimalIncome(EntryData entry)
+    {
+        return Math.Max(0d, entry?.animal != null ? entry.animal.Data.StartIncome : 0d);
     }
 
     private void AddAnimalAlias(string canonicalId, string aliasRaw)
@@ -637,9 +685,9 @@ public class AlbumScreenController : MonoBehaviour
             if (view == null)
                 continue;
 
-            var unlocked = progress != null && progress.IsElementUnlocked(elementType);
+            var unlocked = IsElementUnlockedForCurrentTab(elementType);
             var selected = _selectedElementFilter.HasValue && _selectedElementFilter.Value == elementType;
-            var hasMention = progress != null && HasElementMentionForCurrentTab(elementType);
+            var hasMention = progress != null && unlocked && HasElementTabMentionForCurrentTab(elementType);
             var label = L(rareLabelKeyPrefix + elementType, GetElementLabelFallback(elementType));
             view.Bind(elementType, label, unlocked, selected, hasMention, () => OnElementPressed(elementType, unlocked));
         }
@@ -682,6 +730,7 @@ public class AlbumScreenController : MonoBehaviour
                 continue;
             visibleEntries.Add(entry);
         }
+        SortCardEntries(visibleEntries);
 
         if (visibleEntries.Count == 0)
         {
@@ -707,7 +756,7 @@ public class AlbumScreenController : MonoBehaviour
                              (progressService.HasCardMention(entry.type, entry.id) ||
                               HasAnyRewardMention(entry) ||
                               HasAnyElementMention(entry));
-            var title = unlocked ? entry.displayName : L(unknownKey, unknownFallback);
+            var title = unlocked ? ResolveCurrentDisplayName(entry) : L(unknownKey, unknownFallback);
 
             view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry), entry.rareType);
             _spawnedCardViews.Add(view);
@@ -754,7 +803,24 @@ public class AlbumScreenController : MonoBehaviour
         var unknown = L(unknownKey, unknownFallback);
         if (infoPanelView != null)
         {
-            infoPanelView.ShowLocked(entry != null ? entry.icon : null, infoLockedColor, unknown);
+            var selectedElement = ResolveSelectedElementForInfo();
+            if (entry != null && entry.type == AlbumEntityType.Egg)
+            {
+                var previews = BuildEggHatchPreviewEntries(entry);
+                var hatchIcons = BuildInfoHatchIcons(previews);
+                infoPanelView.ShowLockedEgg(
+                    entry.icon,
+                    infoLockedColor,
+                    unknown,
+                    hatchIcons,
+                    eggHatchUnlockedColor,
+                    eggHatchLockedColor,
+                    selectedElement);
+            }
+            else
+            {
+                infoPanelView.ShowLocked(entry != null ? entry.icon : null, infoLockedColor, unknown, selectedElement);
+            }
             return;
         }
 
@@ -764,7 +830,10 @@ public class AlbumScreenController : MonoBehaviour
             infoIcon.color = infoLockedColor;
         }
 
-        SetEggHatchIcons(Array.Empty<HatchPreviewEntry>(), false);
+        if (entry != null && entry.type == AlbumEntityType.Egg)
+            SetEggHatchIcons(BuildEggHatchPreviewEntries(entry), true);
+        else
+            SetEggHatchIcons(Array.Empty<HatchPreviewEntry>(), false);
 
         if (infoLockedOverlay != null)
             infoLockedOverlay.SetActive(true);
@@ -794,7 +863,7 @@ public class AlbumScreenController : MonoBehaviour
             infoLockedOverlay.SetActive(false);
 
         if (infoTitle != null)
-            infoTitle.text = entry.displayName;
+            infoTitle.text = ResolveCurrentDisplayName(entry);
 
         if (entry.type == AlbumEntityType.Egg)
         {
@@ -851,23 +920,25 @@ public class AlbumScreenController : MonoBehaviour
             infoPanelView.ShowEgg(
                 entry.icon,
                 infoUnlockedColor,
-                entry.displayName,
+                ResolveCurrentDisplayName(entry),
                 BuildEggFirstElementDateText(entry),
                 BuildEggPriceText(entry),
                 string.Empty,
                 hatchIcons,
                 eggHatchUnlockedColor,
-                eggHatchLockedColor);
+                eggHatchLockedColor,
+                ResolveSelectedElementForInfo());
             return;
         }
 
         infoPanelView.ShowAnimal(
             entry.icon,
             infoUnlockedColor,
-            entry.displayName,
+            ResolveCurrentDisplayName(entry),
             BuildAnimalDescriptionText(entry),
             BuildAnimalIncomeText(entry),
-            BuildAnimalMetaText(entry));
+            BuildAnimalMetaText(entry),
+            ResolveSelectedElementForInfo());
     }
 
     private static List<AlbumInfoPanelView.HatchIconData> BuildInfoHatchIcons(IReadOnlyList<HatchPreviewEntry> previews)
@@ -1024,7 +1095,8 @@ public class AlbumScreenController : MonoBehaviour
         if (entry?.egg == null)
             return "-";
 
-        var rawPrice = Math.Max(0d, entry.egg.Data.Price);
+        var selectedElementType = ResolveSelectedElementForInfo();
+        var rawPrice = Math.Max(0d, entry.egg.GetPriceForElement(selectedElementType));
         return FormatSoftAmount(rawPrice);
     }
 
@@ -1167,13 +1239,30 @@ public class AlbumScreenController : MonoBehaviour
         if (entry?.animal == null)
             return "-";
 
-        var incomeValue = Math.Max(0d, entry.animal.Data.StartIncome);
+        var incomeValue = GetAnimalIncomeForElement(entry, ResolveSelectedElementForInfo());
         var incomeLabel = L(incomeLabelKey, incomeLabelFallback);
         var incomeText = G.Currency != null
             ? G.Currency.ToString(incomeValue)
             : Math.Round(incomeValue).ToString("N0", CultureInfo.InvariantCulture);
 
         return $"{incomeLabel}: {incomeText}";
+    }
+
+    private static double GetAnimalIncomeForElement(EntryData entry, ElementType elementType)
+    {
+        if (entry?.animal == null)
+            return 0d;
+
+        var baseIncome = Math.Max(0d, entry.animal.Data.StartIncome);
+        return Math.Round(baseIncome * GetElementIncomeMultiplier(elementType));
+    }
+
+    private static float GetElementIncomeMultiplier(ElementType elementType)
+    {
+        if (elementType == ElementType.ElementType)
+            elementType = ElementType.NoElement;
+
+        return G.Elements != null ? G.Elements.GetMultiplaer(elementType) : 1f;
     }
 
     private void UpdateRewardUi(EntryData entry, bool unlocked)
@@ -1208,7 +1297,7 @@ public class AlbumScreenController : MonoBehaviour
 
         if (rewardButtonText != null)
         {
-            rewardButtonText.text = string.Format(L(claimRewardKey, claimRewardFallback), rewardAmount);
+            rewardButtonText.text = string.Format(CultureInfo.InvariantCulture, L(claimRewardKey, claimRewardFallback), rewardAmount);
         }
 
         if (rewardMentionBadge != null)
@@ -1346,6 +1435,7 @@ public class AlbumScreenController : MonoBehaviour
             background = ResolveTopTabBackground(button);
         if (selectedFrame == null)
             selectedFrame = ResolveTopTabSelectedFrame(button);
+        EnsureButtonChildGraphicsPassThrough(button);
 
         if (tintSelectedTopTab && background != null)
         {
@@ -1466,6 +1556,11 @@ public class AlbumScreenController : MonoBehaviour
         if (_bindingsReady)
             return;
 
+        EnsureButtonChildGraphicsPassThrough(eggsTabButton);
+        EnsureButtonChildGraphicsPassThrough(animalsTabButton);
+        EnsureButtonChildGraphicsPassThrough(closeButton);
+        EnsureButtonChildGraphicsPassThrough(rewardButton);
+
         if (eggsTabButton != null)
             eggsTabButton.onClick.AddListener(SetTabEggs);
         if (animalsTabButton != null)
@@ -1493,6 +1588,39 @@ public class AlbumScreenController : MonoBehaviour
             rewardButton.onClick.RemoveListener(OnRewardPressed);
 
         _bindingsReady = false;
+    }
+
+    private static void EnsureButtonChildGraphicsPassThrough(Button button)
+    {
+        if (button == null)
+            return;
+
+        var target = button.targetGraphic;
+        if (target == null)
+        {
+            target = button.GetComponent<Graphic>();
+            if (target != null)
+                button.targetGraphic = target;
+        }
+
+        var graphics = button.GetComponentsInChildren<Graphic>(true);
+        for (var i = 0; i < graphics.Length; i++)
+        {
+            var graphic = graphics[i];
+            if (graphic == null || graphic == target)
+                continue;
+
+            graphic.raycastTarget = false;
+        }
+    }
+
+    private static void DisableOwnGraphicRaycast(Transform target)
+    {
+        if (target == null)
+            return;
+
+        if (target.TryGetComponent<Graphic>(out var graphic))
+            graphic.raycastTarget = false;
     }
 
     private void OnProgressChanged()
@@ -1575,6 +1703,49 @@ public class AlbumScreenController : MonoBehaviour
         return false;
     }
 
+    private bool IsElementUnlockedForCurrentTab(ElementType elementType)
+    {
+        if (progressService == null)
+            return false;
+
+        var selectedEntry = FindSelectedEntry();
+        if (selectedEntry != null)
+            return IsElementUnlockedForEntry(selectedEntry, elementType);
+
+        var entries = GetEntriesForCurrentTab();
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (entry == null)
+                continue;
+
+            if (IsElementUnlockedForEntry(entry, elementType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsElementUnlockedForEntry(EntryData entry, ElementType elementType)
+    {
+        if (entry == null || progressService == null)
+            return false;
+
+        if (!IsEntryDiscovered(entry))
+            return false;
+
+        if (progressService.IsElementSeen(entry.type, entry.id, elementType))
+            return true;
+
+        // Old saves can know only the base element of a discovered item.
+        return !HasAnyElementSeenForEntry(entry) && ResolveEntryBaseElement(entry) == elementType;
+    }
+
+    private ElementType ResolveSelectedElementForInfo()
+    {
+        return _selectedElementFilter ?? ResolveDefaultElementForDisplay();
+    }
+
     private ElementType ResolveDefaultElementForDisplay()
     {
         if (_selectedElementFilter.HasValue)
@@ -1626,7 +1797,7 @@ public class AlbumScreenController : MonoBehaviour
         for (var i = 0; i < _eggEntries.Count; i++)
         {
             if (_eggEntries[i] != null && _eggEntries[i].id == normalized)
-                return _eggEntries[i].displayName;
+                return ResolveCurrentDisplayName(_eggEntries[i]);
         }
         return L(unknownKey, unknownFallback);
     }
@@ -1637,9 +1808,65 @@ public class AlbumScreenController : MonoBehaviour
         for (var i = 0; i < _animalEntries.Count; i++)
         {
             if (_animalEntries[i] != null && _animalEntries[i].id == normalized)
-                return _animalEntries[i].displayName;
+                return ResolveCurrentDisplayName(_animalEntries[i]);
         }
         return L(unknownKey, unknownFallback);
+    }
+
+    private static string ResolveCurrentDisplayName(EntryData entry)
+    {
+        if (entry == null)
+            return "Unknown";
+
+        var current = !string.IsNullOrWhiteSpace(entry.displayName)
+            ? entry.displayName.Trim()
+            : null;
+
+        string resolved = null;
+        if (entry.type == AlbumEntityType.Egg && entry.egg != null)
+            resolved = ResolveDisplayName(entry.egg.Name, entry.egg.name);
+        else if (entry.type == AlbumEntityType.Animal && entry.animal != null)
+            resolved = ResolveDisplayName(entry.animal.Name, entry.animal.name);
+
+        if (ShouldKeepCurrentDisplayName(current, resolved))
+            return current;
+        if (!string.IsNullOrWhiteSpace(resolved))
+            return resolved.Trim();
+        if (!string.IsNullOrWhiteSpace(current))
+            return current;
+
+        return "Unknown";
+    }
+
+    private static bool ShouldKeepCurrentDisplayName(string current, string next)
+    {
+        if (string.IsNullOrWhiteSpace(current) || string.IsNullOrWhiteSpace(next))
+            return false;
+
+        return IsTechnicalDisplayName(next) && !IsTechnicalDisplayName(current);
+    }
+
+    private static bool IsTechnicalDisplayName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var text = value.Trim();
+        if (text.StartsWith("Item/", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!text.StartsWith("egg", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (text.Length <= 3)
+            return false;
+
+        for (var i = 3; i < text.Length; i++)
+        {
+            if (!char.IsDigit(text[i]))
+                return false;
+        }
+
+        return true;
     }
 
     private static string ResolveDisplayName(string preferred, string fallbackName)
@@ -1666,7 +1893,29 @@ public class AlbumScreenController : MonoBehaviour
         if (TryGetLocalization(key, out localized))
             return true;
 
-        return TryGetLocalization("Item/" + key, out localized);
+        var itemKey = key.StartsWith("Item/", StringComparison.Ordinal) ? key : "Item/" + key;
+        if (TryGetLocalization(itemKey, out localized))
+            return true;
+
+        var fallbackLocalized = LocalizationUtils.T(itemKey, null);
+        if (!string.IsNullOrWhiteSpace(fallbackLocalized) &&
+            !string.Equals(fallbackLocalized, itemKey, StringComparison.Ordinal) &&
+            !string.Equals(fallbackLocalized, key, StringComparison.Ordinal))
+        {
+            localized = fallbackLocalized.Trim();
+            return true;
+        }
+
+        var itemName = ItemDisplayNameResolver.ResolveItemName(key, null);
+        if (!string.IsNullOrWhiteSpace(itemName) &&
+            !string.Equals(itemName, itemKey, StringComparison.Ordinal) &&
+            !string.Equals(itemName, key, StringComparison.Ordinal))
+        {
+            localized = itemName.Trim();
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryGetLocalization(string key, out string localized)
@@ -1750,6 +1999,8 @@ public class AlbumScreenController : MonoBehaviour
                 if (cardsDynamicGrid != null && cardsRoot != cardsDynamicGrid.transform)
                     cardsRoot = cardsDynamicGrid.transform;
             }
+
+            DisableOwnGraphicRaycast(cardsRoot);
         }
 
         if (rareTabsRoot != null)
@@ -1761,6 +2012,8 @@ public class AlbumScreenController : MonoBehaviour
 
             if (rareTabsAdaptiveGrid != null && rareTabsRoot != rareTabsAdaptiveGrid.transform)
                 rareTabsRoot = rareTabsAdaptiveGrid.transform;
+
+            DisableOwnGraphicRaycast(rareTabsRoot);
         }
 
         if (panelRoot != null)
@@ -1793,6 +2046,8 @@ public class AlbumScreenController : MonoBehaviour
 
             if (eggHatchSection == null && eggHatchIconsRoot != null)
                 eggHatchSection = eggHatchIconsRoot.gameObject;
+
+            DisableOwnGraphicRaycast(eggHatchIconsRoot);
 
             if (eggHatchIconTemplate == null && eggHatchIconsRoot != null)
             {
@@ -2004,6 +2259,40 @@ public class AlbumScreenController : MonoBehaviour
         return false;
     }
 
+    private bool HasElementTabMentionForCurrentTab(ElementType elementType)
+    {
+        return HasElementMentionForCurrentTab(elementType) ||
+               HasRewardMentionForCurrentTab(elementType);
+    }
+
+    private bool HasRewardMentionForCurrentTab(ElementType elementType)
+    {
+        if (progressService == null)
+            return false;
+
+        var selectedEntry = FindSelectedEntry();
+        if (selectedEntry != null && !string.IsNullOrEmpty(selectedEntry.id))
+            return ShouldShowRewardMention(selectedEntry, elementType);
+
+        var source = GetEntriesForCurrentTab();
+        for (var i = 0; i < source.Count; i++)
+        {
+            var entry = source[i];
+            if (ShouldShowRewardMention(entry, elementType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool ShouldShowRewardMention(EntryData entry, ElementType elementType)
+    {
+        if (entry == null || progressService == null || string.IsNullOrEmpty(entry.id))
+            return false;
+
+        return progressService.CanClaimReward(entry.type, entry.id, elementType);
+    }
+
     private bool HasAnyElementMention(EntryData entry)
     {
         if (entry == null || progressService == null || _supportedElementTypes == null || _supportedElementTypes.Count == 0)
@@ -2027,7 +2316,8 @@ public class AlbumScreenController : MonoBehaviour
         for (var i = 0; i < _supportedElementTypes.Count; i++)
         {
             var elementType = _supportedElementTypes[i];
-            if (progressService.HasRewardMention(entry.type, entry.id, elementType))
+            if (progressService.HasRewardMention(entry.type, entry.id, elementType) ||
+                ShouldShowRewardMention(entry, elementType))
                 return true;
         }
 

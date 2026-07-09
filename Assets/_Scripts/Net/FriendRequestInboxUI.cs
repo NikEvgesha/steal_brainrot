@@ -102,9 +102,11 @@ public class FriendRequestInboxUI : MonoBehaviour
         if (_panel != null) _panel.SetActive(true);
         if (_text != null)
         {
-            var name = string.IsNullOrWhiteSpace(request.displayName) ? "Player" : request.displayName;
+            var name = string.IsNullOrWhiteSpace(request.displayName)
+                ? LocalizationUtils.T("UI/Common/Player", "Player")
+                : request.displayName;
             var code = string.IsNullOrWhiteSpace(request.friendCode) ? "-" : request.friendCode;
-            _text.text = $"Запрос в друзья от {name} ({code})";
+            _text.text = LocalizationUtils.Format("UI/Friends/RequestLine", "Friend request from {0} ({1})", name, code);
         }
     }
 
@@ -153,16 +155,18 @@ public class FriendRequestInboxUI : MonoBehaviour
         if (!useUniversalPopup || request == null || _api == null)
             return false;
 
-        var name = string.IsNullOrWhiteSpace(request.displayName) ? "Player" : request.displayName;
+        var name = string.IsNullOrWhiteSpace(request.displayName)
+            ? LocalizationUtils.T("UI/Common/Player", "Player")
+            : request.displayName;
         var code = string.IsNullOrWhiteSpace(request.friendCode) ? "-" : request.friendCode;
-        var description = $"Запрос в друзья от {name} ({code})";
+        var description = LocalizationUtils.Format("UI/Friends/RequestLine", "Friend request from {0} ({1})", name, code);
 
         var shown = FriendsPanelController.TryShowPopup(new UniversalDecisionPopup.Request
         {
-            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendRequestTitle", "Запрос в друзья"),
+            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendRequestTitle", "Friend request"),
             description = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, description),
-            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendAccept", "Принять"),
-            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendDecline", "Отклонить"),
+            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendAccept", "Accept"),
+            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/FriendDecline", "Decline"),
             onConfirm = () => StartCoroutine(AcceptFlow(request.requestId)),
             onCancel = () => StartCoroutine(DeclineFlow(request.requestId)),
             closeOnConfirm = true,
@@ -199,8 +203,8 @@ public class FriendRequestInboxUI : MonoBehaviour
         rect.offsetMax = Vector2.zero;
 
         _text = CreateText("RequestText", _panel.transform, new Vector2(0.04f, 0.48f), new Vector2(0.96f, 0.94f));
-        _acceptBtn = CreateButton("AcceptButton", _panel.transform, "Принять", new Vector2(0.08f, 0.10f), new Vector2(0.45f, 0.42f));
-        _declineBtn = CreateButton("DeclineButton", _panel.transform, "Отклонить", new Vector2(0.55f, 0.10f), new Vector2(0.92f, 0.42f));
+        _acceptBtn = CreateButton("AcceptButton", _panel.transform, LocalizationUtils.T("UI/Popup/FriendAccept", "Accept"), new Vector2(0.08f, 0.10f), new Vector2(0.45f, 0.42f));
+        _declineBtn = CreateButton("DeclineButton", _panel.transform, LocalizationUtils.T("UI/Popup/FriendDecline", "Decline"), new Vector2(0.55f, 0.10f), new Vector2(0.92f, 0.42f));
 
         _acceptBtn.onClick.AddListener(OnAccept);
         _declineBtn.onClick.AddListener(OnDecline);

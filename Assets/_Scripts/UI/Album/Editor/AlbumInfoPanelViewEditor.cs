@@ -10,6 +10,10 @@ public sealed class AlbumInfoPanelViewEditor : Editor
     private SerializedProperty _animalModeSlots;
 
     private SerializedProperty _infoIcon;
+    private SerializedProperty _infoIconFxImage;
+    private SerializedProperty _createInfoIconFxIfMissing;
+    private SerializedProperty _infoIconFxScale;
+    private SerializedProperty _lockedInfoIconFxColor;
     private SerializedProperty _titleText;
     private SerializedProperty _lockedOverlay;
     private SerializedProperty _lockedText;
@@ -26,8 +30,10 @@ public sealed class AlbumInfoPanelViewEditor : Editor
 
     private SerializedProperty _eggHatchSection;
     private SerializedProperty _eggHatchIconsRoot;
+    private SerializedProperty _eggHatchIconPrefab;
     private SerializedProperty _eggHatchIconTemplate;
     private SerializedProperty _eggHatchMaxIcons;
+    private SerializedProperty _eggHatchIconSpacing;
 
     private void OnEnable()
     {
@@ -36,6 +42,10 @@ public sealed class AlbumInfoPanelViewEditor : Editor
         _animalModeSlots = serializedObject.FindProperty("animalModeSlots");
 
         _infoIcon = serializedObject.FindProperty("infoIcon");
+        _infoIconFxImage = serializedObject.FindProperty("infoIconFxImage");
+        _createInfoIconFxIfMissing = serializedObject.FindProperty("createInfoIconFxIfMissing");
+        _infoIconFxScale = serializedObject.FindProperty("infoIconFxScale");
+        _lockedInfoIconFxColor = serializedObject.FindProperty("lockedInfoIconFxColor");
         _titleText = serializedObject.FindProperty("titleText");
         _lockedOverlay = serializedObject.FindProperty("lockedOverlay");
         _lockedText = serializedObject.FindProperty("lockedText");
@@ -52,8 +62,10 @@ public sealed class AlbumInfoPanelViewEditor : Editor
 
         _eggHatchSection = serializedObject.FindProperty("eggHatchSection");
         _eggHatchIconsRoot = serializedObject.FindProperty("eggHatchIconsRoot");
+        _eggHatchIconPrefab = serializedObject.FindProperty("eggHatchIconPrefab");
         _eggHatchIconTemplate = serializedObject.FindProperty("eggHatchIconTemplate");
         _eggHatchMaxIcons = serializedObject.FindProperty("eggHatchMaxIcons");
+        _eggHatchIconSpacing = serializedObject.FindProperty("eggHatchIconSpacing");
     }
 
     public override void OnInspectorGUI()
@@ -115,6 +127,10 @@ public sealed class AlbumInfoPanelViewEditor : Editor
         {
             EditorGUILayout.LabelField("Common", EditorStyles.miniBoldLabel);
             DrawSlotRef(_infoIcon, "Icon");
+            DrawSlotRef(_infoIconFxImage, "Icon FX");
+            EditorGUILayout.PropertyField(_createInfoIconFxIfMissing, new GUIContent("Create Icon FX If Missing"));
+            EditorGUILayout.PropertyField(_infoIconFxScale, new GUIContent("Icon FX Scale"));
+            EditorGUILayout.PropertyField(_lockedInfoIconFxColor, new GUIContent("Locked Icon FX Color"));
             DrawSlotRef(_titleText, "Title");
             DrawSlotRef(_lockedOverlay, "Locked Overlay");
             DrawSlotRef(_lockedText, "Locked Text");
@@ -137,8 +153,10 @@ public sealed class AlbumInfoPanelViewEditor : Editor
             EditorGUILayout.LabelField("Egg Hatch Preview", EditorStyles.miniBoldLabel);
             DrawSlotRef(_eggHatchSection, "Section");
             DrawSlotRef(_eggHatchIconsRoot, "Icons Root");
-            DrawSlotRef(_eggHatchIconTemplate, "Icon Template");
+            DrawSlotRef(_eggHatchIconPrefab, "Icon Prefab");
+            DrawSlotRef(_eggHatchIconTemplate, "Legacy Image Template");
             EditorGUILayout.PropertyField(_eggHatchMaxIcons, new GUIContent("Max Icons"));
+            EditorGUILayout.PropertyField(_eggHatchIconSpacing, new GUIContent("Icon Spacing"));
         }
     }
 

@@ -13,13 +13,23 @@ MonoBehaviour:
   m_Name: NoAds_Month
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyPackData
   _id: no_ads_month
-  _name: No Ads 30 Days
+  _name: UI/Shop/Product/NoAdsMonth
   price: 299
   _priceCurrencyType: 2
   _slotType: 0
+  _category: 2
+  _descriptionKey: UI/Shop/Product/NoAdsMonthDesc
+  _descriptionFallback: "\u041E\u0442\u043A\u043B\u044E\u0447\u0430\u0435\u0442 \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u0443\u044E
+    \u0440\u0435\u043A\u043B\u0430\u043C\u0443 \u043D\u0430 30 \u0434\u043D\u0435\u0439."
+  _icon: {fileID: 21300000, guid: bbbe8806fa9cc47229594ced9d95940f, type: 3}
+  _accentColor: {r: 0.1254902, g: 0.79607844, b: 0.90588236, a: 1}
+  _sortOrder: 30
+  _featured: 1
   _rewards:
   - Type: 2
     RewardCurrencyType: 0
     Amount: 30
     Icon: {fileID: 21300000, guid: 823508d108c8f254b81ff12392907625, type: 3}
     Item: {fileID: 0}
+    EffectValue: 0
+    DurationMinutes: 0

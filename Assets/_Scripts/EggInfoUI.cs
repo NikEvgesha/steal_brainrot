@@ -24,13 +24,12 @@ public class EggInfoUI : MonoBehaviour
         if (egg == null)
             return;
 
-        float elementMultiplier = G.Elements != null ? G.Elements.GetMultiplaer(egg.Data.DinamicData.ElementType) : 1f;
         if (_name != null)
-            _name.text = LocalizationUtils.T("Item/" + egg.Name, egg.Name);
+            _name.text = ItemDisplayNameResolver.ResolveItemName(egg.Name, egg.name);
         if (_luck != null)
             _luck.text = FormatAmount(egg.Data.Luck) + "X";
         if (_price != null)
-            _price.text = "$" + FormatAmount(egg.Data.Price * elementMultiplier);
+            _price.text = "$" + FormatAmount(egg.EffectivePrice);
     }
 
     private static string FormatAmount(double amount)

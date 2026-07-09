@@ -13,13 +13,23 @@ MonoBehaviour:
   m_Name: Gems_50
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyPackData
   _id: pack_gems_50
-  _name: Gems Pack
+  _name: UI/Shop/Product/GemsBag
   price: 100
   _priceCurrencyType: 2
   _slotType: 0
+  _category: 3
+  _descriptionKey: UI/Shop/Product/GemsBagDesc
+  _descriptionFallback: "\u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u044B \u0434\u043B\u044F
+    \u0443\u043B\u0443\u0447\u0448\u0435\u043D\u0438\u0439 \u0438 \u0443\u0441\u043A\u043E\u0440\u0435\u043D\u0438\u0439."
+  _icon: {fileID: 21300000, guid: 21b45cc33c8dd4aa39732ffe171e4405, type: 3}
+  _accentColor: {r: 0.1254902, g: 0.79607844, b: 0.90588236, a: 1}
+  _sortOrder: 30
+  _featured: 0
   _rewards:
   - Type: 1
     RewardCurrencyType: 1
     Amount: 50
     Icon: {fileID: 21300000, guid: e74fb0eb39fbd4d94ab0f7601df612ca, type: 3}
     Item: {fileID: 0}
+    EffectValue: 0
+    DurationMinutes: 0

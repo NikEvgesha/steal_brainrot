@@ -386,6 +386,8 @@ MonoBehaviour:
   hideZoneWhenNotLocal: 1
   disableTriggerWhenNotLocal: 1
   slotResolutionRefreshSec: 0.5
+  openPopupOnEnter: 1
+  hidePopupOnExit: 1
   unlockPriceCurrency: 1
   unlockPrice: 49
   autoCollectWhenUnlocked: 1
@@ -401,6 +403,18 @@ MonoBehaviour:
   popupCollectX2Text: Take x2 (AD)
   popupBuyForeverLocalizationKey: UI/ClaimAll/PopupBuyForever
   popupBuyForeverText: Buy forever
+  applyClaimPopupPresentation: 1
+  claimPopupAnchorMin: {x: 0.14, y: 0.18}
+  claimPopupAnchorMax: {x: 0.86, y: 0.72}
+  claimPopupPosition: {x: 0, y: -22}
+  claimPopupPadding: {x: 42, y: 34}
+  claimPopupPanelColor: {r: 0.2, g: 0.02, b: 0.09, a: 0.96}
+  claimPopupConfirmColor: {r: 0.08, g: 0.46, b: 0.29, a: 1}
+  claimPopupCancelColor: {r: 0.5, g: 0.13, b: 0.34, a: 1}
+  claimPopupTextColor: {r: 1, g: 1, b: 1, a: 1}
+  claimPopupTitleFontSize: 44
+  claimPopupDescriptionFontSize: 25
+  claimPopupButtonFontSize: 28
   debugLogs: 1
 --- !u!65 &270612846172312293
 BoxCollider:

@@ -45,7 +45,7 @@ public class BrainrotInfoUI : MonoBehaviour
         if (_remoteView) return;
         if (_offlineIncome == null) return;
         _offlineIncome.gameObject.SetActive(true);
-        _offlineIncome.text = "ќфлайн инком = $" + FormatAmount(income);
+        _offlineIncome.text = LocalizationUtils.Format("UI/Brainrot/OfflineIncome", "Offline income = ${0}", FormatAmount(income));
     }
 
     public void SetRemoteView(bool remote)

@@ -20,30 +20,8 @@ public class SellSlot : MonoBehaviour
         _sellButton.enabled = _item.SellAllowed;
         _lockSellIndicator.SetActive(!_item.SellAllowed);
 
-        switch (item.RareType)
-        {
-            case RareType.Common:
-                _background.color = Color.gray;
-                break;
-            case RareType.Uncommon:
-                _background.color = Color.green;
-                break;
-            case RareType.Rare:
-                _background.color = Color.blue;
-                break;
-            case RareType.Epic:
-                _background.color = Color.yellow;
-                break;
-            case RareType.Legendary:
-                _background.color = Color.magenta;
-                break;
-            case RareType.Mythic:
-                _background.color = Color.red;
-                break;
-            default:
-                break;
-        }
-        BlockyUITheme.StyleCard(gameObject, item.RareType);
+        if (_background == null)
+            Debug.LogWarning("[SellSlot] Background is not assigned.", this);
     }
 
     public void _OnSellButtonClick()

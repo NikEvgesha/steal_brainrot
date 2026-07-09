@@ -30,7 +30,8 @@ public class SellPoint : MonoBehaviour
         }
 
         _ui.SetActive(true);
-        BlockyUITheme.StyleWindow(_ui, BlockyUITheme.Tone.Blue);
+        if (_eggsParent != null && _eggsParent.TryGetComponent<AdaptiveGridSpawner>(out var eggsGrid))
+            eggsGrid.Rebuild();
     }
 
 

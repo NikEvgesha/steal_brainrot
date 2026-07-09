@@ -31,35 +31,9 @@ public class InventorySlot : MonoBehaviour
         _name.text = item.Name;
         _quickSlotIndicator.SetActive(_item.InQuickAccess);
 
-
-        // TODO: get color from?
-        switch (item.RareType)
-        {
-            case RareType.Common:
-                _background.color = Color.gray;
-                break;
-            case RareType.Uncommon:
-                _background.color = Color.green;
-                break;
-            case RareType.Rare:
-                _background.color = Color.blue;
-                break;
-            case RareType.Epic:
-                _background.color = Color.yellow;
-                break;
-            case RareType.Legendary:
-                _background.color = Color.magenta;
-                break;
-            case RareType.Mythic:
-                _background.color = Color.red;
-                break;
-            default:
-                break;
-        }
         _sellButtonLockIcon.SetActive(_item.SellAllowed);
         _sellButtonUnlockIcon.SetActive(!_item.SellAllowed);
         _lockSellIndicator.SetActive(!_item.SellAllowed);
-        BlockyUITheme.StyleCard(gameObject, item.RareType);
     }
 
     public void _OnClick() {

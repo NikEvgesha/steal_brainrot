@@ -121,10 +121,10 @@ public enum AchievementType
     KilledBossIceDragon,
 }
 /// <summary>
-/// Здесь перечисляются все идентификаторы квестов.
-/// Чтобы завести новый квест, нужно:
-///   1. Добавить новый элемент в этот enum, например, NewAwesomeQuest = 5.
-///   2. Создать ScriptableObject QuestDefinition, где в инспекторе выбрать именно этот елемент.
+/// Р—РґРµСЃСЊ РїРµСЂРµС‡РёСЃР»СЏСЋС‚СЃСЏ РІСЃРµ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂС‹ РєРІРµСЃС‚РѕРІ.
+/// Р§С‚РѕР±С‹ Р·Р°РІРµСЃС‚Рё РЅРѕРІС‹Р№ РєРІРµСЃС‚, РЅСѓР¶РЅРѕ:
+///   1. Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Р№ СЌР»РµРјРµРЅС‚ РІ СЌС‚РѕС‚ enum, РЅР°РїСЂРёРјРµСЂ, NewAwesomeQuest = 5.
+///   2. РЎРѕР·РґР°С‚СЊ ScriptableObject QuestDefinition, РіРґРµ РІ РёРЅСЃРїРµРєС‚РѕСЂРµ РІС‹Р±СЂР°С‚СЊ РёРјРµРЅРЅРѕ СЌС‚РѕС‚ РµР»РµРјРµРЅС‚.
 /// </summary>
 public enum QuestID
 {
@@ -141,10 +141,10 @@ public enum QuestID
 
 }
 /// <summary>
-/// Отдельный enum для всех «ключей квестов». 
-/// В него входят пары: <QuestID>_Title и <QuestID>_Description.
-/// Эти ключи используются только внутри QuestDefinition, 
-/// чтобы не мешать основным ключам локализации.
+/// РћС‚РґРµР»СЊРЅС‹Р№ enum РґР»СЏ РІСЃРµС… В«РєР»СЋС‡РµР№ РєРІРµСЃС‚РѕРІВ».
+/// Р’ РЅРµРіРѕ РІС…РѕРґСЏС‚ РїР°СЂС‹: <QuestID>_Title Рё <QuestID>_Description.
+/// Р­С‚Рё РєР»СЋС‡Рё РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ С‚РѕР»СЊРєРѕ РІРЅСѓС‚СЂРё QuestDefinition,
+/// С‡С‚РѕР±С‹ РЅРµ РјРµС€Р°С‚СЊ РѕСЃРЅРѕРІРЅС‹Рј РєР»СЋС‡Р°Рј Р»РѕРєР°Р»РёР·Р°С†РёРё.
 /// </summary>
 public enum QuestKeyTypeTitle
 {
@@ -160,10 +160,10 @@ public enum QuestKeyTypeTitle
     Quest_KillBoss_Title,
 }
 /// <summary>
-/// Отдельный enum для всех «ключей квестов». 
-/// В него вход <QuestID>_Description.
-/// Эти ключи используются только внутри QuestDefinition, 
-/// чтобы не мешать основным ключам локализации.
+/// РћС‚РґРµР»СЊРЅС‹Р№ enum РґР»СЏ РІСЃРµС… В«РєР»СЋС‡РµР№ РєРІРµСЃС‚РѕРІВ».
+/// Р’ РЅРµРіРѕ РІС…РѕРґ <QuestID>_Description.
+/// Р­С‚Рё РєР»СЋС‡Рё РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ С‚РѕР»СЊРєРѕ РІРЅСѓС‚СЂРё QuestDefinition,
+/// С‡С‚РѕР±С‹ РЅРµ РјРµС€Р°С‚СЊ РѕСЃРЅРѕРІРЅС‹Рј РєР»СЋС‡Р°Рј Р»РѕРєР°Р»РёР·Р°С†РёРё.
 /// </summary>
 public enum QuestKeyTypeDescription
 {
@@ -297,8 +297,16 @@ public enum Item
 
 public enum ShopSlotType
 {
-    Small, // 2-3 в строке
-    Big // занимает всю строку
+    Small, // 2-3 РІ СЃС‚СЂРѕРєРµ
+    Big // Р·Р°РЅРёРјР°РµС‚ РІСЃСЋ СЃС‚СЂРѕРєСѓ
+}
+
+public enum ShopCategory
+{
+    Featured,
+    Boosts,
+    Permanent,
+    Currency
 }
 
 public enum ShopRewardType
@@ -306,7 +314,12 @@ public enum ShopRewardType
     Item,
     Currency,
     NoAdsMonth,
-    NoAdsForever
+    NoAdsForever,
+    PermanentIncomePercent,
+    PermanentElementLuckPercent,
+    ConsumableIncomeBoost,
+    ConsumableElementLuckBoost,
+    ConsumableHatchSkip
 }
 
 public enum RaycastType

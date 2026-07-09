@@ -150,7 +150,8 @@ MonoBehaviour:
     - Receive
   - Key: UI/Egg/ReadyIn
     Translations:
-    - "\u0412\u044B\u043B\u0443\u043F\u0438\u0442\u0441\u044F \u0447\u0435\u0440\u0435\u0437 {0}"
+    - "\u0412\u044B\u043B\u0443\u043F\u0438\u0442\u0441\u044F \u0447\u0435\u0440\u0435\u0437
+      {0}"
     - Ready in {0}
   - Key: AdTimer
     Translations:
@@ -1340,51 +1341,502 @@ MonoBehaviour:
     Translations:
     - "\u0412\u044B\u0431\u0435\u0440\u0438 \u043F\u0438\u0442\u043E\u043C\u0446\u0430"
     - Choose a pet
+  - Key: UI/Ads/TimedInterstitialCountdown
+    Translations:
+    - "\u0420\u0435\u043A\u043B\u0430\u043C\u0430 \u0447\u0435\u0440\u0435\u0437
+      {0}"
+    - Ad in {0}
+  - Key: UI/Ads/TimedInterstitialReward
+    Translations:
+    - "\u041D\u0430\u0433\u0440\u0430\u0434\u0430: +{0}"
+    - 'Reward: +{0}'
+  - Key: UI/Brainrot/OfflineIncome
+    Translations:
+    - "\u041E\u0444\u043B\u0430\u0439\u043D \u0434\u043E\u0445\u043E\u0434 = ${0}"
+    - Offline income = ${0}
+  - Key: UI/Gifts/InboxLine
+    Translations:
+    - "\u041F\u043E\u0434\u0430\u0440\u043E\u043A \u043E\u0442 {0}: {1} ({2})"
+    - 'Gift from {0}: {1} ({2})'
+  - Key: UI/Friends/RequestLine
+    Translations:
+    - "\u0417\u0430\u043F\u0440\u043E\u0441 \u0432 \u0434\u0440\u0443\u0437\u044C\u044F
+      \u043E\u0442 {0} ({1})"
+    - Friend request from {0} ({1})
+  - Key: UI/Friends/Friend
+    Translations:
+    - "\u0414\u0440\u0443\u0433"
+    - Friend
+  - Key: UI/Friends/RequestSent
+    Translations:
+    - "\u0417\u0430\u043F\u0440\u043E\u0441 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D"
+    - Request sent
+  - Key: UI/Common/Loading
+    Translations:
+    - "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430..."
+    - Loading...
+  - Key: UI/Profile/OpenBoard
+    Translations:
+    - "\u041F\u0440\u043E\u0444\u0438\u043B\u044C"
+    - Profile
+  - Key: UI/Profile/FriendCode
+    Translations:
+    - "\u041A\u043E\u0434"
+    - Code
+  - Key: UI/Profile/IncomeAllPets
+    Translations:
+    - "\u0414\u043E\u0445\u043E\u0434/\u0441\u0435\u043A \u0432\u0441\u0435\u0445
+      \u0436\u0438\u0432\u043E\u0442\u043D\u044B\u0445"
+    - Income/sec (all pets)
+  - Key: UI/Profile/IncomeBestPet
+    Translations:
+    - "\u041B\u0443\u0447\u0448\u0438\u0439 \u0434\u043E\u0445\u043E\u0434/\u0441\u0435\u043A"
+    - Best pet income/sec
+  - Key: UI/Profile/HatchedTotal
+    Translations:
+    - "\u0412\u0441\u0435\u0433\u043E \u0432\u044B\u043B\u0443\u043F\u043B\u0435\u043D\u043E"
+    - Total hatched
+  - Key: UI/Profile/IncomeBigPet
+    Translations:
+    - "\u0414\u043E\u0445\u043E\u0434/\u0441\u0435\u043A \u0431\u043E\u043B\u044C\u0448\u043E\u0433\u043E
+      \u043F\u0438\u0442\u043E\u043C\u0446\u0430"
+    - Big pet income/sec
+  - Key: UI/Profile/Stats
+    Translations:
+    - "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043A\u0430"
+    - Stats
+  - Key: UI/Profile/LikeButton
+    Translations:
+    - "\u041B\u0430\u0439\u043A"
+    - Like
+  - Key: UI/Profile/LikeUnavailable
+    Translations:
+    - "\u041B\u0430\u0439\u043A \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E
+      \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D"
+    - Like is temporarily unavailable
+  - Key: UI/Profile/Likes
+    Translations:
+    - "\u041B\u0430\u0439\u043A\u0438"
+    - Likes
+  - Key: UI/Profile/LikedToday
+    Translations:
+    - "\u041B\u0430\u0439\u043A \u0441\u0435\u0433\u043E\u0434\u043D\u044F \u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D"
+    - Liked today
+  - Key: UI/Profile/LikeAlreadyToday
+    Translations:
+    - "\u0412\u044B \u0443\u0436\u0435 \u043B\u0430\u0439\u043A\u0430\u043B\u0438
+      \u044D\u0442\u043E\u0433\u043E \u0438\u0433\u0440\u043E\u043A\u0430 \u0441\u0435\u0433\u043E\u0434\u043D\u044F"
+    - You already liked this player today
+  - Key: UI/Album/TabEggs
+    Translations:
+    - "\u042F\u0439\u0446\u0430"
+    - Eggs
+  - Key: UI/Album/TabAnimals
+    Translations:
+    - "\u0416\u0438\u0432\u043E\u0442\u043D\u044B\u0435"
+    - Animals
+  - Key: UI/Album/SectionEggs
+    Translations:
+    - "\u042F\u0439\u0446\u0430"
+    - Eggs
+  - Key: UI/Album/SectionAnimals
+    Translations:
+    - "\u0416\u0438\u0432\u043E\u0442\u043D\u044B\u0435"
+    - Animals
+  - Key: UI/Album/Unknown
+    Translations:
+    - ???
+    - ???
+  - Key: UI/Album/EggInfoDescription
+    Translations:
+    - "\u0418\u0437 \u044F\u0439\u0446\u0430 \u043C\u043E\u0433\u0443\u0442 \u0432\u044B\u043B\u0443\u043F\u0438\u0442\u044C\u0441\u044F:"
+    - 'Can hatch from this egg:'
+  - Key: UI/Album/AnimalInfoDescription
+    Translations:
+    - "\u041C\u043E\u0436\u043D\u043E \u043F\u043E\u043B\u0443\u0447\u0438\u0442\u044C
+      \u0438\u0437 \u044F\u0438\u0446:"
+    - 'Can hatch from eggs:'
+  - Key: UI/Album/Income
+    Translations:
+    - "\u0414\u043E\u0445\u043E\u0434/\u0441\u0435\u043A"
+    - Income/sec
+  - Key: UI/Album/EggPrice
+    Translations:
+    - "\u0426\u0435\u043D\u0430"
+    - Price
+  - Key: UI/Album/EggFirstElementDate
+    Translations:
+    - '{0}'
+    - '{0}'
+  - Key: UI/Album/AnimalFirstDate
+    Translations:
+    - "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E: {0}"
+    - 'First obtained: {0}'
+  - Key: UI/Album/DateUnknown
+    Translations:
+    - "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E"
+    - Unknown
+  - Key: UI/Album/RewardInfo
+    Translations:
+    - "\u041D\u0430\u0433\u0440\u0430\u0434\u0430: +{0} \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - 'Reward: +{0} Gems'
+  - Key: UI/Album/ClaimReward
+    Translations:
+    - +{0}
+    - +{0}
+  - Key: UI/Album/RewardClaimed
+    Translations:
+    - "\u0417\u0430\u0431\u0440\u0430\u043D\u043E"
+    - Claimed
+  - Key: UI/Album/Element/NoElement
+    Translations:
+    - "\u041E\u0431\u044B\u0447\u043D\u044B\u0439"
+    - Neutral
+  - Key: UI/Album/Element/Gold
+    Translations:
+    - "\u0417\u043E\u043B\u043E\u0442\u043E\u0439"
+    - Gold
+  - Key: UI/Album/Element/Diamond
+    Translations:
+    - "\u0410\u043B\u043C\u0430\u0437"
+    - Diamond
+  - Key: UI/Album/Element/Electric
+    Translations:
+    - "\u042D\u043B\u0435\u043A\u0442\u0440\u043E"
+    - Electric
+  - Key: UI/Album/Element/Fire
+    Translations:
+    - "\u041E\u0433\u043E\u043D\u044C"
+    - Fire
+  - Key: Item/Carrot
+    Translations:
+    - "\u041C\u043E\u0440\u043A\u043E\u0432\u044C"
+    - Carrot
+  - Key: Item/Strawberry
+    Translations:
+    - "\u041A\u043B\u0443\u0431\u043D\u0438\u043A\u0430"
+    - Strawberry
+  - Key: Item/Banana
+    Translations:
+    - "\u0411\u0430\u043D\u0430\u043D"
+    - Banana
+  - Key: Item/Cake
+    Translations:
+    - "\u0422\u043E\u0440\u0442"
+    - Cake
+  - Key: UI/ClaimAll/OpenPopup
+    Translations:
+    - "\u0421\u043E\u0431\u0440\u0430\u0442\u044C \u0432\u0441\u0451"
+    - Claim all
+  - Key: UI/ClaimAll/PopupTitle
+    Translations:
+    - "\u0421\u043E\u0431\u0440\u0430\u0442\u044C \u0432\u0435\u0441\u044C \u0434\u043E\u0445\u043E\u0434"
+    - Collect all income
+  - Key: UI/ClaimAll/PopupDescription
+    Translations:
+    - "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043F\u043E\u0441\u043E\u0431
+      \u0441\u0431\u043E\u0440\u0430 \u0434\u043E\u0445\u043E\u0434\u0430."
+    - Choose how to collect income.
+  - Key: UI/ClaimAll/PopupCollectX2Ad
+    Translations:
+    - "\u0417\u0430\u0431\u0440\u0430\u0442\u044C x2 \u0437\u0430 \u0440\u0435\u043A\u043B\u0430\u043C\u0443"
+    - Take x2 (AD)
+  - Key: UI/ClaimAll/PopupBuyForever
+    Translations:
+    - "\u041A\u0443\u043F\u0438\u0442\u044C \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - Buy forever
+  - Key: UI/Conveyor/ChancesBase
+    Translations:
+    - "\u0411\u0435\u0437 \u0431\u043E\u043D\u0443\u0441\u0430 \u0443\u0434\u0430\u0447\u0438"
+    - Without luck bonus
+  - Key: UI/Conveyor/ChancesWithLuck
+    Translations:
+    - "\u0421 \u0431\u043E\u043D\u0443\u0441\u043E\u043C \u0443\u0434\u0430\u0447\u0438"
+    - With luck bonus
+  - Key: UI/Conveyor/EggBreakdown
+    Translations:
+    - "\u042F\u0439\u0446\u0430 \u0438 \u0432\u043E\u0437\u043C\u043E\u0436\u043D\u044B\u0435
+      \u0436\u0438\u0432\u043E\u0442\u043D\u044B\u0435"
+    - Eggs and possible hatch outcomes
+  - Key: UI/EggCatalog/Open
+    Translations:
+    - "\u0428\u0430\u043D\u0441\u044B \u044F\u0438\u0446"
+    - Egg chances
+  - Key: UI/EggCatalog/Title
+    Translations:
+    - "\u0428\u0430\u043D\u0441\u044B \u0432\u044B\u043F\u0430\u0434\u0435\u043D\u0438\u044F
+      \u044F\u0438\u0446"
+    - Egg Drop Chances
+  - Key: UI/EggCatalog/Empty
+    Translations:
+    - "\u042F\u0439\u0446\u0430 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u044B."
+    - No eggs configured.
+  - Key: UI/EggCatalog/NoPets
+    Translations:
+    - "\u0416\u0438\u0432\u043E\u0442\u043D\u044B\u0435 \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u044B."
+    - No animals configured.
+  - Key: UI/EggCatalog/LuckLabel
+    Translations:
+    - "\u0423\u0434\u0430\u0447\u0430"
+    - Luck
   - Key: Item/egg1
     Translations:
-    - "\u041B\u0443\u0433\u043E\u0432\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Meadow Egg
+    - "\u041B\u0443\u0433\u043E\u0432\u043E\u0435"
+    - Meadow
   - Key: Item/egg2
     Translations:
-    - "\u041F\u044F\u0442\u043D\u0438\u0441\u0442\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Spotted Egg
+    - "\u041F\u044F\u0442\u043D\u0438\u0441\u0442\u043E\u0435"
+    - Spotted
   - Key: Item/egg3
     Translations:
-    - "\u0420\u0435\u0447\u043D\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - River Egg
+    - "\u0420\u0435\u0447\u043D\u043E\u0435"
+    - River
   - Key: Item/egg4
     Translations:
-    - "\u041B\u0435\u0441\u043D\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Forest Egg
+    - "\u041B\u0435\u0441\u043D\u043E\u0435"
+    - Forest
   - Key: Item/egg5
     Translations:
-    - "\u041E\u0433\u043D\u0435\u043D\u043D\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Flame Egg
+    - "\u041E\u0433\u043D\u0435\u043D\u043D\u043E\u0435"
+    - Flame
   - Key: Item/egg6
     Translations:
-    - "\u0422\u0440\u043E\u043F\u0438\u0447\u0435\u0441\u043A\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Tropical Egg
+    - "\u0422\u0440\u043E\u043F\u0438\u0447\u0435\u0441\u043A\u043E\u0435"
+    - Tropical
   - Key: Item/egg7
     Translations:
-    - "\u0418\u0437\u0443\u043C\u0440\u0443\u0434\u043D\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Emerald Egg
+    - "\u0418\u0437\u0443\u043C\u0440\u0443\u0434\u043D\u043E\u0435"
+    - Emerald
   - Key: Item/egg8
     Translations:
-    - "\u041B\u0443\u043D\u043D\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Moonlit Egg
+    - "\u041B\u0443\u043D\u043D\u043E\u0435"
+    - Moonlit
   - Key: Item/egg9
     Translations:
-    - "\u0417\u0432\u0451\u0437\u0434\u043D\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Starlit Egg
+    - "\u0417\u0432\u0451\u0437\u0434\u043D\u043E\u0435"
+    - Starlit
   - Key: Item/egg10
     Translations:
-    - "\u0412\u0443\u043B\u043A\u0430\u043D\u0438\u0447\u0435\u0441\u043A\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Volcanic Egg
+    - "\u0412\u0443\u043B\u043A\u0430\u043D\u0438\u0447\u0435\u0441\u043A\u043E\u0435"
+    - Volcanic
   - Key: Item/egg11
     Translations:
-    - "\u0413\u0440\u043E\u0437\u043E\u0432\u043E\u0435 \u044F\u0439\u0446\u043E"
-    - Storm Egg
+    - "\u0413\u0440\u043E\u0437\u043E\u0432\u043E\u0435"
+    - Storm
   - Key: Item/egg12
     Translations:
-    - "\u0414\u0440\u0430\u043A\u043E\u043D\u044C\u0435 \u044F\u0439\u0446\u043E"
-    - Dragon Egg
+    - "\u0414\u0440\u0430\u043A\u043E\u043D\u044C\u0435"
+    - Dragon
+  - Key: UI/Playtime/Title
+    Translations:
+    - "\u041D\u0430\u0433\u0440\u0430\u0434\u044B \u0437\u0430 \u0432\u0440\u0435\u043C\u044F"
+    - Playtime rewards
+  - Key: UI/Playtime/Claim
+    Translations:
+    - "\u0417\u0430\u0431\u0440\u0430\u0442\u044C"
+    - Claim
+  - Key: UI/Playtime/Claimed
+    Translations:
+    - "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E"
+    - Claimed
+  - Key: UI/Roulette/Title
+    Translations:
+    - "\u041A\u043E\u043B\u0435\u0441\u043E \u0443\u0434\u0430\u0447\u0438"
+    - Lucky wheel
+  - Key: UI/Roulette/FreeSpin
+    Translations:
+    - "\u0411\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u043E"
+    - Free spin
+  - Key: UI/Shop/Title
+    Translations:
+    - "\u041C\u0430\u0433\u0430\u0437\u0438\u043D"
+    - Shop
+  - Key: UI/Shop/TabFeatured
+    Translations:
+    - "\u041B\u0443\u0447\u0448\u0435\u0435"
+    - Featured
+  - Key: UI/Shop/TabBoosts
+    Translations:
+    - "\u0423\u0441\u0438\u043B\u0435\u043D\u0438\u044F"
+    - Boosts
+  - Key: UI/Shop/TabPermanent
+    Translations:
+    - "\u041D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - Permanent
+  - Key: UI/Shop/TabCurrency
+    Translations:
+    - "\u0412\u0430\u043B\u044E\u0442\u0430"
+    - Currency
+  - Key: UI/Shop/Owned
+    Translations:
+    - "\u041A\u0443\u043F\u043B\u0435\u043D\u043E"
+    - Owned
+  - Key: UI/Shop/Use
+    Translations:
+    - "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C"
+    - Use
+  - Key: UI/Shop/OwnedCount
+    Translations:
+    - "\u0412 \u043D\u0430\u043B\u0438\u0447\u0438\u0438: {0}"
+    - 'Owned: {0}'
+  - Key: UI/Shop/ActiveTimer
+    Translations:
+    - "\u0410\u043A\u0442\u0438\u0432\u043D\u043E: {0}"
+    - 'Active: {0}'
+  - Key: UI/Shop/RewardGems
+    Translations:
+    - "+{0} \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - +{0} gems
+  - Key: UI/Shop/RewardCoins
+    Translations:
+    - "+{0} \u043C\u043E\u043D\u0435\u0442"
+    - +{0} coins
+  - Key: UI/Shop/NoAdsDays
+    Translations:
+    - "\u0411\u0435\u0437 \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E\u0439
+      \u0440\u0435\u043A\u043B\u0430\u043C\u044B {0} \u0434\u043D\u0435\u0439"
+    - No forced ads for {0} days
+  - Key: UI/Shop/NoAdsForever
+    Translations:
+    - "\u0411\u0435\u0437 \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E\u0439
+      \u0440\u0435\u043A\u043B\u0430\u043C\u044B \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - No forced ads forever
+  - Key: UI/Shop/PermanentIncome
+    Translations:
+    - "+{0}% \u043A \u0434\u043E\u0445\u043E\u0434\u0443 \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - +{0}% income forever
+  - Key: UI/Shop/PermanentLuck
+    Translations:
+    - "+{0}% \u043A \u0448\u0430\u043D\u0441\u0443 \u0441\u0442\u0438\u0445\u0438\u0438
+      \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - +{0}% elemental chance forever
+  - Key: UI/Shop/TimedIncome
+    Translations:
+    - "\u0414\u043E\u0445\u043E\u0434 x{0} \u043D\u0430 {1} \u043C\u0438\u043D."
+    - x{0} income for {1} min
+  - Key: UI/Shop/TimedLuck
+    Translations:
+    - "+{0}% \u043A \u0448\u0430\u043D\u0441\u0443 \u0441\u0442\u0438\u0445\u0438\u0438
+      \u043D\u0430 {1} \u043C\u0438\u043D."
+    - +{0}% elemental chance for {1} min
+  - Key: UI/Shop/HatchSkip
+    Translations:
+    - "-{0} \u043C\u0438\u043D. \u0432\u0441\u0435\u043C \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u043C
+      \u044F\u0439\u0446\u0430\u043C"
+    - -{0} min for all active eggs
+  - Key: UI/Shop/ItemAmount
+    Translations:
+    - "\u041F\u0440\u0435\u0434\u043C\u0435\u0442 x{0}"
+    - Item x{0}
+  - Key: UI/Shop/Product/IncomeBoost
+    Translations:
+    - "\u041C\u043E\u043D\u0435\u0442\u043D\u044B\u0439 \u0437\u0430\u0440\u044F\u0434"
+    - Coin charge
+  - Key: UI/Shop/Product/IncomeBoostDesc
+    Translations:
+    - "\u0423\u0434\u0432\u0430\u0438\u0432\u0430\u0435\u0442 \u0432\u0435\u0441\u044C
+      \u0434\u043E\u0445\u043E\u0434 \u043D\u0430 10 \u043C\u0438\u043D\u0443\u0442."
+    - Doubles all income for 10 minutes.
+  - Key: UI/Shop/Product/LuckBoost
+    Translations:
+    - "\u0417\u0430\u0440\u044F\u0434 \u0443\u0434\u0430\u0447\u0438"
+    - Luck charge
+  - Key: UI/Shop/Product/LuckBoostDesc
+    Translations:
+    - "\u041F\u043E\u0432\u044B\u0448\u0430\u0435\u0442 \u0448\u0430\u043D\u0441
+      \u0441\u0442\u0438\u0445\u0438\u0439\u043D\u044B\u0445 \u044F\u0438\u0446 \u043D\u0430
+      15% \u043D\u0430 10 \u043C\u0438\u043D\u0443\u0442."
+    - Adds 15% elemental egg chance for 10 minutes.
+  - Key: UI/Shop/Product/HatchSkip
+    Translations:
+    - "\u0423\u0441\u043A\u043E\u0440\u0438\u0442\u0435\u043B\u044C \u0432\u044B\u043B\u0443\u043F\u043B\u0435\u043D\u0438\u044F"
+    - Hatch accelerator
+  - Key: UI/Shop/Product/HatchSkipDesc
+    Translations:
+    - "\u0421\u043E\u043A\u0440\u0430\u0449\u0430\u0435\u0442 \u0442\u0430\u0439\u043C\u0435\u0440
+      \u0432\u0441\u0435\u0445 \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0445 \u044F\u0438\u0446
+      \u043D\u0430 30 \u043C\u0438\u043D\u0443\u0442."
+    - Reduces all active egg timers by 30 minutes.
+  - Key: UI/Shop/Product/PermanentIncome
+    Translations:
+    - "\u0421\u0442\u0430\u0431\u0438\u043B\u044C\u043D\u044B\u0439 \u0434\u043E\u0445\u043E\u0434"
+    - Stable income
+  - Key: UI/Shop/Product/PermanentIncomeDesc
+    Translations:
+    - "\u041D\u0430\u0432\u0441\u0435\u0433\u0434\u0430 \u0443\u0432\u0435\u043B\u0438\u0447\u0438\u0432\u0430\u0435\u0442
+      \u0432\u0435\u0441\u044C \u0434\u043E\u0445\u043E\u0434 \u043D\u0430 25%."
+    - Permanently increases all income by 25%.
+  - Key: UI/Shop/Product/PermanentLuck
+    Translations:
+    - "\u0422\u0430\u043B\u0438\u0441\u043C\u0430\u043D \u0441\u0442\u0438\u0445\u0438\u0439"
+    - Elemental talisman
+  - Key: UI/Shop/Product/PermanentLuckDesc
+    Translations:
+    - "\u041D\u0430\u0432\u0441\u0435\u0433\u0434\u0430 \u0434\u043E\u0431\u0430\u0432\u043B\u044F\u0435\u0442
+      10% \u043A \u0448\u0430\u043D\u0441\u0443 \u0441\u0442\u0438\u0445\u0438\u0439\u043D\u044B\u0445
+      \u044F\u0438\u0446."
+    - Permanently adds 10% elemental egg chance.
+  - Key: UI/Shop/Product/CoinsBag
+    Translations:
+    - "\u041C\u0435\u0448\u043E\u043A \u043C\u043E\u043D\u0435\u0442"
+    - Coin bag
+  - Key: UI/Shop/Product/CoinsBagDesc
+    Translations:
+    - "\u041D\u0435\u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0437\u0430\u043F\u0430\u0441
+      \u043C\u043E\u043D\u0435\u0442."
+    - A small coin supply.
+  - Key: UI/Shop/Product/CoinsChest
+    Translations:
+    - "\u0421\u0443\u043D\u0434\u0443\u043A \u043C\u043E\u043D\u0435\u0442"
+    - Coin chest
+  - Key: UI/Shop/Product/CoinsChestDesc
+    Translations:
+    - "\u0411\u043E\u043B\u044C\u0448\u043E\u0439 \u0441\u0443\u043D\u0434\u0443\u043A
+      \u043C\u043E\u043D\u0435\u0442."
+    - A large chest of coins.
+  - Key: UI/Shop/Product/GemsBag
+    Translations:
+    - "\u041D\u0430\u0431\u043E\u0440 \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - Gem pack
+  - Key: UI/Shop/Product/GemsBagDesc
+    Translations:
+    - "\u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u044B \u0434\u043B\u044F
+      \u0443\u043B\u0443\u0447\u0448\u0435\u043D\u0438\u0439 \u0438 \u0443\u0441\u043A\u043E\u0440\u0435\u043D\u0438\u0439."
+    - Gems for upgrades and accelerations.
+  - Key: UI/Shop/Product/GemsChest
+    Translations:
+    - "\u0421\u0443\u043D\u0434\u0443\u043A \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432"
+    - Gem chest
+  - Key: UI/Shop/Product/GemsChestDesc
+    Translations:
+    - "\u0411\u043E\u043B\u044C\u0448\u043E\u0439 \u0441\u0443\u043D\u0434\u0443\u043A
+      \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432."
+    - A large chest of gems.
+  - Key: UI/Shop/Product/StarterEggs
+    Translations:
+    - "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043D\u0430\u0431\u043E\u0440"
+    - Starter pack
+  - Key: UI/Shop/Product/StarterEggsDesc
+    Translations:
+    - "\u041D\u0430\u0431\u043E\u0440 \u044F\u0438\u0446 \u0438 \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432
+      \u0434\u043B\u044F \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u0441\u0442\u0430\u0440\u0442\u0430."
+    - Eggs and gems for a quick start.
+  - Key: UI/Shop/Product/NoAdsMonth
+    Translations:
+    - "\u0411\u0435\u0437 \u0440\u0435\u043A\u043B\u0430\u043C\u044B \u043D\u0430
+      \u043C\u0435\u0441\u044F\u0446"
+    - No ads for a month
+  - Key: UI/Shop/Product/NoAdsMonthDesc
+    Translations:
+    - "\u041E\u0442\u043A\u043B\u044E\u0447\u0430\u0435\u0442 \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u0443\u044E
+      \u0440\u0435\u043A\u043B\u0430\u043C\u0443 \u043D\u0430 30 \u0434\u043D\u0435\u0439."
+    - Disables forced ads for 30 days.
+  - Key: UI/Shop/Product/NoAdsForever
+    Translations:
+    - "\u0411\u0435\u0437 \u0440\u0435\u043A\u043B\u0430\u043C\u044B \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - No ads forever
+  - Key: UI/Shop/Product/NoAdsForeverDesc
+    Translations:
+    - "\u041D\u0430\u0432\u0441\u0435\u0433\u0434\u0430 \u043E\u0442\u043A\u043B\u044E\u0447\u0430\u0435\u0442
+      \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u0443\u044E \u0440\u0435\u043A\u043B\u0430\u043C\u0443."
+    - Disables forced ads forever.

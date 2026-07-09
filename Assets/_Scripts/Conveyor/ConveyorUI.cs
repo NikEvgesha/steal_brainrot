@@ -456,7 +456,7 @@ public static class ConveyorDropChanceCalculator
         {
             var egg = eggs[i];
             var id = GetId(egg.name, egg.Name);
-            var name = string.IsNullOrWhiteSpace(egg.Name) ? egg.name : egg.Name;
+            var name = GetLocalizedEggName(egg, id);
             AddOrAccumulate(aggregate, id, name, eggChance);
         }
 
@@ -484,7 +484,7 @@ public static class ConveyorDropChanceCalculator
         {
             var egg = eggs[i];
             var id = GetId(egg.name, egg.Name);
-            var name = string.IsNullOrWhiteSpace(egg.Name) ? egg.name : egg.Name;
+            var name = GetLocalizedEggName(egg, id);
             if (!aggregate.TryGetValue(id, out var entry))
             {
                 entry = new EggBreakdownEntry
@@ -697,6 +697,19 @@ public static class ConveyorDropChanceCalculator
         if (!string.IsNullOrWhiteSpace(prefabName))
             return prefabName.Trim();
         return "unknown";
+    }
+
+    private static string GetLocalizedEggName(Egg egg, string id)
+    {
+        if (egg == null)
+            return string.IsNullOrWhiteSpace(id) ? "unknown" : id;
+
+        var fallback = !string.IsNullOrWhiteSpace(egg.Name) ? egg.Name.Trim() : egg.name;
+        var key = string.IsNullOrWhiteSpace(id) ? fallback : id.Trim();
+        if (string.IsNullOrWhiteSpace(key))
+            return "unknown";
+
+        return ItemDisplayNameResolver.ResolveItemName(key, fallback);
     }
 
     private static List<BrainrotDropView> BuildDropList(Egg egg)

@@ -19,6 +19,8 @@ public sealed class AdaptiveGridSpawnerEditor : Editor
     private SerializedProperty paddingPercent;
     private SerializedProperty spacingUnits;
     private SerializedProperty spacingPercent;
+    private SerializedProperty contentResizeMode;
+    private SerializedProperty keepAtLeastParentSize;
 
     private SerializedProperty fixedCellSize;
     private SerializedProperty hideFixedOverflow;
@@ -53,6 +55,8 @@ public sealed class AdaptiveGridSpawnerEditor : Editor
         paddingPercent = serializedObject.FindProperty("paddingPercent");
         spacingUnits = serializedObject.FindProperty("spacingUnits");
         spacingPercent = serializedObject.FindProperty("spacingPercent");
+        contentResizeMode = serializedObject.FindProperty("contentResizeMode");
+        keepAtLeastParentSize = serializedObject.FindProperty("keepAtLeastParentSize");
 
         fixedCellSize = serializedObject.FindProperty("fixedCellSize");
         hideFixedOverflow = serializedObject.FindProperty("hideFixedOverflow");
@@ -108,7 +112,21 @@ public sealed class AdaptiveGridSpawnerEditor : Editor
 
         EditorGUILayout.PropertyField(spacingUnits);
         DrawSpacingBySelectedUnits();
+        DrawScrollContent();
         EditorGUILayout.Space(8f);
+    }
+
+    private void DrawScrollContent()
+    {
+        EditorGUILayout.PropertyField(contentResizeMode);
+        if (IsMixed(contentResizeMode) ||
+            (AdaptiveGridSpawner.ContentResizeMode)contentResizeMode.enumValueIndex != AdaptiveGridSpawner.ContentResizeMode.None)
+        {
+            EditorGUILayout.PropertyField(keepAtLeastParentSize);
+            EditorGUILayout.HelpBox(
+                "For vertical ScrollRect content use Expand Height with Horizontal Then Vertical fill and Preferred Columns.",
+                MessageType.Info);
+        }
     }
 
     private void DrawPaddingBySelectedUnits()

@@ -6,10 +6,12 @@ public class FPS_UI : MonoBehaviour
 {
     [SerializeField] private float sampleInterval = 0.5f;
     [SerializeField] private KeyCode toggleKey = KeyCode.F2;
+    [SerializeField] private bool visibleOnStart;
     [SerializeField] private bool showFrameTime = true;
     [SerializeField] private bool showQuality = true;
 
     private Text _fpsText;
+    private Canvas _canvas;
     private float _timeAccumulator;
     private float _fpsAccumulator;
     private int _framesCount;
@@ -32,6 +34,7 @@ public class FPS_UI : MonoBehaviour
         Canvas canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = short.MaxValue - 8;
+        canvas.enabled = false;
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -61,6 +64,7 @@ public class FPS_UI : MonoBehaviour
         text.color = Color.white;
         text.raycastTarget = false;
         text.supportRichText = true;
+        text.enabled = false;
 
         Outline outline = textObject.GetComponent<Outline>();
         outline.effectColor = new Color(0f, 0f, 0f, 0.95f);
@@ -70,12 +74,14 @@ public class FPS_UI : MonoBehaviour
     private void Awake()
     {
         _fpsText = GetComponent<Text>();
+        _canvas = GetComponentInParent<Canvas>();
+        SetVisible(visibleOnStart);
     }
 
     private void Update()
     {
         if (Input.GetKeyDown(toggleKey))
-            _fpsText.enabled = !_fpsText.enabled;
+            SetVisible(!IsVisible());
 
         float deltaTime = Mathf.Max(Time.unscaledDeltaTime, 0.0001f);
         if (deltaTime > 0.25f)
@@ -133,5 +139,18 @@ public class FPS_UI : MonoBehaviour
         _framesCount = 0;
         _minFps = float.MaxValue;
         _maxFps = 0f;
+    }
+
+    private bool IsVisible()
+    {
+        return (_canvas == null || _canvas.enabled) && _fpsText != null && _fpsText.enabled;
+    }
+
+    private void SetVisible(bool visible)
+    {
+        if (_canvas != null)
+            _canvas.enabled = visible;
+        if (_fpsText != null)
+            _fpsText.enabled = visible;
     }
 }

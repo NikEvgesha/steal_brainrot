@@ -525,12 +525,18 @@ public static class BlockyUITheme
 
         foreach (var text in root.GetComponentsInChildren<Text>(true))
         {
+            if (text.GetComponentInParent<InventorySlot>(true) != null)
+                continue;
+
             int minimumSize = title != null && text.transform == title ? 42 : 20;
             ApplyText(text, Color.white, minimumSize);
         }
 
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
         {
+            if (text.GetComponentInParent<InventorySlot>(true) != null)
+                continue;
+
             int minimumSize = title != null && text.transform == title ? 42 : 20;
             ApplyText(text, Color.white, minimumSize);
         }

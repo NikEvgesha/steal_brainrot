@@ -38,6 +38,13 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         Percent
     }
 
+    public enum ContentResizeMode
+    {
+        None,
+        ExpandHeight,
+        ExpandWidth
+    }
+
     [Header("Source")]
     [SerializeField] private GameObject itemPrefab;
     [SerializeField] private bool skipPrefabWhenItIsChild = true;
@@ -53,6 +60,10 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
     [SerializeField] private PercentPadding paddingPercent;
     [SerializeField] private LayoutValueMode spacingUnits = LayoutValueMode.Pixels;
     [SerializeField] private Vector2 spacingPercent;
+
+    [Header("Scroll Content")]
+    [SerializeField] private ContentResizeMode contentResizeMode = ContentResizeMode.None;
+    [SerializeField] private bool keepAtLeastParentSize = true;
 
     [Header("Fixed Cell Size")]
     [SerializeField] private Vector2 fixedCellSize = new Vector2(120f, 120f);
@@ -286,10 +297,11 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
             return;
 
         var rect = root.rect;
-        var layout = ResolveLayout(rect.size);
+        var measureSize = ResolveMeasureSize(root, rect.size);
+        var layout = ResolveLayout(measureSize);
         var availableSize = new Vector2(
-            Mathf.Max(0f, rect.width - layout.PaddingHorizontal),
-            Mathf.Max(0f, rect.height - layout.PaddingVertical));
+            Mathf.Max(0f, measureSize.x - layout.PaddingHorizontal),
+            Mathf.Max(0f, measureSize.y - layout.PaddingVertical));
 
         var items = CollectLayoutItems();
         var requestedCount = sizingMode == CellSizingMode.FitItemCount
@@ -303,6 +315,7 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         Rows = metrics.rows;
         Capacity = metrics.capacity;
         CellSize = metrics.cellSize;
+        ResizeContentIfNeeded(root, occupied, layout);
 
         for (var i = 0; i < items.Count; i++)
         {
@@ -389,7 +402,16 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
 
         var cell = ClampPositiveSize(fixedCellSize, new Vector2(1f, 1f));
         var columns = CalculateFitCount(availableSize.x, cell.x, resolvedSpacing.x);
-        var rows = CalculateFitCount(availableSize.y, cell.y, resolvedSpacing.y);
+        var rows = contentResizeMode == ContentResizeMode.ExpandHeight && fillDirection == FillDirection.HorizontalThenVertical
+            ? Mathf.CeilToInt(itemCount / (float)Mathf.Max(1, columns))
+            : CalculateFitCount(availableSize.y, cell.y, resolvedSpacing.y);
+        if (contentResizeMode == ContentResizeMode.ExpandHeight && fillDirection == FillDirection.HorizontalThenVertical)
+            columns = Mathf.Max(1, columns);
+        if (contentResizeMode == ContentResizeMode.ExpandWidth && fillDirection == FillDirection.VerticalThenHorizontal)
+        {
+            rows = Mathf.Max(1, CalculateFitCount(availableSize.y, cell.y, resolvedSpacing.y));
+            columns = Mathf.CeilToInt(itemCount / (float)Mathf.Max(1, rows));
+        }
         return new LayoutMetrics
         {
             columns = columns,
@@ -416,6 +438,9 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         {
             var columns = Mathf.Max(1, preferredColumns);
             var rows = Mathf.CeilToInt(itemCount / (float)columns);
+            if (contentResizeMode == ContentResizeMode.ExpandHeight && fillDirection == FillDirection.HorizontalThenVertical)
+                return BuildFitMetricsForExpandedHeight(availableSize, itemCount, columns, rows, resolvedSpacing);
+
             return BuildFitMetrics(availableSize, itemCount, columns, rows, resolvedSpacing);
         }
 
@@ -423,6 +448,9 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         {
             var rows = Mathf.Max(1, preferredRows);
             var columns = Mathf.CeilToInt(itemCount / (float)rows);
+            if (contentResizeMode == ContentResizeMode.ExpandWidth && fillDirection == FillDirection.VerticalThenHorizontal)
+                return BuildFitMetricsForExpandedWidth(availableSize, itemCount, columns, rows, resolvedSpacing);
+
             return BuildFitMetrics(availableSize, itemCount, columns, rows, resolvedSpacing);
         }
 
@@ -486,6 +514,62 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
             capacity = Mathf.Max(itemCount, columns * rows),
             cellSize = cell
         };
+    }
+
+    private LayoutMetrics BuildFitMetricsForExpandedHeight(Vector2 availableSize, int itemCount, int columns, int rows, Vector2 resolvedSpacing)
+    {
+        columns = Mathf.Max(1, columns);
+        rows = Mathf.Max(1, rows);
+
+        var rawWidth = (availableSize.x - resolvedSpacing.x * (columns - 1)) / columns;
+        var cell = new Vector2(Mathf.Max(1f, rawWidth), Mathf.Max(1f, fixedCellSize.y));
+        if (preserveAspectRatio)
+            cell.y = cell.x / Mathf.Max(0.05f, cellAspectRatio);
+
+        ApplyCellSizeLimits(ref cell);
+        return new LayoutMetrics
+        {
+            columns = columns,
+            rows = rows,
+            capacity = Mathf.Max(itemCount, columns * rows),
+            cellSize = cell
+        };
+    }
+
+    private LayoutMetrics BuildFitMetricsForExpandedWidth(Vector2 availableSize, int itemCount, int columns, int rows, Vector2 resolvedSpacing)
+    {
+        columns = Mathf.Max(1, columns);
+        rows = Mathf.Max(1, rows);
+
+        var rawHeight = (availableSize.y - resolvedSpacing.y * (rows - 1)) / rows;
+        var cell = new Vector2(Mathf.Max(1f, fixedCellSize.x), Mathf.Max(1f, rawHeight));
+        if (preserveAspectRatio)
+            cell.x = cell.y * Mathf.Max(0.05f, cellAspectRatio);
+
+        ApplyCellSizeLimits(ref cell);
+        return new LayoutMetrics
+        {
+            columns = columns,
+            rows = rows,
+            capacity = Mathf.Max(itemCount, columns * rows),
+            cellSize = cell
+        };
+    }
+
+    private void ApplyCellSizeLimits(ref Vector2 cell)
+    {
+        if (useMaxCellSize)
+        {
+            var maxSize = NormalizeMaxSize(maxCellSize);
+            cell.x = Mathf.Min(cell.x, maxSize.x);
+            cell.y = Mathf.Min(cell.y, maxSize.y);
+        }
+
+        if (useMinCellSize && (!allowBelowMinWhenNeeded || (cell.x >= minCellSize.x && cell.y >= minCellSize.y)))
+        {
+            cell.x = Mathf.Max(cell.x, minCellSize.x);
+            cell.y = Mathf.Max(cell.y, minCellSize.y);
+        }
     }
 
     private int ResolveVisibleItemCount(int itemCount, int requestedCount, LayoutMetrics metrics)
@@ -588,6 +672,54 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         }
     }
 
+    private Vector2 ResolveMeasureSize(RectTransform root, Vector2 rootSize)
+    {
+        var size = rootSize;
+        var parent = root != null ? root.parent as RectTransform : null;
+        if (parent == null)
+            return size;
+
+        var parentSize = parent.rect.size;
+        if (contentResizeMode == ContentResizeMode.ExpandHeight)
+            size.y = Mathf.Max(1f, parentSize.y);
+        else if (contentResizeMode == ContentResizeMode.ExpandWidth)
+            size.x = Mathf.Max(1f, parentSize.x);
+
+        return size;
+    }
+
+    private void ResizeContentIfNeeded(RectTransform root, LayoutMetrics occupied, ResolvedLayout layout)
+    {
+        if (root == null || contentResizeMode == ContentResizeMode.None)
+            return;
+
+        var targetSize = root.rect.size;
+        var contentWidth = layout.PaddingHorizontal +
+                           occupied.usedColumns * occupied.cellSize.x +
+                           Mathf.Max(0, occupied.usedColumns - 1) * layout.Spacing.x;
+        var contentHeight = layout.PaddingVertical +
+                            occupied.usedRows * occupied.cellSize.y +
+                            Mathf.Max(0, occupied.usedRows - 1) * layout.Spacing.y;
+
+        var parent = root.parent as RectTransform;
+        if (keepAtLeastParentSize && parent != null)
+        {
+            var parentSize = parent.rect.size;
+            contentWidth = Mathf.Max(contentWidth, parentSize.x);
+            contentHeight = Mathf.Max(contentHeight, parentSize.y);
+        }
+
+        if (contentResizeMode == ContentResizeMode.ExpandHeight)
+            targetSize.y = Mathf.Max(1f, contentHeight);
+        else if (contentResizeMode == ContentResizeMode.ExpandWidth)
+            targetSize.x = Mathf.Max(1f, contentWidth);
+
+        if (Mathf.Abs(root.rect.width - targetSize.x) > 0.1f)
+            root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetSize.x);
+        if (Mathf.Abs(root.rect.height - targetSize.y) > 0.1f)
+            root.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetSize.y);
+    }
+
     private static Vector2 GetAnchorForStartCorner(StartCorner corner)
     {
         switch (corner)
@@ -672,7 +804,6 @@ public sealed class AdaptiveGridSpawner : MonoBehaviour
         preferredColumns = Mathf.Max(0, preferredColumns);
         preferredRows = Mathf.Max(0, preferredRows);
         cellAspectRatio = Mathf.Max(0.05f, cellAspectRatio);
-
     }
 
     private void EnsureRuntimeState()

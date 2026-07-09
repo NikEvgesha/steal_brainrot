@@ -104,8 +104,10 @@ public class GiftInboxUI : MonoBehaviour
         if (_panel != null) _panel.SetActive(true);
         if (_text != null)
         {
-            var name = string.IsNullOrEmpty(gift.fromDisplayName) ? "Player" : gift.fromDisplayName;
-            _text.text = $"Подарок от {name}: {gift.itemType} ({gift.itemId})";
+            var name = string.IsNullOrEmpty(gift.fromDisplayName)
+                ? LocalizationUtils.T("UI/Common/Player", "Player")
+                : gift.fromDisplayName;
+            _text.text = LocalizationUtils.Format("UI/Gifts/InboxLine", "Gift from {0}: {1} ({2})", name, gift.itemType, gift.itemId);
         }
     }
 
@@ -167,17 +169,19 @@ public class GiftInboxUI : MonoBehaviour
         if (!useUniversalPopup || gift == null)
             return false;
 
-        var fromName = string.IsNullOrWhiteSpace(gift.fromDisplayName) ? "Player" : gift.fromDisplayName;
+        var fromName = string.IsNullOrWhiteSpace(gift.fromDisplayName)
+            ? LocalizationUtils.T("UI/Common/Player", "Player")
+            : gift.fromDisplayName;
         var itemType = string.IsNullOrWhiteSpace(gift.itemType) ? "-" : gift.itemType;
         var itemId = string.IsNullOrWhiteSpace(gift.itemId) ? "-" : gift.itemId;
-        var description = $"Подарок от {fromName}: {itemType} ({itemId})";
+        var description = LocalizationUtils.Format("UI/Gifts/InboxLine", "Gift from {0}: {1} ({2})", fromName, itemType, itemId);
 
         var shown = FriendsPanelController.TryShowPopup(new UniversalDecisionPopup.Request
         {
-            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftTitle", "Подарок"),
+            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftTitle", "Gift"),
             description = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, description),
-            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftTake", "Забрать"),
-            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftDecline", "Отказаться"),
+            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftTake", "Take"),
+            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Popup/GiftDecline", "Decline"),
             onConfirm = () => StartCoroutine(AcceptFlow(gift)),
             onCancel = () => StartCoroutine(DeclineFlow(gift)),
             closeOnConfirm = true,
@@ -299,8 +303,8 @@ public class GiftInboxUI : MonoBehaviour
         rect.offsetMax = Vector2.zero;
 
         _text = CreateText("GiftText", _panel.transform, new Vector2(0.05f, 0.5f), new Vector2(0.95f, 0.95f));
-        _acceptBtn = CreateButton("AcceptButton", _panel.transform, "Принять", new Vector2(0.1f, 0.1f), new Vector2(0.45f, 0.45f));
-        _declineBtn = CreateButton("DeclineButton", _panel.transform, "Отказать", new Vector2(0.55f, 0.1f), new Vector2(0.9f, 0.45f));
+        _acceptBtn = CreateButton("AcceptButton", _panel.transform, LocalizationUtils.T("UI/Popup/GiftTake", "Take"), new Vector2(0.1f, 0.1f), new Vector2(0.45f, 0.45f));
+        _declineBtn = CreateButton("DeclineButton", _panel.transform, LocalizationUtils.T("UI/Popup/GiftDecline", "Decline"), new Vector2(0.55f, 0.1f), new Vector2(0.9f, 0.45f));
 
         _acceptBtn.onClick.AddListener(OnAccept);
         _declineBtn.onClick.AddListener(OnDecline);

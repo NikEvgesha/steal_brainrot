@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 public class BigPetSetUI : MonoBehaviour
 {
@@ -20,23 +21,32 @@ public class BigPetSetUI : MonoBehaviour
     {
         ClearSlots();
 
-        if (petList == null)
+        if (petList == null || _slotParent == null || _slotPrefab == null)
             return;
 
         foreach (var pet in petList)
         {
+            if (pet == null)
+                continue;
+
             BigPetSetSlot slot = Instantiate(_slotPrefab, _slotParent);
             slot.Init(this, pet);
             _slots.Add(slot);
         }
+
+        RebuildGrid();
     }
 
     private void ClearSlots()
     {
         for (int i = 0; i < _slots.Count; i++)
         {
-            if (_slots[i] != null)
-                Destroy(_slots[i].gameObject);
+            var slot = _slots[i];
+            if (slot == null)
+                continue;
+
+            slot.gameObject.SetActive(false);
+            Destroy(slot.gameObject);
         }
 
         _slots.Clear();
@@ -46,8 +56,20 @@ public class BigPetSetUI : MonoBehaviour
     {
         for (int i = 0; i < _slots.Count; i++)
         {
-            _slots[i].gameObject.SetActive(i <= idx);
+            if (_slots[i] != null)
+                _slots[i].gameObject.SetActive(i <= idx);
         }
+
+        RebuildGrid();
+    }
+
+    private void RebuildGrid()
+    {
+        if (_slotParent != null && _slotParent.TryGetComponent<AdaptiveGridSpawner>(out var grid))
+            grid.Rebuild();
+
+        if (_slotParent is RectTransform rectTransform)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
     }
 
 
@@ -67,6 +89,9 @@ public class BigPetSetUI : MonoBehaviour
 
     public void OnPetClicked(Brainrot pet)
     {
+        if (_remoteMode || pet == null)
+            return;
+
         PetSlotClicked?.Invoke(pet);
     }
 
@@ -79,7 +104,15 @@ public class BigPetSetUI : MonoBehaviour
                 _uiPanel.SetActive(false);
             return;
         }
+        if (_uiPanel == null)
+            return;
+
         _uiPanel.SetActive(open);
+        if (open)
+        {
+            RebuildGrid();
+            Canvas.ForceUpdateCanvases();
+        }
     }
 
     public void ChangeActivePet(Brainrot pet)

@@ -108,7 +108,6 @@ public class BigPetPoint : MonoBehaviour
         }
 
         _setPetUI.PetSlotClicked.AddListener(ChangeActivePet);
-        _setPetUI.InitUI(_activePets);
 
         CacheSceneRefs();
 
@@ -637,6 +636,7 @@ public class BigPetPoint : MonoBehaviour
         if (_setPetUI != null)
         {
             _setPetUI.gameObject.SetActive(true);
+            _setPetUI.InitUI(_activePets);
             _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
         }
 
@@ -727,10 +727,7 @@ public class BigPetPoint : MonoBehaviour
         if (pet == null)
             return false;
 
-        if (string.IsNullOrWhiteSpace(pet.Name))
-            return false;
-
-        if (ExcludedBigPetIds.Contains(pet.Name))
+        if (ExcludedBigPetIds.Contains(GetPetId(pet)))
             return false;
 
         return pet.Data.StartIncome > 0d;
@@ -749,7 +746,21 @@ public class BigPetPoint : MonoBehaviour
         if (incomeCompare != 0)
             return incomeCompare;
 
-        return string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
+        return string.Compare(GetPetId(left), GetPetId(right), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetPetId(Brainrot pet)
+    {
+        if (pet == null)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(pet.Name))
+            return pet.Name.Trim();
+
+        if (!string.IsNullOrWhiteSpace(pet.gameObject.name))
+            return pet.gameObject.name.Replace("(Clone)", string.Empty).Trim();
+
+        return pet.name != null ? pet.name.Replace("(Clone)", string.Empty).Trim() : string.Empty;
     }
 
     private int GetMaxAvailablePetIndexForLevel(int level)

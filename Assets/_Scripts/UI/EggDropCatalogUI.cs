@@ -177,9 +177,9 @@ public class EggDropCatalogUI : MonoBehaviour
         if (egg == null)
             return string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(egg.Name))
-            return egg.Name;
-        return egg.name;
+        var id = GetId(egg);
+        var fallback = !string.IsNullOrWhiteSpace(egg.Name) ? egg.Name.Trim() : egg.name;
+        return ItemDisplayNameResolver.ResolveItemName(id, fallback);
     }
 
     private static string GetId(Egg egg)

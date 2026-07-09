@@ -61,7 +61,7 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool incrementalSnapshotApply = true;
     [Header("Local Home Marker")]
     [SerializeField] private bool showLocalHomeMarker = true;
-    [SerializeField] private Vector3 localHomeMarkerOffset = new Vector3(0f, 7f, 0f);
+    [SerializeField] private Vector3 localHomeMarkerOffset = new Vector3(0f, 20f, 0f);
     [SerializeField] private Vector2 localHomeMarkerIconSize = new Vector2(112f, 112f);
     [SerializeField] private float localHomeMarkerWorldScale = 0.03f;
     [SerializeField] private float localHomeMarkerBobAmplitude = 0.18f;

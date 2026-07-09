@@ -99,7 +99,7 @@ public class AlbumProgressService : MonoBehaviour
             return true;
         }
 
-        return TryGetFirstDiscoveryDate(type, normalizedId, out discoveredAtUtc);
+        return false;
     }
 
     public bool IsRewardClaimed(AlbumEntityType type, string id)

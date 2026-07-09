@@ -13,13 +13,23 @@ MonoBehaviour:
   m_Name: Gems_500
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyPackData
   _id: pack_gems_500
-  _name: Gems Chest
+  _name: UI/Shop/Product/GemsChest
   price: 5000
   _priceCurrencyType: 2
   _slotType: 0
+  _category: 3
+  _descriptionKey: UI/Shop/Product/GemsChestDesc
+  _descriptionFallback: "\u0411\u043E\u043B\u044C\u0448\u043E\u0439 \u0441\u0443\u043D\u0434\u0443\u043A
+    \u043A\u0440\u0438\u0441\u0442\u0430\u043B\u043B\u043E\u0432."
+  _icon: {fileID: 21300000, guid: 21b45cc33c8dd4aa39732ffe171e4405, type: 3}
+  _accentColor: {r: 0.6156863, g: 0.33333334, b: 0.90588236, a: 1}
+  _sortOrder: 40
+  _featured: 1
   _rewards:
   - Type: 1
     RewardCurrencyType: 1
     Amount: 500
     Icon: {fileID: 21300000, guid: 9387c3e17133ec84293f99f8a9e20dc7, type: 3}
     Item: {fileID: 0}
+    EffectValue: 0
+    DurationMinutes: 0

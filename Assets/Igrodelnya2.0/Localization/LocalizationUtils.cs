@@ -4,6 +4,13 @@ using UnityEngine;
 public static class LocalizationUtils
 {
     private static readonly HashSet<string> MissingKeys = new HashSet<string>();
+    private static LocalizationData fallbackData;
+
+    public static void ConfigureFallback(LocalizationData data)
+    {
+        if (data != null)
+            fallbackData = data;
+    }
 
     public static string T(string key, string fallback = null)
     {
@@ -11,7 +18,7 @@ public static class LocalizationUtils
             return fallback ?? string.Empty;
 
         var manager = LocalizationManager.Instance;
-        var data = manager != null ? manager.LocalizationData : null;
+        var data = manager != null && manager.LocalizationData != null ? manager.LocalizationData : fallbackData;
         if (data == null)
             return fallback ?? key;
 

@@ -20,6 +20,7 @@ public static class G
     public static PurchasesManager Purchases;
     public static IncomeModifiersHub Income;
     public static PlayerLuckHub Luck;
+    public static ShopEffectsService ShopEffects;
     public static ItemPrefabStorage Storage;
     public static ZooBackendClient Backend;
     public static AlbumProgressService Album;
