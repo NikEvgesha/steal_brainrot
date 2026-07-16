@@ -4,29 +4,30 @@ using UnityEngine.AI;
 public class ArrowPointer : MonoBehaviour
 {
     public static ArrowPointer Instance { get; private set; }
-    [Tooltip("Объект, на который нужно указывать")]
+
+    [Tooltip("World-space target for the arrow")]
     public Transform target;
 
-    [Tooltip("Если у персонажа есть NavMeshAgent, укажи его — стрелка будет смотреть на steeringTarget")]
+    [Tooltip("Optional NavMeshAgent; its steering target takes precedence")]
     public NavMeshAgent agent;
 
-    [Tooltip("Скорость поворота (град/сек)")]
+    [Tooltip("Turn speed in degrees per second")]
     public float turnSpeed = 540f;
 
-    [Tooltip("Скрывать стрелку, если подходим близко")]
+    [Tooltip("Hide the arrow within this distance")]
     public float hideDistance = 1.0f;
 
-    [Tooltip("Насколько прижимаем стрелку к полу")]
+    [Tooltip("Reserved ground offset")]
     public float groundRayHeight = 0.2f;
 
-    [Tooltip("Слои, считающиеся полом")]
+    [Tooltip("Reserved ground mask")]
     public LayerMask groundMask = ~0;
 
-    Renderer[] rends;
+    private Renderer[] _renderers;
 
-    void Awake()
+    private void Awake()
     {
-        if(Instance == null)
+        if (Instance == null)
         {
             Instance = this;
         }
@@ -36,43 +37,57 @@ public class ArrowPointer : MonoBehaviour
             return;
         }
 
-        rends = GetComponentsInChildren<Renderer>(true);
+        _renderers = GetComponentsInChildren<Renderer>(true);
     }
 
-    void Update()
+    private void OnDestroy()
     {
-        Vector3? tgt = GetTargetPos();
-        if (!tgt.HasValue) { SetVisible(false); return; }
+        if (Instance == this)
+            Instance = null;
+    }
 
-        Vector3 tgtPos = tgt.Value;
-        float dist = Vector3.Distance(tgtPos, transform.position);
-        SetVisible(dist > hideDistance);
+    private void Update()
+    {
+        Vector3? targetPosition = GetTargetPosition();
+        if (!targetPosition.HasValue)
+        {
+            SetVisible(false);
+            return;
+        }
 
-        // Поворачиваемся к цели только по горизонтали (Y — вверх)
-        Vector3 dir = tgtPos - transform.position;
-        dir.y = 0f; // << ключевая строка: игнорируем высоту
+        Vector3 position = targetPosition.Value;
+        float distance = Vector3.Distance(position, transform.position);
+        SetVisible(distance > hideDistance);
 
-        if (dir.sqrMagnitude < 0.0001f) return;
+        // Rotate toward the target only on the horizontal plane.
+        Vector3 direction = position - transform.position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+            return;
 
-        Quaternion look = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        Quaternion look = Quaternion.LookRotation(direction.normalized, Vector3.up);
         transform.rotation = Quaternion.RotateTowards(transform.rotation, look, turnSpeed * Time.deltaTime);
     }
 
-    Vector3? GetTargetPos()
+    private Vector3? GetTargetPosition()
     {
-        if (agent != null && agent.hasPath) return agent.steeringTarget;
-        if (target != null) return target.position;
+        if (agent != null && agent.hasPath)
+            return agent.steeringTarget;
+        if (target != null)
+            return target.position;
         return null;
     }
 
-    void SetVisible(bool v)
+    private void SetVisible(bool visible)
     {
-        if (rends == null) return;
-        foreach (var r in rends) r.enabled = v;
+        if (_renderers == null)
+            return;
+        foreach (Renderer targetRenderer in _renderers)
+            targetRenderer.enabled = visible;
     }
 
 #if UNITY_EDITOR
-    void OnDrawGizmosSelected()
+    private void OnDrawGizmosSelected()
     {
         if (target != null)
         {

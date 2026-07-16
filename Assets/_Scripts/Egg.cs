@@ -268,6 +268,8 @@ public class Egg : InventoryItem
         _totalDurationSec = Mathf.RoundToInt(
             _data.SecondsToHatching * GetElementMultiplier()
         );
+        if (G.Tutorial != null)
+            _totalDurationSec = G.Tutorial.GetHatchDurationSeconds(this, _totalDurationSec);
 
         // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
@@ -370,6 +372,17 @@ public class Egg : InventoryItem
         );
         DateTimeOffset now = DateTimeOffset.UtcNow;
         _endUtc = endTime.ToUnixTimeSeconds() > 0 ? endTime : now.AddSeconds(_totalDurationSec);
+        if (G.Tutorial != null)
+        {
+            int tutorialDuration = G.Tutorial.GetHatchDurationSeconds(this, _totalDurationSec);
+            if (tutorialDuration < _totalDurationSec)
+            {
+                _totalDurationSec = tutorialDuration;
+                DateTimeOffset tutorialEnd = now.AddSeconds(tutorialDuration);
+                if (_endUtc > tutorialEnd)
+                    _endUtc = tutorialEnd;
+            }
+        }
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
         StartTicker();
     }
@@ -508,11 +521,19 @@ public class Egg : InventoryItem
 
         LocalPlayerStatsStore.IncrementHatched();
         _currentCell.UpdateFieldItem(Item.Brainrot);
+        TutorialSignals.Raise(
+            TutorialSignalType.AnimalHatched,
+            _currentCell,
+            brainrot.Name,
+            Item.Brainrot);
         Destroy(gameObject);
         _currentCell.LockCell(false);
     }
     private Brainrot GetRandomBrainrot()
     {
+        if (G.Tutorial != null && G.Tutorial.TryGetGuaranteedStarterAnimal(this, out Brainrot starterAnimal))
+            return starterAnimal;
+
         var picked = ConveyorDropChanceCalculator.PickRandomBrainrot(this, applyLuckBonus: true);
         if (picked != null)
             return picked;

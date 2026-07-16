@@ -42,6 +42,7 @@ public class GameEntryPoint : MonoBehaviour
         LobbyDebugPanel.EnsureExists();
 
         G.Initialized?.Invoke();
+        TutorialManager.EnsureExists();
         //_scene.SetActive(true);
         WaitForPlayerLocationsBeforeHideLoading();
     }

@@ -332,6 +332,9 @@ public class AlbumScreenController : MonoBehaviour
 
     private void SetOpen(bool open, bool updateCursor)
     {
+        if (open && G.Tutorial != null && G.Tutorial.IsTutorialActive && !G.Tutorial.AllowsAlbum)
+            return;
+
         if (open && !gameObject.activeSelf)
             gameObject.SetActive(true);
 
@@ -346,6 +349,7 @@ public class AlbumScreenController : MonoBehaviour
         if (open)
         {
             Refresh();
+            TutorialSignals.Raise(TutorialSignalType.AlbumOpened, this);
 
             if (G.Input != null)
                 G.Input.AOpenWindow?.Invoke(this);
@@ -1400,6 +1404,13 @@ public class AlbumScreenController : MonoBehaviour
         var rewardAmount = ResolveRewardAmount(entry);
         if (rewardAmount > 0 && G.Currency != null)
             G.Currency.AddCurrency(CurrencyType.Gems, rewardAmount);
+
+        TutorialSignals.Raise(
+            TutorialSignalType.AlbumRewardClaimed,
+            this,
+            entry.id,
+            entry.type == AlbumEntityType.Egg ? Item.Egg : Item.Brainrot,
+            rewardAmount);
 
         if (rewardMentionBadge != null)
             rewardMentionBadge.SetActive(false);

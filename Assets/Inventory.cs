@@ -118,6 +118,8 @@ public class Inventory : MonoBehaviour
         item.OnInventoryAdd();
         G.QuickAccess.Add(item);
         ItemAdded?.Invoke(item);
+        if (forceSave)
+            TutorialSignals.Raise(TutorialSignalType.ItemAcquired, item, item.Name, item.Type);
     }
 
     public void Remove(InventoryItem item)

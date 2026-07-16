@@ -22,6 +22,7 @@ public class Field : MonoBehaviour
 
     public int ID => _id;
     public bool IsRemoteMode => _remoteMode;
+    public bool IsUnblocked => _unblocked;
     
     private void Awake()
     {
@@ -114,6 +115,8 @@ public class Field : MonoBehaviour
     {
         ApplyUnblockedVisual(true);
         G.Save.SaveFieldUnblockStatus(_id, true);
+        if (!_remoteMode)
+            TutorialSignals.Raise(TutorialSignalType.FieldUnlocked, this);
     }
 
 

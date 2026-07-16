@@ -26,6 +26,7 @@ public class SavedItems
 }
 public class MirraSDKSaveProvider : SaveProvider
 {
+    private const string TutorialStateKey = "Tutorial.State.V1";
     public override bool IsInitialized => isInitialize;
     private bool isInitialize;
     public override void Initialize()
@@ -90,6 +91,17 @@ public class MirraSDKSaveProvider : SaveProvider
     {
         if (!isInitialize) return;
         MirraSDK.Data.SetBool(SaveKey.EndTutorial.ToString(), endTutorial);
+        Changed = true;
+    }
+    public override string LoadTutorialState()
+    {
+        if (!isInitialize) return string.Empty;
+        return MirraSDK.Data.GetString(TutorialStateKey, string.Empty);
+    }
+    public override void SaveTutorialState(string json)
+    {
+        if (!isInitialize) return;
+        MirraSDK.Data.SetString(TutorialStateKey, json ?? string.Empty);
         Changed = true;
     }
     public override void SaveQuestProgress(int step)

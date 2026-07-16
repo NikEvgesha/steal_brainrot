@@ -1,5 +1,10 @@
 # Localization TODO (separate backlog)
 
+## Tutorial V1 coverage (2026-07-16)
+- [x] Added 33 editable RU/EN keys for tutorial progress, skip confirmation and all 13 desktop/touch steps.
+- [x] Added `Tools/Tutorial V1/Synchronize RU-EN Localization` and setup validation for missing/empty/corrupted values.
+- [ ] Run the tutorial in Play Mode while switching RU/EN on desktop and touch viewports; verify wrapping and safe-area placement.
+
 ## Priority 0 - stability
 - [ ] Add strict fallback behavior: if key exists but selected language value is empty, use fallback language (EN) and never render empty text.
 - [ ] Add runtime guard for dynamic localization calls: missing key -> fallback text + one warning in log (no spam).

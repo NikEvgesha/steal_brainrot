@@ -49,6 +49,18 @@ public class FieldCell : MonoBehaviour
             return _currentPet;
         }
     }
+    public Egg CurrentEgg
+    {
+        get
+        {
+            if (_currentEgg == null && _inField == Item.Egg)
+                _currentEgg = GetComponentInChildren<Egg>(true);
+
+            return _currentEgg;
+        }
+    }
+    public Item OccupiedItem => _inField;
+    public bool IsFree => _inField == Item.Free;
     public bool IsRemoteMode
     {
         get

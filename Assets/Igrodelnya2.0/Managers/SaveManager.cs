@@ -153,6 +153,38 @@ public class SaveManager : MonoBehaviour
         MarkProgressExists();
         saveProvider.SaveTutorialProgress(endTutorial);
     }
+    public TutorialSaveData LoadTutorialState()
+    {
+        if (saveProvider == null || !saveProvider.IsInitialized)
+            return TutorialSaveData.CreateNew();
+
+        string json = saveProvider.LoadTutorialState();
+        if (string.IsNullOrWhiteSpace(json))
+            return TutorialSaveData.CreateNew();
+
+        try
+        {
+            TutorialSaveData state = JsonConvert.DeserializeObject<TutorialSaveData>(json);
+            if (state == null)
+                return TutorialSaveData.CreateNew();
+            state.Normalize();
+            return state;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SaveManager] Invalid tutorial state, starting from a safe default: {ex.Message}");
+            return TutorialSaveData.CreateNew();
+        }
+    }
+    public void SaveTutorialState(TutorialSaveData state)
+    {
+        if (state == null || saveProvider == null || !saveProvider.IsInitialized)
+            return;
+
+        state.Normalize();
+        MarkProgressExists();
+        saveProvider.SaveTutorialState(JsonConvert.SerializeObject(state));
+    }
     public void SaveGems(double amount)
     {
         MarkProgressExists();

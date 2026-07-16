@@ -1,10 +1,11 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
 
-// Главный менеджер аналитики
+// Central fan-out for product analytics providers.
 public class AnalyticsManager : MonoBehaviour
 {
     private static AnalyticsManager _instance;
+
     public static AnalyticsManager Instance
     {
         get
@@ -13,79 +14,72 @@ public class AnalyticsManager : MonoBehaviour
             {
                 GameObject go = new GameObject("AnalyticsManager");
                 _instance = go.AddComponent<AnalyticsManager>();
-                DontDestroyOnLoad(go); // Чтобы менеджер сохранялся между сценами
+                DontDestroyOnLoad(go);
             }
+
             return _instance;
         }
     }
 
-    [SerializeField] private List<AnalyticsProvider> analyticsProviders = new List<AnalyticsProvider>(); // Список активных провайдеров
+    [SerializeField] private List<AnalyticsProvider> analyticsProviders = new List<AnalyticsProvider>();
+    private bool _missingProvidersWarningLogged;
 
-    void Awake()
+    public bool HasProviders => analyticsProviders != null && analyticsProviders.Count > 0;
+
+    private void Awake()
     {
         if (_instance != null && _instance != this)
         {
             Destroy(gameObject);
             return;
         }
-        _instance = this;
-        //DontDestroyOnLoad(gameObject);
 
-        // Инициализация всех провайдеров
+        _instance = this;
         InitializeProviders();
-        //LogEvent(EventName.gameStart.ToString());
     }
 
     private void InitializeProviders()
     {
-        foreach (var provider in analyticsProviders)
-        {
+        foreach (AnalyticsProvider provider in analyticsProviders)
             provider.Initialize();
-            //Debug.Log($"Initialized analytics provider: {provider.GetType().Name}");
-        }
     }
 
-    // Метод для отправки события всем провайдерам
     public void LogEvent(string eventName, Dictionary<string, object> parameters = null)
     {
-        if (analyticsProviders.Count == 0)
+        if (!HasProviders)
         {
-            Debug.LogWarning("No analytics providers configured!");
+            WarnAboutMissingProvidersOnce();
             return;
         }
 
-        foreach (var provider in analyticsProviders)
-        {
+        foreach (AnalyticsProvider provider in analyticsProviders)
             provider.SendEvent(eventName, parameters);
-        }
     }
+
     public void LogEvent(string eventName)
     {
-        if (analyticsProviders.Count == 0)
+        if (!HasProviders)
         {
-            Debug.LogWarning("No analytics providers configured!");
+            WarnAboutMissingProvidersOnce();
             return;
         }
 
-        foreach (var provider in analyticsProviders)
-        {
+        foreach (AnalyticsProvider provider in analyticsProviders)
             provider.SendEvent(eventName);
-        }
     }
+
     public void LogEvent(string eventName, Dictionary<string, string> parameters = null)
     {
-        if (analyticsProviders.Count == 0)
+        if (!HasProviders)
         {
-            Debug.LogWarning("No analytics providers configured!");
+            WarnAboutMissingProvidersOnce();
             return;
         }
 
-        foreach (var provider in analyticsProviders)
-        {
+        foreach (AnalyticsProvider provider in analyticsProviders)
             provider.SendEvent(eventName, parameters);
-        }
     }
-    // Метод для добавления провайдера в рантайме (опционально)
+
     public void AddProvider(AnalyticsProvider provider)
     {
         if (!analyticsProviders.Contains(provider))
@@ -94,22 +88,30 @@ public class AnalyticsManager : MonoBehaviour
             provider.Initialize();
         }
     }
+
+    private void WarnAboutMissingProvidersOnce()
+    {
+        if (_missingProvidersWarningLogged)
+            return;
+
+        _missingProvidersWarningLogged = true;
+        Debug.LogWarning("No analytics providers configured. Product events will be ignored in this session.");
+    }
 }
 
-// Пример реализации для Firebase Analytics
+// Example Firebase provider implementation.
 /*public class FirebaseAnalyticsProvider : IAnalyticsProvider
 {
     public void Initialize()
     {
-        // Здесь код инициализации Firebase, если нужно
+        // Initialize Firebase here when the provider is enabled.
         Debug.Log("Firebase Analytics initialized");
     }
 
     public void SendEvent(string eventName, Dictionary<string, object> parameters)
     {
-        // Пример отправки события в Firebase
+        // Forward the event to Firebase.
         // Firebase.Analytics.FirebaseAnalytics.LogEvent(eventName, parameters);
         Debug.Log($"Firebase event logged: {eventName}, Params: {parameters?.Count ?? 0}");
     }
 }*/
-

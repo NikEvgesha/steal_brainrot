@@ -17,6 +17,7 @@ public class DummySaveProvider : SaveProvider
     private const string BackendPlayerIdKey = "BackendPlayerId";
     private const string BackendFriendCodeKey = "BackendFriendCode";
     private const string BackendDisplayNameKey = "BackendDisplayName";
+    private const string TutorialStateKey = "Tutorial.State.V1";
 
     public override bool IsInitialized => true;
 
@@ -68,6 +69,16 @@ public class DummySaveProvider : SaveProvider
     public override void SaveTutorialProgress(bool endTutorial)
     {
         PlayerPrefs.SetInt(SaveKey.EndTutorial.ToString(), endTutorial ? 1 : 0);
+    }
+
+    public override string LoadTutorialState()
+    {
+        return PlayerPrefs.GetString(TutorialStateKey, string.Empty);
+    }
+
+    public override void SaveTutorialState(string json)
+    {
+        PlayerPrefs.SetString(TutorialStateKey, json ?? string.Empty);
     }
 
     public override void SaveQuestProgress(int step)

@@ -70,6 +70,7 @@ public class Brainrot : InventoryItem
     public Action Selled;
     public Action Stealed;
     private Coroutine _incomeCorutine;
+    private bool _incomeReadySignaled;
     private Animator[] _animators;
     private Animation[] _legacyAnimations;
     private bool _animationsSubscribed;
@@ -170,6 +171,7 @@ public class Brainrot : InventoryItem
         _lastIncomeTime = effectiveLastIncomeTs;
         var incomeAccumulationTime = Math.Max(0L, nowTs - effectiveLastIncomeTs);
         _currentIncome = Math.Max(0d, Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome));
+        _incomeReadySignaled = _currentIncome > 0d;
         if (floor != null)
             NewPlace(floor);
         if (_canvas != null)
@@ -302,6 +304,13 @@ public class Brainrot : InventoryItem
         if (playAudio && _audio)
             _audio.Play();
 
+        TutorialSignals.Raise(
+            TutorialSignalType.IncomeCollected,
+            _floorListener,
+            Name,
+            Item.Brainrot,
+            collected);
+
         return collected;
     }
 
@@ -361,6 +370,16 @@ public class Brainrot : InventoryItem
             _currentIncome += _dinamicData.ResultIncome; //2 is the magic number
             _currentIncome = (double.IsInfinity(_currentIncome)) ? float.MaxValue : _currentIncome;
             _currentIncome = Math.Round(_currentIncome);
+            if (!_incomeReadySignaled && _currentIncome > 0d)
+            {
+                _incomeReadySignaled = true;
+                TutorialSignals.Raise(
+                    TutorialSignalType.IncomeReady,
+                    _floorListener,
+                    Name,
+                    Item.Brainrot,
+                    _currentIncome);
+            }
             if (_canvas != null)
                 _canvas.UpdateIncome(_currentIncome);
         }

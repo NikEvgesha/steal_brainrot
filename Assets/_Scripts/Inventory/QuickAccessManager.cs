@@ -102,8 +102,13 @@ public class QuickAccessManager : MonoBehaviour
 
     public void DropCurrent(FieldCell field)
     {
+        if (_currentActive == null || field == null || field.IsRemoteMode)
+            return;
+
         _dropping = true;
-        
+        InventoryItem placedItem = _currentActive;
+        Item placedType = placedItem.Type;
+        string placedId = placedItem.Name;
         _floorListener = field;
         _currentActive.transform.SetParent(_floorListener.transform);
         _currentActive.transform.localPosition = Vector3.zero;
@@ -123,6 +128,12 @@ public class QuickAccessManager : MonoBehaviour
         PlaceItem?.Invoke(_currentActive.Type);
         G.Inventory.Remove(_currentActive);
         _dropping = false;
+
+        TutorialSignals.Raise(
+            placedType == Item.Egg ? TutorialSignalType.EggPlaced : TutorialSignalType.AnimalPlaced,
+            field,
+            placedId,
+            placedType);
     }
 
 

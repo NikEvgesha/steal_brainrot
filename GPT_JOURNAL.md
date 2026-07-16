@@ -917,3 +917,19 @@
   - `START_PROMPT.md` now points new contexts to the overview and handoff before legacy TODO files.
 - The current tutorial implementation was documented as a minimal skeleton, not a completed onboarding system.
 - Mobile controls were previously verified through Unity Bridge for movement, camera rotation, jump input and final Game View layout; Play Mode was stopped after verification.
+
+### 2026-07-16 (tutorial V1 implementation)
+- Replaced the tutorial skeleton with a 13-step onboarding state machine covering movement, local home/conveyor navigation, starter egg placement/hatch, guaranteed first animal, income collection, first expansion, album reward and the next independent goal.
+- Added exact persisted progress with stable step IDs, timestamps and idempotent starter reward flags to Mirra SDK and Dummy/PlayerPrefs providers; the legacy completion bool remains as migration fallback.
+- Added gameplay signals at inventory acquisition, local placement, hatch, first income, field unlock, conveyor upgrade and album reward boundaries.
+- The free `egg1` grant is fact-checked against inventory/local cells, its first hatch is capped at 5 seconds, and its first animal is guaranteed as `Capybara` without reroll duplication.
+- Tutorial targets resolve only from the local slot. Remote field placement is rejected, and remote field/conveyor events cannot advance onboarding.
+- Added prefab-first tutorial UI at `Assets/Resources/Tutorial/TutorialView.prefab`, safe-area target arrow, renderer highlight, conflicting-button blocker, album gate and confirmed skip flow.
+- Timed interstitials are suppressed during onboarding and receive a 45-second grace period after completion or skip.
+- Added six tutorial analytics events with `step_id`, `step_index`, `elapsed_sec`, `input_mode` and `online_mode`; missing analytics providers now warn once per session.
+- Added 33 RU/EN localization keys with desktop/touch copy plus editor synchronization and setup validation tools.
+- Verification:
+  - Unity `6000.3.9f1` batch compilation completed successfully; only five pre-existing unused-field warnings remain in `AlbumScreenController`.
+  - `TutorialV1EditorTools.BatchSynchronizeAndValidate` passed: 13 steps, editable prefab nodes and all 33 RU/EN keys.
+  - `git diff --check` passed (line-ending conversion warnings only).
+- Remaining acceptance: full Play Mode passes on desktop offline, desktop online and mobile/touch, with restart/idempotence/local-base/ad-grace assertions. Unity Bridge was unavailable on `localhost:7777`, so these runtime passes were not claimed.

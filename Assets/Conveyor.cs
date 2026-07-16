@@ -372,6 +372,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         SetLevel(lvl);
         G.Luck?.NotifyChanged();
         BaseDirtyTracker.MarkDirty();
+        TutorialSignals.Raise(TutorialSignalType.ConveyorUpgraded, this, id.ToString(), Item.Free, id);
         if (id < _levels.Count - 1)
             _levels[id + 1].SetPurchasingAvailable(true);
     }

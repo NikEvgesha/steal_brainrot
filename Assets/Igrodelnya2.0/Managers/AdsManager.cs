@@ -40,6 +40,8 @@ public class AdsManager : MonoBehaviour
     private Coroutine _rewardPopupRoutine;
     private float _lastSuccessfulAdRealtime;
     private bool _timedInterstitialFlowInProgress;
+    private bool _tutorialInterstitialSuppressed;
+    private float _tutorialInterstitialGraceUntilRealtime;
 
     private Canvas _adOverlayCanvas;
     private RectTransform _countdownPanel;
@@ -173,6 +175,12 @@ public class AdsManager : MonoBehaviour
 
     private bool TryShowInterstitialAd(Action<bool> onComplete)
     {
+        if (IsInterstitialTemporarilySuppressed)
+        {
+            onComplete?.Invoke(false);
+            return false;
+        }
+
         if (AreInterstitialAdsDisabled)
         {
             onComplete?.Invoke(false);
@@ -220,6 +228,25 @@ public class AdsManager : MonoBehaviour
     {
         PlayerPrefs.SetInt(NoAdsForeverKey, 1);
         PlayerPrefs.Save();
+    }
+
+    public bool IsInterstitialTemporarilySuppressed =>
+        _tutorialInterstitialSuppressed || Time.realtimeSinceStartup < _tutorialInterstitialGraceUntilRealtime;
+
+    public void SetTutorialInterstitialSuppressed(bool suppressed, float graceSeconds = 0f)
+    {
+        _tutorialInterstitialSuppressed = suppressed;
+        if (suppressed)
+        {
+            _tutorialInterstitialGraceUntilRealtime = 0f;
+            HideCountdown();
+        }
+        else
+        {
+            _tutorialInterstitialGraceUntilRealtime = Time.realtimeSinceStartup + Mathf.Max(0f, graceSeconds);
+        }
+
+        ResetTimedInterstitialTimer();
     }
 
     public void AddProvider(AdsProvider provider)
@@ -414,7 +441,7 @@ public class AdsManager : MonoBehaviour
 
     private bool CanCountTimedInterstitialTime()
     {
-        if (AreInterstitialAdsDisabled || _interstitialInProgress || _rewardedInProgress)
+        if (AreInterstitialAdsDisabled || IsInterstitialTemporarilySuppressed || _interstitialInProgress || _rewardedInProgress)
             return false;
 
         if (G.Control != null && G.Control.CursorActive)
