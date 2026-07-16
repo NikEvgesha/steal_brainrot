@@ -949,3 +949,11 @@
 - Live checks confirmed `SpawnPoint`, local `Conveyor`, `EGG_1(Clone)`, free `cell2`, animal `cell2`, locked `Field_1` and `AlbumButton` targets; the album gate was interactable on its step and timed interstitial suppression was active.
 - The existing tutorial save is restored to `learn_movement` after QA; no full gameplay/inventory reset was performed.
 - Remaining acceptance is unchanged: complete clean-profile desktop offline/online and mobile/touch runs, including restart/idempotence/reward/grace-period assertions.
+
+### 2026-07-17 (Tutorial V2 requirements captured)
+- Added `Docs/TUTORIAL_V2_BACKLOG.md` without changing the current V1 runtime flow.
+- Recorded the move from a saved linear index to independent per-step state keyed by immutable `stable_id`, including migration, reorder safety, new lessons for existing players and explicit rename aliases.
+- Defined the required contract for every lesson: activation trigger, prerequisites, start/context, goal, progress, completion signal, hints, skip behavior, reward idempotence, priority and analytics.
+- Recorded the planned upper-right task panel, collapsible left-slide behavior, persistent UI preference and independent world/UI arrow behavior.
+- Split skipping into current-step and current-pack actions. Skipping a pack must not suppress future lesson IDs added by later updates.
+- Left the revised lesson list intentionally TBD until its content and trigger table is approved.

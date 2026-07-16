@@ -82,3 +82,7 @@ Before changing the handoff status to complete, record all of these passes:
 5. After completion/skip: verify disabled UI is restored and the first possible interstitial is delayed by at least 45 seconds.
 
 Also inspect analytics output with a configured provider. A missing provider intentionally emits only one warning per session and does not block gameplay.
+
+## Planned Tutorial V2
+
+The next iteration is tracked separately in `Docs/TUTORIAL_V2_BACKLOG.md`: per-task persistence independent of catalog order, new lessons for existing players, individual activation/progress/completion contracts, upper-right collapsible UI, and separate skip-current/skip-pack actions. Tutorial V1 remains unchanged until the revised content table is approved.
