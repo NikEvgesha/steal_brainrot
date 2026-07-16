@@ -5,17 +5,34 @@ using UnityEngine.UI;
 
 public sealed class TutorialView : MonoBehaviour
 {
+    private const string CollapsedPreferenceKey = "Tutorial.UI.Collapsed";
+
     public event Action PrimaryPressed;
     public event Action SecondaryPressed;
 
     private TMP_Text _messageText;
     private TMP_Text _progressText;
     private TMP_Text _primaryButtonText;
+    private TMP_Text _secondaryButtonText;
+    private TMP_Text _collapseButtonText;
     private Button _primaryButton;
     private Button _secondaryButton;
+    private Button _collapseButton;
+    private RectTransform _panelViewport;
+    private RectTransform _panelContent;
+    private RectTransform _collapseButtonRect;
     private RectTransform _directionArrow;
     private Transform _worldTarget;
     private Camera _camera;
+    private bool _collapsed;
+    private float _expandedPanelX;
+    private float _collapsedPanelX;
+    private float _targetPanelX;
+    private Vector2 _panelViewportBasePosition;
+    private Vector2 _collapseButtonBasePosition;
+    private Rect _lastSafeArea;
+    private int _lastScreenWidth = -1;
+    private int _lastScreenHeight = -1;
 
     public void Initialize()
     {
@@ -33,11 +50,21 @@ public sealed class TutorialView : MonoBehaviour
 
         _messageText = FindNamedComponent<TMP_Text>("Text_Message");
         _progressText = FindChild("Label_Name")?.GetComponentInChildren<TMP_Text>(true);
-        _primaryButton = FindNamedComponent<Button>("Button_SkipText");
-        _secondaryButton = FindNamedComponent<Button>("Button_SkipIcon");
+        _primaryButton = FindNamedComponent<Button>("Button_SkipTask") ?? FindNamedComponent<Button>("Button_SkipText");
+        _secondaryButton = FindNamedComponent<Button>("Button_SkipAll") ?? FindNamedComponent<Button>("Button_SkipIcon");
+        _collapseButton = FindNamedComponent<Button>("Button_Collapse");
         _primaryButtonText = _primaryButton != null
             ? _primaryButton.GetComponentInChildren<TMP_Text>(true)
             : null;
+        _secondaryButtonText = _secondaryButton != null
+            ? _secondaryButton.GetComponentInChildren<TMP_Text>(true)
+            : null;
+        _collapseButtonText = _collapseButton != null
+            ? _collapseButton.GetComponentInChildren<TMP_Text>(true)
+            : null;
+        _panelViewport = FindChild("PanelViewport") as RectTransform;
+        _panelContent = FindChild("TutorialPanel") as RectTransform;
+        _collapseButtonRect = _collapseButton != null ? _collapseButton.transform as RectTransform : null;
 
         if (_progressText != null)
         {
@@ -46,14 +73,14 @@ public sealed class TutorialView : MonoBehaviour
             _progressText.fontSizeMax = 34f;
             _progressText.textWrappingMode = TextWrappingModes.NoWrap;
             RectTransform progressRect = _progressText.transform as RectTransform;
-            if (progressRect != null)
+            if (progressRect != null && _panelContent == null)
                 progressRect.sizeDelta = new Vector2(Mathf.Max(340f, progressRect.sizeDelta.x), progressRect.sizeDelta.y);
         }
 
         if (_primaryButton != null)
         {
             RectTransform primaryRect = _primaryButton.transform as RectTransform;
-            if (primaryRect != null)
+            if (primaryRect != null && _panelContent == null)
                 primaryRect.sizeDelta = new Vector2(210f, 72f);
         }
 
@@ -65,12 +92,29 @@ public sealed class TutorialView : MonoBehaviour
             _primaryButtonText.textWrappingMode = TextWrappingModes.NoWrap;
         }
 
-        RectTransform bubbleRect = FindChild("SpeechBubble") as RectTransform;
-        if (bubbleRect != null)
+        RectTransform bubbleRect = _panelContent != null ? _panelContent : FindChild("SpeechBubble") as RectTransform;
+        if (_panelContent == null && bubbleRect != null)
         {
-            bubbleRect.sizeDelta = new Vector2(bubbleRect.sizeDelta.x, 340f);
-            bubbleRect.anchoredPosition = new Vector2(bubbleRect.anchoredPosition.x, 250f);
+            bubbleRect.anchorMin = Vector2.one;
+            bubbleRect.anchorMax = Vector2.one;
+            bubbleRect.pivot = Vector2.one;
+            bubbleRect.sizeDelta = new Vector2(560f, 250f);
+            bubbleRect.anchoredPosition = new Vector2(-24f, -112f);
+            _panelContent = bubbleRect;
         }
+
+        if (_panelContent != null)
+        {
+            _expandedPanelX = _panelContent.anchoredPosition.x;
+            _collapsedPanelX = _expandedPanelX - Mathf.Max(300f, _panelContent.rect.width + 24f);
+            SetCollapsed(PlayerPrefs.GetInt(CollapsedPreferenceKey, 0) == 1, immediate: true);
+        }
+
+        if (_panelViewport != null)
+            _panelViewportBasePosition = _panelViewport.anchoredPosition;
+        if (_collapseButtonRect != null)
+            _collapseButtonBasePosition = _collapseButtonRect.anchoredPosition;
+        ApplySafeArea(force: true);
 
         Transform arrow = FindChild("Icon_Arrow");
         if (arrow != null)
@@ -108,10 +152,16 @@ public sealed class TutorialView : MonoBehaviour
             _secondaryButton.onClick.AddListener(OnSecondaryPressed);
         }
 
+        if (_collapseButton != null)
+        {
+            _collapseButton.onClick.RemoveListener(OnCollapsePressed);
+            _collapseButton.onClick.AddListener(OnCollapsePressed);
+        }
+
         SetWorldTarget(null);
     }
 
-    public void SetStep(string progress, string message, string primaryLabel, bool isFinalStep)
+    public void SetStep(string progress, string message, string primaryLabel, string secondaryLabel, bool isFinalStep)
     {
         if (_progressText != null)
             _progressText.text = progress ?? string.Empty;
@@ -119,14 +169,16 @@ public sealed class TutorialView : MonoBehaviour
             _messageText.text = message ?? string.Empty;
         if (_primaryButtonText != null)
             _primaryButtonText.text = primaryLabel ?? string.Empty;
+        if (_secondaryButtonText != null)
+            _secondaryButtonText.text = secondaryLabel ?? string.Empty;
 
         if (_primaryButton != null)
             _primaryButton.gameObject.SetActive(true);
         if (_secondaryButton != null)
-            _secondaryButton.gameObject.SetActive(false);
+            _secondaryButton.gameObject.SetActive(!isFinalStep);
     }
 
-    public void ShowInlineSkipConfirmation(string progress, string message, string confirmLabel)
+    public void ShowInlineSkipConfirmation(string progress, string message, string confirmLabel, string cancelLabel)
     {
         if (_progressText != null)
             _progressText.text = progress ?? string.Empty;
@@ -134,6 +186,8 @@ public sealed class TutorialView : MonoBehaviour
             _messageText.text = message ?? string.Empty;
         if (_primaryButtonText != null)
             _primaryButtonText.text = confirmLabel ?? string.Empty;
+        if (_secondaryButtonText != null)
+            _secondaryButtonText.text = cancelLabel ?? string.Empty;
 
         if (_primaryButton != null)
             _primaryButton.gameObject.SetActive(true);
@@ -150,7 +204,42 @@ public sealed class TutorialView : MonoBehaviour
 
     private void LateUpdate()
     {
+        ApplySafeArea(force: false);
+        UpdatePanelSlide();
         UpdateDirectionArrow();
+    }
+
+    private void ApplySafeArea(bool force)
+    {
+        Rect safeArea = Screen.safeArea;
+        if (!force && _lastScreenWidth == Screen.width && _lastScreenHeight == Screen.height && _lastSafeArea == safeArea)
+            return;
+
+        _lastScreenWidth = Screen.width;
+        _lastScreenHeight = Screen.height;
+        _lastSafeArea = safeArea;
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        float scaleFactor = canvas != null && canvas.scaleFactor > 0f ? canvas.scaleFactor : 1f;
+        float rightInset = Mathf.Max(0f, Screen.width - safeArea.xMax) / scaleFactor;
+        float topInset = Mathf.Max(0f, Screen.height - safeArea.yMax) / scaleFactor;
+        Vector2 inset = new Vector2(-rightInset, -topInset);
+
+        if (_panelViewport != null)
+            _panelViewport.anchoredPosition = _panelViewportBasePosition + inset;
+        if (_collapseButtonRect != null)
+            _collapseButtonRect.anchoredPosition = _collapseButtonBasePosition + inset;
+    }
+
+    private void UpdatePanelSlide()
+    {
+        if (_panelContent == null)
+            return;
+
+        Vector2 position = _panelContent.anchoredPosition;
+        float nextX = Mathf.MoveTowards(position.x, _targetPanelX, 1500f * Time.unscaledDeltaTime);
+        if (!Mathf.Approximately(position.x, nextX))
+            _panelContent.anchoredPosition = new Vector2(nextX, position.y);
     }
 
     private void UpdateDirectionArrow()
@@ -224,12 +313,34 @@ public sealed class TutorialView : MonoBehaviour
         SecondaryPressed?.Invoke();
     }
 
+    private void OnCollapsePressed()
+    {
+        SetCollapsed(!_collapsed, immediate: false);
+        PlayerPrefs.SetInt(CollapsedPreferenceKey, _collapsed ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    private void SetCollapsed(bool collapsed, bool immediate)
+    {
+        _collapsed = collapsed;
+        _targetPanelX = collapsed ? _collapsedPanelX : _expandedPanelX;
+        if (immediate && _panelContent != null)
+        {
+            Vector2 position = _panelContent.anchoredPosition;
+            _panelContent.anchoredPosition = new Vector2(_targetPanelX, position.y);
+        }
+        if (_collapseButtonText != null)
+            _collapseButtonText.text = collapsed ? ">" : "<";
+    }
+
     private void OnDestroy()
     {
         if (_primaryButton != null)
             _primaryButton.onClick.RemoveListener(OnPrimaryPressed);
         if (_secondaryButton != null)
             _secondaryButton.onClick.RemoveListener(OnSecondaryPressed);
+        if (_collapseButton != null)
+            _collapseButton.onClick.RemoveListener(OnCollapsePressed);
     }
 
     private void SetNamedObjectActive(string objectName, bool active)

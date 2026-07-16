@@ -957,3 +957,13 @@
 - Recorded the planned upper-right task panel, collapsible left-slide behavior, persistent UI preference and independent world/UI arrow behavior.
 - Split skipping into current-step and current-pack actions. Skipping a pack must not suppress future lesson IDs added by later updates.
 - Left the revised lesson list intentionally TBD until its content and trigger table is approved.
+
+### 2026-07-17 01:17 MSK (Tutorial V2 technical checkpoint)
+- Replaced the single linear tutorial position with V2 per-task state keyed by immutable `stable_id`: status, definition revision, progress payload/value, reward flag and timestamps are persisted independently.
+- Added V1/legacy completion migration, catalog synchronization for future IDs and deterministic prerequisite/priority scheduling. Completed/skipped IDs do not replay after reorder or revision changes; a later unknown ID is created as `Unseen`.
+- Preserved the existing 13-step content while moving runtime activation/completion to the new state. Movement progress resumes from its per-task value.
+- Rebuilt `Resources/Tutorial/TutorialView.prefab` as an editable upper-right panel with skip-current, skip-current-pack and a persistent animated collapse control. Panel and target arrow respect safe area.
+- Added RU/EN strings and editor validation for the new controls plus synthetic migration checks.
+- Unity verification completed: compilation/setup validation passed; expanded/collapsed UI was inspected at `1280x720`, `800x600` and `390x844`; skip-current moved only `learn_movement` to `Skipped` and activated `find_home`.
+- Restored the test save to a fresh V2 `learn_movement` state and reset the collapse preference before stopping Play Mode.
+- Tomorrow: approve the new lesson/trigger table, implement individual activation/progress/completion/hint and safe `OnSkip` handlers, add rename/reorder tests, then run confirmation-popup, restart, RU/EN, offline/online and mobile end-to-end acceptance.

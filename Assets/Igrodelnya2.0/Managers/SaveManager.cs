@@ -160,20 +160,30 @@ public class SaveManager : MonoBehaviour
 
         string json = saveProvider.LoadTutorialState();
         if (string.IsNullOrWhiteSpace(json))
-            return TutorialSaveData.CreateNew();
+        {
+            TutorialSaveData newState = TutorialSaveData.CreateNew();
+            newState.Normalize(saveProvider.GetTutorialProgress());
+            return newState;
+        }
 
         try
         {
             TutorialSaveData state = JsonConvert.DeserializeObject<TutorialSaveData>(json);
             if (state == null)
-                return TutorialSaveData.CreateNew();
-            state.Normalize();
+            {
+                TutorialSaveData newState = TutorialSaveData.CreateNew();
+                newState.Normalize(saveProvider.GetTutorialProgress());
+                return newState;
+            }
+            state.Normalize(saveProvider.GetTutorialProgress());
             return state;
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"[SaveManager] Invalid tutorial state, starting from a safe default: {ex.Message}");
-            return TutorialSaveData.CreateNew();
+            TutorialSaveData fallback = TutorialSaveData.CreateNew();
+            fallback.Normalize(saveProvider.GetTutorialProgress());
+            return fallback;
         }
     }
     public void SaveTutorialState(TutorialSaveData state)

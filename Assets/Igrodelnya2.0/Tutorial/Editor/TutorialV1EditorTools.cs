@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Build;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public static class TutorialV1EditorTools
 {
@@ -13,6 +15,22 @@ public static class TutorialV1EditorTools
     {
         ["UI/Tutorial/Progress"] = new[] { "Обучение {0}/{1}", "Tutorial {0}/{1}" },
         ["UI/Tutorial/Skip"] = new[] { "Пропустить", "Skip" },
+        ["UI/Tutorial/SkipTask"] = new[] { "Пропустить задание", "Skip task" },
+        ["UI/Tutorial/SkipAll"] = new[] { "Пропустить всё", "Skip all" },
+        ["UI/Tutorial/SkipTaskTitle"] = new[] { "Пропустить это задание?", "Skip this task?" },
+        ["UI/Tutorial/SkipTaskDescription"] = new[]
+        {
+            "Будет пропущено только это задание. Следующее доступное обучение всё ещё сможет появиться.",
+            "Only this task will be skipped. The next available lesson can still appear."
+        },
+        ["UI/Tutorial/SkipAllTitle"] = new[] { "Пропустить все текущие задания?", "Skip all current lessons?" },
+        ["UI/Tutorial/SkipAllDescription"] = new[]
+        {
+            "Все известные сейчас задания будут пропущены. Новое обучение из будущих обновлений всё ещё может появиться.",
+            "All currently known lessons will be skipped. New lessons added later may still appear."
+        },
+        ["UI/Tutorial/Collapse"] = new[] { "Свернуть", "Collapse" },
+        ["UI/Tutorial/Expand"] = new[] { "Развернуть", "Expand" },
         ["UI/Tutorial/Done"] = new[] { "Готово", "Done" },
         ["UI/Tutorial/SkipTitle"] = new[] { "Пропустить обучение?", "Skip tutorial?" },
         ["UI/Tutorial/SkipDescription"] = new[]
@@ -197,6 +215,7 @@ public static class TutorialV1EditorTools
     {
         var errors = new List<string>();
         ValidateCatalog(errors);
+        ValidateSaveMigration(errors);
         ValidateViewPrefab(errors);
         ValidateLocalization(errors);
 
@@ -212,11 +231,150 @@ public static class TutorialV1EditorTools
         ValidateSetup();
     }
 
+    [MenuItem("Tools/Tutorial V2/Rebuild Upper-Right View Prefab")]
+    public static void RebuildUpperRightViewPrefab()
+    {
+        TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+        if (font == null)
+            throw new BuildFailedException("TMP default font asset is missing.");
+
+        var root = new GameObject("TutorialView", typeof(RectTransform), typeof(TutorialView));
+        root.layer = LayerMask.NameToLayer("UI");
+        RectTransform rootRect = root.GetComponent<RectTransform>();
+        SetRect(rootRect, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+
+        GameObject viewport = CreateRectObject("PanelViewport", root.transform);
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        SetRect(viewportRect, Vector2.one, Vector2.one, Vector2.one, new Vector2(-24f, -108f), new Vector2(560f, 250f));
+        viewport.AddComponent<RectMask2D>();
+
+        GameObject panel = CreateImageObject("TutorialPanel", viewport.transform, new Color(0.88f, 0.84f, 0.76f, 0.98f));
+        RectTransform panelRect = panel.GetComponent<RectTransform>();
+        SetRect(panelRect, Vector2.one, Vector2.one, Vector2.one, Vector2.zero, new Vector2(560f, 250f));
+        Outline panelOutline = panel.AddComponent<Outline>();
+        panelOutline.effectColor = new Color(0.05f, 0.04f, 0.03f, 1f);
+        panelOutline.effectDistance = new Vector2(4f, -4f);
+
+        TMP_Text progress = CreateText("Label_Name", panel.transform, font, 27f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+        SetRect(progress.rectTransform, new Vector2(0f, 1f), Vector2.one, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(-32f, 46f));
+        progress.color = new Color(0.08f, 0.17f, 0.28f, 1f);
+        progress.enableAutoSizing = true;
+        progress.fontSizeMin = 18f;
+        progress.fontSizeMax = 28f;
+        progress.text = "Обучение 1/13";
+
+        TMP_Text message = CreateText("Text_Message", panel.transform, font, 27f, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+        SetRect(message.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(-32f, -112f));
+        message.color = new Color(0.08f, 0.1f, 0.13f, 1f);
+        message.enableAutoSizing = true;
+        message.fontSizeMin = 18f;
+        message.fontSizeMax = 28f;
+        message.textWrappingMode = TextWrappingModes.Normal;
+        message.text = "Текущее задание";
+
+        Button skipTask = CreateButton("Button_SkipTask", panel.transform, font, "Пропустить задание", new Color(0.22f, 0.47f, 0.78f, 1f));
+        SetRect(skipTask.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-190f, 14f), new Vector2(174f, 48f));
+
+        Button skipAll = CreateButton("Button_SkipAll", panel.transform, font, "Пропустить всё", new Color(0.58f, 0.3f, 0.22f, 1f));
+        SetRect(skipAll.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-14f, 14f), new Vector2(160f, 48f));
+
+        Button collapse = CreateButton("Button_Collapse", root.transform, font, "<", new Color(0.22f, 0.47f, 0.78f, 1f));
+        SetRect(collapse.transform as RectTransform, Vector2.one, Vector2.one, Vector2.one, new Vector2(-14f, -116f), new Vector2(48f, 48f));
+        collapse.transform.SetAsLastSibling();
+
+        GameObject arrow = CreateImageObject("Icon_Arrow", root.transform, Color.white);
+        RectTransform arrowRect = arrow.GetComponent<RectTransform>();
+        SetRect(arrowRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(88f, 80f));
+        Image arrowImage = arrow.GetComponent<Image>();
+        arrowImage.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(
+            "Assets/_Sprites/GUI-CasualFantasy/ResourcesData/Sprites/Components/Frame/SpeechFrame01_DemoIcon.png");
+        arrowImage.preserveAspect = true;
+        arrowImage.raycastTarget = false;
+        Outline arrowOutline = arrow.AddComponent<Outline>();
+        arrowOutline.effectColor = new Color(1f, 0.78f, 0.05f, 1f);
+        arrowOutline.effectDistance = new Vector2(6f, -6f);
+        arrow.SetActive(false);
+
+        PrefabUtility.SaveAsPrefabAsset(root, ViewPrefabPath);
+        UnityEngine.Object.DestroyImmediate(root);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"[TutorialV2] Rebuilt editable upper-right tutorial view at {ViewPrefabPath}.");
+    }
+
+    private static GameObject CreateRectObject(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.layer = LayerMask.NameToLayer("UI");
+        go.transform.SetParent(parent, false);
+        return go;
+    }
+
+    private static GameObject CreateImageObject(string name, Transform parent, Color color)
+    {
+        GameObject go = CreateRectObject(name, parent);
+        go.AddComponent<CanvasRenderer>();
+        Image image = go.AddComponent<Image>();
+        image.color = color;
+        return go;
+    }
+
+    private static TMP_Text CreateText(
+        string name,
+        Transform parent,
+        TMP_FontAsset font,
+        float fontSize,
+        FontStyles style,
+        TextAlignmentOptions alignment)
+    {
+        GameObject go = CreateRectObject(name, parent);
+        TextMeshProUGUI text = go.AddComponent<TextMeshProUGUI>();
+        text.font = font;
+        text.fontSize = fontSize;
+        text.fontStyle = style;
+        text.alignment = alignment;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private static Button CreateButton(string name, Transform parent, TMP_FontAsset font, string label, Color color)
+    {
+        GameObject go = CreateImageObject(name, parent, color);
+        Button button = go.AddComponent<Button>();
+        button.targetGraphic = go.GetComponent<Image>();
+        Outline outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0.04f, 0.04f, 0.04f, 1f);
+        outline.effectDistance = new Vector2(3f, -3f);
+
+        TMP_Text text = CreateText("Text", go.transform, font, 22f, FontStyles.Bold, TextAlignmentOptions.Center);
+        SetRect(text.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(-12f, -8f));
+        text.color = Color.white;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 14f;
+        text.fontSizeMax = 22f;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.text = label;
+        return button;
+    }
+
+    private static void SetRect(
+        RectTransform rect,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 pivot,
+        Vector2 anchoredPosition,
+        Vector2 sizeDelta)
+    {
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = sizeDelta;
+        rect.localScale = Vector3.one;
+    }
+
     private static void ValidateCatalog(List<string> errors)
     {
-        if (TutorialStepCatalog.Steps.Length != 13)
-            errors.Add($"Expected 13 tutorial steps, got {TutorialStepCatalog.Steps.Length}.");
-
         var stableIds = new HashSet<string>(StringComparer.Ordinal);
         for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
         {
@@ -225,9 +383,71 @@ public static class TutorialV1EditorTools
                 errors.Add($"Step {i} has no stable id.");
             else if (!stableIds.Add(step.stableId))
                 errors.Add($"Duplicate stable id '{step.stableId}'.");
-            if (step != null && (int)step.id != i)
-                errors.Add($"Step '{step.stableId}' enum value {(int)step.id} does not match index {i}.");
+            if (step != null && string.IsNullOrWhiteSpace(step.packId))
+                errors.Add($"Step '{step.stableId}' has no pack id.");
+            if (step != null && step.definitionRevision < 1)
+                errors.Add($"Step '{step.stableId}' has invalid definition revision {step.definitionRevision}.");
         }
+
+        for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
+        {
+            TutorialStepDefinition step = TutorialStepCatalog.Steps[i];
+            if (step == null || step.prerequisiteStableIds == null)
+                continue;
+            for (int j = 0; j < step.prerequisiteStableIds.Length; j++)
+            {
+                string prerequisite = step.prerequisiteStableIds[j];
+                if (string.Equals(prerequisite, step.stableId, StringComparison.Ordinal))
+                    errors.Add($"Step '{step.stableId}' depends on itself.");
+                else if (!stableIds.Contains(prerequisite))
+                    errors.Add($"Step '{step.stableId}' has missing prerequisite '{prerequisite}'.");
+            }
+        }
+    }
+
+    private static void ValidateSaveMigration(List<string> errors)
+    {
+        var legacy = new TutorialSaveData
+        {
+            version = 1,
+            perStepInitialized = false,
+            stepId = "place_starter_egg",
+            stepIndex = 5,
+            startedUnix = 100,
+            stepStartedUnix = 200
+        };
+        legacy.Normalize(false);
+        for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
+        {
+            TutorialTaskSaveData state = legacy.GetTaskState(TutorialStepCatalog.Steps[i].stableId);
+            TutorialTaskStatus expected = i < 5
+                ? TutorialTaskStatus.Completed
+                : i == 5 ? TutorialTaskStatus.Active : TutorialTaskStatus.Unseen;
+            if (state == null || state.status != expected)
+                errors.Add($"Legacy active-step migration failed for '{TutorialStepCatalog.Steps[i].stableId}'.");
+        }
+
+        var legacyCompleted = new TutorialSaveData
+        {
+            version = 1,
+            perStepInitialized = false,
+            completed = true,
+            completedUnix = 300
+        };
+        legacyCompleted.Normalize(true);
+        if (!legacyCompleted.AreAllKnownStepsTerminal())
+            errors.Add("Completed V1 save did not migrate all known tasks to terminal states.");
+
+        var futureDefinition = new TutorialStepDefinition(
+            TutorialStepId.ContinueIndependently,
+            "future_lesson_validation",
+            "Future lesson",
+            "Future lesson",
+            priority: 999,
+            packId: "future_validation");
+        TutorialTaskSaveData future = legacyCompleted.GetOrCreateTaskState(futureDefinition);
+        if (future == null || future.status != TutorialTaskStatus.Unseen)
+            errors.Add("A new stable id is not eligible as unseen for a previously completed player.");
     }
 
     private static void ValidateViewPrefab(List<string> errors)
@@ -239,7 +459,11 @@ public static class TutorialV1EditorTools
             return;
         }
 
-        string[] requiredChildren = { "Text_Message", "Label_Name", "Button_SkipText", "Button_SkipIcon", "Icon_Arrow" };
+        string[] requiredChildren =
+        {
+            "PanelViewport", "TutorialPanel", "Text_Message", "Label_Name",
+            "Button_SkipTask", "Button_SkipAll", "Button_Collapse", "Icon_Arrow"
+        };
         Transform[] children = prefab.GetComponentsInChildren<Transform>(true);
         foreach (string childName in requiredChildren)
         {

@@ -6,6 +6,12 @@
 - [x] Updated the starter-egg RU/EN copy to describe the real marked, free conveyor interaction instead of an automatic grant.
 - [~] Live Bridge spot-check confirmed long RU/EN tutorial copy and progress labels fit at `1280x720`; explicit language switching, `800x600` and touch safe-area passes remain.
 
+## Tutorial V2 UI checkpoint (2026-07-17)
+- [x] Added editable RU/EN keys for skip-current, skip-current-pack, their confirmations, collapse and expand actions.
+- [x] Localization synchronization and setup validation cover the new keys.
+- [x] RU layout was checked through Unity Bridge at `1280x720`, `800x600` and portrait `390x844` without clipping.
+- [ ] Tomorrow: switch RU/EN live, approve the revised lesson table, then add final copy for every new or changed `stable_id`.
+
 ## Priority 0 - stability
 - [ ] Add strict fallback behavior: if key exists but selected language value is empty, use fallback language (EN) and never render empty text.
 - [ ] Add runtime guard for dynamic localization calls: missing key -> fallback text + one warning in log (no spam).

@@ -6,6 +6,13 @@ using UnityEngine.UI;
 
 public sealed class TutorialManager : MonoBehaviour
 {
+    private enum SkipRequestScope
+    {
+        None,
+        CurrentTask,
+        CurrentPack
+    }
+
     private const string ViewResourcePath = "Tutorial/TutorialView";
     private const string StarterEggId = "egg1";
     private const string StarterAnimalId = "Capybara";
@@ -18,6 +25,8 @@ public sealed class TutorialManager : MonoBehaviour
     public static TutorialManager Instance { get; private set; }
 
     private TutorialSaveData _state;
+    private TutorialStepDefinition _currentDefinition;
+    private TutorialTaskSaveData _currentTaskState;
     private TutorialView _view;
     private TutorialTargetHighlighter _highlighter;
     private TutorialUiBlocker _uiBlocker;
@@ -27,8 +36,13 @@ public sealed class TutorialManager : MonoBehaviour
     private float _movementDistance;
     private float _stepActivatedRealtime;
     private float _nextTargetRefresh;
+    private float _nextActivationScan;
+    private float _lastSavedMovementProgress;
     private bool _active;
+    private bool _schedulerReady;
+    private bool _processingTransition;
     private bool _inlineSkipConfirmation;
+    private SkipRequestScope _pendingSkipScope;
     private float _nextStarterOfferAttempt;
     private bool _starterOfferErrorLogged;
     private Egg _starterOfferEgg;
@@ -40,9 +54,12 @@ public sealed class TutorialManager : MonoBehaviour
     public bool IsTutorialActive => _active;
     public bool AllowsAlbum => _active && _state != null && CurrentStep == TutorialStepId.ClaimAlbumReward;
     public Transform CurrentTarget => _currentTarget;
-    public TutorialStepId CurrentStep => TutorialStepCatalog.Steps[CurrentStepIndex].id;
-    private int CurrentStepIndex => _state != null
-        ? Mathf.Clamp(_state.stepIndex, 0, TutorialStepCatalog.Steps.Length - 1)
+    public TutorialStepId CurrentStep => _currentDefinition != null
+        ? _currentDefinition.id
+        : TutorialStepId.LearnMovement;
+    public string CurrentStableId => _currentDefinition != null ? _currentDefinition.stableId : string.Empty;
+    private int CurrentStepIndex => _currentDefinition != null
+        ? Mathf.Max(0, TutorialStepCatalog.FindIndex(_currentDefinition.stableId, 0))
         : 0;
 
     public static TutorialManager EnsureExists()
@@ -124,37 +141,28 @@ public sealed class TutorialManager : MonoBehaviour
         _state = G.Save.LoadTutorialState();
         if (_state == null)
             _state = TutorialSaveData.CreateNew();
-        _state.Normalize();
+        bool normalized = _state.Normalize(G.Save.GetTutorialProgress());
+        _schedulerReady = true;
+        if (normalized)
+            SaveState();
 
-        if (_state.completed || G.Save.GetTutorialProgress())
-        {
-            _state.completed = true;
-            G.Save.SaveTutorialState(_state);
-            yield break;
-        }
-
-        CreateView();
-        CloseConflictingWindows();
-
-        bool resumed = _state.startedUnix > 0;
-        long now = UtcNowUnix();
-        if (_state.startedUnix <= 0)
-            _state.startedUnix = now;
-        if (_state.stepStartedUnix <= 0)
-            _state.stepStartedUnix = now;
-
-        _active = true;
-        G.Ad?.SetTutorialInterstitialSuppressed(true);
-        SaveState();
-
-        LogEvent(resumed ? "tutorial_resumed" : "tutorial_started", BuildStepParameters());
-        ActivateCurrentStep(logStepStarted: true);
+        TryStartNextAvailable(emitSessionEvent: true);
     }
 
     private void Update()
     {
-        if (!_active || _state == null)
+        if (!_schedulerReady || _state == null)
             return;
+
+        if (!_active)
+        {
+            if (Time.unscaledTime >= _nextActivationScan)
+            {
+                _nextActivationScan = Time.unscaledTime + 1f;
+                TryStartNextAvailable(emitSessionEvent: true);
+            }
+            return;
+        }
 
         RefreshTargetIfNeeded();
 #if UNITY_EDITOR
@@ -162,6 +170,102 @@ public sealed class TutorialManager : MonoBehaviour
             return;
 #endif
         EvaluateCurrentStep();
+    }
+
+    private bool TryStartNextAvailable(bool emitSessionEvent)
+    {
+        if (_active || _state == null)
+            return _active;
+
+        TutorialStepDefinition definition = null;
+        TutorialTaskSaveData persistedActive = _state.GetTaskState(_state.activeStepId);
+        if (persistedActive != null && persistedActive.status == TutorialTaskStatus.Active)
+            definition = TutorialStepCatalog.Find(persistedActive.stableId);
+
+        bool resumed = definition != null && persistedActive.startedUnix > 0;
+        if (definition == null)
+            definition = FindNextAvailableDefinition();
+
+        if (definition == null)
+        {
+            if (_state.AreAllKnownStepsTerminal())
+            {
+                if (!G.Save.GetTutorialProgress())
+                    G.Save.SaveTutorialProgress(true);
+                _schedulerReady = false;
+            }
+            return false;
+        }
+
+        BeginDefinition(definition, emitSessionEvent, resumed);
+        return true;
+    }
+
+    private TutorialStepDefinition FindNextAvailableDefinition()
+    {
+        TutorialStepDefinition best = null;
+        for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
+        {
+            TutorialStepDefinition definition = TutorialStepCatalog.Steps[i];
+            TutorialTaskSaveData state = _state.GetOrCreateTaskState(definition);
+            if (state == null || state.IsTerminal || !ArePrerequisitesTerminal(definition) || !CanActivateDefinition(definition))
+                continue;
+
+            _state.SetAvailable(definition, UtcNowUnix());
+            if (best == null || definition.priority < best.priority)
+                best = definition;
+        }
+
+        return best;
+    }
+
+    private bool ArePrerequisitesTerminal(TutorialStepDefinition definition)
+    {
+        if (definition == null || definition.prerequisiteStableIds == null)
+            return true;
+
+        for (int i = 0; i < definition.prerequisiteStableIds.Length; i++)
+        {
+            string prerequisiteId = definition.prerequisiteStableIds[i];
+            TutorialTaskSaveData prerequisite = _state.GetTaskState(prerequisiteId);
+            if (prerequisite == null || !prerequisite.IsTerminal)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool CanActivateDefinition(TutorialStepDefinition definition)
+    {
+        // V1 definitions are prerequisite-driven. Future contextual handlers can add
+        // gameplay-fact triggers here without changing persisted identity or order.
+        return definition != null;
+    }
+
+    private void BeginDefinition(TutorialStepDefinition definition, bool emitSessionEvent, bool resumed)
+    {
+        if (definition == null || _state == null)
+            return;
+
+        long now = UtcNowUnix();
+        _currentTaskState = _state.Activate(definition, now);
+        if (_currentTaskState == null)
+            return;
+
+        _currentDefinition = definition;
+        if (_state.startedUnix <= 0)
+            _state.startedUnix = now;
+
+        CreateView();
+        CloseConflictingWindows();
+        _active = true;
+        G.Ad?.SetTutorialInterstitialSuppressed(true);
+        G.Save.SaveTutorialProgress(false);
+        SaveState();
+
+        if (emitSessionEvent)
+            LogEvent(resumed || _state.startedUnix < now ? "tutorial_resumed" : "tutorial_started", BuildStepParameters());
+        ActivateCurrentStep(logStepStarted: true);
     }
 
     private void EvaluateCurrentStep()
@@ -242,18 +346,27 @@ public sealed class TutorialManager : MonoBehaviour
             _movementDistance += frameDistance;
         _lastMovementPosition = position;
 
+        if (_currentTaskState != null && _movementDistance - _lastSavedMovementProgress >= 0.5f)
+        {
+            _lastSavedMovementProgress = _movementDistance;
+            _state.SetProgress(CurrentStableId, _movementDistance, string.Empty, UtcNowUnix());
+            SaveState();
+        }
+
         if (_movementDistance >= MovementDistanceRequired)
             CompleteCurrentStep();
     }
 
     private void ActivateCurrentStep(bool logStepStarted)
     {
-        _state.Normalize();
+        _state.Normalize(G.Save != null && G.Save.GetTutorialProgress());
         _stepActivatedRealtime = Time.realtimeSinceStartup;
-        _movementDistance = 0f;
+        _movementDistance = _currentTaskState != null ? (float)_currentTaskState.progressValue : 0f;
+        _lastSavedMovementProgress = _movementDistance;
         _lastMovementPosition = G.Player != null ? G.Player.transform.position : Vector3.zero;
         _nextStarterOfferAttempt = 0f;
         _inlineSkipConfirmation = false;
+        _pendingSkipScope = SkipRequestScope.None;
 
         _uiBlocker?.SetAlbumAllowed(CurrentStep == TutorialStepId.ClaimAlbumReward);
         RefreshView();
@@ -265,40 +378,47 @@ public sealed class TutorialManager : MonoBehaviour
 
     private void CompleteCurrentStep()
     {
-        if (!_active || _state == null)
+        if (!_active || _state == null || _currentDefinition == null || _processingTransition)
             return;
 
+        _processingTransition = true;
         if (CurrentStep == TutorialStepId.AcquireStarterEgg)
             ClearStarterEggOffer();
 
-        LogEvent("tutorial_step_completed", BuildStepParameters());
-        int nextIndex = CurrentStepIndex + 1;
-        if (nextIndex >= TutorialStepCatalog.Steps.Length)
+        Dictionary<string, object> finalParameters = BuildStepParameters();
+        LogEvent("tutorial_step_completed", finalParameters);
+        _state.MarkTerminal(CurrentStableId, wasSkipped: false, UtcNowUnix());
+        SaveState();
+        AdvanceAfterTerminal(finalParameters, "tutorial_completed");
+        _processingTransition = false;
+    }
+
+    private void AdvanceAfterTerminal(Dictionary<string, object> finalParameters, string terminalEventName)
+    {
+        _currentDefinition = null;
+        _currentTaskState = null;
+        _active = false;
+
+        TutorialStepDefinition next = FindNextAvailableDefinition();
+        if (next != null)
         {
-            CompleteTutorial(skipped: false);
+            BeginDefinition(next, emitSessionEvent: false, resumed: false);
             return;
         }
 
-        _state.stepIndex = nextIndex;
-        _state.stepId = TutorialStepCatalog.Steps[nextIndex].stableId;
-        _state.stepStartedUnix = UtcNowUnix();
-        SaveState();
-        ActivateCurrentStep(logStepStarted: true);
+        FinishActiveSession(terminalEventName, finalParameters);
     }
 
-    private void CompleteTutorial(bool skipped)
+    private void FinishActiveSession(string eventName, Dictionary<string, object> parameters)
     {
-        if (!_active || _state == null)
-            return;
-
         ClearStarterEggOffer();
-        _state.completed = true;
-        _state.skipped = skipped;
-        _state.completedUnix = UtcNowUnix();
+        _state.Normalize(G.Save != null && G.Save.GetTutorialProgress());
         SaveState();
-        G.Save.SaveTutorialProgress(true);
+        if (_state.AreAllKnownStepsTerminal())
+            G.Save.SaveTutorialProgress(true);
 
-        LogEvent(skipped ? "tutorial_skipped" : "tutorial_completed", BuildStepParameters());
+        if (!string.IsNullOrWhiteSpace(eventName))
+            LogEvent(eventName, parameters);
 
         _active = false;
         G.Ad?.SetTutorialInterstitialSuppressed(false, PostTutorialInterstitialGraceSeconds);
@@ -307,11 +427,14 @@ public sealed class TutorialManager : MonoBehaviour
         if (_view != null)
             Destroy(_view.gameObject);
         _view = null;
+        _currentDefinition = null;
+        _currentTaskState = null;
+        _nextActivationScan = Time.unscaledTime + 1f;
     }
 
     public void QuickStopTutorial()
     {
-        RequestSkip();
+        RequestSkip(SkipRequestScope.CurrentPack);
     }
 
 #if UNITY_EDITOR
@@ -320,8 +443,9 @@ public sealed class TutorialManager : MonoBehaviour
         if (!_active || _state == null)
             return;
 
-        _state.stepIndex = Mathf.Clamp(stepIndex, 0, TutorialStepCatalog.Steps.Length - 1);
-        _state.stepId = TutorialStepCatalog.Steps[_state.stepIndex].stableId;
+        int clamped = Mathf.Clamp(stepIndex, 0, TutorialStepCatalog.Steps.Length - 1);
+        _currentDefinition = TutorialStepCatalog.Steps[clamped];
+        _currentTaskState = _state.Activate(_currentDefinition, UtcNowUnix());
         _editorDebugFreezeProgress = true;
         ActivateCurrentStep(logStepStarted: false);
     }
@@ -332,20 +456,28 @@ public sealed class TutorialManager : MonoBehaviour
     }
 #endif
 
-    private void RequestSkip()
+    private void RequestSkip(SkipRequestScope scope)
     {
-        if (!_active)
+        if (!_active || scope == SkipRequestScope.None)
             return;
+
+        bool skipPack = scope == SkipRequestScope.CurrentPack;
+        string titleKey = skipPack ? "UI/Tutorial/SkipAllTitle" : "UI/Tutorial/SkipTaskTitle";
+        string titleFallback = skipPack ? "Skip all current lessons?" : "Skip this task?";
+        string descriptionKey = skipPack ? "UI/Tutorial/SkipAllDescription" : "UI/Tutorial/SkipTaskDescription";
+        string descriptionFallback = skipPack
+            ? "All currently known lessons will be skipped. New lessons added later may still appear."
+            : "Only this task will be skipped. The next available lesson can still appear.";
+        string confirmKey = skipPack ? "UI/Tutorial/SkipAll" : "UI/Tutorial/SkipTask";
+        string confirmFallback = skipPack ? "Skip all" : "Skip task";
 
         var request = new UniversalDecisionPopup.Request
         {
-            title = new UniversalDecisionPopup.LocalizedTextPayload("UI/Tutorial/SkipTitle", "Skip tutorial?"),
-            description = new UniversalDecisionPopup.LocalizedTextPayload(
-                "UI/Tutorial/SkipDescription",
-                "You can continue without hints. The starter reward will not be issued again."),
-            confirm = new UniversalDecisionPopup.LocalizedTextPayload("UI/Tutorial/SkipConfirm", "Skip"),
+            title = new UniversalDecisionPopup.LocalizedTextPayload(titleKey, titleFallback),
+            description = new UniversalDecisionPopup.LocalizedTextPayload(descriptionKey, descriptionFallback),
+            confirm = new UniversalDecisionPopup.LocalizedTextPayload(confirmKey, confirmFallback),
             cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Tutorial/SkipCancel", "Continue"),
-            onConfirm = () => CompleteTutorial(skipped: true),
+            onConfirm = () => ConfirmSkip(scope),
             onCancel = CancelInlineSkipConfirmation
         };
 
@@ -360,10 +492,65 @@ public sealed class TutorialManager : MonoBehaviour
         }
 
         _inlineSkipConfirmation = true;
+        _pendingSkipScope = scope;
         _view?.ShowInlineSkipConfirmation(
-            L("UI/Tutorial/SkipTitle", "Skip tutorial?"),
-            L("UI/Tutorial/SkipDescription", "You can continue without hints. The starter reward will not be issued again."),
-            L("UI/Tutorial/SkipConfirm", "Skip"));
+            L(titleKey, titleFallback),
+            L(descriptionKey, descriptionFallback),
+            L(confirmKey, confirmFallback),
+            L("UI/Tutorial/SkipCancel", "Continue"));
+    }
+
+    private void ConfirmSkip(SkipRequestScope scope)
+    {
+        _inlineSkipConfirmation = false;
+        _pendingSkipScope = SkipRequestScope.None;
+        if (scope == SkipRequestScope.CurrentPack)
+            SkipCurrentPack();
+        else if (scope == SkipRequestScope.CurrentTask)
+            SkipCurrentTask();
+    }
+
+    private void SkipCurrentTask()
+    {
+        if (!_active || _state == null || _currentDefinition == null || _processingTransition)
+            return;
+
+        _processingTransition = true;
+        if (CurrentStep == TutorialStepId.AcquireStarterEgg)
+            ClearStarterEggOffer();
+
+        Dictionary<string, object> parameters = BuildStepParameters();
+        LogEvent("tutorial_step_skipped", parameters);
+        _state.MarkTerminal(CurrentStableId, wasSkipped: true, UtcNowUnix());
+        SaveState();
+        AdvanceAfterTerminal(parameters, "tutorial_completed");
+        _processingTransition = false;
+    }
+
+    private void SkipCurrentPack()
+    {
+        if (!_active || _state == null || _currentDefinition == null || _processingTransition)
+            return;
+
+        _processingTransition = true;
+        Dictionary<string, object> parameters = BuildStepParameters();
+        string packId = _currentDefinition.packId;
+        long now = UtcNowUnix();
+        for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
+        {
+            TutorialStepDefinition definition = TutorialStepCatalog.Steps[i];
+            if (!string.Equals(definition.packId, packId, StringComparison.Ordinal))
+                continue;
+            TutorialTaskSaveData state = _state.GetOrCreateTaskState(definition);
+            if (state != null && !state.IsTerminal)
+                _state.MarkTerminal(definition.stableId, wasSkipped: true, now);
+        }
+
+        ClearStarterEggOffer();
+        SaveState();
+        LogEvent("tutorial_skipped", parameters);
+        AdvanceAfterTerminal(parameters, terminalEventName: null);
+        _processingTransition = false;
     }
 
     private void CancelInlineSkipConfirmation()
@@ -372,6 +559,7 @@ public sealed class TutorialManager : MonoBehaviour
             return;
 
         _inlineSkipConfirmation = false;
+        _pendingSkipScope = SkipRequestScope.None;
         RefreshView();
     }
 
@@ -379,17 +567,17 @@ public sealed class TutorialManager : MonoBehaviour
     {
         if (CurrentStep == TutorialStepId.ContinueIndependently)
         {
-            CompleteTutorial(skipped: false);
+            CompleteCurrentStep();
             return;
         }
 
         if (_inlineSkipConfirmation)
         {
-            CompleteTutorial(skipped: true);
+            ConfirmSkip(_pendingSkipScope);
             return;
         }
 
-        RequestSkip();
+        RequestSkip(SkipRequestScope.CurrentTask);
     }
 
     private void OnSecondaryPressed()
@@ -397,12 +585,19 @@ public sealed class TutorialManager : MonoBehaviour
         if (_inlineSkipConfirmation)
             CancelInlineSkipConfirmation();
         else
-            RequestSkip();
+            RequestSkip(SkipRequestScope.CurrentPack);
     }
 
     private void OnTutorialSignal(TutorialSignal signal)
     {
-        if (!_active || !IsSignalFromLocalGameplay(signal))
+        if (!_schedulerReady)
+            return;
+        if (!_active)
+        {
+            _nextActivationScan = 0f;
+            return;
+        }
+        if (_processingTransition || !IsSignalFromLocalGameplay(signal))
             return;
 
         switch (signal.Type)
@@ -462,7 +657,8 @@ public sealed class TutorialManager : MonoBehaviour
     {
         if (!_active || _state == null || egg == null || _state.starterAnimalGranted)
             return originalDurationSeconds;
-        if (CurrentStepIndex > (int)TutorialStepId.HatchStarterEgg)
+        TutorialTaskSaveData hatchState = _state.GetTaskState("hatch_starter_egg");
+        if (hatchState != null && hatchState.IsTerminal)
             return originalDurationSeconds;
         if (!string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
             return originalDurationSeconds;
@@ -475,7 +671,8 @@ public sealed class TutorialManager : MonoBehaviour
         animal = null;
         if (!_active || _state == null || _state.starterAnimalGranted || egg == null)
             return false;
-        if (CurrentStepIndex > (int)TutorialStepId.HatchStarterEgg)
+        TutorialTaskSaveData hatchState = _state.GetTaskState("hatch_starter_egg");
+        if (hatchState != null && hatchState.IsTerminal)
             return false;
         if (!string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -952,10 +1149,10 @@ public sealed class TutorialManager : MonoBehaviour
 
     private void RefreshView()
     {
-        if (_view == null || _state == null)
+        if (_view == null || _state == null || _currentDefinition == null)
             return;
 
-        TutorialStepDefinition step = TutorialStepCatalog.Steps[CurrentStepIndex];
+        TutorialStepDefinition step = _currentDefinition;
         bool touch = G.Control != null && G.Control.UseTouchControl;
         string message = touch
             ? L(step.touchTextKey, step.touchFallback)
@@ -963,14 +1160,15 @@ public sealed class TutorialManager : MonoBehaviour
         string progress = LocalizationUtils.Format(
             "UI/Tutorial/Progress",
             "Tutorial {0}/{1}",
-            CurrentStepIndex + 1,
+            Mathf.Min(TutorialStepCatalog.Steps.Length, _state.CountTerminalKnownSteps() + 1),
             TutorialStepCatalog.Steps.Length);
         bool final = CurrentStep == TutorialStepId.ContinueIndependently;
         string button = final
             ? L("UI/Tutorial/Done", "Done")
-            : L("UI/Tutorial/Skip", "Skip");
+            : L("UI/Tutorial/SkipTask", "Skip task");
+        string secondaryButton = L("UI/Tutorial/SkipAll", "Skip all");
 
-        _view.SetStep(progress, message, button, final);
+        _view.SetStep(progress, message, button, secondaryButton, final);
         _view.SetWorldTarget(_currentTarget);
     }
 
@@ -991,15 +1189,17 @@ public sealed class TutorialManager : MonoBehaviour
     {
         if (_state == null || G.Save == null)
             return;
-        _state.Normalize();
+        _state.Normalize(G.Save.GetTutorialProgress());
         G.Save.SaveTutorialState(_state);
     }
 
     private Dictionary<string, object> BuildStepParameters()
     {
-        TutorialStepDefinition step = TutorialStepCatalog.Steps[CurrentStepIndex];
+        TutorialStepDefinition step = _currentDefinition ?? TutorialStepCatalog.Steps[CurrentStepIndex];
         long now = UtcNowUnix();
-        long stepStart = _state != null && _state.stepStartedUnix > 0 ? _state.stepStartedUnix : now;
+        long stepStart = _currentTaskState != null && _currentTaskState.startedUnix > 0
+            ? _currentTaskState.startedUnix
+            : now;
         return new Dictionary<string, object>
         {
             ["step_id"] = step.stableId,
@@ -1039,10 +1239,17 @@ public sealed class TutorialManager : MonoBehaviour
     {
         if (_inlineSkipConfirmation)
         {
+            bool skipPack = _pendingSkipScope == SkipRequestScope.CurrentPack;
             _view?.ShowInlineSkipConfirmation(
-                L("UI/Tutorial/SkipTitle", "Skip tutorial?"),
-                L("UI/Tutorial/SkipDescription", "You can continue without hints. The starter reward will not be issued again."),
-                L("UI/Tutorial/SkipConfirm", "Skip"));
+                L(skipPack ? "UI/Tutorial/SkipAllTitle" : "UI/Tutorial/SkipTaskTitle",
+                    skipPack ? "Skip all current lessons?" : "Skip this task?"),
+                L(skipPack ? "UI/Tutorial/SkipAllDescription" : "UI/Tutorial/SkipTaskDescription",
+                    skipPack
+                        ? "All currently known lessons will be skipped. New lessons added later may still appear."
+                        : "Only this task will be skipped. The next available lesson can still appear."),
+                L(skipPack ? "UI/Tutorial/SkipAll" : "UI/Tutorial/SkipTask",
+                    skipPack ? "Skip all" : "Skip task"),
+                L("UI/Tutorial/SkipCancel", "Continue"));
             return;
         }
 
