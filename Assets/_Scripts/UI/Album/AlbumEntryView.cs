@@ -21,6 +21,10 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
     private Action _onClick;
     private int _lastClickFrame = -1;
 
+    public bool IsUnlocked { get; private set; }
+    public bool IsSelected { get; private set; }
+    public bool HasMention { get; private set; }
+
     private void Awake()
     {
         if (button == null)
@@ -46,6 +50,9 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
     public void Bind(Sprite icon, string title, bool unlocked, bool selected, bool hasMention, Action onClick, RareType rareType = RareType.Common)
     {
         _onClick = onClick;
+        IsUnlocked = unlocked;
+        IsSelected = selected;
+        HasMention = hasMention;
 
         if (iconImage != null)
         {

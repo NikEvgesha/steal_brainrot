@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public sealed class TutorialManager : MonoBehaviour
 {
@@ -28,11 +29,17 @@ public sealed class TutorialManager : MonoBehaviour
     private float _nextTargetRefresh;
     private bool _active;
     private bool _inlineSkipConfirmation;
-    private bool _starterGrantAttempted;
+    private float _nextStarterOfferAttempt;
+    private bool _starterOfferErrorLogged;
+    private Egg _starterOfferEgg;
     private Coroutine _startRoutine;
+#if UNITY_EDITOR
+    private bool _editorDebugFreezeProgress;
+#endif
 
     public bool IsTutorialActive => _active;
     public bool AllowsAlbum => _active && _state != null && CurrentStep == TutorialStepId.ClaimAlbumReward;
+    public Transform CurrentTarget => _currentTarget;
     public TutorialStepId CurrentStep => TutorialStepCatalog.Steps[CurrentStepIndex].id;
     private int CurrentStepIndex => _state != null
         ? Mathf.Clamp(_state.stepIndex, 0, TutorialStepCatalog.Steps.Length - 1)
@@ -84,6 +91,7 @@ public sealed class TutorialManager : MonoBehaviour
     {
         TutorialSignals.Raised -= OnTutorialSignal;
         UnsubscribeLocalization();
+        ClearStarterEggOffer();
 
         if (_active && G.Ad != null)
             G.Ad.SetTutorialInterstitialSuppressed(false, PostTutorialInterstitialGraceSeconds);
@@ -149,6 +157,10 @@ public sealed class TutorialManager : MonoBehaviour
             return;
 
         RefreshTargetIfNeeded();
+#if UNITY_EDITOR
+        if (_editorDebugFreezeProgress)
+            return;
+#endif
         EvaluateCurrentStep();
     }
 
@@ -178,10 +190,10 @@ public sealed class TutorialManager : MonoBehaviour
                     }
                     CompleteCurrentStep();
                 }
-                else if (!_starterGrantAttempted && activeFor >= 0.4f)
+                else if (activeFor >= 0.4f && Time.unscaledTime >= _nextStarterOfferAttempt)
                 {
-                    _starterGrantAttempted = true;
-                    GrantStarterEggOnce();
+                    _nextStarterOfferAttempt = Time.unscaledTime + 1.5f;
+                    EnsureStarterEggOffer();
                 }
                 break;
 
@@ -205,7 +217,7 @@ public sealed class TutorialManager : MonoBehaviour
                 break;
 
             case TutorialStepId.WaitForFirstIncome:
-                FieldCell incomeCell = FindLocalAnimalCell();
+                FieldCell incomeCell = FindLocalAnimalCell(requireCollectibleIncome: true);
                 if (incomeCell != null && incomeCell.CurrentBrainrot != null && incomeCell.CurrentBrainrot.CurrentIncome > 0d)
                     CompleteCurrentStep();
                 break;
@@ -240,12 +252,12 @@ public sealed class TutorialManager : MonoBehaviour
         _stepActivatedRealtime = Time.realtimeSinceStartup;
         _movementDistance = 0f;
         _lastMovementPosition = G.Player != null ? G.Player.transform.position : Vector3.zero;
-        _starterGrantAttempted = false;
+        _nextStarterOfferAttempt = 0f;
         _inlineSkipConfirmation = false;
 
+        _uiBlocker?.SetAlbumAllowed(CurrentStep == TutorialStepId.ClaimAlbumReward);
         RefreshView();
         RefreshTarget(force: true);
-        _uiBlocker?.SetAlbumAllowed(CurrentStep == TutorialStepId.ClaimAlbumReward);
 
         if (logStepStarted)
             LogEvent("tutorial_step_started", BuildStepParameters());
@@ -255,6 +267,9 @@ public sealed class TutorialManager : MonoBehaviour
     {
         if (!_active || _state == null)
             return;
+
+        if (CurrentStep == TutorialStepId.AcquireStarterEgg)
+            ClearStarterEggOffer();
 
         LogEvent("tutorial_step_completed", BuildStepParameters());
         int nextIndex = CurrentStepIndex + 1;
@@ -276,6 +291,7 @@ public sealed class TutorialManager : MonoBehaviour
         if (!_active || _state == null)
             return;
 
+        ClearStarterEggOffer();
         _state.completed = true;
         _state.skipped = skipped;
         _state.completedUnix = UtcNowUnix();
@@ -297,6 +313,24 @@ public sealed class TutorialManager : MonoBehaviour
     {
         RequestSkip();
     }
+
+#if UNITY_EDITOR
+    public void EditorDebugSetStep(int stepIndex)
+    {
+        if (!_active || _state == null)
+            return;
+
+        _state.stepIndex = Mathf.Clamp(stepIndex, 0, TutorialStepCatalog.Steps.Length - 1);
+        _state.stepId = TutorialStepCatalog.Steps[_state.stepIndex].stableId;
+        _editorDebugFreezeProgress = true;
+        ActivateCurrentStep(logStepStarted: false);
+    }
+
+    public void EditorDebugResumeProgress()
+    {
+        _editorDebugFreezeProgress = false;
+    }
+#endif
 
     private void RequestSkip()
     {
@@ -450,28 +484,79 @@ public sealed class TutorialManager : MonoBehaviour
         return animal != null && Egg.IsAnimalDrop(animal);
     }
 
-    private void GrantStarterEggOnce()
+    public bool TryPrepareStarterEggPurchase(Egg egg)
     {
-        if (_state.starterEggGranted || HasStarterProgressItem())
-            return;
-
-        Egg prefab = G.Storage.GetEgg(StarterEggId);
-        if (prefab == null)
+        if (!_active || _state == null || CurrentStep != TutorialStepId.AcquireStarterEgg ||
+            egg == null || !string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
         {
-            Debug.LogError($"[Tutorial] Starter egg '{StarterEggId}' was not found in ItemPrefabStorage.");
-            return;
+            return false;
         }
 
-        Egg egg = Instantiate(prefab);
-        var data = egg.Data.DinamicData;
+        Conveyor conveyor = FindLocalConveyor();
+        if (conveyor == null || !conveyor.IsTrackedEgg(egg))
+            return false;
+
+        _starterOfferEgg = egg;
+        egg.SetTutorialFreePurchase(true);
+        BrainrotDinamicData data = egg.Data.DinamicData;
         data.ElementType = ElementType.NoElement;
         data.WeightMultiplier = 1f;
         data.ResultIncome = 0d;
         egg.SetData(data);
-        G.Inventory.Add(egg);
+        return true;
+    }
 
-        _state.starterEggGranted = true;
-        SaveState();
+    private void EnsureStarterEggOffer()
+    {
+        if (_state.starterEggGranted || HasStarterProgressItem())
+            return;
+
+        Egg existingOffer = FindStarterEggOnConveyor();
+        if (existingOffer != null)
+        {
+            SetStarterEggOffer(existingOffer);
+            return;
+        }
+
+        Egg prefab = G.Storage.GetEgg(StarterEggId);
+        if (prefab == null)
+        {
+            if (!_starterOfferErrorLogged)
+            {
+                _starterOfferErrorLogged = true;
+                Debug.LogError($"[Tutorial] Starter egg '{StarterEggId}' was not found in ItemPrefabStorage.");
+            }
+            return;
+        }
+
+        Conveyor conveyor = FindLocalConveyor();
+        Egg spawnedOffer = conveyor != null ? conveyor.SpawnTutorialEgg(prefab) : null;
+        if (spawnedOffer != null)
+        {
+            SetStarterEggOffer(spawnedOffer);
+            return;
+        }
+
+        if (!_starterOfferErrorLogged)
+        {
+            _starterOfferErrorLogged = true;
+            Debug.LogError("[Tutorial] Local conveyor cannot spawn the starter egg offer.");
+        }
+    }
+
+    private void SetStarterEggOffer(Egg egg)
+    {
+        if (_starterOfferEgg != null && _starterOfferEgg != egg)
+            _starterOfferEgg.SetTutorialFreePurchase(false);
+        _starterOfferEgg = egg;
+        _starterOfferEgg.SetTutorialFreePurchase(true);
+    }
+
+    private void ClearStarterEggOffer()
+    {
+        if (_starterOfferEgg != null)
+            _starterOfferEgg.SetTutorialFreePurchase(false);
+        _starterOfferEgg = null;
     }
 
     private bool HasStarterProgressItem()
@@ -557,9 +642,13 @@ public sealed class TutorialManager : MonoBehaviour
                 return GetRemoteBases()?.GetLocalSlotEntryPoint() ?? ResolveLocalRoot();
 
             case TutorialStepId.ReachConveyor:
-            case TutorialStepId.AcquireStarterEgg:
-            case TutorialStepId.MakeFirstExpansion:
                 return FindLocalConveyor()?.transform;
+
+            case TutorialStepId.AcquireStarterEgg:
+                return FindStarterEggOnConveyor()?.transform ?? FindLocalConveyor()?.transform;
+
+            case TutorialStepId.MakeFirstExpansion:
+                return FindNearestExpansionTarget();
 
             case TutorialStepId.PlaceStarterEgg:
                 return FindLocalFreeCell()?.transform;
@@ -569,8 +658,16 @@ public sealed class TutorialManager : MonoBehaviour
 
             case TutorialStepId.MeetStarterAnimal:
             case TutorialStepId.WaitForFirstIncome:
-            case TutorialStepId.CollectFirstIncome:
                 return FindLocalAnimalCell()?.transform;
+
+            case TutorialStepId.CollectFirstIncome:
+                return (FindLocalAnimalCell(requireCollectibleIncome: true) ?? FindLocalAnimalCell())?.transform;
+
+            case TutorialStepId.ClaimAlbumReward:
+                return FindAlbumTarget();
+
+            case TutorialStepId.ContinueIndependently:
+                return FindLocalConveyor()?.transform;
 
             default:
                 return null;
@@ -630,25 +727,161 @@ public sealed class TutorialManager : MonoBehaviour
     private FieldCell FindLocalEggCell()
     {
         FieldCell[] cells = GetLocalCells();
+        FieldCell nearest = null;
+        float nearestDistance = float.MaxValue;
+        Vector3 origin = G.Player != null ? G.Player.transform.position : Vector3.zero;
         for (int i = 0; i < cells.Length; i++)
         {
-            if (cells[i] != null && !cells[i].IsRemoteMode && cells[i].CurrentEgg != null)
-                return cells[i];
+            FieldCell cell = cells[i];
+            if (cell == null || cell.IsRemoteMode || cell.CurrentEgg == null)
+                continue;
+            float distance = (cell.transform.position - origin).sqrMagnitude;
+            if (distance >= nearestDistance)
+                continue;
+            nearest = cell;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    private FieldCell FindLocalAnimalCell(bool requireCollectibleIncome = false)
+    {
+        FieldCell[] cells = GetLocalCells();
+        FieldCell nearest = null;
+        float nearestDistance = float.MaxValue;
+        Vector3 origin = G.Player != null ? G.Player.transform.position : Vector3.zero;
+        for (int i = 0; i < cells.Length; i++)
+        {
+            FieldCell cell = cells[i];
+            if (cell == null || cell.IsRemoteMode || cell.CurrentBrainrot == null ||
+                (requireCollectibleIncome && !cell.CurrentBrainrot.HasCollectibleIncome))
+                continue;
+            float distance = (cell.transform.position - origin).sqrMagnitude;
+            if (distance >= nearestDistance)
+                continue;
+            nearest = cell;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    private Egg FindStarterEggOnConveyor()
+    {
+        Conveyor conveyor = FindLocalConveyor();
+        Vector3 origin = G.Player != null ? G.Player.transform.position : Vector3.zero;
+        return conveyor != null ? conveyor.FindNearestAvailableEgg(origin, StarterEggId) : null;
+    }
+
+    private Transform FindNearestExpansionTarget()
+    {
+        Vector3 origin = G.Player != null ? G.Player.transform.position : Vector3.zero;
+        Transform nearest = null;
+        float nearestDistance = float.MaxValue;
+        Conveyor conveyor = FindLocalConveyor();
+        if (conveyor != null)
+        {
+            Egg egg = conveyor.FindNearestAvailableEgg(origin);
+            ConsiderNearestTarget(egg != null ? egg.transform : null, origin, ref nearest, ref nearestDistance);
+            ConsiderNearestTarget(conveyor.transform, origin, ref nearest, ref nearestDistance);
+        }
+
+        Transform root = ResolveLocalRoot();
+        if (root != null)
+        {
+            Field[] fields = root.GetComponentsInChildren<Field>(true);
+            for (int i = 0; i < fields.Length; i++)
+            {
+                Field field = fields[i];
+                if (field == null || field.IsRemoteMode || field.IsUnblocked || !field.gameObject.activeInHierarchy)
+                    continue;
+                ConsiderNearestTarget(field.transform, origin, ref nearest, ref nearestDistance);
+            }
+        }
+
+        return nearest;
+    }
+
+    private Transform FindAlbumTarget()
+    {
+        AlbumScreenController[] albums = FindObjectsByType<AlbumScreenController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < albums.Length; i++)
+        {
+            AlbumScreenController album = albums[i];
+            if (album == null || !album.IsOpen)
+                continue;
+
+            Button[] albumButtons = album.GetComponentsInChildren<Button>(true);
+            for (int j = 0; j < albumButtons.Length; j++)
+            {
+                Button button = albumButtons[j];
+                if (button != null && button.gameObject.activeInHierarchy && button.interactable &&
+                    BuildHierarchyName(button.transform).IndexOf("reward", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return button.transform;
+                }
+            }
+
+            AlbumEntryView[] cards = album.GetComponentsInChildren<AlbumEntryView>(true);
+            AlbumEntryView unlockedFallback = null;
+            for (int j = 0; j < cards.Length; j++)
+            {
+                AlbumEntryView card = cards[j];
+                if (card == null || !card.gameObject.activeInHierarchy || !card.IsUnlocked)
+                    continue;
+                if (card.HasMention)
+                    return card.transform;
+                if (unlockedFallback == null)
+                    unlockedFallback = card;
+            }
+
+            if (unlockedFallback != null)
+                return unlockedFallback.transform;
+
+            return album.transform;
+        }
+
+        Button[] buttons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button button = buttons[i];
+            if (button != null && button.gameObject.activeInHierarchy && button.interactable &&
+                string.Equals(button.name, "AlbumButton", StringComparison.OrdinalIgnoreCase))
+            {
+                return button.transform;
+            }
         }
 
         return null;
     }
 
-    private FieldCell FindLocalAnimalCell()
+    private static void ConsiderNearestTarget(
+        Transform candidate,
+        Vector3 origin,
+        ref Transform nearest,
+        ref float nearestDistance)
     {
-        FieldCell[] cells = GetLocalCells();
-        for (int i = 0; i < cells.Length; i++)
+        if (candidate == null)
+            return;
+        float distance = (candidate.position - origin).sqrMagnitude;
+        if (distance >= nearestDistance)
+            return;
+        nearest = candidate;
+        nearestDistance = distance;
+    }
+
+    private static string BuildHierarchyName(Transform current)
+    {
+        string result = string.Empty;
+        int depth = 0;
+        while (current != null && depth++ < 8)
         {
-            if (cells[i] != null && !cells[i].IsRemoteMode && cells[i].CurrentBrainrot != null)
-                return cells[i];
+            result += "/" + current.name;
+            current = current.parent;
         }
 
-        return null;
+        return result;
     }
 
     private FieldCell[] GetLocalCells()
@@ -706,9 +939,9 @@ public sealed class TutorialManager : MonoBehaviour
         for (int i = 0; i < canvases.Length; i++)
         {
             Canvas canvas = canvases[i];
-            if (canvas == null || canvas.renderMode == RenderMode.WorldSpace)
+            if (canvas == null || canvas.renderMode == RenderMode.WorldSpace || !canvas.isActiveAndEnabled)
                 continue;
-            if (canvas.name == "GameCanvas")
+            if (canvas.name.StartsWith("GameCanvas", StringComparison.Ordinal))
                 return canvas;
             if (best == null || canvas.sortingOrder > best.sortingOrder)
                 best = canvas;

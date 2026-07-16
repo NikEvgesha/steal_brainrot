@@ -933,3 +933,19 @@
   - `TutorialV1EditorTools.BatchSynchronizeAndValidate` passed: 13 steps, editable prefab nodes and all 33 RU/EN keys.
   - `git diff --check` passed (line-ending conversion warnings only).
 - Remaining acceptance: full Play Mode passes on desktop offline, desktop online and mobile/touch, with restart/idempotence/local-base/ad-grace assertions. Unity Bridge was unavailable on `localhost:7777`, so these runtime passes were not claimed.
+
+### 2026-07-16 (tutorial V1 live Bridge alignment)
+- Connected to the running Unity Bridge and inspected the tutorial in Play Mode on the existing mature online save.
+- Fixed the runtime view selecting the disabled `FPSOverlayCanvas`; it now prefers an active `GameCanvas*`, and the task panel is visible at `1280x720`.
+- Adjusted the task panel, progress label and text skip button so long RU/EN copy fits without clipping; enlarged and correctly oriented the existing arrow for world and screen-space UI targets.
+- Aligned onboarding with the product model of one ordered task plus a dynamic nearest-target arrow:
+  - local home entry and conveyor;
+  - nearest real conveyor `egg1`;
+  - nearest free cell, egg cell and animal/income cell;
+  - nearest valid egg/conveyor/locked-field expansion;
+  - `AlbumButton`, then an available reward or relevant unlocked/mentioned album card.
+- Replaced the automatic starter-egg grant with an actual marked conveyor interaction. The tutorial-owned `egg1` offer is free, remains tracked by the normal conveyor purchase flow and is cleared safely when the step ends.
+- Added editor-only forced-step/freeze helpers for target QA without writing forced steps to the player's tutorial save.
+- Live checks confirmed `SpawnPoint`, local `Conveyor`, `EGG_1(Clone)`, free `cell2`, animal `cell2`, locked `Field_1` and `AlbumButton` targets; the album gate was interactable on its step and timed interstitial suppression was active.
+- The existing tutorial save is restored to `learn_movement` after QA; no full gameplay/inventory reset was performed.
+- Remaining acceptance is unchanged: complete clean-profile desktop offline/online and mobile/touch runs, including restart/idempotence/reward/grace-period assertions.

@@ -67,6 +67,7 @@ public class Egg : InventoryItem
     private long _hatchingTimectamp;
     private bool _initialized;
     private bool _remoteConveyorPurchase;
+    private bool _tutorialFreePurchase;
     private bool _purchaseInProgress;
     private bool _speedBoostAdInProgress;
 
@@ -78,7 +79,7 @@ public class Egg : InventoryItem
     public long HatchingTime => _hatchingTimectamp;
     public EggStatus Status => _status;
     public EggData Data { get { return _data; } }
-    public double EffectivePrice => GetPriceForElement(_data.DinamicData.ElementType);
+    public double EffectivePrice => _tutorialFreePurchase ? 0d : GetPriceForElement(_data.DinamicData.ElementType);
     [HideInInspector] public UnityEvent<Egg> EggPurchased;
 
     public double GetPriceForElement(ElementType elementType)
@@ -198,6 +199,12 @@ public class Egg : InventoryItem
         _remoteConveyorPurchase = remoteRewardPurchase;
         ApplyBuyPanelAdBadge();
     }
+
+    public void SetTutorialFreePurchase(bool free)
+    {
+        _tutorialFreePurchase = free;
+        _infoUI?.SetInfo(this);
+    }
     private void SetTypeVisual()
     {
         ElementTypeVfx.Ensure(
@@ -237,6 +244,13 @@ public class Egg : InventoryItem
     public void TryBuy()
     {
         if (_purchaseInProgress) return;
+
+        if (G.Tutorial != null && G.Tutorial.TryPrepareStarterEggPurchase(this))
+        {
+            G.Inventory.Add(this);
+            EggPurchased.Invoke(this);
+            return;
+        }
 
         if (_remoteConveyorPurchase)
         {

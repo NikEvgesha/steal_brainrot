@@ -54,13 +54,13 @@ public static class TutorialV1EditorTools
         },
         ["UI/Tutorial/Step/acquire_starter_egg/Desktop"] = new[]
         {
-            "Получите бесплатное стартовое яйцо. Оно уже выбрано на панели быстрого доступа.",
-            "Take your free starter egg. It is already selected in the quick bar."
+            "Подойдите к отмеченному яйцу на конвейере и удерживайте E. Первое яйцо бесплатно.",
+            "Approach the marked egg on the conveyor and hold E to take it. Your first egg is free."
         },
         ["UI/Tutorial/Step/acquire_starter_egg/Touch"] = new[]
         {
-            "Получите бесплатное стартовое яйцо. Оно уже выбрано на панели быстрого доступа.",
-            "Take your free starter egg. It is already selected in the quick bar."
+            "Подойдите к отмеченному яйцу на конвейере и удерживайте кнопку действия. Первое яйцо бесплатно.",
+            "Approach the marked egg on the conveyor and hold the action button. Your first egg is free."
         },
         ["UI/Tutorial/Step/return_home/Desktop"] = new[]
         {

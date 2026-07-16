@@ -3,7 +3,8 @@
 ## Tutorial V1 coverage (2026-07-16)
 - [x] Added 33 editable RU/EN keys for tutorial progress, skip confirmation and all 13 desktop/touch steps.
 - [x] Added `Tools/Tutorial V1/Synchronize RU-EN Localization` and setup validation for missing/empty/corrupted values.
-- [ ] Run the tutorial in Play Mode while switching RU/EN on desktop and touch viewports; verify wrapping and safe-area placement.
+- [x] Updated the starter-egg RU/EN copy to describe the real marked, free conveyor interaction instead of an automatic grant.
+- [~] Live Bridge spot-check confirmed long RU/EN tutorial copy and progress labels fit at `1280x720`; explicit language switching, `800x600` and touch safe-area passes remain.
 
 ## Priority 0 - stability
 - [ ] Add strict fallback behavior: if key exists but selected language value is empty, use fallback language (EN) and never render empty text.

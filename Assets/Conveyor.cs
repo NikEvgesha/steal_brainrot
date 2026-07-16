@@ -235,6 +235,46 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         _eggs.Remove(egg);
     }
 
+    public Egg FindNearestAvailableEgg(Vector3 origin, string requiredId = null)
+    {
+        EnsureEggStorage();
+        Egg nearest = null;
+        float nearestDistance = float.MaxValue;
+        foreach (Egg egg in _eggs)
+        {
+            if (egg == null || egg.Status != EggStatus.Conveyer || !egg.gameObject.activeInHierarchy)
+                continue;
+            if (!string.IsNullOrEmpty(requiredId) && !string.Equals(egg.Name, requiredId, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            float distance = (egg.transform.position - origin).sqrMagnitude;
+            if (distance >= nearestDistance)
+                continue;
+            nearest = egg;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    public bool IsTrackedEgg(Egg egg)
+    {
+        return egg != null && _eggs != null && _eggs.Contains(egg);
+    }
+
+    public Egg SpawnTutorialEgg(Egg prefab)
+    {
+        if (_remoteMode || prefab == null || _spawnPoint == null)
+            return null;
+
+        EnsureEggStorage();
+        Egg egg = Instantiate(prefab, _spawnPoint.position, _spawnPoint.rotation);
+        egg.SetConveyorPurchaseMode(false);
+        _eggs.Add(egg);
+        egg.EggPurchased.AddListener(OnEggPurchase);
+        return egg;
+    }
+
     public float GetPercentBonus()
     {
         return Mathf.Max(0f, UnlockedIncomeMultiplier - 1f);

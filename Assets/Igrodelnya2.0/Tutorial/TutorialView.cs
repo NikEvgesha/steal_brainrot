@@ -39,6 +39,39 @@ public sealed class TutorialView : MonoBehaviour
             ? _primaryButton.GetComponentInChildren<TMP_Text>(true)
             : null;
 
+        if (_progressText != null)
+        {
+            _progressText.enableAutoSizing = true;
+            _progressText.fontSizeMin = 18f;
+            _progressText.fontSizeMax = 34f;
+            _progressText.textWrappingMode = TextWrappingModes.NoWrap;
+            RectTransform progressRect = _progressText.transform as RectTransform;
+            if (progressRect != null)
+                progressRect.sizeDelta = new Vector2(Mathf.Max(340f, progressRect.sizeDelta.x), progressRect.sizeDelta.y);
+        }
+
+        if (_primaryButton != null)
+        {
+            RectTransform primaryRect = _primaryButton.transform as RectTransform;
+            if (primaryRect != null)
+                primaryRect.sizeDelta = new Vector2(210f, 72f);
+        }
+
+        if (_primaryButtonText != null)
+        {
+            _primaryButtonText.enableAutoSizing = true;
+            _primaryButtonText.fontSizeMin = 16f;
+            _primaryButtonText.fontSizeMax = 30f;
+            _primaryButtonText.textWrappingMode = TextWrappingModes.NoWrap;
+        }
+
+        RectTransform bubbleRect = FindChild("SpeechBubble") as RectTransform;
+        if (bubbleRect != null)
+        {
+            bubbleRect.sizeDelta = new Vector2(bubbleRect.sizeDelta.x, 340f);
+            bubbleRect.anchoredPosition = new Vector2(bubbleRect.anchoredPosition.x, 250f);
+        }
+
         Transform arrow = FindChild("Icon_Arrow");
         if (arrow != null)
         {
@@ -49,7 +82,17 @@ public sealed class TutorialView : MonoBehaviour
                 _directionArrow.anchorMin = new Vector2(0.5f, 0.5f);
                 _directionArrow.anchorMax = new Vector2(0.5f, 0.5f);
                 _directionArrow.pivot = new Vector2(0.5f, 0.5f);
-                _directionArrow.sizeDelta = new Vector2(64f, 56f);
+                _directionArrow.sizeDelta = new Vector2(88f, 80f);
+                Image arrowImage = _directionArrow.GetComponent<Image>();
+                if (arrowImage != null)
+                {
+                    arrowImage.color = Color.white;
+                    Outline outline = _directionArrow.GetComponent<Outline>();
+                    if (outline == null)
+                        outline = _directionArrow.gameObject.AddComponent<Outline>();
+                    outline.effectColor = new Color(1f, 0.78f, 0.05f, 1f);
+                    outline.effectDistance = new Vector2(6f, -6f);
+                }
             }
         }
 
@@ -80,7 +123,7 @@ public sealed class TutorialView : MonoBehaviour
         if (_primaryButton != null)
             _primaryButton.gameObject.SetActive(true);
         if (_secondaryButton != null)
-            _secondaryButton.gameObject.SetActive(!isFinalStep);
+            _secondaryButton.gameObject.SetActive(false);
     }
 
     public void ShowInlineSkipConfirmation(string progress, string message, string confirmLabel)
@@ -119,12 +162,29 @@ public sealed class TutorialView : MonoBehaviour
             return;
         }
 
-        if (_camera == null)
-            _camera = Camera.main;
-        if (_camera == null)
-            return;
+        Vector3 viewport;
+        RectTransform uiTarget = _worldTarget as RectTransform;
+        Canvas targetCanvas = uiTarget != null ? uiTarget.GetComponentInParent<Canvas>() : null;
+        if (uiTarget != null && targetCanvas != null && targetCanvas.renderMode != RenderMode.WorldSpace)
+        {
+            Camera eventCamera = targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null
+                : targetCanvas.worldCamera;
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(eventCamera, uiTarget.position);
+            viewport = new Vector3(
+                Screen.width > 0 ? screenPoint.x / Screen.width : 0.5f,
+                Screen.height > 0 ? screenPoint.y / Screen.height : 0.5f,
+                1f);
+        }
+        else
+        {
+            if (_camera == null)
+                _camera = Camera.main;
+            if (_camera == null)
+                return;
+            viewport = _camera.WorldToViewportPoint(_worldTarget.position);
+        }
 
-        Vector3 viewport = _camera.WorldToViewportPoint(_worldTarget.position);
         if (viewport.z < 0f)
         {
             viewport.x = 1f - viewport.x;
@@ -150,7 +210,7 @@ public sealed class TutorialView : MonoBehaviour
         _directionArrow.anchorMax = clamped;
         _directionArrow.anchoredPosition = Vector2.zero;
         if (direction.sqrMagnitude > 0.0001f)
-            _directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f);
+            _directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg + 90f);
         _directionArrow.gameObject.SetActive(true);
     }
 
