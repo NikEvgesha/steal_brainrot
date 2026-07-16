@@ -14,17 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyPackData
   _id: pack_coins_50000
   _name: UI/Shop/Product/CoinsChest
-  price: 5000
-  _priceCurrencyType: 2
+  price: 100
+  _priceCurrencyType: 1
   _slotType: 0
-  _category: 3
+  _category: 0
   _descriptionKey: UI/Shop/Product/CoinsChestDesc
   _descriptionFallback: "\u0411\u043E\u043B\u044C\u0448\u043E\u0439 \u0441\u0443\u043D\u0434\u0443\u043A
     \u043C\u043E\u043D\u0435\u0442."
   _icon: {fileID: 21300000, guid: d27ac6cfdb67049f79c092866ed0a916, type: 3}
   _accentColor: {r: 1, g: 0.59607846, b: 0.16078432, a: 1}
-  _sortOrder: 20
+  _sortOrder: 30
   _featured: 1
+  _rewardedAdFallback: 0
+  _rewardedAdGems: 5
   _rewards:
   - Type: 1
     RewardCurrencyType: 0

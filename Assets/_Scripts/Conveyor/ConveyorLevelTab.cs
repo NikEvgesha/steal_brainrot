@@ -40,7 +40,7 @@ public class ConveyorLevelTab : MonoBehaviour
         if (_localization == null)
             return;
 
-        string localizationKey = GetLocalizationKey(_fallbackName);
+        string localizationKey = GetLocalizationKey(_level);
         if (string.IsNullOrEmpty(localizationKey))
         {
             _localization.enabled = false;
@@ -106,13 +106,20 @@ public class ConveyorLevelTab : MonoBehaviour
         return level.RareType != RareType.RareType ? level.RareType.ToString() : string.Empty;
     }
 
-    private static string GetLocalizationKey(string fallbackName)
+    public static string GetLocalizedName(ConveyorLevel level)
     {
-        if (string.IsNullOrWhiteSpace(fallbackName))
+        var fallbackName = GetFallbackName(level);
+        var key = GetLocalizationKey(level);
+        return string.IsNullOrEmpty(key)
+            ? fallbackName
+            : LocalizationUtils.T(key, fallbackName);
+    }
+
+    private static string GetLocalizationKey(ConveyorLevel level)
+    {
+        if (level == null || level.RareType == RareType.RareType)
             return null;
 
-        return Enum.TryParse(fallbackName, true, out RareType rareType) && rareType != RareType.RareType
-            ? "Boost/RareType/" + rareType
-            : null;
+        return "Boost/RareType/" + level.RareType;
     }
 }

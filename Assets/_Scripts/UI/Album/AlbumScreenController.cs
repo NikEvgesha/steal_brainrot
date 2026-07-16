@@ -129,8 +129,6 @@ public class AlbumScreenController : MonoBehaviour
     [SerializeField] private string eggPriceLabelFallback = "";
     [SerializeField] private string eggFirstRareDateKey = "UI/Album/EggFirstElementDate";
     [SerializeField] private string eggFirstRareDateFallback = "{0}";
-    [SerializeField] private string animalFirstDateKey = "UI/Album/AnimalFirstDate";
-    [SerializeField] private string animalFirstDateFallback = "First obtained: {0}";
     [SerializeField] private string albumDateUnknownKey = "UI/Album/DateUnknown";
     [SerializeField] private string albumDateUnknownFallback = "Unknown";
     [SerializeField] private string animalDescriptionKeyPrefix = "UI/Album/AnimalDescription/";
@@ -182,6 +180,7 @@ public class AlbumScreenController : MonoBehaviour
     private Color _animalsTabBaseColor = Color.white;
     private bool _hasAnimalsTabBaseColor;
     private bool _externalOpenButtonRegistered;
+    private LocalizationManager _subscribedLocalizationManager;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeInHierarchy : gameObject.activeInHierarchy;
 
@@ -201,6 +200,9 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnDestroy()
     {
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        UnsubscribeFromLocalizationManager();
         UnbindButtons();
         if (progressService != null)
             progressService.Changed.RemoveListener(OnProgressChanged);
@@ -208,6 +210,10 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnEnable()
     {
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
+        LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
+
         if (G.Input != null)
         {
             G.Input.AOpenWindow -= CloseFromOtherWindow;
@@ -229,6 +235,10 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnDisable()
     {
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        UnsubscribeFromLocalizationManager();
+
         if (G.Input != null)
             G.Input.AOpenWindow -= CloseFromOtherWindow;
 
@@ -260,6 +270,36 @@ public class AlbumScreenController : MonoBehaviour
     public void Toggle()
     {
         SetOpen(!IsOpen);
+    }
+
+    private void OnLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || manager == _subscribedLocalizationManager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _subscribedLocalizationManager = manager;
+        _subscribedLocalizationManager.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_subscribedLocalizationManager == null)
+            return;
+
+        _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = null;
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        if (isActiveAndEnabled)
+            Refresh();
     }
 
     public void RegisterExternalOpenButton(Button externalButton, GameObject mentionBadge)
@@ -894,16 +934,19 @@ public class AlbumScreenController : MonoBehaviour
         }
         else
         {
-            SetEggHatchIcons(Array.Empty<HatchPreviewEntry>(), false);
+            var sourcePreviews = BuildAnimalSourcePreviewEntries(entry);
+            var hasSourceUi = SetEggHatchIcons(sourcePreviews, true);
 
             if (infoDescription != null)
-                infoDescription.text = BuildAnimalDescriptionText(entry);
+                infoDescription.text = BuildAnimalFirstDateText(entry);
 
             if (infoIncome != null)
                 infoIncome.text = BuildAnimalIncomeText(entry);
 
             if (infoSources != null)
-                infoSources.text = BuildAnimalMetaText(entry);
+                infoSources.text = hasSourceUi && sourcePreviews.Count > 0
+                    ? string.Empty
+                    : BuildAnimalSourcesText(entry);
         }
     }
 
@@ -931,13 +974,17 @@ public class AlbumScreenController : MonoBehaviour
             return;
         }
 
+        var sourceIcons = BuildInfoHatchIcons(BuildAnimalSourcePreviewEntries(entry));
         infoPanelView.ShowAnimal(
             entry.icon,
             infoUnlockedColor,
             ResolveCurrentDisplayName(entry),
-            BuildAnimalDescriptionText(entry),
+            BuildAnimalFirstDateText(entry),
             BuildAnimalIncomeText(entry),
-            BuildAnimalMetaText(entry),
+            string.Empty,
+            sourceIcons,
+            eggHatchUnlockedColor,
+            eggHatchLockedColor,
             ResolveSelectedElementForInfo());
     }
 
@@ -989,6 +1036,34 @@ public class AlbumScreenController : MonoBehaviour
         var limit = eggHatchMaxIcons > 0 ? eggHatchMaxIcons : result.Count;
         if (result.Count > limit)
             result.RemoveRange(limit, result.Count - limit);
+
+        return result;
+    }
+
+    private List<HatchPreviewEntry> BuildAnimalSourcePreviewEntries(EntryData entry)
+    {
+        var result = new List<HatchPreviewEntry>();
+        if (entry == null || string.IsNullOrEmpty(entry.id))
+            return result;
+
+        if (!_animalSourcesByAnimalId.TryGetValue(entry.id, out var sources) || sources == null)
+            return result;
+
+        for (var i = 0; i < sources.Count; i++)
+        {
+            var source = sources[i];
+            if (source.egg == null || source.egg.Icon == null)
+                continue;
+
+            var unlocked = progressService == null ||
+                           progressService.IsDiscovered(AlbumEntityType.Egg, source.eggId);
+            result.Add(new HatchPreviewEntry
+            {
+                icon = source.egg.Icon,
+                unlocked = unlocked,
+                chance = source.chance
+            });
+        }
 
         return result;
     }
@@ -1080,14 +1155,13 @@ public class AlbumScreenController : MonoBehaviour
     private string BuildAnimalFirstDateText(EntryData entry)
     {
         var fallbackDate = L(albumDateUnknownKey, albumDateUnknownFallback);
-        var rawLabel = L(animalFirstDateKey, animalFirstDateFallback);
         if (entry == null || progressService == null)
-            return string.Format(rawLabel, fallbackDate);
+            return fallbackDate;
 
         if (!progressService.TryGetFirstDiscoveryDate(entry.type, entry.id, out var firstSeenDate))
-            return string.Format(rawLabel, fallbackDate);
+            return fallbackDate;
 
-        return string.Format(rawLabel, FormatAlbumDate(firstSeenDate));
+        return FormatAlbumDate(firstSeenDate);
     }
 
     private string BuildEggPriceText(EntryData entry)
@@ -1119,8 +1193,7 @@ public class AlbumScreenController : MonoBehaviour
         }
 
         var key = animalDescriptionKeyPrefix + entry.id;
-        var localized = L(key, key);
-        if (!string.Equals(localized, key, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(localized))
+        if (TryL(key, out var localized))
             return localized;
 
         return L(animalInfoDescKey, animalInfoDescFallback);
@@ -2398,13 +2471,13 @@ public class AlbumScreenController : MonoBehaviour
 
     private static string L(string key, string fallback)
     {
-        if (LocalizationManager.Instance != null && LocalizationManager.Instance.LocalizationData != null)
-        {
-            var translated = LocalizationManager.Instance.LocalizationData.GetTranslation(key);
-            if (!string.IsNullOrWhiteSpace(translated) && !string.Equals(translated, key, StringComparison.Ordinal))
-                return translated;
-        }
+        return LocalizationUtils.T(key, fallback);
+    }
 
-        return fallback;
+    private static bool TryL(string key, out string translated)
+    {
+        translated = LocalizationUtils.T(key);
+        return !string.IsNullOrWhiteSpace(translated)
+               && !string.Equals(translated, key, StringComparison.Ordinal);
     }
 }

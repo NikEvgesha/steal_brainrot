@@ -236,7 +236,10 @@ public class FlatLightingController : MonoBehaviour
         var wait = new WaitForSeconds(Mathf.Max(0.25f, reapplyIntervalSec));
         while (true)
         {
-            Apply();
+            // Keep cheap global settings enforced without rescanning every renderer,
+            // light and camera in the scene. Full scene work runs on scene load.
+            ApplyRuntimeQualityLimits();
+            ApplyFog();
             yield return wait;
         }
     }

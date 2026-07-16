@@ -3,6 +3,8 @@ using UnityEngine.EventSystems;
 
 public class OnScreenButton : MonoBehaviour, IPointerClickHandler, IPointerDownHandler, IPointerUpHandler
 {
+    [SerializeField] private bool _triggerOnPointerDown;
+
     private bool _triggered;
     private bool _holded;
     public bool IsTriggered
@@ -24,12 +26,15 @@ public class OnScreenButton : MonoBehaviour, IPointerClickHandler, IPointerDownH
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        _triggered = true; 
+        if (!_triggerOnPointerDown)
+            _triggered = true;
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
         _holded = true;
+        if (_triggerOnPointerDown)
+            _triggered = true;
     }
 
     public void OnPointerUp(PointerEventData eventData)

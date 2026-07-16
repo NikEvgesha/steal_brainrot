@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyPackData
   _id: pack_eggs_1
   _name: UI/Shop/Product/StarterEggs
-  price: 10
-  _priceCurrencyType: 2
+  price: 150
+  _priceCurrencyType: 1
   _slotType: 1
   _category: 0
   _descriptionKey: UI/Shop/Product/StarterEggsDesc
@@ -24,8 +24,10 @@ MonoBehaviour:
     \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u0441\u0442\u0430\u0440\u0442\u0430."
   _icon: {fileID: 21300000, guid: f7cd02fb2cad94777b648af914859281, type: 3}
   _accentColor: {r: 1, g: 0.84705883, b: 0.15294118, a: 1}
-  _sortOrder: 5
+  _sortOrder: 10
   _featured: 1
+  _rewardedAdFallback: 0
+  _rewardedAdGems: 5
   _rewards:
   - Type: 0
     RewardCurrencyType: 1

@@ -868,3 +868,52 @@
   - Play Mode smoke found no new exceptions from the changed systems;
   - shop effect smoke returned `owned 1 -> use true -> owned 0`, active income multiplier `x2`;
   - remaining Console noise is missing pre-existing animal localization keys.
+
+### 2026-07-10 (SpecialShop one-page navigation + ad-only fallback)
+- Preserved the manually adjusted `SpecialShop.prefab` window layout and converted its left buttons from category filters into one-page scroll links:
+  - first button scrolls to the page start;
+  - second button scrolls to Boosts;
+  - third button is hidden until its future feature is ready;
+  - fourth button scrolls to Gems.
+- Added editable `SpecialShopSectionHeader.prefab`; product cards and row spacing remain controlled by their existing prefabs.
+- Added three generated blocky navigation icons under `Assets/_Textures/UI/ShopNavigation` and assigned them to the existing left buttons.
+- Changed all non-gem product prices to Gems. Gem packs remain platform purchases when purchases are available.
+- Added rewarded-ad fallback for platforms without purchases:
+  - only the small gem offer remains visible;
+  - the price icon changes to the ad icon;
+  - a completed rewarded ad grants the configured gem amount (`5` by default).
+- Verification through Unity Bridge:
+  - top, Boosts and Gems anchors scroll correctly without rebuilding the card list;
+  - ad-only mode shows one `+5` gem offer and hides the large IAP pack;
+  - no new runtime exceptions were found.
+
+### 2026-07-10 (SpecialShop adaptive reward grid)
+- Replaced `SpecialShopSlot/Rewards` horizontal layout with `AdaptiveGridSpawner` using percentage padding and spacing, centered one-row fit sizing, and no min/max cell constraints.
+- Added an editable tiled background and outline directly to `SpecialShopRewardSlot.prefab`.
+- Multi-reward cards now hide their summary `Effect`; single-reward cards keep it visible.
+- Unity Bridge runtime verification showed three rewards at `33x33` inside the current `Rewards` rect, with `Effect` disabled and no new Console errors.
+
+### 2026-07-11 (Editable local home marker prefab)
+- Replaced the runtime-generated `LocalHomeWorldMarker` hierarchy with `Assets/_Prefabs/UI/LocalHomeWorldMarker.prefab` and assigned it in `RemoteBasesApplier.prefab`.
+- The prefab owns its icon, Canvas and presentation settings: offset `(0, 20, 0)`, size `112x112`, world scale `0.1`, Canvas order `50`, refresh intervals `0.35/0.5`, and bob `0.18/2.2`.
+- `RemoteBasesApplier` now only instantiates the assigned prefab and provides the local-base target; it no longer overrides marker presentation values.
+- Unity Bridge Play Mode verification confirmed the prefab icon and configured size, scale and sorting order with no new runtime errors.
+
+### 2026-07-11 (Preserve authored ad icons)
+- Updated `AdButtonIconDecorator` so scene-wide decoration skips buttons that already contain an authored `AdIcon`.
+- Explicit visibility updates can still show or hide an existing `AdIcon`, but no longer replace its sprite, color, size, anchors or position.
+- Unity Bridge verification confirmed Roulette keeps `Icon_ImageIcon_Ad_00_l` at `(38, 0)` and `44x44` before and after decoration.
+
+### 2026-07-16 (mobile controls + publisher handoff)
+- Added a prefab-first mobile control scheme inspired by Roblox:
+  - dynamic left joystick;
+  - right-side camera swipe;
+  - separate jump button;
+  - multitouch ownership and safe-area handling;
+  - automatic creation only for mobile/touch providers.
+- Added project-level documentation:
+  - `Docs/PROJECT_OVERVIEW.md` describes gameplay, startup, architecture, platform providers, online/offline invariants, key prefabs and verification workflow;
+  - `Docs/NEXT_TASKS_HANDOFF.md` converts publisher feedback into isolated tasks for tutorial, analytics, retention, ad pacing, content balance and release hardening;
+  - `START_PROMPT.md` now points new contexts to the overview and handoff before legacy TODO files.
+- The current tutorial implementation was documented as a minimal skeleton, not a completed onboarding system.
+- Mobile controls were previously verified through Unity Bridge for movement, camera rotation, jump input and final Game View layout; Play Mode was stopped after verification.

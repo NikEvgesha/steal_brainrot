@@ -29,6 +29,8 @@ public class ShopPackData : ScriptableObject
     [SerializeField] private Color _accentColor = new Color(0.08f, 0.48f, 0.94f, 1f);
     [SerializeField] private int _sortOrder;
     [SerializeField] private bool _featured;
+    [SerializeField] private bool _rewardedAdFallback;
+    [SerializeField, Min(1)] private int _rewardedAdGems = 5;
     [SerializeField] private List<ShopReward> _rewards;
 
     public string Id => _id;
@@ -44,6 +46,8 @@ public class ShopPackData : ScriptableObject
     public Color AccentColor => _accentColor;
     public int SortOrder => _sortOrder;
     public bool Featured => _featured;
+    public bool RewardedAdFallback => _rewardedAdFallback;
+    public int RewardedAdGems => Mathf.Max(1, _rewardedAdGems);
 
     public bool HasConsumableReward
     {

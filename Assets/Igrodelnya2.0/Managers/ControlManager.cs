@@ -1,11 +1,14 @@
+using System.Collections;
 using UnityEngine;
 
 public class ControlManager : MonoBehaviour
 {
     [SerializeField] private bool _useTouchControls;
     [SerializeField] private DeviceProvider _provider;
+    [SerializeField] private GameObject _mobileControlsPrefab;
     private bool _cursorActive;
     private bool _moveActive = true;
+    private bool _inspectorTouchOverride;
     public bool UseTouchControl { get { return _useTouchControls; } private set { } }
 
     private int _activeWindows = 0;
@@ -55,6 +58,7 @@ public class ControlManager : MonoBehaviour
         if (G.Control == null)
         {
             G.Control = this;
+            _inspectorTouchOverride = _useTouchControls;
             DontDestroyOnLoad(gameObject);
         }
         else
@@ -65,26 +69,49 @@ public class ControlManager : MonoBehaviour
 
     private void Start()
     {
-        if (_provider && _provider.IsInitialized())
-        {
-            if (_provider.IsMobileDevice())
-            {
-                _useTouchControls = true;
-            }
-        }
-        else
-        {
-            if (Application.isMobilePlatform)
-            {
-                _useTouchControls = true;
-            }
-        }
+        RefreshControlMode();
+        if (_provider != null && !_provider.IsInitialized())
+            StartCoroutine(WaitForDeviceProvider());
         //if (!_useTouchControls)
         //{
         //    CursorActive = false;  
         //}
         if (!_useTouchControls)
             ApplyCursorState(_cursorActive);
+    }
+
+    private IEnumerator WaitForDeviceProvider()
+    {
+        var wait = new WaitForSecondsRealtime(0.25f);
+        while (_provider != null && !_provider.IsInitialized())
+            yield return wait;
+
+        RefreshControlMode();
+    }
+
+    private void RefreshControlMode()
+    {
+        bool providerReportsMobile = _provider != null &&
+                                     _provider.IsInitialized() &&
+                                     _provider.IsMobileDevice();
+        bool useTouch = _inspectorTouchOverride || Application.isMobilePlatform || providerReportsMobile;
+        _useTouchControls = useTouch;
+
+        if (useTouch)
+            EnsureMobileControls();
+
+        if (ControlUI.Instance != null)
+            ControlUI.Instance.UseMobileSetup(useTouch);
+    }
+
+    private void EnsureMobileControls()
+    {
+        if (ControlUI.Instance != null || _mobileControlsPrefab == null)
+            return;
+
+        GameObject controls = Instantiate(_mobileControlsPrefab);
+        controls.name = _mobileControlsPrefab.name;
+        DontDestroyOnLoad(controls);
     }
 
     private void ApplyCursorState(bool cursorActive)

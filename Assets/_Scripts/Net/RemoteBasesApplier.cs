@@ -61,11 +61,7 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private bool incrementalSnapshotApply = true;
     [Header("Local Home Marker")]
     [SerializeField] private bool showLocalHomeMarker = true;
-    [SerializeField] private Vector3 localHomeMarkerOffset = new Vector3(0f, 20f, 0f);
-    [SerializeField] private Vector2 localHomeMarkerIconSize = new Vector2(112f, 112f);
-    [SerializeField] private float localHomeMarkerWorldScale = 0.03f;
-    [SerializeField] private float localHomeMarkerBobAmplitude = 0.18f;
-    [SerializeField] private float localHomeMarkerBobSpeed = 2.2f;
+    [SerializeField] private LocalHomeWorldMarker localHomeMarkerPrefab;
     [Header("Proximity Sync")]
     [SerializeField] private bool syncOnlyNearSlots = true;
     [SerializeField] private float syncDistanceMeters = 100f;
@@ -2347,18 +2343,18 @@ public class RemoteBasesApplier : MonoBehaviour
 
         if (_localHomeMarker == null)
         {
-            var markerObject = new GameObject("LocalHomeWorldMarker", typeof(RectTransform));
-            markerObject.transform.SetParent(transform, false);
-            _localHomeMarker = markerObject.AddComponent<LocalHomeWorldMarker>();
+            _localHomeMarker = GetComponentInChildren<LocalHomeWorldMarker>(true);
+            if (_localHomeMarker == null && localHomeMarkerPrefab != null)
+                _localHomeMarker = Instantiate(localHomeMarkerPrefab, transform, false);
         }
 
-        _localHomeMarker.Initialize(
-            this,
-            localHomeMarkerOffset,
-            localHomeMarkerIconSize,
-            localHomeMarkerWorldScale,
-            localHomeMarkerBobAmplitude,
-            localHomeMarkerBobSpeed);
+        if (_localHomeMarker == null)
+        {
+            Debug.LogWarning("[Lobby] LocalHomeWorldMarker prefab is not assigned.", this);
+            return;
+        }
+
+        _localHomeMarker.Initialize(this);
     }
 
     public void ApplyFriendBase(BaseSnapshotDto snapshot, int slotIndex = 0)

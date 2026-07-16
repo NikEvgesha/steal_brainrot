@@ -15,6 +15,20 @@ public class InventorySlot : MonoBehaviour
     private InventoryItem _item;
     public InventoryItem Item => _item;
 
+    private void OnEnable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+
+        RefreshName();
+    }
+
+    private void OnDisable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+    }
+
     public void Init(InventoryItem item)
     {
         _item = item;
@@ -28,12 +42,25 @@ public class InventorySlot : MonoBehaviour
 
         _background.gameObject.SetActive(true);
         _icon.sprite = item.Icon;
-        _name.text = item.Name;
+        RefreshName();
         _quickSlotIndicator.SetActive(_item.InQuickAccess);
 
         _sellButtonLockIcon.SetActive(_item.SellAllowed);
         _sellButtonUnlockIcon.SetActive(!_item.SellAllowed);
         _lockSellIndicator.SetActive(!_item.SellAllowed);
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        RefreshName();
+    }
+
+    private void RefreshName()
+    {
+        if (_name == null || _item == null)
+            return;
+
+        _name.text = ItemDisplayNameResolver.ResolveItemName(_item.Name, _item.gameObject.name);
     }
 
     public void _OnClick() {

@@ -1,9 +1,9 @@
 using System;
 using TMPro;
-using TouchControlsKit;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
+[DefaultExecutionOrder(-100)]
 public class PlayerInput : MonoBehaviour
 {
     public Vector3 Movement { get; private set; }
@@ -12,6 +12,7 @@ public class PlayerInput : MonoBehaviour
     public float TrainMove { get; private set; }
 
     private TouchControls _touchControls;
+    private bool _touchControlsInitialized;
 
     public bool Sprint { get {
             return _sprint;
@@ -167,7 +168,7 @@ public class PlayerInput : MonoBehaviour
     }
     private void Start()
     {
-        //_touchControls = FindAnyObjectByType<ControlUI>().GetTouchControls();
+        EnsureTouchControls();
     }
 
     private void Update()
@@ -195,7 +196,13 @@ public class PlayerInput : MonoBehaviour
 
         if (UseTouchControls)
         {
-            //_jump = _touchControls.jumpButton.IsTriggered;
+            if (!EnsureTouchControls())
+            {
+                ResetTouchButtons();
+                return;
+            }
+
+            _jump = _touchControls.jumpButton != null && _touchControls.jumpButton.IsTriggered;
             //_pickUp = _touchControls.pickUpButton.IsTriggered;
             //_interaction = _touchControls.putToInventoryButton.IsTriggered;
             //_interactionHold = _touchControls.putToInventoryButton.IsHolded;
@@ -248,7 +255,7 @@ public class PlayerInput : MonoBehaviour
         if (_friends) AFriends?.Invoke();
         if (_playtime) APlaytime?.Invoke();
 
-    // _useItem = _pickUp; //Переработать смысл кнопки
+    // _useItem = _pickUp;
 
 }
 
@@ -257,7 +264,17 @@ public class PlayerInput : MonoBehaviour
 
         if (UseTouchControls)
         {
-            Movement = new Vector3(_touchControls.moveJoystick.Horizontal(), 0f, _touchControls.moveJoystick.Vertical());
+            if (EnsureTouchControls() && _touchControls.moveJoystick != null)
+            {
+                Movement = new Vector3(
+                    _touchControls.moveJoystick.Horizontal(),
+                    0f,
+                    _touchControls.moveJoystick.Vertical());
+            }
+            else
+            {
+                Movement = Vector3.zero;
+            }
         } else
         {
             Movement = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).normalized;
@@ -276,8 +293,9 @@ public class PlayerInput : MonoBehaviour
     {
         if (UseTouchControls)
         {
-            //Rotation = _touchControls.cameraTouchController.GetRotationInput();
-            Rotation = TCKInput.GetAxis("Touchpad");
+            Rotation = EnsureTouchControls() && _touchControls.cameraTouchController != null
+                ? _touchControls.cameraTouchController.GetRotationInput()
+                : Vector2.zero;
         }
         else
         {
@@ -296,5 +314,32 @@ public class PlayerInput : MonoBehaviour
     public void UseAttack(bool use)
     {
 
+    }
+
+    private bool EnsureTouchControls()
+    {
+        if (_touchControlsInitialized &&
+            _touchControls.moveJoystick != null &&
+            _touchControls.cameraTouchController != null)
+        {
+            return true;
+        }
+
+        ControlUI controlUI = ControlUI.Instance;
+        if (controlUI == null)
+            return false;
+
+        _touchControls = controlUI.GetTouchControls();
+        _touchControlsInitialized = _touchControls.moveJoystick != null &&
+                                    _touchControls.cameraTouchController != null;
+        return _touchControlsInitialized;
+    }
+
+    private void ResetTouchButtons()
+    {
+        _jump = false;
+        _sprint = false;
+        _interaction = false;
+        _interactionHold = false;
     }
 }

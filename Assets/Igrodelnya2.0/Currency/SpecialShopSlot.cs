@@ -13,6 +13,7 @@ public class SpecialShopSlot : MonoBehaviour
     [SerializeField] private Image _productIcon;
     [SerializeField] private Image _cardBackground;
     [SerializeField] private Transform _rewardParent;
+    [SerializeField] private AdaptiveGridSpawner _rewardsGrid;
     [SerializeField] private SpecialShopRewardSlot _rewardPrefab;
 
     [Header("Purchase")]
@@ -48,8 +49,12 @@ public class SpecialShopSlot : MonoBehaviour
             _name.text = LocalizationUtils.T(pack.Name, pack.Name);
         if (_description != null)
             _description.text = LocalizationUtils.T(pack.DescriptionKey, pack.DescriptionFallback);
+        bool hasMultipleRewards = pack.Rewards != null && pack.Rewards.Count > 1;
         if (_effectText != null)
+        {
+            _effectText.gameObject.SetActive(!hasMultipleRewards);
             _effectText.text = _shop != null ? _shop.BuildRewardSummary(pack) : string.Empty;
+        }
 
         var icon = ResolveProductIcon(pack);
         if (_productIcon != null)
@@ -124,24 +129,34 @@ public class SpecialShopSlot : MonoBehaviour
         if (_shopPackData == null)
             return;
 
+        bool rewardedAdFallback = _shop != null && _shop.IsRewardedAdFallback(_shopPackData);
         bool realPurchase = _shopPackData.PriceCurrencyType == CurrencyType.Real;
         string providerPrice = _productData != null ? _productData.Price : string.Empty;
         if (_price != null)
         {
-            _price.text = realPurchase && !string.IsNullOrWhiteSpace(providerPrice)
-                ? providerPrice
-                : _shopPackData.Price.ToString();
+            if (rewardedAdFallback)
+                _price.text = LocalizationUtils.Format("UI/Shop/RewardedAdPrice", "+{0}", _shopPackData.RewardedAdGems);
+            else
+                _price.text = realPurchase && !string.IsNullOrWhiteSpace(providerPrice)
+                    ? providerPrice
+                    : _shopPackData.Price.ToString();
         }
 
         if (_currencyIcon != null)
         {
-            Sprite icon = G.Currency != null ? G.Currency.GetCurrencyIcon(_shopPackData.PriceCurrencyType) : null;
+            Sprite icon = rewardedAdFallback
+                ? _shop.RewardedAdIcon
+                : G.Currency != null ? G.Currency.GetCurrencyIcon(_shopPackData.PriceCurrencyType) : null;
             _currencyIcon.sprite = icon;
             _currencyIcon.enabled = icon != null;
         }
 
         if (_currencyText != null)
-            _currencyText.text = realPurchase ? string.Empty : _shopPackData.PriceCurrencyType.ToString();
+            _currencyText.text = rewardedAdFallback || realPurchase
+                ? string.Empty
+                : LocalizationUtils.T(
+                    "UI/Currency/" + _shopPackData.PriceCurrencyType,
+                    _shopPackData.PriceCurrencyType.ToString());
     }
 
     private void RefreshActiveTimer(ShopEffectsService effects)
@@ -173,24 +188,42 @@ public class SpecialShopSlot : MonoBehaviour
         if (_rewardParent == null || _rewardPrefab == null)
             return;
 
+        if (_rewardsGrid == null)
+            _rewardsGrid = _rewardParent.GetComponent<AdaptiveGridSpawner>();
+
+        _rewardsGrid?.ClearSpawnedItems();
+
         for (int i = _rewardParent.childCount - 1; i >= 0; i--)
         {
             var child = _rewardParent.GetChild(i);
             if (child != _rewardPrefab.transform)
+            {
+                child.gameObject.SetActive(false);
                 Destroy(child.gameObject);
+            }
         }
 
         _rewardPrefab.gameObject.SetActive(false);
         if (pack.Rewards == null || pack.Rewards.Count <= 1)
+        {
+            _rewardsGrid?.Rebuild();
             return;
+        }
 
         for (int i = 0; i < pack.Rewards.Count; i++)
         {
             var reward = pack.Rewards[i];
-            var rewardView = Instantiate(_rewardPrefab, _rewardParent);
+            var rewardView = _rewardsGrid != null
+                ? _rewardsGrid.SpawnObject<SpecialShopRewardSlot>(_rewardPrefab.gameObject)
+                : Instantiate(_rewardPrefab, _rewardParent);
+            if (rewardView == null)
+                continue;
+
             rewardView.gameObject.SetActive(true);
             rewardView.SetReward(ResolveRewardIcon(reward), Mathf.Max(1, reward.Amount));
         }
+
+        _rewardsGrid?.Rebuild();
     }
 
     private static Sprite ResolveProductIcon(ShopPackData pack)

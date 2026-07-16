@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyPackData
   _id: no_ads_month
   _name: UI/Shop/Product/NoAdsMonth
-  price: 299
-  _priceCurrencyType: 2
+  price: 300
+  _priceCurrencyType: 1
   _slotType: 0
   _category: 2
   _descriptionKey: UI/Shop/Product/NoAdsMonthDesc
@@ -25,6 +25,8 @@ MonoBehaviour:
   _accentColor: {r: 0.1254902, g: 0.79607844, b: 0.90588236, a: 1}
   _sortOrder: 30
   _featured: 1
+  _rewardedAdFallback: 0
+  _rewardedAdGems: 5
   _rewards:
   - Type: 2
     RewardCurrencyType: 0

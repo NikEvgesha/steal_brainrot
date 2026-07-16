@@ -156,7 +156,8 @@ public class TPCameraController : MonoBehaviour
 
         // ¬ращение Ч только при удержании ѕ ћ (удобно дл€ WebGL), либо всегда, если отключить флаг
 
-        bool canRotate = !rotateOnRightMouse || Input.GetMouseButton(1);
+        bool useTouchInput = G.Control != null && G.Control.UseTouchControl && G.Input != null;
+        bool canRotate = useTouchInput || !rotateOnRightMouse || Input.GetMouseButton(1);
 
 
 
@@ -164,9 +165,12 @@ public class TPCameraController : MonoBehaviour
 
         {
 
-            float mx = Input.GetAxis("Mouse X");
+            Vector2 lookInput = useTouchInput
+                ? G.Input.Rotation
+                : new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+            float mx = lookInput.x;
 
-            float my = Input.GetAxis("Mouse Y");
+            float my = lookInput.y;
 
 
 
@@ -180,7 +184,7 @@ public class TPCameraController : MonoBehaviour
 
             // «ахват/освобождение курсора под WebGL Ч только при действий пользовател€
 
-            if (rotateOnRightMouse)
+            if (rotateOnRightMouse && !useTouchInput)
 
             {
 
@@ -200,7 +204,7 @@ public class TPCameraController : MonoBehaviour
 
 
 
-        if (rotateOnRightMouse && Input.GetMouseButtonUp(1))
+        if (!useTouchInput && rotateOnRightMouse && Input.GetMouseButtonUp(1))
 
         {
 

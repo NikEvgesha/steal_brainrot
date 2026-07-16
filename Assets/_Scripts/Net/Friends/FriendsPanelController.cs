@@ -50,8 +50,13 @@ public class FriendsPanelController : MonoBehaviour
     [Header("Close")]
     [SerializeField] private Button _closeButton;
     [SerializeField] private Button _toggleButton;
+
+    [Header("Availability")]
+    [SerializeField, Min(0.1f)] private float serverStateRefreshInterval = 0.5f;
+
     private Coroutine _openFlow;
     private Coroutine _externalRefreshFlow;
+    private Coroutine _availabilityFlow;
     private bool _isOpen;
 
     public static void RequestLiveRefresh()
@@ -99,10 +104,16 @@ public class FriendsPanelController : MonoBehaviour
         _toggleButton.onClick.AddListener(() => ToggleOpen()) ;
         copyCodeButton.onClick.AddListener(CopyMyCode);
         addButton.onClick.AddListener(() => StartCoroutine(AddFriendFlow()));
+
+        RefreshAvailability();
     }
+
     public void ToggleOpen()
     {
         //if (!(LoadingManager.Instance.CurrentLocation == Location.Lobby)) return;
+        if (!_isOpen && !IsFriendsAvailable())
+            return;
+
         _isOpen = !_isOpen;
         G.Control.CursorActive = _isOpen;
         _ui.SetActive(_isOpen);
@@ -128,6 +139,10 @@ public class FriendsPanelController : MonoBehaviour
             G.Input.AFriends += ToggleOpen;
             G.Input.AOpenWindow += Close;
         }
+
+        RefreshAvailability();
+        if (_availabilityFlow == null)
+            _availabilityFlow = StartCoroutine(AvailabilityFlow());
     }
     private void OnDisable()
     {
@@ -143,6 +158,11 @@ public class FriendsPanelController : MonoBehaviour
             StopCoroutine(_externalRefreshFlow);
             _externalRefreshFlow = null;
         }
+        if (_availabilityFlow != null)
+        {
+            StopCoroutine(_availabilityFlow);
+            _availabilityFlow = null;
+        }
     }
 
     private void OnDestroy()
@@ -154,6 +174,7 @@ public class FriendsPanelController : MonoBehaviour
     {
         EnsureRemoteBases();
         EnsureDecisionPopup();
+        RefreshAvailability();
     }
     public void Close(MonoBehaviour ui)
     {
@@ -458,6 +479,36 @@ public class FriendsPanelController : MonoBehaviour
         yield return RefreshFriends();
         yield return RefreshRequests();
         _externalRefreshFlow = null;
+    }
+
+    private IEnumerator AvailabilityFlow()
+    {
+        var wait = new WaitForSecondsRealtime(Mathf.Max(0.1f, serverStateRefreshInterval));
+        while (isActiveAndEnabled)
+        {
+            RefreshAvailability();
+            yield return wait;
+        }
+
+        _availabilityFlow = null;
+    }
+
+    private void RefreshAvailability()
+    {
+        bool available = IsFriendsAvailable();
+
+        if (_toggleButton != null && _toggleButton.gameObject.activeSelf != available)
+            _toggleButton.gameObject.SetActive(available);
+
+        if (!available && _isOpen)
+            ToggleOpen();
+    }
+
+    private static bool IsFriendsAvailable()
+    {
+        return LobbyClient.Instance != null
+            && LobbyClient.Instance.IsOnline
+            && !LobbyClient.Instance.DebugSimulateOffline;
     }
 
     private static Transform FindChildByNameRecursive(Transform parent, string targetName)

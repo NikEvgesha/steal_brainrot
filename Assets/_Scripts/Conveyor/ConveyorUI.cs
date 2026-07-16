@@ -41,6 +41,7 @@ public class ConveyorUI : MonoBehaviour
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChances = new();
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChancesWithLuck = new();
     private readonly List<ConveyorDropChanceCalculator.EggBreakdownEntry> _cachedEggBreakdown = new();
+    private LocalizationManager _subscribedLocalizationManager;
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
@@ -78,6 +79,18 @@ public class ConveyorUI : MonoBehaviour
         EnsurePanel();
     }
 
+    private void OnEnable()
+    {
+        LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
+    }
+
+    private void OnDisable()
+    {
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        UnsubscribeFromLocalizationManager();
+    }
+
     public void ToggleOpen(bool open)
     {
         _isOpen = open;
@@ -105,7 +118,7 @@ public class ConveyorUI : MonoBehaviour
 
         _currentLevelInfo = level;
         if (_levelName != null)
-            _levelName.text = level.Name;
+            _levelName.text = ConveyorLevelTab.GetLocalizedName(level);
         if (_icon != null)
             _icon.sprite = level.Icon;
 
@@ -244,6 +257,40 @@ public class ConveyorUI : MonoBehaviour
             return;
 
         UpdateDropChances(_currentLevelInfo);
+    }
+
+    private void OnLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || manager == _subscribedLocalizationManager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _subscribedLocalizationManager = manager;
+        _subscribedLocalizationManager.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_subscribedLocalizationManager == null)
+            return;
+
+        _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = null;
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        if (_currentLevelInfo == null)
+            return;
+
+        if (_levelName != null)
+            _levelName.text = ConveyorLevelTab.GetLocalizedName(_currentLevelInfo);
+        RefreshCurrentDropChances();
     }
 
     private void UpdateDropChances(ConveyorLevel level)
@@ -540,7 +587,8 @@ public static class ConveyorDropChanceCalculator
 
                 var brainrotChance = eggChance * (itemWeight / weightSum);
                 var id = GetId(brainrot.name, brainrot.Name);
-                var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+                var fallback = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+                var name = ItemDisplayNameResolver.ResolveItemName(brainrot.Name, fallback);
                 AddOrAccumulate(aggregate, id, name, brainrotChance);
             }
         }
@@ -606,7 +654,8 @@ public static class ConveyorDropChanceCalculator
                 continue;
 
             var id = GetId(brainrot.name, brainrot.Name);
-            var name = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+            var fallback = string.IsNullOrWhiteSpace(brainrot.Name) ? brainrot.name : brainrot.Name;
+            var name = ItemDisplayNameResolver.ResolveItemName(brainrot.Name, fallback);
             AddOrAccumulate(aggregate, id, name, weight / totalWeight);
         }
 

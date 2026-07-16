@@ -19,16 +19,43 @@ public class FoodShopSlot : MonoBehaviour
 
     public Food Food => _food;
 
+    private void OnEnable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+
+        RefreshName();
+    }
+
+    private void OnDisable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+    }
+
     public void Init(FoodShopUI ui, Food food)
     {
         _food = food;
         _ui = ui;
 
         _icon.sprite = _food.Icon;
-        _name.text = ItemDisplayNameResolver.ResolveItemName(_food.Name, _food.Name);
+        RefreshName();
         //_amountText.text = _food..ToString();
         _coinPrice.text = G.Currency.ToString(_food.Data.MoneyPrice);
         _gemPrice.text = G.Currency.ToString(_food.Data.GemPrice);
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        RefreshName();
+    }
+
+    private void RefreshName()
+    {
+        if (_name == null || _food == null)
+            return;
+
+        _name.text = ItemDisplayNameResolver.ResolveItemName(_food.Name, _food.gameObject.name);
     }
 
     public void SetAvailability(bool available)

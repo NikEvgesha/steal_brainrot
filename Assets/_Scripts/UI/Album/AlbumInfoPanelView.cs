@@ -154,6 +154,9 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         string descriptionText,
         string incomeText,
         string sourcesText,
+        IReadOnlyList<HatchIconData> sourceIcons,
+        Color sourceUnlockedColor,
+        Color sourceLockedColor,
         ElementType elementType = ElementType.NoElement)
     {
         SetMode(AlbumEntityType.Animal, true);
@@ -163,7 +166,7 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         SetText(animalIncomeText, incomeText);
         SetText(animalSourcesText, sourcesText);
         SetLockedOverlay(false, string.Empty);
-        SetEggHatchIcons(null, false, Color.white, Color.black);
+        SetSourceIcons(AlbumEntityType.Animal, sourceIcons, true, sourceUnlockedColor, sourceLockedColor);
     }
 
     public bool CanShowEggHatchPreview(IReadOnlyList<HatchIconData> hatchIcons)
@@ -463,11 +466,22 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
         Color unlockedColor,
         Color lockedColor)
     {
-        visible = visible && GetModeSlots(AlbumEntityType.Egg).ShowHatchPreview;
-        var shouldShowSection = visible && hatchIcons != null && hatchIcons.Count > 0;
+        return SetSourceIcons(AlbumEntityType.Egg, hatchIcons, visible, unlockedColor, lockedColor);
+    }
+
+    private bool SetSourceIcons(
+        AlbumEntityType mode,
+        IReadOnlyList<HatchIconData> sourceIcons,
+        bool visible,
+        Color unlockedColor,
+        Color lockedColor)
+    {
+        var slots = GetModeSlots(mode);
+        visible = visible && slots.ShowSources && slots.ShowHatchPreview;
+        var shouldShowSection = visible && sourceIcons != null && sourceIcons.Count > 0;
         var iconsRoot = ResolveEggHatchIconsRoot(visible || _eggHatchIconPool.Count > 0);
         var requiredSlots = shouldShowSection
-            ? Mathf.Max(eggHatchMaxIcons > 0 ? eggHatchMaxIcons : 0, hatchIcons.Count)
+            ? Mathf.Max(eggHatchMaxIcons > 0 ? eggHatchMaxIcons : 0, sourceIcons.Count)
             : 0;
 
         if (!EnsureEggHatchIconPool(requiredSlots, iconsRoot))
@@ -486,17 +500,17 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
             if (iconView == null)
                 continue;
 
-            var show = shouldShowSection && hatchIcons != null && i < hatchIcons.Count;
+            var show = shouldShowSection && sourceIcons != null && i < sourceIcons.Count;
             iconView.gameObject.SetActive(show);
             if (!show)
                 continue;
 
-            var data = hatchIcons[i];
+            var data = sourceIcons[i];
             iconView.SetIcon(data.Icon, data.Unlocked ? unlockedColor : lockedColor);
         }
 
         if (!TryRebuildHatchGrid(iconsRoot))
-            LayoutFallbackHatchIcons(iconsRoot, shouldShowSection ? Mathf.Min(hatchIcons.Count, _eggHatchIconPool.Count) : 0);
+            LayoutFallbackHatchIcons(iconsRoot, shouldShowSection ? Mathf.Min(sourceIcons.Count, _eggHatchIconPool.Count) : 0);
         return true;
     }
 
@@ -681,7 +695,8 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
     {
         SetMode(mode, true);
         SetLockedOverlay(false, string.Empty);
-        SetEggHatchSectionActive(mode == AlbumEntityType.Egg && GetModeSlots(AlbumEntityType.Egg).ShowHatchPreview);
+        var slots = GetModeSlots(mode);
+        SetEggHatchSectionActive(slots.ShowSources && slots.ShowHatchPreview);
 
         if (mode == AlbumEntityType.Egg)
         {

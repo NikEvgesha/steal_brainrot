@@ -36,11 +36,16 @@ public static class ItemDisplayNameResolver
 
     public static string ResolveItemName(string id, string fallback = null)
     {
+        var fallbackText = NormalizeUnityInstanceName(fallback);
         var normalizedId = NormalizeItemId(id);
-        var fallbackText = !string.IsNullOrWhiteSpace(fallback) ? fallback.Trim() : normalizedId;
+        if (string.IsNullOrWhiteSpace(normalizedId))
+            normalizedId = NormalizeItemId(fallbackText);
 
         if (string.IsNullOrWhiteSpace(normalizedId))
             return fallbackText ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(fallbackText))
+            fallbackText = normalizedId;
 
         var localizationKey = "Item/" + normalizedId;
         var localized = LocalizationUtils.T(localizationKey, null);
@@ -58,10 +63,22 @@ public static class ItemDisplayNameResolver
         if (string.IsNullOrWhiteSpace(id))
             return string.Empty;
 
-        var result = id.Trim();
+        var result = NormalizeUnityInstanceName(id);
         const string prefix = "Item/";
         if (result.StartsWith(prefix, StringComparison.Ordinal))
             result = result.Substring(prefix.Length);
+        return result;
+    }
+
+    private static string NormalizeUnityInstanceName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var result = value.Trim();
+        const string cloneSuffix = "(Clone)";
+        if (result.EndsWith(cloneSuffix, StringComparison.Ordinal))
+            result = result.Substring(0, result.Length - cloneSuffix.Length).TrimEnd();
         return result;
     }
 

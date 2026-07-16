@@ -57,13 +57,18 @@ public class ControlUI : MonoBehaviour
 
     private void Start()
     {
-        UseMobileSetup(G.Control.UseTouchControl);
+        bool useMobile = G.Control != null
+            ? G.Control.UseTouchControl
+            : Application.isMobilePlatform;
+        UseMobileSetup(useMobile);
     }
     public void UseMobileSetup(bool isMobile)
     {
         _isMobile = isMobile;
-        _mobileUI.SetActive(isMobile);
-        _desktopUI.SetActive(!isMobile);
+        if (_mobileUI != null)
+            _mobileUI.SetActive(isMobile);
+        if (_desktopUI != null)
+            _desktopUI.SetActive(!isMobile);
         //_desktopMenuUI.SetActive(!isMobile);
         //foreach (GameObject go in _hotKeys)
         //{
@@ -84,6 +89,12 @@ public class ControlUI : MonoBehaviour
             return;
         }
         DeactivateAll();
+    }
+
+    private void OnDestroy()
+    {
+        if (_instance == this)
+            _instance = null;
     }
     private void DeactivateAll()
     {

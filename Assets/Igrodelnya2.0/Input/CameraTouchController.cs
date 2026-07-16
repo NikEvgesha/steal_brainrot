@@ -1,165 +1,109 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler { 
+[DefaultExecutionOrder(-120)]
+public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler
+{
     [SerializeField] private RectTransform _touchArea;
-    [SerializeField] private float _dragSpeed = 0.1f;
-    [SerializeField] private float _deadZone = 2f;
+    [SerializeField, Range(0f, 1f)] private float _rightSideStart = 0.42f;
+    [SerializeField] private float _dragSpeed = 0.035f;
+    [SerializeField] private float _deadZone = 1f;
+    [SerializeField] private float _smoothSpeed = 18f;
+    [SerializeField] private bool _ignoreTouchesOverUI = true;
 
-    [SerializeField] private float _smoothSpeed = 10f; // Скорость сглаживания
-
+    private readonly List<RaycastResult> _raycastResults = new List<RaycastResult>(16);
     private bool _isDragging;
-    private Vector2 _startPos;
-    private Vector2 _input;
-
-    private Vector2 _targetInput; // Целевое значение ввода
-    private Vector2 _currentInput; // Текущее сглаженное значение
+    private Vector2 _lastPosition;
+    private Vector2 _targetInput;
+    private Vector2 _currentInput;
     private int _cameraTouchId = -1;
 
     private void Update()
     {
-        // Сглаживание ввода
-        _currentInput = Vector2.Lerp(_currentInput, _targetInput, Time.deltaTime * _smoothSpeed);
+        ProcessTouches();
 
-        // Обрабатываем касания
-        foreach (Touch touch in Input.touches)
+        float blend = 1f - Mathf.Exp(-Mathf.Max(0.01f, _smoothSpeed) * Time.unscaledDeltaTime);
+        _currentInput = Vector2.Lerp(_currentInput, _targetInput, blend);
+        _targetInput = Vector2.zero;
+    }
+
+    private void ProcessTouches()
+    {
+        for (int i = 0; i < Input.touchCount; i++)
         {
-            // Пропускаем, если это не касание камеры
+            Touch touch = Input.GetTouch(i);
+
+            if (_cameraTouchId < 0)
+            {
+                if (touch.phase != TouchPhase.Began || touch.position.x < Screen.width * _rightSideStart)
+                    continue;
+                if (_ignoreTouchesOverUI && IsPointerBlockedByUI(touch.fingerId, touch.position))
+                    continue;
+
+                StartDrag(touch.position, touch.fingerId);
+                continue;
+            }
+
             if (touch.fingerId != _cameraTouchId)
                 continue;
 
-            // Проверяем, не над UI ли касание
-            if (EventSystem.current.IsPointerOverGameObject(touch.fingerId))
-            {
-                Debug.Log("Pointer over UI");
-                EndDrag();
-                continue;
-            }
-
-            if (touch.phase == TouchPhase.Began && !_isDragging)
-            {
-                Debug.Log("Begin drag");
-                StartDrag(touch.position, touch.fingerId);
-            }
-            else if (touch.phase == TouchPhase.Moved && _isDragging)
-            {
-                Debug.Log("move drag");
+            if (touch.phase == TouchPhase.Moved)
                 Drag(touch.position);
-            }
             else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
-            {
-                Debug.Log("end drag");
                 EndDrag();
-            }
         }
     }
 
-    public void StartDrag(Vector3 startPos,  int fingerId = -1)
+    public void StartDrag(Vector3 startPos, int fingerId = -1)
     {
-        _startPos = startPos;
+        if (_isDragging)
+            return;
+
+        _lastPosition = startPos;
         _isDragging = true;
-        if (fingerId != -1)
-            _cameraTouchId = fingerId; // Сохраняем ID касания
+        _cameraTouchId = fingerId;
     }
 
     public void Drag(Vector3 pointerPos)
     {
-        if (!_isDragging) return;
+        if (!_isDragging)
+            return;
 
-        Vector2 currentPos = pointerPos;
-        Vector2 delta = currentPos - _startPos;
+        Vector2 currentPosition = pointerPos;
+        Vector2 delta = currentPosition - _lastPosition;
+        _lastPosition = currentPosition;
 
-        if (delta.magnitude < _deadZone)
-        {
-            delta = Vector2.zero;
-        }
+        if (delta.sqrMagnitude < _deadZone * _deadZone)
+            return;
 
-        _input = new Vector2(delta.x, delta.y) * _dragSpeed;
-        _targetInput = _input; // Обновляем целевое значение
-        _startPos = currentPos;
+        _targetInput += delta * _dragSpeed;
     }
 
     public void EndDrag()
     {
         _isDragging = false;
-        _input = Vector2.zero;
         _targetInput = Vector2.zero;
+        _currentInput = Vector2.zero;
         _cameraTouchId = -1;
     }
 
-
-
     public void OnPointerDown(PointerEventData eventData)
     {
-        // Create a list to store raycast results
-        var results = new System.Collections.Generic.List<RaycastResult>();
-        EventSystem.current.RaycastAll(eventData, results);
-
-        RaycastResult? res = null;
-        // Check each result
-        foreach (var result in results)
-        {
-            // If we hit any UI element that's not part of world space canvas
-            if (result.gameObject.GetComponentInParent<Canvas>()?.renderMode == RenderMode.WorldSpace)
-            {
-                res = result;
-                break;
-            }
-        }
-
-        if (res.HasValue)
-        {
-            BuyTouchHandler handler = res.Value.gameObject.GetComponentInParent<BuyTouchHandler>();
-            if (handler)
-            {
-                handler.OnPointerDown(eventData);
-            }
-        } else
-        {
-            if (_cameraTouchId == -1)
-            {
-                StartDrag(eventData.position);
-            }
-        }
-
-            
+        if (_cameraTouchId < 0)
+            StartDrag(eventData.position, eventData.pointerId);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        Drag(eventData.position);
+        if (eventData.pointerId == _cameraTouchId)
+            Drag(eventData.position);
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        // Create a list to store raycast results
-        var results = new System.Collections.Generic.List<RaycastResult>();
-        EventSystem.current.RaycastAll(eventData, results);
-
-        RaycastResult? res = null;
-        // Check each result
-        foreach (var result in results)
-        {
-            // If we hit any UI element that's not part of world space canvas
-            if (result.gameObject.GetComponentInParent<Canvas>()?.renderMode == RenderMode.WorldSpace)
-            {
-                res = result;
-                break;
-            }
-        }
-
-        if (res.HasValue)
-        {
-            BuyTouchHandler handler = res.Value.gameObject.GetComponentInParent<BuyTouchHandler>();
-            if (handler)
-            {
-                handler.OnPointerUp(eventData);
-            }
-        }
-        else
-        {
+        if (eventData.pointerId == _cameraTouchId)
             EndDrag();
-        }
     }
 
     public Vector2 GetRotationInput()
@@ -167,5 +111,36 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
         return _currentInput;
     }
 
+    private bool IsPointerBlockedByUI(int pointerId, Vector2 position)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
 
+        var eventData = new PointerEventData(eventSystem)
+        {
+            pointerId = pointerId,
+            position = position
+        };
+
+        _raycastResults.Clear();
+        eventSystem.RaycastAll(eventData, _raycastResults);
+        for (int i = 0; i < _raycastResults.Count; i++)
+        {
+            GameObject hitObject = _raycastResults[i].gameObject;
+            if (hitObject == null)
+                continue;
+            if (_touchArea != null && hitObject.transform.IsChildOf(_touchArea))
+                continue;
+            if (hitObject.GetComponentInParent<Canvas>() != null)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void OnDisable()
+    {
+        EndDrag();
+    }
 }

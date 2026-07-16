@@ -1,5 +1,6 @@
 using MirraGames.SDK.Common;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,27 +10,40 @@ public class SpecialShop : MonoBehaviour
     [SerializeField] private List<ShopPackData> _packs;
     [SerializeField] private LocalizationData _localizationData;
     [SerializeField] private GameObject _shopCanvas;
+    [SerializeField] private ScrollRect _scrollRect;
     [SerializeField] private Transform _content;
     [SerializeField] private SpecialShopSlot _slotPrefab;
     [SerializeField] private ShopRow _rowPrefab;
+    [SerializeField] private SpecialShopSectionHeader _sectionHeaderPrefab;
     [SerializeField] private int _maxItemsPerRow = 2;
     [SerializeField] private ShopCategory _defaultCategory = ShopCategory.Featured;
     [SerializeField] private List<Button> _categoryButtons = new();
     [SerializeField] private Color _selectedTabColor = new Color(0.2f, 0.84f, 0.08f, 1f);
     [SerializeField] private Color _normalTabColor = new Color(0.31f, 0.16f, 0.07f, 1f);
+    [SerializeField] private Sprite _rewardedAdIcon;
+    [SerializeField, Min(0.05f)] private float _scrollDuration = 0.3f;
+    [SerializeField] private bool _forceRewardedAdsForTesting;
 
     private readonly Dictionary<string, ShopPackData> _purchaseData = new();
     private readonly List<string> _pendingRestoredPurchaseIds = new();
     private readonly List<ShopRow> _rows = new();
     private readonly List<SpecialShopSlot> _slots = new();
+    private readonly List<SpecialShopSectionHeader> _sectionHeaders = new();
+    private readonly Dictionary<ShopCategory, RectTransform> _sectionAnchors = new();
     private ShopEffectsService _effects;
     private ShopCategory _currentCategory;
     private bool _isOpen;
     private bool _slotsInitialized;
+    private bool _lastPurchasesAvailable;
+    private bool _rewardedAdPurchasePending;
+    private Coroutine _scrollCoroutine;
+    private float _nextPlatformRefresh;
+    private LocalizationManager _subscribedLocalizationManager;
 
     public bool Opened => _isOpen;
     public ShopCategory CurrentCategory => _currentCategory;
     public ShopEffectsService Effects => _effects;
+    public Sprite RewardedAdIcon => _rewardedAdIcon;
 
     private void Awake()
     {
@@ -53,8 +67,23 @@ public class SpecialShop : MonoBehaviour
         G.Purchases?.RestorePurchases();
     }
 
+    private void Update()
+    {
+        if (!_isOpen || Time.unscaledTime < _nextPlatformRefresh)
+            return;
+
+        _nextPlatformRefresh = Time.unscaledTime + 1f;
+        bool purchasesAvailable = PurchasesAvailable();
+        if (purchasesAvailable != _lastPurchasesAvailable)
+            InitSlots();
+    }
+
     private void OnEnable()
     {
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
+        LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
+
         if (_effects != null)
             _effects.Changed += RefreshSlots;
         if (G.Currency != null)
@@ -66,6 +95,10 @@ public class SpecialShop : MonoBehaviour
 
     private void OnDisable()
     {
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        UnsubscribeFromLocalizationManager();
+
         if (_effects != null)
             _effects.Changed -= RefreshSlots;
         if (G.Currency != null)
@@ -74,8 +107,42 @@ public class SpecialShop : MonoBehaviour
 
     private void OnDestroy()
     {
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        UnsubscribeFromLocalizationManager();
+
         if (G.SpecialShop == this)
             G.SpecialShop = null;
+    }
+
+    private void OnLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || manager == _subscribedLocalizationManager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _subscribedLocalizationManager = manager;
+        _subscribedLocalizationManager.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_subscribedLocalizationManager == null)
+            return;
+
+        _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = null;
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        if (_slotsInitialized)
+            InitSlots();
     }
 
     public void InitSlots()
@@ -84,28 +151,51 @@ public class SpecialShop : MonoBehaviour
         _slotsInitialized = false;
         _purchaseData.Clear();
 
-        if (_content == null || _slotPrefab == null || _rowPrefab == null)
+        if (_content == null || _slotPrefab == null || _rowPrefab == null || _sectionHeaderPrefab == null)
         {
-            Debug.LogError("[SpecialShop] Content, slot prefab or row prefab is missing.");
+            Debug.LogError("[SpecialShop] Content, slot, row or section header prefab is missing.");
             return;
         }
 
-        var visible = GetVisiblePacks();
-        for (int i = 0; i < visible.Count; i++)
+        _lastPurchasesAvailable = PurchasesAvailable();
+        var categories = new[]
         {
-            var item = visible[i];
-            Transform row = GetOrCreateAvailableRow(item.SlotType == ShopSlotType.Big);
-            var slot = Instantiate(_slotPrefab, row);
-            string purchaseId = GetPurchaseId(item);
-            PurchaseData data = G.Purchases != null
-                ? G.Purchases.GetPurchaseData(purchaseId)
-                : PurchaseData.Fallback(purchaseId);
+            ShopCategory.Featured,
+            ShopCategory.Boosts,
+            ShopCategory.Permanent,
+            ShopCategory.Currency
+        };
 
-            if (!_purchaseData.ContainsKey(purchaseId))
-                _purchaseData.Add(purchaseId, item);
+        for (int categoryIndex = 0; categoryIndex < categories.Length; categoryIndex++)
+        {
+            ShopCategory category = categories[categoryIndex];
+            var sectionPacks = GetSectionPacks(category);
+            if (sectionPacks.Count == 0)
+                continue;
 
-            slot.Init(this, item, data);
-            _slots.Add(slot);
+            var header = Instantiate(_sectionHeaderPrefab, _content);
+            GetSectionTitle(category, out string key, out string fallback);
+            header.Init(key, fallback);
+            _sectionHeaders.Add(header);
+            _sectionAnchors[category] = header.RectTransform;
+
+            var sectionRows = new List<ShopRow>();
+            for (int i = 0; i < sectionPacks.Count; i++)
+            {
+                var item = sectionPacks[i];
+                Transform row = GetOrCreateAvailableRow(item.SlotType == ShopSlotType.Big, sectionRows);
+                var slot = Instantiate(_slotPrefab, row);
+                string purchaseId = GetPurchaseId(item);
+                PurchaseData data = item.PriceCurrencyType == CurrencyType.Real && _lastPurchasesAvailable && G.Purchases != null
+                    ? G.Purchases.GetPurchaseData(purchaseId)
+                    : PurchaseData.Fallback(purchaseId);
+
+                if (!_purchaseData.ContainsKey(purchaseId))
+                    _purchaseData.Add(purchaseId, item);
+
+                slot.Init(this, item, data);
+                _slots.Add(slot);
+            }
         }
 
         _slotsInitialized = true;
@@ -114,18 +204,14 @@ public class SpecialShop : MonoBehaviour
         Canvas.ForceUpdateCanvases();
     }
 
-    public void ShowFeatured() => SetCategory(ShopCategory.Featured);
-    public void ShowBoosts() => SetCategory(ShopCategory.Boosts);
-    public void ShowPermanent() => SetCategory(ShopCategory.Permanent);
-    public void ShowCurrency() => SetCategory(ShopCategory.Currency);
+    public void ShowFeatured() => ScrollToSection(ShopCategory.Featured);
+    public void ShowBoosts() => ScrollToSection(ShopCategory.Boosts);
+    public void ShowPermanent() => ScrollToSection(ShopCategory.Permanent);
+    public void ShowCurrency() => ScrollToSection(ShopCategory.Currency);
 
     public void SetCategory(ShopCategory category)
     {
-        if (_currentCategory == category && _slotsInitialized)
-            return;
-
-        _currentCategory = category;
-        InitSlots();
+        ScrollToSection(category);
     }
 
     public void ToggleOpen()
@@ -143,11 +229,15 @@ public class SpecialShop : MonoBehaviour
 
         _isOpen = true;
         _shopCanvas.SetActive(true);
+        bool purchasesAvailable = PurchasesAvailable();
+        if (!_slotsInitialized || purchasesAvailable != _lastPurchasesAvailable)
+            InitSlots();
         if (G.Control != null)
             G.Control.CursorActive = true;
         G.Currency?.ShowGems?.Invoke(true);
         G.Input?.AOpenWindow?.Invoke(this);
         RefreshSlots();
+        ScrollToSection(ShopCategory.Featured, false);
     }
 
     public void Close()
@@ -184,6 +274,12 @@ public class SpecialShop : MonoBehaviour
             return;
         }
 
+        if (IsRewardedAdFallback(packData))
+        {
+            TryRewardedAdPurchase(packData);
+            return;
+        }
+
         if (packData.PriceCurrencyType != CurrencyType.Real)
         {
             if (G.Currency != null && G.Currency.RemoveCurrency(packData.PriceCurrencyType, packData.Price))
@@ -216,12 +312,23 @@ public class SpecialShop : MonoBehaviour
         return result;
     }
 
+    public bool IsRewardedAdFallback(ShopPackData packData)
+    {
+        return packData != null
+            && packData.PriceCurrencyType == CurrencyType.Real
+            && packData.RewardedAdFallback
+            && !PurchasesAvailable();
+    }
+
     public string BuildRewardSummary(ShopPackData pack)
     {
         if (pack == null || pack.Rewards == null || pack.Rewards.Count == 0)
             return string.Empty;
 
         var reward = pack.Rewards[0];
+        if (IsRewardedAdFallback(pack))
+            return LocalizationUtils.Format("UI/Shop/RewardGems", "+{0} crystals", pack.RewardedAdGems);
+
         switch (reward.Type)
         {
             case ShopRewardType.Currency:
@@ -249,7 +356,7 @@ public class SpecialShop : MonoBehaviour
         }
     }
 
-    private List<ShopPackData> GetVisiblePacks()
+    private List<ShopPackData> GetSectionPacks(ShopCategory category)
     {
         var result = new List<ShopPackData>();
         if (_packs == null)
@@ -261,11 +368,12 @@ public class SpecialShop : MonoBehaviour
             if (pack == null)
                 continue;
 
-            bool visible = _currentCategory == ShopCategory.Featured
-                ? pack.Featured
-                : pack.Category == _currentCategory;
-            if (visible)
-                result.Add(pack);
+            if (pack.Category != category)
+                continue;
+            if (pack.PriceCurrencyType == CurrencyType.Real && !_lastPurchasesAvailable && !pack.RewardedAdFallback)
+                continue;
+
+            result.Add(pack);
         }
 
         result.Sort((a, b) =>
@@ -276,21 +384,119 @@ public class SpecialShop : MonoBehaviour
         return result;
     }
 
-    private Transform GetOrCreateAvailableRow(bool big)
+    private Transform GetOrCreateAvailableRow(bool big, List<ShopRow> sectionRows)
     {
         if (!big)
         {
-            for (int i = 0; i < _rows.Count; i++)
+            for (int i = 0; i < sectionRows.Count; i++)
             {
-                if (_rows[i] != null && _rows[i].ItemsCount < _rows[i].MaxItems)
-                    return _rows[i].transform;
+                if (sectionRows[i] != null && sectionRows[i].ItemsCount < sectionRows[i].MaxItems)
+                    return sectionRows[i].transform;
             }
         }
 
         var newRow = Instantiate(_rowPrefab, _content);
         newRow.setMaxItems(big ? 1 : Mathf.Max(1, _maxItemsPerRow));
+        sectionRows.Add(newRow);
         _rows.Add(newRow);
         return newRow.transform;
+    }
+
+    private void ScrollToSection(ShopCategory category, bool animated = true)
+    {
+        if (!_slotsInitialized || _scrollRect == null)
+            return;
+
+        _currentCategory = category;
+        UpdateCategoryButtons();
+
+        if (_scrollCoroutine != null)
+            StopCoroutine(_scrollCoroutine);
+        _scrollCoroutine = StartCoroutine(ScrollToSectionRoutine(category, animated));
+    }
+
+    private IEnumerator ScrollToSectionRoutine(ShopCategory category, bool animated)
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        float target = 1f;
+        if (_sectionAnchors.TryGetValue(category, out var anchor) && anchor != null)
+        {
+            float contentHeight = (_content as RectTransform)?.rect.height ?? 0f;
+            float viewportHeight = _scrollRect.viewport != null ? _scrollRect.viewport.rect.height : 0f;
+            float scrollableHeight = Mathf.Max(0f, contentHeight - viewportHeight);
+            if (scrollableHeight > 0.01f)
+            {
+                float sectionTop = Mathf.Max(0f, -anchor.anchoredPosition.y - anchor.rect.height * (1f - anchor.pivot.y));
+                target = 1f - Mathf.Clamp01(sectionTop / scrollableHeight);
+            }
+        }
+
+        if (!animated)
+        {
+            _scrollRect.verticalNormalizedPosition = target;
+            _scrollCoroutine = null;
+            yield break;
+        }
+
+        float start = _scrollRect.verticalNormalizedPosition;
+        float elapsed = 0f;
+        while (elapsed < _scrollDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _scrollDuration));
+            _scrollRect.verticalNormalizedPosition = Mathf.Lerp(start, target, t);
+            yield return null;
+        }
+
+        _scrollRect.verticalNormalizedPosition = target;
+        _scrollCoroutine = null;
+    }
+
+    private void TryRewardedAdPurchase(ShopPackData packData)
+    {
+        if (_rewardedAdPurchasePending || G.Ad == null)
+            return;
+
+        _rewardedAdPurchasePending = true;
+        G.Ad.ShowRewardedAd("SpecialShopGems", success =>
+        {
+            _rewardedAdPurchasePending = false;
+            if (!success)
+                return;
+
+            G.Currency?.AddCurrency(CurrencyType.Gems, packData.RewardedAdGems);
+            RefreshSlots();
+        });
+    }
+
+    private bool PurchasesAvailable()
+    {
+        return !_forceRewardedAdsForTesting && G.Purchases != null && G.Purchases.PurchasesAvailable();
+    }
+
+    private static void GetSectionTitle(ShopCategory category, out string key, out string fallback)
+    {
+        switch (category)
+        {
+            case ShopCategory.Boosts:
+                key = "UI/Shop/SectionBoosts";
+                fallback = "Усиления";
+                break;
+            case ShopCategory.Permanent:
+                key = "UI/Shop/SectionPermanent";
+                fallback = "Навсегда";
+                break;
+            case ShopCategory.Currency:
+                key = "UI/Shop/SectionCurrency";
+                fallback = "Кристаллы";
+                break;
+            default:
+                key = "UI/Shop/SectionFeatured";
+                fallback = "Лучшее";
+                break;
+        }
     }
 
     private void GiveReward(string purchaseId)
@@ -343,16 +549,26 @@ public class SpecialShop : MonoBehaviour
 
     private void ClearSlots()
     {
-        for (int i = 0; i < _rows.Count; i++)
+        if (_content != null)
         {
-            if (_rows[i] == null)
-                continue;
-            _rows[i].gameObject.SetActive(false);
-            Destroy(_rows[i].gameObject);
+            for (int i = _content.childCount - 1; i >= 0; i--)
+            {
+                var child = _content.GetChild(i);
+                if (child.GetComponent<ShopRow>() == null
+                    && child.GetComponent<SpecialShopSectionHeader>() == null)
+                {
+                    continue;
+                }
+
+                child.gameObject.SetActive(false);
+                Destroy(child.gameObject);
+            }
         }
 
         _rows.Clear();
         _slots.Clear();
+        _sectionHeaders.Clear();
+        _sectionAnchors.Clear();
     }
 
     private void RefreshSlots()

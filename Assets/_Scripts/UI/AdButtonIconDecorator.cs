@@ -12,7 +12,7 @@ public static class AdButtonIconDecorator
         var buttons = Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < buttons.Length; i++)
         {
-            if (IsRewardedAdButton(buttons[i]))
+            if (IsRewardedAdButton(buttons[i]) && buttons[i].transform.Find("AdIcon") == null)
                 SetAdIcon(buttons[i], true);
         }
 
@@ -40,7 +40,6 @@ public static class AdButtonIconDecorator
         Transform existingAdIcon = target.Find("AdIcon");
         if (existingAdIcon != null)
         {
-            ConfigureIcon(existingAdIcon);
             existingAdIcon.gameObject.SetActive(visible);
             return;
         }

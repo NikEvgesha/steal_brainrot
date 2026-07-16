@@ -18,18 +18,46 @@ public class EggInfoUI : MonoBehaviour
 
     private EggStatus _status;
     private bool _remoteView;
+    private Egg _egg;
+
+    private void OnEnable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+
+        RefreshName();
+    }
+
+    private void OnDisable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+    }
 
     public void SetInfo(Egg egg)
     {
         if (egg == null)
             return;
 
-        if (_name != null)
-            _name.text = ItemDisplayNameResolver.ResolveItemName(egg.Name, egg.name);
+        _egg = egg;
+        RefreshName();
         if (_luck != null)
             _luck.text = FormatAmount(egg.Data.Luck) + "X";
         if (_price != null)
             _price.text = "$" + FormatAmount(egg.EffectivePrice);
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        RefreshName();
+    }
+
+    private void RefreshName()
+    {
+        if (_name == null || _egg == null)
+            return;
+
+        _name.text = ItemDisplayNameResolver.ResolveItemName(_egg.Name, _egg.gameObject.name);
     }
 
     private static string FormatAmount(double amount)
