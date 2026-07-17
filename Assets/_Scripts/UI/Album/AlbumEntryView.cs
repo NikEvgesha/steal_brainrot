@@ -24,6 +24,8 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
     public bool IsUnlocked { get; private set; }
     public bool IsSelected { get; private set; }
     public bool HasMention { get; private set; }
+    public AlbumEntityType BoundType { get; private set; }
+    public string BoundId { get; private set; } = string.Empty;
 
     private void Awake()
     {
@@ -47,12 +49,23 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
             button.onClick.RemoveListener(OnClicked);
     }
 
-    public void Bind(Sprite icon, string title, bool unlocked, bool selected, bool hasMention, Action onClick, RareType rareType = RareType.Common)
+    public void Bind(
+        Sprite icon,
+        string title,
+        bool unlocked,
+        bool selected,
+        bool hasMention,
+        Action onClick,
+        RareType rareType = RareType.Common,
+        AlbumEntityType boundType = AlbumEntityType.Egg,
+        string boundId = null)
     {
         _onClick = onClick;
         IsUnlocked = unlocked;
         IsSelected = selected;
         HasMention = hasMention;
+        BoundType = boundType;
+        BoundId = boundId ?? string.Empty;
 
         if (iconImage != null)
         {

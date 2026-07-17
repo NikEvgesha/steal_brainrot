@@ -150,6 +150,75 @@ public static class TutorialV1EditorTools
         }
     };
 
+    private static readonly Dictionary<string, string[]> V2Translations = new(StringComparer.Ordinal)
+    {
+        ["UI/Tutorial/Progress"] = new[] { "Обучение {0}/{1}", "Tutorial {0}/{1}" },
+        ["UI/Tutorial/Reward"] = new[] { "Награда: +{0}", "Reward: +{0}" },
+        ["UI/Tutorial/NoReward"] = new[] { "Учебное задание", "Training task" },
+        ["UI/Tutorial/Completed"] = new[] { "ЗАДАНИЕ ВЫПОЛНЕНО!", "TASK COMPLETE!" },
+
+        ["UI/Tutorial/Step/learn_movement/Desktop"] = new[] { "Начни двигаться с помощью WASD. Удерживай правую кнопку мыши, чтобы осматриваться.", "Use WASD to start moving. Hold the right mouse button to look around." },
+        ["UI/Tutorial/Step/learn_movement/Touch"] = new[] { "Начни двигаться левым джойстиком. Проводи пальцем по правой стороне экрана, чтобы осматриваться.", "Move the left joystick to start walking. Swipe the right side to look around." },
+        ["UI/Tutorial/Step/buy_first_egg/Desktop"] = new[] { "Купи отмеченное яйцо за {0} монет.", "Buy the marked egg for {0} coins." },
+        ["UI/Tutorial/Step/buy_first_egg/Touch"] = new[] { "Купи отмеченное яйцо за {0} монет.", "Buy the marked egg for {0} coins." },
+        ["UI/Tutorial/Step/place_first_egg/Desktop"] = new[] { "Поставь яйцо на ближайшую свободную клетку.", "Place an egg on the nearest free cell." },
+        ["UI/Tutorial/Step/place_first_egg/Touch"] = new[] { "Поставь яйцо на ближайшую свободную клетку.", "Place an egg on the nearest free cell." },
+        ["UI/Tutorial/Step/use_first_egg_speedup/Desktop"] = new[] { "Ускорь созревание яйца. Первый раз бесплатно, дальше — за рекламу.", "Skip egg maturation now. The first speedup is free; later speedups require an ad." },
+        ["UI/Tutorial/Step/use_first_egg_speedup/Touch"] = new[] { "Ускорь созревание яйца. Первый раз бесплатно, дальше — за рекламу.", "Skip egg maturation now. The first speedup is free; later speedups require an ad." },
+        ["UI/Tutorial/Step/hatch_first_egg/Desktop"] = new[] { "Яйцо готово. Подойди и удерживай E, чтобы вылупить его.", "The egg is ready. Approach it and hold E to hatch it." },
+        ["UI/Tutorial/Step/hatch_first_egg/Touch"] = new[] { "Яйцо готово. Подойди и удерживай кнопку действия, чтобы вылупить его.", "The egg is ready. Approach it and hold the action button to hatch it." },
+        ["UI/Tutorial/Step/claim_first_album_rewards/Desktop"] = new[] { "Открой альбом и забери оставшиеся награды за яйцо и животное.", "Open the album and claim the remaining rewards for your egg and animal." },
+        ["UI/Tutorial/Step/claim_first_album_rewards/Touch"] = new[] { "Открой альбом и забери оставшиеся награды за яйцо и животное.", "Open the album and claim the remaining rewards for your egg and animal." },
+        ["UI/Tutorial/Step/buy_big_pet/Desktop"] = new[] { "Накопи {0} монет на большое животное. Собирай монеты у выставленных животных.", "Save {0} coins to buy the big animal. Collect coins from placed animals." },
+        ["UI/Tutorial/Step/buy_big_pet/Touch"] = new[] { "Накопи {0} монет на большое животное. Собирай монеты у выставленных животных.", "Save {0} coins to buy the big animal. Collect coins from placed animals." },
+        ["UI/Tutorial/Step/feed_big_pet/Desktop"] = new[] { "Купи первый фрукт и покорми большое животное. Каждый его уровень добавляет 10% к доходу фермы.", "Buy the first fruit and feed it to the big animal. Every big-animal level adds 10% farm income." },
+        ["UI/Tutorial/Step/feed_big_pet/Touch"] = new[] { "Купи первый фрукт и покорми большое животное. Каждый его уровень добавляет 10% к доходу фермы.", "Buy the first fruit and feed it to the big animal. Every big-animal level adds 10% farm income." },
+        ["UI/Tutorial/Step/unlock_first_territory/Desktop"] = new[] { "Накопи {0} монет и открой самую дешёвую территорию.", "Save {0} coins and unlock the cheapest territory." },
+        ["UI/Tutorial/Step/unlock_first_territory/Touch"] = new[] { "Накопи {0} монет и открой самую дешёвую территорию.", "Save {0} coins and unlock the cheapest territory." },
+        ["UI/Tutorial/Step/upgrade_first_conveyor/Desktop"] = new[] { "Накопи {0} монет и купи следующее улучшение конвейера.", "Save {0} coins and purchase the next conveyor upgrade." },
+        ["UI/Tutorial/Step/upgrade_first_conveyor/Touch"] = new[] { "Накопи {0} монет и купи следующее улучшение конвейера.", "Save {0} coins and purchase the next conveyor upgrade." },
+
+        ["UI/Tutorial/Context/BuyEgg"] = new[] { "Купи отмеченное яйцо за {0} монет.", "Buy the marked egg for {0} coins." },
+        ["UI/Tutorial/Context/ReturnHomeEgg"] = new[] { "Вернись на свою ферму вместе с яйцом.", "Return to your farm with the egg." },
+        ["UI/Tutorial/Context/ReacquireEgg"] = new[] { "Яйца больше нет. Купи другое доступное яйцо на своём конвейере.", "The egg is gone. Buy another affordable egg from your conveyor." },
+        ["UI/Tutorial/Context/OpenInventoryEgg"] = new[] { "Открой инвентарь, чтобы найти яйцо.", "Open the inventory to find your egg." },
+        ["UI/Tutorial/Context/ChooseEggTab"] = new[] { "Открой вкладку с яйцами.", "Choose the Eggs tab." },
+        ["UI/Tutorial/Context/AddEggQuick"] = new[] { "Нажми на яйцо, чтобы добавить его в быстрый доступ.", "Tap the egg to add it to quick access." },
+        ["UI/Tutorial/Context/EquipEgg"] = new[] { "Выбери яйцо на панели быстрого доступа.", "Select the egg in quick access." },
+        ["UI/Tutorial/Context/NoFreeCell"] = new[] { "Освободи или открой клетку, чтобы поставить яйцо.", "Unlock or free a cell to place the egg." },
+        ["UI/Tutorial/Context/ApproachFreeCell"] = new[] { "Подойди к подсвеченной свободной клетке.", "Go to the highlighted free cell." },
+        ["UI/Tutorial/Context/PlaceEggActionDesktop"] = new[] { "Удерживай E, чтобы поставить яйцо сюда.", "Hold E to place the egg here." },
+        ["UI/Tutorial/Context/PlaceEggActionTouch"] = new[] { "Удерживай кнопку действия, чтобы поставить яйцо сюда.", "Press the action button to place the egg here." },
+        ["UI/Tutorial/Context/ApproachMaturingEgg"] = new[] { "Подойди к созревающему яйцу. Первое мгновенное созревание бесплатно.", "Approach the maturing egg. Your first instant maturation is free." },
+        ["UI/Tutorial/Context/FreeSpeedupAction"] = new[] { "Заверши созревание сейчас. Первый раз бесплатно, дальше — за рекламу.", "Finish maturation now. The first time is free; later it requires an ad." },
+        ["UI/Tutorial/Context/ApproachReadyEgg"] = new[] { "Подойди к готовому яйцу, чтобы вылупить его.", "Approach the ready egg to hatch it." },
+        ["UI/Tutorial/Context/HatchActionDesktop"] = new[] { "Удерживай E, чтобы вылупить готовое яйцо.", "Hold E to hatch the ready egg." },
+        ["UI/Tutorial/Context/HatchActionTouch"] = new[] { "Удерживай кнопку действия, чтобы вылупить готовое яйцо.", "Press the action button to hatch the ready egg." },
+        ["UI/Tutorial/Context/Album"] = new[] { "Открой альбом и забери оставшиеся награды за яйцо и животное.", "Open the album and claim the remaining egg and animal rewards." },
+        ["UI/Tutorial/Context/SaveBigPet"] = new[] { "Накопи {0} монет на большое животное ({1}/{0}). Собирай монеты у выставленных животных.", "Save {0} coins for the big animal ({1}/{0}). Collect coins from placed animals." },
+        ["UI/Tutorial/Context/ReturnHomeBigPet"] = new[] { "Монет достаточно. Вернись домой и купи большое животное.", "You have enough coins. Return home to buy the big animal." },
+        ["UI/Tutorial/Context/ApproachBigPet"] = new[] { "Подойди к месту большого животного на своей ферме.", "Go to the big-animal place on your farm." },
+        ["UI/Tutorial/Context/BuyBigPetAction"] = new[] { "Купи большое животное за {0} монет.", "Buy the big animal for {0} coins." },
+        ["UI/Tutorial/Context/SaveFood"] = new[] { "Накопи {0} монет на первый фрукт ({1}/{0}). Каждый уровень большого животного добавляет 10% к доходу фермы.", "Save {0} coins for the first fruit ({1}/{0}). Every big-animal level adds 10% farm income." },
+        ["UI/Tutorial/Context/TravelFoodShop"] = new[] { "Отправляйся в магазин еды. Можно использовать кнопку телепорта FOOD.", "Go to the food shop. You can use the FOOD teleport button." },
+        ["UI/Tutorial/Context/BuyFoodAction"] = new[] { "Купи первый фрукт за {0} монет.", "Buy the first fruit for {0} coins." },
+        ["UI/Tutorial/Context/OpenInventoryFood"] = new[] { "Открой инвентарь, чтобы найти фрукт.", "Open the inventory to find the fruit." },
+        ["UI/Tutorial/Context/ChooseFoodTab"] = new[] { "Открой вкладку с едой.", "Choose the Food tab." },
+        ["UI/Tutorial/Context/AddFoodQuick"] = new[] { "Нажми на фрукт, чтобы добавить его в быстрый доступ.", "Tap the fruit to add it to quick access." },
+        ["UI/Tutorial/Context/EquipFood"] = new[] { "Выбери фрукт на панели быстрого доступа.", "Select the fruit in quick access." },
+        ["UI/Tutorial/Context/ReturnHomeFood"] = new[] { "Вернись домой с фруктом, чтобы покормить большое животное.", "Return home with the fruit to feed the big animal." },
+        ["UI/Tutorial/Context/ApproachBigPetWithFood"] = new[] { "Отнеси фрукт большому животному.", "Bring the fruit to the big animal." },
+        ["UI/Tutorial/Context/FeedAction"] = new[] { "Покорми большое животное. Каждый уровень добавляет 10% ко всему доходу фермы.", "Feed the fruit to the big animal. Each level adds 10% to all farm income." },
+        ["UI/Tutorial/Context/SaveTerritory"] = new[] { "Накопи {0} монет на самую дешёвую территорию ({1}/{0}).", "Save {0} coins for the cheapest territory ({1}/{0})." },
+        ["UI/Tutorial/Context/EquipHammer"] = new[] { "Выбери молот, чтобы открыть территорию.", "Select the hammer to unlock territory." },
+        ["UI/Tutorial/Context/ApproachTerritory"] = new[] { "Подойди к подсвеченной самой дешёвой территории.", "Go to the highlighted cheapest territory." },
+        ["UI/Tutorial/Context/BuyTerritoryAction"] = new[] { "Открой эту территорию за {0} монет.", "Unlock this territory for {0} coins." },
+        ["UI/Tutorial/Context/SaveConveyor"] = new[] { "Накопи {0} монет на следующее улучшение конвейера ({1}/{0}).", "Save {0} coins for the next conveyor upgrade ({1}/{0})." },
+        ["UI/Tutorial/Context/ApproachConveyorUpgrade"] = new[] { "Подойди к своему конвейеру, чтобы открыть улучшения.", "Go to your conveyor to open its upgrades." },
+        ["UI/Tutorial/Context/BuyConveyorAction"] = new[] { "Купи это улучшение конвейера за {0} монет.", "Buy this conveyor upgrade for {0} coins." },
+        ["UI/Income/BigPetLevelBonus"] = new[] { "Большое животное, уровень {0}: +{1}% к доходу фермы", "Big animal level {0}: +{1}% farm income" },
+    };
+
     [MenuItem("Tools/Tutorial V1/Synchronize RU-EN Localization")]
     public static void SynchronizeLocalization()
     {
@@ -167,7 +236,7 @@ public static class TutorialV1EditorTools
                 byKey[entry.Key] = entry;
         }
 
-        foreach (KeyValuePair<string, string[]> pair in Translations)
+        foreach (KeyValuePair<string, string[]> pair in V2Translations)
         {
             if (!byKey.TryGetValue(pair.Key, out LocalizationEntry entry))
             {
@@ -185,7 +254,7 @@ public static class TutorialV1EditorTools
         EditorUtility.SetDirty(data);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"[TutorialV1] Synchronized {Translations.Count} RU/EN localization keys.");
+        Debug.Log($"[TutorialV2] Synchronized {V2Translations.Count} RU/EN localization keys.");
     }
 
     [MenuItem("Tools/Tutorial V1/Validate Setup")]
@@ -200,7 +269,7 @@ public static class TutorialV1EditorTools
         if (errors.Count > 0)
             throw new BuildFailedException("[TutorialV1] Validation failed:\n- " + string.Join("\n- ", errors));
 
-        Debug.Log($"[TutorialV1] Validation passed: {TutorialStepCatalog.Steps.Length} steps, prefab and {Translations.Count} RU/EN keys are ready.");
+        Debug.Log($"[TutorialV2] Validation passed: {TutorialStepCatalog.Steps.Length} steps, prefab and {V2Translations.Count} RU/EN keys are ready.");
     }
 
     public static void BatchSynchronizeAndValidate()
@@ -385,12 +454,9 @@ public static class TutorialV1EditorTools
                 errors.Add($"Step '{step.stableId}' has no pack id.");
             if (step != null && step.definitionRevision < 1)
                 errors.Add($"Step '{step.stableId}' has invalid definition revision {step.definitionRevision}.");
-            if (step != null && step.progressTarget <= 0d)
-                errors.Add($"Step '{step.stableId}' has no positive progress target.");
-            if (step != null && (step.completionRewardGems < 1 || step.completionRewardGems > 3))
-                errors.Add($"Step '{step.stableId}' has invalid completion reward {step.completionRewardGems}; expected 1..3 gems.");
-            if (step != null && step.completionTrigger == TutorialCompletionTrigger.ReachHintTarget &&
-                step.hintTarget == TutorialHintTarget.None)
+            if (step != null && (step.completionRewardGems < 0 || step.completionRewardGems > 10))
+                errors.Add($"Step '{step.stableId}' has invalid completion reward {step.completionRewardGems}; expected 0..10 gems.");
+            if (step != null && step.id != TutorialStepId.LearnMovement && step.hintTarget == TutorialHintTarget.None)
             {
                 errors.Add($"Step '{step.stableId}' completes at a target but has no hint target resolver.");
             }
@@ -444,14 +510,14 @@ public static class TutorialV1EditorTools
             stepStartedUnix = 200
         };
         legacy.Normalize(false);
-        for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
+        if (legacy.GetTaskState("learn_movement")?.status != TutorialTaskStatus.Completed ||
+            !string.IsNullOrEmpty(legacy.activeStepId))
+            errors.Add("Legacy progress did not preserve the retained movement lesson safely.");
+        for (int i = 1; i < TutorialStepCatalog.Steps.Length; i++)
         {
             TutorialTaskSaveData state = legacy.GetTaskState(TutorialStepCatalog.Steps[i].stableId);
-            TutorialTaskStatus expected = i < 5
-                ? TutorialTaskStatus.Completed
-                : i == 5 ? TutorialTaskStatus.Active : TutorialTaskStatus.Unseen;
-            if (state == null || state.status != expected)
-                errors.Add($"Legacy active-step migration failed for '{TutorialStepCatalog.Steps[i].stableId}'.");
+            if (state == null || state.status != TutorialTaskStatus.Unseen)
+                errors.Add($"New V2 lesson '{TutorialStepCatalog.Steps[i].stableId}' was incorrectly settled by legacy progress.");
         }
 
         var legacyCompleted = new TutorialSaveData
@@ -462,13 +528,10 @@ public static class TutorialV1EditorTools
             completedUnix = 300
         };
         legacyCompleted.Normalize(true);
-        if (!legacyCompleted.AreAllKnownStepsTerminal())
-            errors.Add("Completed V1 save did not migrate all known tasks to terminal states.");
-        for (int i = 0; i < legacyCompleted.taskStates.Count; i++)
-        {
-            if (!legacyCompleted.taskStates[i].completionRewardGranted)
-                errors.Add($"Historical terminal task '{legacyCompleted.taskStates[i].stableId}' was left eligible for a retroactive completion reward.");
-        }
+        if (legacyCompleted.AreAllKnownStepsTerminal() ||
+            legacyCompleted.GetTaskState("learn_movement")?.status != TutorialTaskStatus.Completed ||
+            !legacyCompleted.GetTaskState("learn_movement").completionRewardGranted)
+            errors.Add("Completed V1 save did not retain movement while leaving new V2 lessons eligible.");
 
         var preRewardV2 = TutorialSaveData.CreateNew();
         preRewardV2.Normalize(false);
@@ -484,11 +547,12 @@ public static class TutorialV1EditorTools
         }
 
         var futureDefinition = new TutorialStepDefinition(
-            TutorialStepId.ContinueIndependently,
+            TutorialStepId.UpgradeConveyor,
             "future_lesson_validation",
             "Future lesson",
             "Future lesson",
             priority: 999,
+            completionRewardGems: 0,
             packId: "future_validation");
         TutorialTaskSaveData future = legacyCompleted.GetOrCreateTaskState(futureDefinition);
         if (future == null || future.status != TutorialTaskStatus.Unseen)
@@ -534,12 +598,12 @@ public static class TutorialV1EditorTools
         var reorderedState = TutorialSaveData.CreateNew();
         reorderedState.Normalize(false);
         reorderedState.MarkTerminal("learn_movement", wasSkipped: false, now: 600);
-        reorderedState.MarkTerminal("find_home", wasSkipped: true, now: 601);
+        reorderedState.MarkTerminal("buy_first_egg", wasSkipped: true, now: 601);
         reorderedState.taskStates.Reverse();
         reorderedState.stepIndex = TutorialStepCatalog.Steps.Length - 1;
         reorderedState.Normalize(false);
         if (reorderedState.GetTaskState("learn_movement")?.status != TutorialTaskStatus.Completed ||
-            reorderedState.GetTaskState("find_home")?.status != TutorialTaskStatus.Skipped)
+            reorderedState.GetTaskState("buy_first_egg")?.status != TutorialTaskStatus.Skipped)
         {
             errors.Add("Per-step state changed after persisted task order and legacy index were rearranged.");
         }
@@ -584,7 +648,7 @@ public static class TutorialV1EditorTools
                 byKey[entry.Key] = entry;
         }
 
-        foreach (string key in Translations.Keys)
+        foreach (string key in V2Translations.Keys)
         {
             if (!byKey.TryGetValue(key, out LocalizationEntry entry))
             {

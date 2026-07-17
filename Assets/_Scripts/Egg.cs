@@ -78,6 +78,7 @@ public class Egg : InventoryItem
 
     public long HatchingTime => _hatchingTimectamp;
     public EggStatus Status => _status;
+    public FieldCell CurrentCell => _currentCell;
     public EggData Data { get { return _data; } }
     public double EffectivePrice => _tutorialFreePurchase ? 0d : GetPriceForElement(_data.DinamicData.ElementType);
     [HideInInspector] public UnityEvent<Egg> EggPurchased;
@@ -245,13 +246,6 @@ public class Egg : InventoryItem
     {
         if (_purchaseInProgress) return;
 
-        if (G.Tutorial != null && G.Tutorial.TryPrepareStarterEggPurchase(this))
-        {
-            G.Inventory.Add(this);
-            EggPurchased.Invoke(this);
-            return;
-        }
-
         if (_remoteConveyorPurchase)
         {
             if (G.Ad == null) return;
@@ -282,9 +276,6 @@ public class Egg : InventoryItem
         _totalDurationSec = Mathf.RoundToInt(
             _data.SecondsToHatching * GetElementMultiplier()
         );
-        if (G.Tutorial != null)
-            _totalDurationSec = G.Tutorial.GetHatchDurationSeconds(this, _totalDurationSec);
-
         // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
         _currentCell.SpeedBoost.RemoveListener(SpeedBoostAd);
@@ -320,6 +311,12 @@ public class Egg : InventoryItem
         if (_status != EggStatus.Maturing || _speedBoostAdInProgress)
             return;
 
+        if (G.Tutorial != null && G.Tutorial.TryUseFreeEggSpeedup(this))
+        {
+            CompleteMaturationSpeedup(wasFree: true);
+            return;
+        }
+
         if (G.Ad == null)
         {
             Debug.LogWarning("[Egg] Ads manager is missing, speed boost ad skipped.");
@@ -333,8 +330,22 @@ public class Egg : InventoryItem
             if (!success || _status != EggStatus.Maturing)
                 return;
 
-            ApplySpeedBoostSeconds(30 * 60);
+            CompleteMaturationSpeedup(wasFree: false);
         });
+    }
+
+    private void CompleteMaturationSpeedup(bool wasFree)
+    {
+        if (_status != EggStatus.Maturing)
+            return;
+
+        SpeedBoostInstant();
+        TutorialSignals.Raise(
+            TutorialSignalType.EggSpeedupUsed,
+            _currentCell,
+            Name,
+            Item.Egg,
+            wasFree ? 1d : 0d);
     }
 
     private void ApplySpeedBoostSeconds(int seconds)
@@ -386,17 +397,6 @@ public class Egg : InventoryItem
         );
         DateTimeOffset now = DateTimeOffset.UtcNow;
         _endUtc = endTime.ToUnixTimeSeconds() > 0 ? endTime : now.AddSeconds(_totalDurationSec);
-        if (G.Tutorial != null)
-        {
-            int tutorialDuration = G.Tutorial.GetHatchDurationSeconds(this, _totalDurationSec);
-            if (tutorialDuration < _totalDurationSec)
-            {
-                _totalDurationSec = tutorialDuration;
-                DateTimeOffset tutorialEnd = now.AddSeconds(tutorialDuration);
-                if (_endUtc > tutorialEnd)
-                    _endUtc = tutorialEnd;
-            }
-        }
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
         StartTicker();
     }

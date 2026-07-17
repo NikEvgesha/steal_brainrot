@@ -11,6 +11,8 @@ public class FoodShopUI : MonoBehaviour
 
     private List<FoodShopSlot> _slots = new();
 
+    public IReadOnlyList<FoodShopSlot> Slots => _slots;
+
     [HideInInspector]
     public UnityEvent<Food, bool> BuyButtonClicked;
     [HideInInspector]
@@ -55,6 +57,17 @@ public class FoodShopUI : MonoBehaviour
     public void OnResupplyButtonClicked()
     {
         ResupplyButtonClicked.Invoke();
+    }
+
+    public FoodShopSlot FindSlot(Food food)
+    {
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            if (_slots[i] != null && _slots[i].Food == food)
+                return _slots[i];
+        }
+
+        return null;
     }
 
 }

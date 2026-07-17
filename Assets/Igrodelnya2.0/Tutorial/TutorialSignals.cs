@@ -12,7 +12,11 @@ public enum TutorialSignalType
     FieldUnlocked,
     ConveyorUpgraded,
     AlbumOpened,
-    AlbumRewardClaimed
+    AlbumRewardClaimed,
+    EggSpeedupUsed,
+    BigPetPurchased,
+    FoodPurchased,
+    BigPetFed
 }
 
 public readonly struct TutorialSignal

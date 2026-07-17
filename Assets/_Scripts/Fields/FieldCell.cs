@@ -61,6 +61,10 @@ public class FieldCell : MonoBehaviour
     }
     public Item OccupiedItem => _inField;
     public bool IsFree => _inField == Item.Free;
+    public bool IsPlayerOnCell => _playerOnCell;
+    public Transform DropActionTarget => _dropButton != null ? _dropButton.transform : transform;
+    public Transform SpeedupActionTarget => _addSpeedButton != null ? _addSpeedButton.transform : transform;
+    public Transform HatchActionTarget => _hatchButton != null ? _hatchButton.transform : transform;
     public bool IsRemoteMode
     {
         get
@@ -117,9 +121,10 @@ public class FieldCell : MonoBehaviour
                 {
                     case EggStatus.Maturing:
                         _addSpeedButton.SetActive(true);
+                        bool freeSpeedup = G.Tutorial != null && G.Tutorial.IsFreeEggSpeedupAvailable;
                         SetPanelRewardedAdBadge(
                             _addSpeedButton,
-                            true,
+                            !freeSpeedup,
                             _speedBoostAdIcon,
                             _speedBoostAdLabel,
                             _addSpeedButton.transform,

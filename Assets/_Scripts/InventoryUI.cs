@@ -19,6 +19,24 @@ public class InventoryUI : MonoBehaviour
 
     public UnityEvent<InventoryItem> QuickAccessSwitched;
 
+    public bool IsOpen => _isOpen;
+    public Item SelectedTab => _selectedTab;
+    public IReadOnlyList<InventorySlot> Slots => _slots;
+
+    public InventorySlot FindSlot(InventoryItem item)
+    {
+        if (item == null)
+            return null;
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            if (_slots[i] != null && _slots[i].Item == item)
+                return _slots[i];
+        }
+
+        return null;
+    }
+
 
     private void Awake()
     {

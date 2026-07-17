@@ -8,10 +8,11 @@
 
 ## Tutorial V2 UI checkpoint (2026-07-17)
 - [x] Removed skip controls from the active UI/runtime localization contract and added `UI/Tutorial/Reward`.
-- [x] Localization synchronization and setup validation cover 31 active RU/EN keys.
+- [x] Approved and implemented the final ten-task lesson table, including all dynamic context copy.
+- [x] Localization synchronization and setup validation cover 63 active RU/EN keys.
 - [x] RU layout was checked through Unity Bridge at `1280x720`, `800x600` and portrait `390x844` without clipping.
 - [x] Live RU/EN switching updates the task panel, including its completion reward label.
-- [ ] Approve the revised lesson table, then add final copy for every new or changed `stable_id`.
+- [ ] Repeat the layout and live RU/EN checks for the final ten-task copy on clean desktop/mobile profiles.
 
 ## Priority 0 - stability
 - [ ] Add strict fallback behavior: if key exists but selected language value is empty, use fallback language (EN) and never render empty text.

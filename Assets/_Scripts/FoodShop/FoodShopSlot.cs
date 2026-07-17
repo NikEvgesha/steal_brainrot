@@ -18,6 +18,7 @@ public class FoodShopSlot : MonoBehaviour
     private FoodShopUI _ui;
 
     public Food Food => _food;
+    public Transform CoinButtonTarget => _coinButton != null ? _coinButton.transform : transform;
 
     private void OnEnable()
     {

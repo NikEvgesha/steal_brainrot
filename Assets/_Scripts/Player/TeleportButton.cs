@@ -11,6 +11,8 @@ public class TeleportButton : MonoBehaviour
     [HideInInspector]
     public UnityEvent<ScenePoint> teleportButtonClicked;
 
+    public ScenePoint Destination => _destination;
+
     private void Awake()
     {
         _button = GetComponent<Button>();

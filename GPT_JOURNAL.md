@@ -986,3 +986,14 @@
 - Rebuilt the editable upper-right prefab with a gem reward badge and localized `UI/Tutorial/Reward` label.
 - Live Unity check: no skip objects, `Награда: +1` visible, first completion changed gems `14 -> 15`, repeated completion stayed at `15` with `completionRewardGranted=true`.
 - Final Play smoke confirmed `currencyReady=true`, `14` gems and visible `Награда: +1`. Restored the exact pre-test tutorial save, gems and collapse preference; Play Mode stopped. Validator passed for 13 steps, prefab and 31 active RU/EN keys.
+
+### 2026-07-17 (Tutorial V2 final ten-task implementation)
+- Replaced the provisional 13-step catalog with the approved ten-task `core_v2` flow: movement, buy/place egg, free speed-up, hatch, album rewards, BigPet purchase/feed, territory and conveyor upgrade.
+- Implemented dynamic context routing for home/shop travel, teleport alternatives, inventory/quick-slot recovery, exact album/food/conveyor UI targets and local world actions. Natural egg maturation suspends the speed-up lesson instead of blocking hatch and lets it resurface on a later egg.
+- Restored real starter-egg price and maturation duration. The first used speed-up fully matures an egg for free; later rewarded-ad speed-ups also finish the complete remaining timer.
+- Added the purchased BigPet global-income modifier: every saved level contributes `+10%` to all farm income. Added explicit purchase, food-purchase and feed tutorial signals.
+- Final rewards are `0/3/3/5/0/0/5/3/3/10` (`32` total). Zero-reward steps hide the reward badge; skip remains absent.
+- Save schema V4 keeps each task and reward independent. New V2 IDs remain unseen for existing players; already-satisfied mechanics still display the lesson briefly, then play the normal completion animation and grant its reward.
+- Expanded owned localization to 63 RU/EN keys and updated catalog/migration validation. Unity compile and validator passed for all 10 tasks.
+- Live Bridge on the existing mature save confirmed sequential auto-completion into the album lesson, visible upper-right UI on `GameCanvas(Clone)`, an arrow to `AlbumButton` and a level-30 BigPet multiplier of `4.0` (`+300%`). Fixed the view choosing the disabled `FPSOverlayCanvas` by preferring the active game canvas.
+- Remaining acceptance is the full clean-profile desktop offline/online and mobile/touch matrix, including restart substates, total `32` reward, free/rewarded speed-up and ad grace-period checks.

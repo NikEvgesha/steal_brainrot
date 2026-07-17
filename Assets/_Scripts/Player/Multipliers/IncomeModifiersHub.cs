@@ -6,6 +6,7 @@ public sealed class IncomeModifiersHub : MonoBehaviour
 {
     [SerializeField] private bool _autoCollectFromChildren = true;
     [SerializeField] private bool _autoAddConveyorUpgradeBonus = true;
+    [SerializeField] private bool _autoAddBigPetLevelBonus = true;
     [SerializeField] private List<IncomeModifierBehaviour> _modifiers = new();
 
     private CurrencyManager _currencyManager;
@@ -63,13 +64,17 @@ public sealed class IncomeModifiersHub : MonoBehaviour
 
     private void EnsureAutoModifiers()
     {
-        if (!_autoAddConveyorUpgradeBonus)
-            return;
+        if (_autoAddConveyorUpgradeBonus &&
+            GetComponentInChildren<ConveyorUpgradeBonusModifierMB>(includeInactive: true) == null)
+        {
+            gameObject.AddComponent<ConveyorUpgradeBonusModifierMB>();
+        }
 
-        if (GetComponentInChildren<ConveyorUpgradeBonusModifierMB>(includeInactive: true) != null)
-            return;
-
-        gameObject.AddComponent<ConveyorUpgradeBonusModifierMB>();
+        if (_autoAddBigPetLevelBonus &&
+            GetComponentInChildren<BigPetLevelIncomeModifierMB>(includeInactive: true) == null)
+        {
+            gameObject.AddComponent<BigPetLevelIncomeModifierMB>();
+        }
     }
 
     public void Register(IncomeModifierBehaviour modifier)

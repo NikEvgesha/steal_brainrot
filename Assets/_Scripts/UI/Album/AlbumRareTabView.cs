@@ -30,6 +30,10 @@ public class AlbumRareTabView : MonoBehaviour
     private Color _baseButtonColor = Color.white;
     private bool _hasBaseButtonColor;
 
+    public ElementType BoundElement { get; private set; } = ElementType.ElementType;
+    public bool IsSelected { get; private set; }
+    public bool HasMention { get; private set; }
+
     private void Awake()
     {
         if (button == null)
@@ -68,6 +72,9 @@ public class AlbumRareTabView : MonoBehaviour
     public void Bind(ElementType elementType, string title, bool unlocked, bool selected, bool hasMention, Action onClick)
     {
         _onClick = onClick;
+        BoundElement = elementType;
+        IsSelected = selected;
+        HasMention = hasMention;
 
         if (button != null)
             button.interactable = true;

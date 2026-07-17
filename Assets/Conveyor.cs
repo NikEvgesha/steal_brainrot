@@ -52,6 +52,11 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     public float UnlockedLevelProgress01 => MaxLevelIndex <= 0 ? 0f : Mathf.Clamp01(UnlockedLevelIndex / (float)MaxLevelIndex);
     public float UnlockedIncomeMultiplier => GetUnlockedLevel() != null ? GetUnlockedLevel().IncomeMultiplier : 1f;
     public float UnlockedElementChanceBonus01 => GetUnlockedLevel() != null ? GetUnlockedLevel().ElementChanceBonus01 : 0f;
+    public bool HasAnyUpgrade => _lastUnlockedLevel > 0;
+    public ConveyorLevel NextUpgradeLevel => _levels != null && _lastUnlockedLevel + 1 < _levels.Count
+        ? _levels[_lastUnlockedLevel + 1]
+        : null;
+    public double NextUpgradePriceCoins => NextUpgradeLevel != null ? NextUpgradeLevel.PriceCoin : 0d;
 
     private void Awake()
     {
@@ -257,6 +262,28 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         return nearest;
     }
 
+    public Egg FindNearestAffordableEgg(Vector3 origin, double balance)
+    {
+        EnsureEggStorage();
+        Egg nearest = null;
+        float nearestDistance = float.MaxValue;
+        foreach (Egg egg in _eggs)
+        {
+            if (egg == null || egg.Status != EggStatus.Conveyer || !egg.gameObject.activeInHierarchy)
+                continue;
+            if (egg.EffectivePrice > balance)
+                continue;
+
+            float distance = (egg.transform.position - origin).sqrMagnitude;
+            if (distance >= nearestDistance)
+                continue;
+            nearest = egg;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
     public bool IsTrackedEgg(Egg egg)
     {
         return egg != null && _eggs != null && _eggs.Contains(egg);
@@ -269,6 +296,12 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
 
         EnsureEggStorage();
         Egg egg = Instantiate(prefab, _spawnPoint.position, _spawnPoint.rotation);
+        egg.SetData(new BrainrotDinamicData
+        {
+            ElementType = ElementType.NoElement,
+            WeightMultiplier = 1f,
+            ResultIncome = 0d,
+        });
         egg.SetConveyorPurchaseMode(false);
         _eggs.Add(egg);
         egg.EggPurchased.AddListener(OnEggPurchase);

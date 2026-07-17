@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,14 +16,19 @@ public sealed class TutorialView : MonoBehaviour
     private TMP_Text _doneButtonText;
     private TMP_Text _collapseButtonText;
     private Image _rewardIcon;
+    private GameObject _rewardBadge;
     private Button _doneButton;
     private Button _collapseButton;
     private RectTransform _panelViewport;
     private RectTransform _panelContent;
     private RectTransform _collapseButtonRect;
     private RectTransform _directionArrow;
+    private RectTransform _secondaryDirectionArrow;
     private Transform _worldTarget;
+    private Transform _secondaryWorldTarget;
     private Camera _camera;
+    private Coroutine _completionPulse;
+    private Vector3 _panelBaseScale = Vector3.one;
     private bool _collapsed;
     private float _expandedPanelX;
     private float _collapsedPanelX;
@@ -51,6 +57,7 @@ public sealed class TutorialView : MonoBehaviour
         _progressText = FindChild("Label_Name")?.GetComponentInChildren<TMP_Text>(true);
         _rewardText = FindNamedComponent<TMP_Text>("Reward_Text");
         _rewardIcon = FindNamedComponent<Image>("Reward_Icon");
+        _rewardBadge = FindChild("RewardBadge")?.gameObject;
         _doneButton = FindNamedComponent<Button>("Button_Done");
         _collapseButton = FindNamedComponent<Button>("Button_Collapse");
         _doneButtonText = _doneButton != null
@@ -102,6 +109,7 @@ public sealed class TutorialView : MonoBehaviour
 
         if (_panelContent != null)
         {
+            _panelBaseScale = _panelContent.localScale;
             _expandedPanelX = _panelContent.anchoredPosition.x;
             _collapsedPanelX = _expandedPanelX - Mathf.Max(300f, _panelContent.rect.width + 24f);
             SetCollapsed(PlayerPrefs.GetInt(CollapsedPreferenceKey, 0) == 1, immediate: true);
@@ -134,6 +142,15 @@ public sealed class TutorialView : MonoBehaviour
                     outline.effectColor = new Color(1f, 0.78f, 0.05f, 1f);
                     outline.effectDistance = new Vector2(6f, -6f);
                 }
+
+                _secondaryDirectionArrow = Instantiate(_directionArrow, transform, false);
+                _secondaryDirectionArrow.name = "Icon_Arrow_Secondary";
+                Image secondaryImage = _secondaryDirectionArrow.GetComponent<Image>();
+                if (secondaryImage != null)
+                    secondaryImage.color = new Color(0.35f, 0.9f, 1f, 1f);
+                Outline secondaryOutline = _secondaryDirectionArrow.GetComponent<Outline>();
+                if (secondaryOutline != null)
+                    secondaryOutline.effectColor = new Color(0.05f, 0.45f, 0.9f, 1f);
             }
         }
 
@@ -149,7 +166,7 @@ public sealed class TutorialView : MonoBehaviour
             _collapseButton.onClick.AddListener(OnCollapsePressed);
         }
 
-        SetWorldTarget(null);
+        SetWorldTargets(null, null);
     }
 
     public void SetStep(
@@ -166,8 +183,13 @@ public sealed class TutorialView : MonoBehaviour
             _messageText.text = message ?? string.Empty;
         if (_rewardText != null)
             _rewardText.text = reward ?? string.Empty;
-        if (_rewardIcon != null && rewardIcon != null)
+        if (_rewardIcon != null)
+        {
             _rewardIcon.sprite = rewardIcon;
+            _rewardIcon.gameObject.SetActive(rewardIcon != null);
+        }
+        if (_rewardBadge != null)
+            _rewardBadge.SetActive(rewardIcon != null);
         if (_doneButtonText != null)
             _doneButtonText.text = doneLabel ?? string.Empty;
         if (_doneButton != null)
@@ -176,16 +198,49 @@ public sealed class TutorialView : MonoBehaviour
 
     public void SetWorldTarget(Transform target)
     {
-        _worldTarget = target;
+        SetWorldTargets(target, null);
+    }
+
+    public void SetWorldTargets(Transform primary, Transform secondary)
+    {
+        _worldTarget = primary;
+        _secondaryWorldTarget = secondary;
         if (_directionArrow != null)
             _directionArrow.gameObject.SetActive(_worldTarget != null);
+        if (_secondaryDirectionArrow != null)
+            _secondaryDirectionArrow.gameObject.SetActive(_secondaryWorldTarget != null);
+    }
+
+    public void ShowCompleted(string label, string reward, Sprite rewardIcon)
+    {
+        if (_progressText != null)
+            _progressText.text = "OK";
+        if (_messageText != null)
+            _messageText.text = label ?? string.Empty;
+        if (_rewardText != null)
+            _rewardText.text = reward ?? string.Empty;
+        if (_rewardIcon != null)
+        {
+            _rewardIcon.sprite = rewardIcon;
+            _rewardIcon.gameObject.SetActive(rewardIcon != null);
+        }
+        if (_rewardBadge != null)
+            _rewardBadge.SetActive(rewardIcon != null);
+        if (_doneButton != null)
+            _doneButton.gameObject.SetActive(false);
+
+        SetWorldTargets(null, null);
+        if (_completionPulse != null)
+            StopCoroutine(_completionPulse);
+        _completionPulse = StartCoroutine(CompletionPulse());
     }
 
     private void LateUpdate()
     {
         ApplySafeArea(force: false);
         UpdatePanelSlide();
-        UpdateDirectionArrow();
+        UpdateDirectionArrow(_directionArrow, _worldTarget);
+        UpdateDirectionArrow(_secondaryDirectionArrow, _secondaryWorldTarget);
     }
 
     private void ApplySafeArea(bool force)
@@ -221,17 +276,17 @@ public sealed class TutorialView : MonoBehaviour
             _panelContent.anchoredPosition = new Vector2(nextX, position.y);
     }
 
-    private void UpdateDirectionArrow()
+    private void UpdateDirectionArrow(RectTransform directionArrow, Transform worldTarget)
     {
-        if (_directionArrow == null || _worldTarget == null)
+        if (directionArrow == null || worldTarget == null)
         {
-            if (_directionArrow != null)
-                _directionArrow.gameObject.SetActive(false);
+            if (directionArrow != null)
+                directionArrow.gameObject.SetActive(false);
             return;
         }
 
         Vector3 viewport;
-        RectTransform uiTarget = _worldTarget as RectTransform;
+        RectTransform uiTarget = worldTarget as RectTransform;
         Canvas targetCanvas = uiTarget != null ? uiTarget.GetComponentInParent<Canvas>() : null;
         if (uiTarget != null && targetCanvas != null && targetCanvas.renderMode != RenderMode.WorldSpace)
         {
@@ -250,7 +305,7 @@ public sealed class TutorialView : MonoBehaviour
                 _camera = Camera.main;
             if (_camera == null)
                 return;
-            viewport = _camera.WorldToViewportPoint(_worldTarget.position);
+            viewport = _camera.WorldToViewportPoint(worldTarget.position);
         }
 
         if (viewport.z < 0f)
@@ -274,12 +329,31 @@ public sealed class TutorialView : MonoBehaviour
             Mathf.Clamp(viewport.x, minX, maxX),
             Mathf.Clamp(viewport.y, minY, maxY));
 
-        _directionArrow.anchorMin = clamped;
-        _directionArrow.anchorMax = clamped;
-        _directionArrow.anchoredPosition = Vector2.zero;
+        directionArrow.anchorMin = clamped;
+        directionArrow.anchorMax = clamped;
+        directionArrow.anchoredPosition = Vector2.zero;
         if (direction.sqrMagnitude > 0.0001f)
-            _directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg + 90f);
-        _directionArrow.gameObject.SetActive(true);
+            directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg + 90f);
+        directionArrow.gameObject.SetActive(true);
+    }
+
+    private IEnumerator CompletionPulse()
+    {
+        if (_panelContent == null)
+            yield break;
+
+        const float duration = 0.72f;
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float pulse = Mathf.Sin(t * Mathf.PI) * (1f - t * 0.35f);
+            _panelContent.localScale = _panelBaseScale * (1f + pulse * 0.1f);
+            yield return null;
+        }
+        _panelContent.localScale = _panelBaseScale;
+        _completionPulse = null;
     }
 
     private void OnDonePressed()
@@ -309,6 +383,8 @@ public sealed class TutorialView : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_completionPulse != null)
+            StopCoroutine(_completionPulse);
         if (_doneButton != null)
             _doneButton.onClick.RemoveListener(OnDonePressed);
         if (_collapseButton != null)

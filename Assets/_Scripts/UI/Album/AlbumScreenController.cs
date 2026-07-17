@@ -183,6 +183,34 @@ public class AlbumScreenController : MonoBehaviour
     private LocalizationManager _subscribedLocalizationManager;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeInHierarchy : gameObject.activeInHierarchy;
+    public AlbumEntityType CurrentTab => _currentTab;
+    public ElementType? SelectedElement => _selectedElementFilter;
+    public Transform RewardActionTarget => rewardButton != null ? rewardButton.transform : transform;
+
+    public Transform GetTopTabTarget(AlbumEntityType type)
+    {
+        Button button = type == AlbumEntityType.Egg ? eggsTabButton : animalsTabButton;
+        return button != null ? button.transform : transform;
+    }
+
+    public Transform FindElementTabTarget(ElementType elementType)
+    {
+        return _elementViews.TryGetValue(elementType, out AlbumRareTabView view) && view != null
+            ? view.transform
+            : transform;
+    }
+
+    public Transform FindCardTarget(AlbumEntityType type, string id)
+    {
+        for (int i = 0; i < _spawnedCardViews.Count; i++)
+        {
+            AlbumEntryView view = _spawnedCardViews[i];
+            if (view != null && view.BoundType == type &&
+                string.Equals(view.BoundId, id, StringComparison.OrdinalIgnoreCase))
+                return view.transform;
+        }
+        return transform;
+    }
 
     private void Awake()
     {
@@ -802,7 +830,7 @@ public class AlbumScreenController : MonoBehaviour
                               HasAnyElementMention(entry));
             var title = unlocked ? ResolveCurrentDisplayName(entry) : L(unknownKey, unknownFallback);
 
-            view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry), entry.rareType);
+            view.Bind(entry.icon, title, unlocked, selected, hasMention, () => OnCardPressed(entry), entry.rareType, entry.type, entry.id);
             _spawnedCardViews.Add(view);
         }
 

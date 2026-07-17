@@ -46,6 +46,10 @@ public class ConveyorUI : MonoBehaviour
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
 
+    public bool IsOpen => _isOpen;
+    public ConveyorLevel CurrentLevelInfo => _currentLevelInfo;
+    public Transform CoinBuyTarget => _buttonBuyCoins != null ? _buttonBuyCoins.transform : transform;
+
 
 
     public void Init(List<ConveyorLevel> levels)
@@ -257,6 +261,11 @@ public class ConveyorUI : MonoBehaviour
             return;
 
         UpdateDropChances(_currentLevelInfo);
+    }
+
+    public void ShowLevel(ConveyorLevel level)
+    {
+        SetInfo(level);
     }
 
     private void OnLocalizationManagerReady(LocalizationManager manager)

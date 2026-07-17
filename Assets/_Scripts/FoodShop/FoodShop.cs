@@ -17,9 +17,13 @@ public class FoodShop : MonoBehaviour
 
     private Dictionary<Food, int> _foodAmount;
     private int _timeToResupply;
+    private bool _playerInside;
 
 
     public Transform TeleportPoint => _teleportPoint;
+    public IReadOnlyList<Food> Foods => _foodList;
+    public FoodShopUI Ui => _ui;
+    public bool IsPlayerInside => _playerInside;
 
     private void Awake()
     {
@@ -91,12 +95,14 @@ public class FoodShop : MonoBehaviour
 
     public void _OnPlayerEnter()
     {
+        _playerInside = true;
         Open();
     }
 
 
     public void _OnPlayerExit()
     {
+        _playerInside = false;
         Close();
     }
 
@@ -111,7 +117,27 @@ public class FoodShop : MonoBehaviour
             G.Inventory.Add(foodObj);
             _foodAmount[food]--;
             _ui.UpdateUI(_foodAmount);
+            TutorialSignals.Raise(TutorialSignalType.FoodPurchased, foodObj, foodObj.Name, Item.Food, food.Data.MoneyPrice);
         }
+    }
+
+    public Food GetFirstFood()
+    {
+        return _foodList != null && _foodList.Count > 0 ? _foodList[0] : null;
+    }
+
+    public int GetStock(Food food)
+    {
+        return food != null && _foodAmount != null && _foodAmount.TryGetValue(food, out int amount) ? amount : 0;
+    }
+
+    public void EnsureTutorialFoodAvailable(Food food)
+    {
+        if (food == null || _foodAmount == null || !_foodAmount.ContainsKey(food))
+            return;
+        if (_foodAmount[food] <= 0)
+            _foodAmount[food] = 1;
+        _ui?.UpdateUI(_foodAmount);
     }
 
     private void TryBuyResupply()

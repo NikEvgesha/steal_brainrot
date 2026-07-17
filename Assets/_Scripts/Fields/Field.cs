@@ -23,6 +23,8 @@ public class Field : MonoBehaviour
     public int ID => _id;
     public bool IsRemoteMode => _remoteMode;
     public bool IsUnblocked => _unblocked;
+    public float UnlockPrice => Mathf.Max(0f, _price);
+    public Transform BuyActionTarget => _buyPanel != null ? _buyPanel.transform : transform;
     
     private void Awake()
     {

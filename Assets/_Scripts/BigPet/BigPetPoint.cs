@@ -8,6 +8,8 @@ using UnityEngine.UI;
 
 public class BigPetPoint : MonoBehaviour
 {
+    public static event Action<int> LocalLevelChanged;
+
     private static readonly HashSet<string> ExcludedBigPetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "balerina",
@@ -62,6 +64,12 @@ public class BigPetPoint : MonoBehaviour
     private readonly List<Brainrot> _activePets = new List<Brainrot>();
 
     public double CurrentIncomePerSecond => _purchased ? _currentIncome : 0d;
+    public double UnlockPrice => Math.Max(0d, _unlockPrice);
+    public bool IsPurchased => _purchased;
+    public int CurrentLevel => Mathf.Max(1, _currentLvl);
+    public bool IsPlayerInArea => _playerInArea;
+    public Transform BuyActionTarget => _buyPanel != null ? _buyPanel.transform : transform;
+    public Transform FeedActionTarget => _feedButton != null ? _feedButton.transform : transform;
     public bool IsRemoteMode => _remoteMode;
     public bool HasCollectibleIncome => !_remoteMode && _purchased && _accumulatedIncome > 0d;
 
@@ -208,6 +216,7 @@ public class BigPetPoint : MonoBehaviour
         _feeding = true;
         if (_feedButton != null)
             _feedButton.SetActive(false);
+        TutorialSignals.Raise(TutorialSignalType.BigPetFed, this, food.Name, Item.Food);
         StartCoroutine(FeedProcess());
     }
 
@@ -271,6 +280,7 @@ public class BigPetPoint : MonoBehaviour
                 _xpForNextLvl += _xpAddintPerLvl;
             }       
             G.Save.SaveBigPetLvl(_currentLvl);
+            LocalLevelChanged?.Invoke(_currentLvl);
             BaseDirtyTracker.MarkDirty();
 
             var newMaxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
@@ -583,7 +593,9 @@ public class BigPetPoint : MonoBehaviour
         _purchased = true;
         G.Save.SaveBigPetStatus(true);
         InitPurchasedState();
+        LocalLevelChanged?.Invoke(CurrentLevel);
         BaseDirtyTracker.MarkDirty();
+        TutorialSignals.Raise(TutorialSignalType.BigPetPurchased, this, value: _unlockPrice);
 
         if (_playerInArea)
         {

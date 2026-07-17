@@ -8,6 +8,22 @@ public class QuickAccessPanelUI : MonoBehaviour
 
     private List<QuickSlot> _slots;
 
+    public IReadOnlyList<QuickSlot> Slots => _slots;
+
+    public QuickSlot FindSlot(InventoryItem item)
+    {
+        if (item == null || _slots == null)
+            return null;
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            if (_slots[i] != null && _slots[i].Item == item)
+                return _slots[i];
+        }
+
+        return null;
+    }
+
     void Start()
     {
         G.QuickAccess.ItemsUpdated.AddListener(UpdateUI);

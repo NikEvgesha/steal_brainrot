@@ -30,7 +30,7 @@ public sealed class TutorialTaskSaveData
 [Serializable]
 public sealed class TutorialSaveData
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public int version = CurrentVersion;
 
@@ -46,6 +46,11 @@ public sealed class TutorialSaveData
     public bool skipped;
     public bool starterEggGranted;
     public bool starterAnimalGranted;
+    public bool freeEggSpeedupUsed;
+    public string tutorialEggId = string.Empty;
+    public int tutorialEggElement;
+    public string tutorialAnimalId = string.Empty;
+    public int tutorialAnimalElement;
     public long startedUnix;
     public long stepStartedUnix;
     public long completedUnix;
@@ -216,6 +221,19 @@ public sealed class TutorialSaveData
         RefreshLegacyProjection();
     }
 
+    public void Suspend(string stableId, long now)
+    {
+        TutorialTaskSaveData state = GetTaskState(stableId);
+        if (state == null || state.IsTerminal)
+            return;
+
+        state.status = TutorialTaskStatus.Available;
+        state.updatedUnix = now;
+        if (string.Equals(activeStepId, stableId, StringComparison.Ordinal))
+            activeStepId = string.Empty;
+        RefreshLegacyProjection();
+    }
+
     public int CountTerminalKnownSteps()
     {
         int count = 0;
@@ -238,9 +256,8 @@ public sealed class TutorialSaveData
 
     private void MigrateLegacy(bool legacyTutorialCompleted)
     {
-        int legacyIndex = TutorialStepCatalog.FindIndex(stepId, stepIndex);
+        int matchedCurrentIndex = TutorialStepCatalog.FindIndex(stepId, -1);
         bool legacyDone = legacyTutorialCompleted || completed;
-        bool legacySkipped = legacyDone && skipped;
 
         taskStates.Clear();
         for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
@@ -252,19 +269,18 @@ public sealed class TutorialSaveData
                 definitionRevision = definition.definitionRevision
             };
 
-            if (legacyDone)
+            // A legacy completion proves only lessons that retained the same stable
+            // identity. Newly added V2 lessons intentionally stay unseen so they can
+            // appear for existing players and auto-complete against live game facts.
+            bool legacyMovementDone = string.Equals(definition.stableId, "learn_movement", StringComparison.Ordinal) &&
+                                      (legacyDone || stepIndex > 0 || !string.Equals(stepId, "learn_movement", StringComparison.Ordinal));
+            if (legacyMovementDone)
             {
-                state.status = legacySkipped ? TutorialTaskStatus.Skipped : TutorialTaskStatus.Completed;
+                state.status = TutorialTaskStatus.Completed;
                 state.completedUnix = completedUnix;
                 state.updatedUnix = completedUnix;
             }
-            else if (i < legacyIndex)
-            {
-                state.status = TutorialTaskStatus.Completed;
-                state.completedUnix = stepStartedUnix > 0 ? stepStartedUnix : startedUnix;
-                state.updatedUnix = state.completedUnix;
-            }
-            else if (i == legacyIndex)
+            else if (!legacyDone && i == matchedCurrentIndex)
             {
                 state.status = TutorialTaskStatus.Active;
                 state.startedUnix = stepStartedUnix > 0 ? stepStartedUnix : startedUnix;
@@ -275,7 +291,7 @@ public sealed class TutorialSaveData
             taskStates.Add(state);
         }
 
-        if (legacyDone)
+        if (legacyDone || matchedCurrentIndex < 0)
             activeStepId = string.Empty;
         perStepInitialized = true;
         version = CurrentVersion;
