@@ -10,6 +10,7 @@ public static class TutorialV1EditorTools
 {
     private const string LocalizationPath = "Assets/Igrodelnya2.0/Localization/LocalizationData.asset";
     private const string ViewPrefabPath = "Assets/Resources/Tutorial/TutorialView.prefab";
+    private const string HandPointerPath = "Assets/Resources/Tutorial/UIHandPointer.png";
 
     private static readonly Dictionary<string, string[]> Translations = new(StringComparer.Ordinal)
     {
@@ -152,6 +153,9 @@ public static class TutorialV1EditorTools
 
     private static readonly Dictionary<string, string[]> V2Translations = new(StringComparer.Ordinal)
     {
+        ["UI/Tutorial/ClaimReward"] = new[] { "Забрать +{0}", "Claim +{0}" },
+        ["UI/Tutorial/Continue"] = new[] { "Продолжить", "Continue" },
+        ["UI/Tutorial/RewardClaimed"] = new[] { "НАГРАДА ПОЛУЧЕНА!", "REWARD CLAIMED!" },
         ["UI/Tutorial/Progress"] = new[] { "Обучение {0}/{1}", "Tutorial {0}/{1}" },
         ["UI/Tutorial/Reward"] = new[] { "Награда: +{0}", "Reward: +{0}" },
         ["UI/Tutorial/NoReward"] = new[] { "Учебное задание", "Training task" },
@@ -281,6 +285,7 @@ public static class TutorialV1EditorTools
     [MenuItem("Tools/Tutorial V2/Rebuild Upper-Right View Prefab")]
     public static void RebuildUpperRightViewPrefab()
     {
+        ConfigureHandPointerImporter();
         TMP_FontAsset font = TMP_Settings.defaultFontAsset;
         if (font == null)
             throw new BuildFailedException("TMP default font asset is missing.");
@@ -292,19 +297,20 @@ public static class TutorialV1EditorTools
 
         GameObject viewport = CreateRectObject("PanelViewport", root.transform);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-        SetRect(viewportRect, Vector2.one, Vector2.one, Vector2.one, new Vector2(-24f, -108f), new Vector2(560f, 250f));
+        SetRect(viewportRect, Vector2.one, Vector2.one, Vector2.one, new Vector2(0f, -108f), new Vector2(560f, 250f));
         viewport.AddComponent<RectMask2D>();
 
-        GameObject panel = CreateImageObject("TutorialPanel", viewport.transform, new Color(0.88f, 0.84f, 0.76f, 0.98f));
+        GameObject panel = CreateImageObject("TutorialPanel", viewport.transform, new Color(0.015f, 0.018f, 0.024f, 0.82f));
         RectTransform panelRect = panel.GetComponent<RectTransform>();
         SetRect(panelRect, Vector2.one, Vector2.one, Vector2.one, Vector2.zero, new Vector2(560f, 250f));
+        BlockyUITheme.ApplyPanel(panel.GetComponent<Image>(), new Color(0.015f, 0.018f, 0.024f, 0.82f), studs: false);
         Outline panelOutline = panel.AddComponent<Outline>();
-        panelOutline.effectColor = new Color(0.05f, 0.04f, 0.03f, 1f);
+        panelOutline.effectColor = new Color(0.68f, 0.72f, 0.8f, 0.75f);
         panelOutline.effectDistance = new Vector2(4f, -4f);
 
         TMP_Text progress = CreateText("Label_Name", panel.transform, font, 27f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
         SetRect(progress.rectTransform, new Vector2(0f, 1f), Vector2.one, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(-32f, 46f));
-        progress.color = new Color(0.08f, 0.17f, 0.28f, 1f);
+        progress.color = new Color(0.96f, 0.8f, 0.25f, 1f);
         progress.enableAutoSizing = true;
         progress.fontSizeMin = 18f;
         progress.fontSizeMax = 28f;
@@ -312,7 +318,7 @@ public static class TutorialV1EditorTools
 
         TMP_Text message = CreateText("Text_Message", panel.transform, font, 27f, FontStyles.Bold, TextAlignmentOptions.TopLeft);
         SetRect(message.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(-32f, -112f));
-        message.color = new Color(0.08f, 0.1f, 0.13f, 1f);
+        message.color = Color.white;
         message.enableAutoSizing = true;
         message.fontSizeMin = 18f;
         message.fontSizeMax = 28f;
@@ -321,6 +327,9 @@ public static class TutorialV1EditorTools
 
         GameObject rewardBadge = CreateImageObject("RewardBadge", panel.transform, new Color(0.96f, 0.72f, 0.18f, 1f));
         SetRect(rewardBadge.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-14f, 14f), new Vector2(190f, 48f));
+        Button rewardButton = rewardBadge.AddComponent<Button>();
+        rewardButton.targetGraphic = rewardBadge.GetComponent<Image>();
+        rewardButton.interactable = false;
         Outline rewardOutline = rewardBadge.AddComponent<Outline>();
         rewardOutline.effectColor = new Color(0.18f, 0.1f, 0.03f, 1f);
         rewardOutline.effectDistance = new Vector2(3f, -3f);
@@ -345,7 +354,7 @@ public static class TutorialV1EditorTools
         SetRect(done.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-214f, 14f), new Vector2(160f, 48f));
         done.gameObject.SetActive(false);
 
-        Button collapse = CreateButton("Button_Collapse", root.transform, font, "<", new Color(0.22f, 0.47f, 0.78f, 1f));
+        Button collapse = CreateButton("Button_Collapse", root.transform, font, ">", new Color(0.22f, 0.47f, 0.78f, 1f));
         SetRect(collapse.transform as RectTransform, Vector2.one, Vector2.one, Vector2.one, new Vector2(-14f, -116f), new Vector2(48f, 48f));
         collapse.transform.SetAsLastSibling();
 
@@ -367,6 +376,23 @@ public static class TutorialV1EditorTools
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Debug.Log($"[TutorialV2] Rebuilt editable upper-right tutorial view at {ViewPrefabPath}.");
+    }
+
+    [MenuItem("Tools/Tutorial V2/Configure Hand Pointer Sprite")]
+    public static void ConfigureHandPointerImporter()
+    {
+        AssetDatabase.ImportAsset(HandPointerPath, ImportAssetOptions.ForceUpdate);
+        if (AssetImporter.GetAtPath(HandPointerPath) is not TextureImporter importer)
+            throw new BuildFailedException($"Tutorial hand pointer is missing at {HandPointerPath}.");
+
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = false;
+        importer.wrapMode = TextureWrapMode.Clamp;
+        importer.filterMode = FilterMode.Bilinear;
+        importer.textureCompression = TextureImporterCompression.CompressedHQ;
+        importer.SaveAndReimport();
     }
 
     private static GameObject CreateRectObject(string name, Transform parent)
@@ -573,6 +599,8 @@ public static class TutorialV1EditorTools
                     progressJson = "{\"stage\":2}",
                     rewardGranted = true,
                     completionRewardGranted = true,
+                    objectiveCompleted = true,
+                    objectiveAutoCompleted = true,
                     startedUnix = 400,
                     updatedUnix = 500
                 },
@@ -590,9 +618,10 @@ public static class TutorialV1EditorTools
         if (aliasMigration.GetTaskState("validation_old_id") != null || aliasResult == null ||
             aliasResult.status != TutorialTaskStatus.Active || aliasResult.progressValue != 3.5d ||
             !aliasResult.rewardGranted || !aliasResult.completionRewardGranted ||
+            !aliasResult.objectiveCompleted || !aliasResult.objectiveAutoCompleted ||
             aliasMigration.activeStepId != "validation_new_id")
         {
-            errors.Add("Stable-id alias migration did not preserve active status, progress, rewards or active id.");
+            errors.Add("Stable-id alias migration did not preserve active status, progress, objective, rewards or active id.");
         }
 
         var reorderedState = TutorialSaveData.CreateNew();

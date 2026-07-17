@@ -1591,6 +1591,7 @@ MonoBehaviour:
   _audio: {fileID: 2864573618113148850}
   _buyPanel: {fileID: 3307459438238229988}
   _changePetArea: {fileID: 0}
+  _changePetInteractionDistance: 5
   PlayerEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -2323,12 +2324,12 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2.84, y: 0.18697846, z: 2.97}
-  m_Center: {x: 0, y: -0.079889774, z: 0}
+  m_Size: {x: 4.5, y: 2, z: 4.5}
+  m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!114 &8317297664833403691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2371,7 +2372,7 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  MaxDistance: 0.1
+  MaxDistance: 5
 --- !u!1 &6425528216913230085
 GameObject:
   m_ObjectHideFlags: 0

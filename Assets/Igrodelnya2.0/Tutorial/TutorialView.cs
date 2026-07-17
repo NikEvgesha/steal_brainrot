@@ -8,7 +8,7 @@ public sealed class TutorialView : MonoBehaviour
 {
     private const string CollapsedPreferenceKey = "Tutorial.UI.Collapsed";
 
-    public event Action DonePressed;
+    public event Action RewardClaimPressed;
 
     private TMP_Text _messageText;
     private TMP_Text _progressText;
@@ -17,6 +17,7 @@ public sealed class TutorialView : MonoBehaviour
     private TMP_Text _collapseButtonText;
     private Image _rewardIcon;
     private GameObject _rewardBadge;
+    private Button _rewardClaimButton;
     private Button _doneButton;
     private Button _collapseButton;
     private RectTransform _panelViewport;
@@ -27,6 +28,8 @@ public sealed class TutorialView : MonoBehaviour
     private Transform _worldTarget;
     private Transform _secondaryWorldTarget;
     private Camera _camera;
+    private Sprite _worldArrowSprite;
+    private Sprite _handPointerSprite;
     private Coroutine _completionPulse;
     private Vector3 _panelBaseScale = Vector3.one;
     private bool _collapsed;
@@ -58,6 +61,30 @@ public sealed class TutorialView : MonoBehaviour
         _rewardText = FindNamedComponent<TMP_Text>("Reward_Text");
         _rewardIcon = FindNamedComponent<Image>("Reward_Icon");
         _rewardBadge = FindChild("RewardBadge")?.gameObject;
+        if (_rewardBadge != null)
+        {
+            _rewardClaimButton = _rewardBadge.GetComponent<Button>();
+            if (_rewardClaimButton == null)
+                _rewardClaimButton = _rewardBadge.AddComponent<Button>();
+
+            Image rewardBackground = _rewardBadge.GetComponent<Image>();
+            if (rewardBackground != null)
+            {
+                rewardBackground.raycastTarget = true;
+                _rewardClaimButton.targetGraphic = rewardBackground;
+            }
+
+            ColorBlock colors = _rewardClaimButton.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+            colors.pressedColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+            colors.selectedColor = Color.white;
+            colors.disabledColor = new Color(0.35f, 0.35f, 0.38f, 0.82f);
+            colors.fadeDuration = 0.1f;
+            _rewardClaimButton.colors = colors;
+            _rewardClaimButton.transition = Selectable.Transition.ColorTint;
+            _rewardClaimButton.navigation = new Navigation { mode = Navigation.Mode.None };
+        }
         _doneButton = FindNamedComponent<Button>("Button_Done");
         _collapseButton = FindNamedComponent<Button>("Button_Collapse");
         _doneButtonText = _doneButton != null
@@ -103,20 +130,35 @@ public sealed class TutorialView : MonoBehaviour
             bubbleRect.anchorMax = Vector2.one;
             bubbleRect.pivot = Vector2.one;
             bubbleRect.sizeDelta = new Vector2(560f, 250f);
-            bubbleRect.anchoredPosition = new Vector2(-24f, -112f);
+            bubbleRect.anchoredPosition = new Vector2(0f, -112f);
             _panelContent = bubbleRect;
         }
 
         if (_panelContent != null)
         {
+            Vector2 panelPosition = _panelContent.anchoredPosition;
+            _panelContent.anchoredPosition = new Vector2(0f, panelPosition.y);
+            Image panelImage = _panelContent.GetComponent<Image>();
+            if (panelImage != null)
+            {
+                BlockyUITheme.ApplyPanel(panelImage, new Color(0.015f, 0.018f, 0.024f, 0.82f), studs: false);
+                Outline outline = _panelContent.GetComponent<Outline>();
+                if (outline != null)
+                    outline.effectColor = new Color(0.68f, 0.72f, 0.8f, 0.75f);
+            }
+
             _panelBaseScale = _panelContent.localScale;
             _expandedPanelX = _panelContent.anchoredPosition.x;
-            _collapsedPanelX = _expandedPanelX - Mathf.Max(300f, _panelContent.rect.width + 24f);
+            _collapsedPanelX = _expandedPanelX + Mathf.Max(300f, _panelContent.rect.width + 16f);
             SetCollapsed(PlayerPrefs.GetInt(CollapsedPreferenceKey, 0) == 1, immediate: true);
         }
 
         if (_panelViewport != null)
+        {
+            Vector2 viewportPosition = _panelViewport.anchoredPosition;
+            _panelViewport.anchoredPosition = new Vector2(0f, viewportPosition.y);
             _panelViewportBasePosition = _panelViewport.anchoredPosition;
+        }
         if (_collapseButtonRect != null)
             _collapseButtonBasePosition = _collapseButtonRect.anchoredPosition;
         ApplySafeArea(force: true);
@@ -135,6 +177,8 @@ public sealed class TutorialView : MonoBehaviour
                 Image arrowImage = _directionArrow.GetComponent<Image>();
                 if (arrowImage != null)
                 {
+                    _worldArrowSprite = arrowImage.sprite;
+                    _handPointerSprite = Resources.Load<Sprite>("Tutorial/UIHandPointer");
                     arrowImage.color = Color.white;
                     Outline outline = _directionArrow.GetComponent<Outline>();
                     if (outline == null)
@@ -156,8 +200,14 @@ public sealed class TutorialView : MonoBehaviour
 
         if (_doneButton != null)
         {
-            _doneButton.onClick.RemoveListener(OnDonePressed);
-            _doneButton.onClick.AddListener(OnDonePressed);
+            _doneButton.gameObject.SetActive(false);
+        }
+
+        if (_rewardClaimButton != null)
+        {
+            _rewardClaimButton.onClick.RemoveListener(OnRewardClaimPressed);
+            _rewardClaimButton.onClick.AddListener(OnRewardClaimPressed);
+            _rewardClaimButton.interactable = false;
         }
 
         if (_collapseButton != null)
@@ -189,11 +239,13 @@ public sealed class TutorialView : MonoBehaviour
             _rewardIcon.gameObject.SetActive(rewardIcon != null);
         }
         if (_rewardBadge != null)
-            _rewardBadge.SetActive(rewardIcon != null);
+            _rewardBadge.SetActive(true);
+        if (_rewardClaimButton != null)
+            _rewardClaimButton.interactable = false;
         if (_doneButtonText != null)
             _doneButtonText.text = doneLabel ?? string.Empty;
         if (_doneButton != null)
-            _doneButton.gameObject.SetActive(isFinalStep);
+            _doneButton.gameObject.SetActive(false);
     }
 
     public void SetWorldTarget(Transform target)
@@ -225,11 +277,28 @@ public sealed class TutorialView : MonoBehaviour
             _rewardIcon.gameObject.SetActive(rewardIcon != null);
         }
         if (_rewardBadge != null)
-            _rewardBadge.SetActive(rewardIcon != null);
+            _rewardBadge.SetActive(true);
+        if (_rewardClaimButton != null)
+            _rewardClaimButton.interactable = true;
         if (_doneButton != null)
             _doneButton.gameObject.SetActive(false);
 
+        SetCollapsed(false, immediate: false);
         SetWorldTargets(null, null);
+        if (_completionPulse != null)
+            StopCoroutine(_completionPulse);
+        _completionPulse = StartCoroutine(CompletionPulse());
+    }
+
+    public void ShowClaimed(string label)
+    {
+        if (_progressText != null)
+            _progressText.text = "OK";
+        if (_messageText != null)
+            _messageText.text = label ?? string.Empty;
+        if (_rewardClaimButton != null)
+            _rewardClaimButton.interactable = false;
+
         if (_completionPulse != null)
             StopCoroutine(_completionPulse);
         _completionPulse = StartCoroutine(CompletionPulse());
@@ -288,7 +357,8 @@ public sealed class TutorialView : MonoBehaviour
         Vector3 viewport;
         RectTransform uiTarget = worldTarget as RectTransform;
         Canvas targetCanvas = uiTarget != null ? uiTarget.GetComponentInParent<Canvas>() : null;
-        if (uiTarget != null && targetCanvas != null && targetCanvas.renderMode != RenderMode.WorldSpace)
+        bool isScreenUi = uiTarget != null && targetCanvas != null && targetCanvas.renderMode != RenderMode.WorldSpace;
+        if (isScreenUi)
         {
             Camera eventCamera = targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay
                 ? null
@@ -329,11 +399,57 @@ public sealed class TutorialView : MonoBehaviour
             Mathf.Clamp(viewport.x, minX, maxX),
             Mathf.Clamp(viewport.y, minY, maxY));
 
+        Image pointerImage = directionArrow.GetComponent<Image>();
+        Outline pointerOutline = directionArrow.GetComponent<Outline>();
+        if (isScreenUi && _handPointerSprite != null)
+        {
+            Vector2 targetPixels = new Vector2(viewport.x * Screen.width, viewport.y * Screen.height);
+            Vector2 fromCenterPixels = targetPixels - safe.center;
+            Vector2 pointingDirection = fromCenterPixels.sqrMagnitude > 1f
+                ? fromCenterPixels.normalized
+                : Vector2.up;
+            float tapPulse = Mathf.Sin(Time.unscaledTime * 6.5f) * 7f;
+            Vector2 pointerPixels = targetPixels - pointingDirection * (76f - tapPulse);
+            pointerPixels.x = Mathf.Clamp(pointerPixels.x, safe.xMin + 58f, safe.xMax - 58f);
+            pointerPixels.y = Mathf.Clamp(pointerPixels.y, safe.yMin + 58f, safe.yMax - 58f);
+            clamped = new Vector2(
+                Screen.width > 0 ? pointerPixels.x / Screen.width : 0.5f,
+                Screen.height > 0 ? pointerPixels.y / Screen.height : 0.5f);
+
+            directionArrow.sizeDelta = new Vector2(112f, 112f);
+            directionArrow.localRotation = Quaternion.Euler(
+                0f,
+                0f,
+                Mathf.Atan2(pointingDirection.y, pointingDirection.x) * Mathf.Rad2Deg - 90f);
+            if (pointerImage != null)
+            {
+                pointerImage.sprite = _handPointerSprite;
+                pointerImage.preserveAspect = true;
+                pointerImage.color = Color.white;
+            }
+            if (pointerOutline != null)
+                pointerOutline.enabled = false;
+        }
+        else
+        {
+            directionArrow.sizeDelta = new Vector2(88f, 80f);
+            if (pointerImage != null)
+            {
+                pointerImage.sprite = _worldArrowSprite;
+                pointerImage.preserveAspect = true;
+                pointerImage.color = directionArrow == _secondaryDirectionArrow
+                    ? new Color(0.35f, 0.9f, 1f, 1f)
+                    : Color.white;
+            }
+            if (pointerOutline != null)
+                pointerOutline.enabled = true;
+            if (direction.sqrMagnitude > 0.0001f)
+                directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg + 90f);
+        }
+
         directionArrow.anchorMin = clamped;
         directionArrow.anchorMax = clamped;
         directionArrow.anchoredPosition = Vector2.zero;
-        if (direction.sqrMagnitude > 0.0001f)
-            directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg + 90f);
         directionArrow.gameObject.SetActive(true);
     }
 
@@ -356,9 +472,9 @@ public sealed class TutorialView : MonoBehaviour
         _completionPulse = null;
     }
 
-    private void OnDonePressed()
+    private void OnRewardClaimPressed()
     {
-        DonePressed?.Invoke();
+        RewardClaimPressed?.Invoke();
     }
 
     private void OnCollapsePressed()
@@ -378,15 +494,15 @@ public sealed class TutorialView : MonoBehaviour
             _panelContent.anchoredPosition = new Vector2(_targetPanelX, position.y);
         }
         if (_collapseButtonText != null)
-            _collapseButtonText.text = collapsed ? ">" : "<";
+            _collapseButtonText.text = collapsed ? "<" : ">";
     }
 
     private void OnDestroy()
     {
         if (_completionPulse != null)
             StopCoroutine(_completionPulse);
-        if (_doneButton != null)
-            _doneButton.onClick.RemoveListener(OnDonePressed);
+        if (_rewardClaimButton != null)
+            _rewardClaimButton.onClick.RemoveListener(OnRewardClaimPressed);
         if (_collapseButton != null)
             _collapseButton.onClick.RemoveListener(OnCollapsePressed);
     }

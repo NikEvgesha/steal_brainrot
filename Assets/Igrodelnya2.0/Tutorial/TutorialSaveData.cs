@@ -20,6 +20,8 @@ public sealed class TutorialTaskSaveData
     public double progressValue;
     public bool rewardGranted;
     public bool completionRewardGranted;
+    public bool objectiveCompleted;
+    public bool objectiveAutoCompleted;
     public long startedUnix;
     public long updatedUnix;
     public long completedUnix;
@@ -30,7 +32,7 @@ public sealed class TutorialTaskSaveData
 [Serializable]
 public sealed class TutorialSaveData
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public int version = CurrentVersion;
 
@@ -214,6 +216,8 @@ public sealed class TutorialSaveData
             return;
 
         state.status = wasSkipped ? TutorialTaskStatus.Skipped : TutorialTaskStatus.Completed;
+        state.objectiveCompleted = false;
+        state.objectiveAutoCompleted = false;
         state.updatedUnix = now;
         state.completedUnix = now;
         if (string.Equals(activeStepId, stableId, StringComparison.Ordinal))
@@ -406,6 +410,8 @@ public sealed class TutorialSaveData
         destination.definitionRevision = Math.Max(destination.definitionRevision, source.definitionRevision);
         destination.rewardGranted |= source.rewardGranted;
         destination.completionRewardGranted |= source.completionRewardGranted;
+        destination.objectiveCompleted |= source.objectiveCompleted;
+        destination.objectiveAutoCompleted |= source.objectiveAutoCompleted;
         destination.startedUnix = MinPositive(destination.startedUnix, source.startedUnix);
         destination.updatedUnix = Math.Max(destination.updatedUnix, source.updatedUnix);
         destination.completedUnix = Math.Max(destination.completedUnix, source.completedUnix);

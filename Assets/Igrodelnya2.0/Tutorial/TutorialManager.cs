@@ -38,6 +38,7 @@ public sealed class TutorialManager : MonoBehaviour
     private bool _active;
     private bool _schedulerReady;
     private bool _processingTransition;
+    private bool _awaitingRewardClaim;
     private bool _establishedPlayerAtSessionStart;
     private bool _sessionEventLogged;
     private Coroutine _startRoutine;
@@ -101,6 +102,8 @@ public sealed class TutorialManager : MonoBehaviour
     {
         TutorialSignals.Raised -= OnTutorialSignal;
         UnsubscribeLocalization();
+        if (_view != null)
+            _view.RewardClaimPressed -= OnRewardClaimPressed;
         if (_active)
             G.Ad?.SetTutorialInterstitialSuppressed(false, PostTutorialInterstitialGraceSeconds);
         if (G.Tutorial == this)
@@ -164,6 +167,9 @@ public sealed class TutorialManager : MonoBehaviour
             }
             return;
         }
+
+        if (_awaitingRewardClaim)
+            return;
 
         if (Time.unscaledTime >= _nextContextRefresh)
         {
@@ -260,6 +266,7 @@ public sealed class TutorialManager : MonoBehaviour
 
         _active = true;
         _processingTransition = false;
+        _awaitingRewardClaim = false;
         _stepActivatedRealtime = Time.unscaledTime;
         _nextContextRefresh = 0f;
         _movementDistance = Math.Max(0d, _currentTaskState.progressValue) > float.MaxValue
@@ -271,8 +278,15 @@ public sealed class TutorialManager : MonoBehaviour
         if (_view != null)
             _view.gameObject.SetActive(true);
 
-        RunStartAction(definition.startAction);
-        RefreshContext();
+        if (!_currentTaskState.objectiveCompleted)
+        {
+            RunStartAction(definition.startAction);
+            RefreshContext();
+        }
+        else
+        {
+            PresentClaimableCompletion();
+        }
         SaveState();
 
         if (!_sessionEventLogged)
@@ -361,7 +375,36 @@ public sealed class TutorialManager : MonoBehaviour
 
     private void CompleteCurrentStep(bool autoCompleted)
     {
-        if (_processingTransition || _currentDefinition == null || _currentTaskState == null)
+        if (_processingTransition || _awaitingRewardClaim || _currentDefinition == null || _currentTaskState == null)
+            return;
+
+        _awaitingRewardClaim = true;
+        _currentTaskState.objectiveCompleted = true;
+        _currentTaskState.objectiveAutoCompleted = autoCompleted;
+        _currentTaskState.updatedUnix = UtcNowUnix();
+        SaveState();
+        PresentClaimableCompletion();
+    }
+
+    private void PresentClaimableCompletion()
+    {
+        if (_currentDefinition == null || _currentTaskState == null)
+            return;
+
+        _awaitingRewardClaim = true;
+        int reward = Math.Max(0, _currentDefinition.completionRewardGems);
+        SetTargets(null, null, null);
+        _view?.ShowCompleted(
+            L("UI/Tutorial/Completed", "TASK COMPLETE!"),
+            reward > 0
+                ? FormatLocalized("UI/Tutorial/ClaimReward", "Claim +{0}", reward)
+                : L("UI/Tutorial/Continue", "Continue"),
+            reward > 0 ? G.Currency?.GetCurrencyIcon(CurrencyType.Gems) : null);
+    }
+
+    private void OnRewardClaimPressed()
+    {
+        if (!_awaitingRewardClaim || _processingTransition || _currentDefinition == null || _currentTaskState == null)
             return;
 
         _processingTransition = true;
@@ -375,17 +418,18 @@ public sealed class TutorialManager : MonoBehaviour
                 G.Currency?.AddCurrency(CurrencyType.Gems, reward);
         }
 
+        bool autoCompleted = _currentTaskState.objectiveAutoCompleted;
         _state.MarkTerminal(CurrentStableId, wasSkipped: false, UtcNowUnix());
         SaveState();
         Dictionary<string, object> parameters = BuildStepParameters();
         parameters["auto_completed"] = autoCompleted;
         LogEvent("tutorial_step_completed", parameters);
 
+        _awaitingRewardClaim = false;
         SetTargets(null, null, null);
-        _view?.ShowCompleted(
-            L("UI/Tutorial/Completed", "TASK COMPLETE!"),
-            reward > 0 ? FormatLocalized("UI/Tutorial/Reward", "Reward: +{0}", reward) : string.Empty,
-            reward > 0 ? G.Currency?.GetCurrencyIcon(CurrencyType.Gems) : null);
+        _view?.ShowClaimed(reward > 0
+            ? L("UI/Tutorial/RewardClaimed", "REWARD CLAIMED!")
+            : L("UI/Tutorial/Completed", "TASK COMPLETE!"));
         StartCoroutine(AdvanceAfterCompletion());
     }
 
@@ -393,6 +437,7 @@ public sealed class TutorialManager : MonoBehaviour
     {
         yield return new WaitForSecondsRealtime(CompletionPresentationSeconds);
         _processingTransition = false;
+        _awaitingRewardClaim = false;
         _currentDefinition = null;
         _currentTaskState = null;
         TryStartNextAvailable();
@@ -407,6 +452,7 @@ public sealed class TutorialManager : MonoBehaviour
         SaveState();
         _currentDefinition = null;
         _currentTaskState = null;
+        _awaitingRewardClaim = false;
         _active = false;
         SetTargets(null, null, null);
         TryStartNextAvailable();
@@ -1413,6 +1459,8 @@ public sealed class TutorialManager : MonoBehaviour
         _view = canvas != null ? Instantiate(prefab, canvas.transform) : Instantiate(prefab);
         _view.name = "TutorialView";
         _view.Initialize();
+        _view.RewardClaimPressed -= OnRewardClaimPressed;
+        _view.RewardClaimPressed += OnRewardClaimPressed;
         _view.gameObject.SetActive(false);
     }
 
@@ -1532,12 +1580,20 @@ public sealed class TutorialManager : MonoBehaviour
             return;
         manager.OnLanguageChanged -= OnLanguageChanged;
         manager.OnLanguageChanged += OnLanguageChanged;
-        RefreshContext();
+        RefreshLocalizedTutorialView();
     }
 
     private void OnLanguageChanged(string _)
     {
-        RefreshContext();
+        RefreshLocalizedTutorialView();
+    }
+
+    private void RefreshLocalizedTutorialView()
+    {
+        if (_awaitingRewardClaim)
+            PresentClaimableCompletion();
+        else
+            RefreshContext();
     }
 
     private static string L(string key, string fallback)
@@ -1587,6 +1643,8 @@ public sealed class TutorialManager : MonoBehaviour
             task.status = i < clamped ? TutorialTaskStatus.Completed : TutorialTaskStatus.Unseen;
             task.completionRewardGranted = i < clamped;
             task.rewardGranted = i < clamped;
+            task.objectiveCompleted = false;
+            task.objectiveAutoCompleted = false;
         }
         _editorDebugFreezeProgress = true;
         BeginDefinition(TutorialStepCatalog.Steps[clamped], resumed: false);

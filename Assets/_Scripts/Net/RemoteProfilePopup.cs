@@ -43,6 +43,9 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     private bool _likedToday;
     private bool _likeRequestInFlight;
     private int _likesCount;
+    private string _displayName;
+    private PlayerPublicStatsDto _stats;
+    private LocalizationManager _subscribedLocalizationManager;
 
     public static RemoteProfilePopup Instance
     {
@@ -60,12 +63,10 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             {
                 _instance = Instantiate(prefab);
                 _instance.name = prefab.name;
-                DontDestroyOnLoad(_instance.gameObject);
                 return _instance;
             }
 
             var go = new GameObject("RemoteProfilePopup");
-            DontDestroyOnLoad(go);
             _instance = go.AddComponent<RemoteProfilePopup>();
             return _instance;
         }
@@ -80,14 +81,25 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         }
 
         _instance = this;
-        DontDestroyOnLoad(gameObject);
         BuildUI();
+        ApplyVisualStyle();
         BindButtonListeners();
         Hide();
     }
 
+    private void OnEnable()
+    {
+        SubscribeLocalization();
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeLocalization();
+    }
+
     private void OnDestroy()
     {
+        UnsubscribeLocalization();
         if (_closeButton != null)
             _closeButton.onClick.RemoveListener(Hide);
         if (_likeButton != null)
@@ -99,13 +111,15 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         if (_panel == null)
             BuildUI();
 
-        var playerName = string.IsNullOrWhiteSpace(displayName) ? L("UI/Common/Player", "Player") : displayName;
-        var safeStats = stats ?? new PlayerPublicStatsDto();
+        _displayName = displayName;
+        _stats = stats ?? new PlayerPublicStatsDto();
         _targetPlayerId = string.IsNullOrWhiteSpace(targetPlayerId) ? null : targetPlayerId;
         _targetFriendCode = string.IsNullOrWhiteSpace(targetFriendCode) ? null : targetFriendCode;
         _likedToday = false;
         _likesCount = 0;
         _likeRequestInFlight = false;
+
+        MountOnGameCanvas();
 
         if (_noticeRoutine != null)
         {
@@ -123,30 +137,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             _likeStateRoutine = null;
         }
 
-        if (_title != null)
-            _title.text = playerName;
-
-        if (_avatarInitial != null)
-            _avatarInitial.text = string.IsNullOrWhiteSpace(playerName) ? "?" : playerName.Substring(0, 1).ToUpperInvariant();
-
-        if (_friendCode != null)
-        {
-            var hasCode = !string.IsNullOrWhiteSpace(_targetFriendCode);
-            _friendCode.gameObject.SetActive(hasCode);
-            if (hasCode)
-                _friendCode.text = $"{L("UI/Profile/FriendCode", "Code")}: {_targetFriendCode}";
-        }
-
-        if (_body != null)
-        {
-            _body.text =
-                $"{L("UI/Profile/IncomeAllPets", "Income/sec (all pets)")}: {FormatValue(safeStats.petsIncomePerSec)}\n" +
-                $"{L("UI/Profile/IncomeBestPet", "Best pet income/sec")}: {FormatValue(safeStats.bestPetIncomePerSec)}\n" +
-                $"{L("UI/Profile/HatchedTotal", "Total hatched")}: {safeStats.totalHatched}\n" +
-                $"{L("UI/Profile/IncomeBigPet", "Big pet income/sec")}: {FormatValue(safeStats.bigPetIncomePerSec)}";
-        }
-
-        UpdateLikeUi();
+        RefreshLocalizedContent();
 
         if (HasLikeTarget())
         {
@@ -155,6 +146,56 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
         if (_panel != null)
             _panel.SetActive(true);
+    }
+
+    private void MountOnGameCanvas()
+    {
+        if (_panel == null)
+            return;
+
+        Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        Canvas host = null;
+        int bestOrder = int.MinValue;
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            Canvas candidate = canvases[i];
+            if (candidate == null || candidate == _canvas || !candidate.enabled ||
+                candidate.renderMode == RenderMode.WorldSpace)
+            {
+                continue;
+            }
+
+            if (candidate.name.StartsWith("GameCanvas", StringComparison.OrdinalIgnoreCase))
+            {
+                host = candidate;
+                break;
+            }
+
+            if (candidate.sortingOrder > bestOrder && candidate.sortingOrder < 5000)
+            {
+                host = candidate;
+                bestOrder = candidate.sortingOrder;
+            }
+        }
+
+        if (host == null)
+            return;
+
+        RectTransform panelRect = _panel.transform as RectTransform;
+        if (_panel.transform.parent != host.transform)
+            _panel.transform.SetParent(host.transform, false);
+        if (panelRect != null)
+        {
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+            panelRect.localScale = Vector3.one;
+        }
+        _panel.transform.SetAsLastSibling();
+
+        if (_canvas != null)
+            _canvas.enabled = false;
     }
 
     public void Hide()
@@ -218,13 +259,13 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         AddOutline(window.gameObject, new Vector2(4f, -4f), BlockyUITheme.BlackStroke);
         AddShadow(window.gameObject, new Vector2(0f, -5f), new Color(0f, 0f, 0f, 0.45f));
 
-        var header = CreatePanel("ProfileHeader", window.transform, new Vector2(0f, 0.79f), Vector2.one, BlockyUITheme.GreenHeader, true);
+        var header = CreatePanel("ProfileHeader", window.transform, new Vector2(0f, 0.79f), Vector2.one, BlockyUITheme.GreenHeader, false);
         AddOutline(header.gameObject, new Vector2(2f, -2f), BlockyUITheme.BlackStroke);
 
-        var content = CreatePanel("ProfileContent", window.transform, new Vector2(0.035f, 0.08f), new Vector2(0.965f, 0.745f), BlockyUITheme.DarkBrownPanel, true);
+        var content = CreatePanel("ProfileContent", window.transform, new Vector2(0.035f, 0.08f), new Vector2(0.965f, 0.745f), BlockyUITheme.DarkBrownPanel, false);
         AddOutline(content.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
 
-        var avatarCard = CreatePanel("AvatarCard", content.transform, new Vector2(0.045f, 0.34f), new Vector2(0.31f, 0.87f), BlockyUITheme.BlueHeader, true);
+        var avatarCard = CreatePanel("AvatarCard", content.transform, new Vector2(0.045f, 0.34f), new Vector2(0.31f, 0.87f), BlockyUITheme.BlueHeader, false);
         AddOutline(avatarCard.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
 
         _title = CreateText("Title", header.transform, new Vector2(0.055f, 0.08f), new Vector2(0.82f, 0.93f), TextAnchor.MiddleLeft, 46);
@@ -299,6 +340,98 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             _likeButton.onClick.RemoveListener(OnLikePressed);
             _likeButton.onClick.AddListener(OnLikePressed);
         }
+    }
+
+    public void ApplyVisualStyle()
+    {
+        Transform root = _panel != null ? _panel.transform : transform;
+        ApplyPanelStyle(root, "ProfileWindow", BlockyUITheme.BrownBody, studs: true);
+        ApplyPanelStyle(root, "ProfileHeader", BlockyUITheme.GreenHeader, studs: false);
+        ApplyPanelStyle(root, "ProfileContent", BlockyUITheme.DarkBrownPanel, studs: false);
+        ApplyPanelStyle(root, "AvatarCard", BlockyUITheme.BlueHeader, studs: false);
+        if (_likeButton != null)
+            BlockyUITheme.ApplyButton(_likeButton, BlockyUITheme.GreenHeader);
+        if (_closeButton != null)
+            BlockyUITheme.ApplyButton(_closeButton, BlockyUITheme.RedHeader);
+    }
+
+    private static void ApplyPanelStyle(Transform root, string name, Color color, bool studs)
+    {
+        Transform target = FindChildByName(root, name);
+        if (target != null && target.TryGetComponent(out Image image))
+            BlockyUITheme.ApplyPanel(image, color, studs);
+    }
+
+    private void RefreshLocalizedContent()
+    {
+        string playerName = string.IsNullOrWhiteSpace(_displayName)
+            ? L("UI/Common/Player", "Player")
+            : _displayName;
+        PlayerPublicStatsDto safeStats = _stats ?? new PlayerPublicStatsDto();
+
+        if (_title != null)
+            _title.text = playerName;
+        if (_avatarInitial != null)
+            _avatarInitial.text = string.IsNullOrWhiteSpace(playerName) ? "?" : playerName.Substring(0, 1).ToUpperInvariant();
+        if (_friendCode != null)
+        {
+            bool hasCode = !string.IsNullOrWhiteSpace(_targetFriendCode);
+            _friendCode.gameObject.SetActive(hasCode);
+            if (hasCode)
+                _friendCode.text = $"{L("UI/Profile/FriendCode", "Code")}: {_targetFriendCode}";
+        }
+        if (_body != null)
+        {
+            _body.text =
+                $"{L("UI/Profile/IncomeAllPets", "Income/sec (all pets)")}: {FormatValue(safeStats.petsIncomePerSec)}\n" +
+                $"{L("UI/Profile/IncomeBestPet", "Best pet income/sec")}: {FormatValue(safeStats.bestPetIncomePerSec)}\n" +
+                $"{L("UI/Profile/HatchedTotal", "Total hatched")}: {safeStats.totalHatched}\n" +
+                $"{L("UI/Profile/IncomeBigPet", "Big pet income/sec")}: {FormatValue(safeStats.bigPetIncomePerSec)}";
+        }
+
+        UpdateLikeUi();
+        if (_notice != null && _notice.gameObject.activeSelf && _likedToday)
+            _notice.text = BuildAlreadyLikedText(null);
+    }
+
+    private void SubscribeLocalization()
+    {
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
+        BindLocalizationManager(LocalizationManager.Instance);
+    }
+
+    private void UnsubscribeLocalization()
+    {
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        if (_subscribedLocalizationManager != null)
+            _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = null;
+    }
+
+    private void OnLocalizationManagerReady(LocalizationManager manager)
+    {
+        BindLocalizationManager(manager);
+        RefreshLocalizedContent();
+    }
+
+    private void BindLocalizationManager(LocalizationManager manager)
+    {
+        if (_subscribedLocalizationManager == manager)
+            return;
+        if (_subscribedLocalizationManager != null)
+            _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = manager;
+        if (_subscribedLocalizationManager != null)
+            _subscribedLocalizationManager.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        RefreshLocalizedContent();
     }
 
     private static Transform FindChildByName(Transform root, string childName)
@@ -682,13 +815,6 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
     private static string L(string key, string fallback)
     {
-        if (LocalizationManager.Instance != null && LocalizationManager.Instance.LocalizationData != null)
-        {
-            var translated = LocalizationManager.Instance.LocalizationData.GetTranslation(key);
-            if (!string.IsNullOrWhiteSpace(translated) && !string.Equals(translated, key, StringComparison.Ordinal))
-                return translated;
-        }
-
-        return fallback;
+        return LocalizationUtils.T(key, fallback);
     }
 }

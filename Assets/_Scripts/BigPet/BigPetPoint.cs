@@ -42,6 +42,7 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private AudioSource _audio;
     [SerializeField] private InteractionPanel _buyPanel;
     [SerializeField] private GameObject _changePetArea;
+    [SerializeField, Min(1f)] private float _changePetInteractionDistance = 5f;
 
     private bool _purchased;
     private bool _playerInArea;
@@ -611,6 +612,26 @@ public class BigPetPoint : MonoBehaviour
             var area = transform.Find("ChangePetArea");
             if (area != null)
                 _changePetArea = area.gameObject;
+        }
+
+        if (_changePetArea == null)
+            return;
+
+        InteractionRaycastListener listener = _changePetArea.GetComponent<InteractionRaycastListener>();
+        if (listener != null)
+            listener.MaxDistance = Mathf.Max(listener.MaxDistance, _changePetInteractionDistance);
+
+        BoxCollider interactionCollider = _changePetArea.GetComponent<BoxCollider>();
+        if (interactionCollider != null)
+        {
+            interactionCollider.isTrigger = true;
+            Vector3 size = interactionCollider.size;
+            interactionCollider.size = new Vector3(
+                Mathf.Max(4.5f, size.x),
+                Mathf.Max(2f, size.y),
+                Mathf.Max(4.5f, size.z));
+            Vector3 center = interactionCollider.center;
+            interactionCollider.center = new Vector3(center.x, Mathf.Max(0.9f, center.y), center.z);
         }
     }
 

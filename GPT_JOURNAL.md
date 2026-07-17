@@ -997,3 +997,13 @@
 - Expanded owned localization to 63 RU/EN keys and updated catalog/migration validation. Unity compile and validator passed for all 10 tasks.
 - Live Bridge on the existing mature save confirmed sequential auto-completion into the album lesson, visible upper-right UI on `GameCanvas(Clone)`, an arrow to `AlbumButton` and a level-30 BigPet multiplier of `4.0` (`+300%`). Fixed the view choosing the disabled `FPSOverlayCanvas` by preferring the active game canvas.
 - Remaining acceptance is the full clean-profile desktop offline/online and mobile/touch matrix, including restart substates, total `32` reward, free/rewarded speed-up and ad grace-period checks.
+
+### 2026-07-17 (Tutorial claim UX, profile popup and BigPet selection)
+- Restyled the tutorial panel as a right-edge, translucent black overlay. Its collapse animation now moves the body to the right behind the screen edge and leaves only the reopen control visible.
+- Generated a new chunky cartoon hand asset for screen-space targets, imported it as a transparent sprite and added a short pointing pulse. World-space targets keep the existing arrow/highlight behavior.
+- Split objective completion from settlement in save schema V5. A task now persists its completed objective, enables `Забрать +N` or `Продолжить`, and advances only after the player presses it; the reward-granted flag is still saved before the currency mutation to prevent duplicate payouts after restart.
+- Added RU/EN strings for claim/continue/claimed states and rebuilt the editable tutorial prefab with a disabled-to-active reward button.
+- Reworked `RemoteProfilePopup` to use the correct blocky plain/stud image roles, shared live localization and the active `GameCanvas`. Bridge checks confirmed the complete popup and immediate RU/EN refresh without reopening it.
+- Fixed intermittent BigPet selection by expanding `ChangePetArea` to a `4.5 × 2 × 4.5` trigger with a `5`-unit interaction distance; runtime prefab values were confirmed through Bridge.
+- Live tutorial checks confirmed expanded/collapsed states, the animated UI hand, disabled/active claim states and a single `46 -> 49` payout on `Забрать +3`. The test profile was restored to `46` gems and all ten prior tasks terminal before leaving Play Mode.
+- Remaining P0 acceptance is unchanged: full clean-profile desktop offline/online and mobile/touch passes, including restart while awaiting claim and rewarded-ad/grace-period assertions.
