@@ -288,34 +288,22 @@ public class UniversalDecisionPopup : MonoBehaviour
 
     private static string ResolveLocalization(string key, string fallback)
     {
-        if (!string.IsNullOrWhiteSpace(key)
-            && LocalizationManager.Instance != null
-            && LocalizationManager.Instance.LocalizationData != null)
-        {
-            var translated = LocalizationManager.Instance.LocalizationData.GetTranslation(key);
-            if (!string.IsNullOrWhiteSpace(translated)
-                && !string.Equals(translated, key, StringComparison.Ordinal))
-            {
-                return translated;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(fallback))
-            return fallback;
-
-        return key ?? string.Empty;
+        return LocalizationUtils.T(key, fallback);
     }
 
     private void SubscribeLocalization()
     {
         if (LocalizationManager.Instance != null)
             LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
     }
 
     private void UnsubscribeLocalization()
     {
         if (LocalizationManager.Instance != null)
             LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
     }
 
     private void AutoBindReferences()

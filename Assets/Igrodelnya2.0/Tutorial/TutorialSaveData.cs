@@ -75,8 +75,10 @@ public sealed class TutorialSaveData
             changed = true;
         }
 
+        changed |= ApplyStableIdAliases();
         changed |= RemoveInvalidAndDuplicateStates();
         changed |= SynchronizeCatalog();
+        changed |= BackfillRewardFlags();
         changed |= NormalizeActiveState();
 
         version = CurrentVersion;
@@ -98,6 +100,36 @@ public sealed class TutorialSaveData
         }
 
         return null;
+    }
+
+    public bool MigrateStableIdAlias(string oldStableId, string newStableId)
+    {
+        if (string.IsNullOrWhiteSpace(oldStableId) || string.IsNullOrWhiteSpace(newStableId) ||
+            string.Equals(oldStableId, newStableId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        TutorialTaskSaveData source = GetTaskState(oldStableId);
+        if (source == null)
+            return false;
+
+        TutorialTaskSaveData destination = GetTaskState(newStableId);
+        if (destination == null)
+        {
+            source.stableId = newStableId;
+        }
+        else if (destination != source)
+        {
+            MergeTaskState(destination, source);
+            taskStates.Remove(source);
+        }
+
+        if (string.Equals(activeStepId, oldStableId, StringComparison.Ordinal))
+            activeStepId = newStableId;
+        if (string.Equals(stepId, oldStableId, StringComparison.Ordinal))
+            stepId = newStableId;
+        return true;
     }
 
     public TutorialTaskSaveData GetOrCreateTaskState(TutorialStepDefinition definition)
@@ -267,6 +299,83 @@ public sealed class TutorialSaveData
         }
 
         return changed;
+    }
+
+    private bool ApplyStableIdAliases()
+    {
+        bool changed = false;
+        TutorialStableIdAlias[] aliases = TutorialStepCatalog.StableIdAliases;
+        if (aliases == null)
+            return false;
+
+        for (int i = 0; i < aliases.Length; i++)
+        {
+            TutorialStableIdAlias alias = aliases[i];
+            if (alias != null)
+                changed |= MigrateStableIdAlias(alias.oldStableId, alias.newStableId);
+        }
+
+        return changed;
+    }
+
+    private bool BackfillRewardFlags()
+    {
+        bool changed = false;
+        if (starterEggGranted)
+        {
+            TutorialTaskSaveData acquire = GetTaskState("acquire_starter_egg");
+            if (acquire != null && !acquire.rewardGranted)
+            {
+                acquire.rewardGranted = true;
+                changed = true;
+            }
+        }
+
+        if (starterAnimalGranted)
+        {
+            TutorialTaskSaveData hatch = GetTaskState("hatch_starter_egg");
+            if (hatch != null && !hatch.rewardGranted)
+            {
+                hatch.rewardGranted = true;
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    private static void MergeTaskState(TutorialTaskSaveData destination, TutorialTaskSaveData source)
+    {
+        if (destination == null || source == null)
+            return;
+
+        if (source.IsTerminal && !destination.IsTerminal)
+            destination.status = source.status;
+        else if (!destination.IsTerminal && source.status == TutorialTaskStatus.Active)
+            destination.status = TutorialTaskStatus.Active;
+        else if (destination.status == TutorialTaskStatus.Unseen && source.status == TutorialTaskStatus.Available)
+            destination.status = TutorialTaskStatus.Available;
+
+        if (source.updatedUnix >= destination.updatedUnix)
+        {
+            destination.progressJson = source.progressJson ?? string.Empty;
+            destination.progressValue = source.progressValue;
+        }
+
+        destination.definitionRevision = Math.Max(destination.definitionRevision, source.definitionRevision);
+        destination.rewardGranted |= source.rewardGranted;
+        destination.startedUnix = MinPositive(destination.startedUnix, source.startedUnix);
+        destination.updatedUnix = Math.Max(destination.updatedUnix, source.updatedUnix);
+        destination.completedUnix = Math.Max(destination.completedUnix, source.completedUnix);
+    }
+
+    private static long MinPositive(long first, long second)
+    {
+        if (first <= 0)
+            return second;
+        if (second <= 0)
+            return first;
+        return Math.Min(first, second);
     }
 
     private bool NormalizeActiveState()

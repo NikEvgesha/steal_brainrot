@@ -387,6 +387,28 @@ public static class TutorialV1EditorTools
                 errors.Add($"Step '{step.stableId}' has no pack id.");
             if (step != null && step.definitionRevision < 1)
                 errors.Add($"Step '{step.stableId}' has invalid definition revision {step.definitionRevision}.");
+            if (step != null && step.progressTarget <= 0d)
+                errors.Add($"Step '{step.stableId}' has no positive progress target.");
+            if (step != null && step.completionTrigger == TutorialCompletionTrigger.ReachHintTarget &&
+                step.hintTarget == TutorialHintTarget.None)
+            {
+                errors.Add($"Step '{step.stableId}' completes at a target but has no hint target resolver.");
+            }
+            if (step != null && step.skipPolicy == TutorialSkipPolicy.EnsureStarterEggInInventory &&
+                step.completionTrigger != TutorialCompletionTrigger.StarterEggAcquired)
+            {
+                errors.Add($"Step '{step.stableId}' has a starter-egg skip policy with an incompatible completion trigger.");
+            }
+            if (step != null && step.skipPolicy == TutorialSkipPolicy.EnsureStarterEggPlaced &&
+                step.completionTrigger != TutorialCompletionTrigger.StarterEggPlaced)
+            {
+                errors.Add($"Step '{step.stableId}' has a placement skip policy with an incompatible completion trigger.");
+            }
+            if (step != null && step.skipPolicy == TutorialSkipPolicy.EnsureStarterAnimalHatched &&
+                step.completionTrigger != TutorialCompletionTrigger.StarterAnimalHatched)
+            {
+                errors.Add($"Step '{step.stableId}' has a hatch skip policy with an incompatible completion trigger.");
+            }
         }
 
         for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
@@ -402,6 +424,26 @@ public static class TutorialV1EditorTools
                 else if (!stableIds.Contains(prerequisite))
                     errors.Add($"Step '{step.stableId}' has missing prerequisite '{prerequisite}'.");
             }
+        }
+
+        var aliasSources = new HashSet<string>(StringComparer.Ordinal);
+        TutorialStableIdAlias[] aliases = TutorialStepCatalog.StableIdAliases;
+        if (aliases == null)
+            return;
+        for (int i = 0; i < aliases.Length; i++)
+        {
+            TutorialStableIdAlias alias = aliases[i];
+            if (alias == null || string.IsNullOrWhiteSpace(alias.oldStableId) || string.IsNullOrWhiteSpace(alias.newStableId))
+            {
+                errors.Add($"Stable-id alias {i} is incomplete.");
+                continue;
+            }
+            if (!aliasSources.Add(alias.oldStableId))
+                errors.Add($"Duplicate stable-id alias source '{alias.oldStableId}'.");
+            if (stableIds.Contains(alias.oldStableId))
+                errors.Add($"Stable-id alias source '{alias.oldStableId}' is still used by a current definition.");
+            if (!stableIds.Contains(alias.newStableId))
+                errors.Add($"Stable-id alias target '{alias.newStableId}' does not exist in the catalog.");
         }
     }
 
@@ -448,6 +490,54 @@ public static class TutorialV1EditorTools
         TutorialTaskSaveData future = legacyCompleted.GetOrCreateTaskState(futureDefinition);
         if (future == null || future.status != TutorialTaskStatus.Unseen)
             errors.Add("A new stable id is not eligible as unseen for a previously completed player.");
+
+        var aliasMigration = new TutorialSaveData
+        {
+            version = TutorialSaveData.CurrentVersion,
+            perStepInitialized = true,
+            activeStepId = "validation_old_id",
+            taskStates = new List<TutorialTaskSaveData>
+            {
+                new()
+                {
+                    stableId = "validation_old_id",
+                    status = TutorialTaskStatus.Active,
+                    progressValue = 3.5d,
+                    progressJson = "{\"stage\":2}",
+                    rewardGranted = true,
+                    startedUnix = 400,
+                    updatedUnix = 500
+                },
+                new()
+                {
+                    stableId = "validation_new_id",
+                    status = TutorialTaskStatus.Unseen,
+                    definitionRevision = 2
+                }
+            }
+        };
+        if (!aliasMigration.MigrateStableIdAlias("validation_old_id", "validation_new_id"))
+            errors.Add("Stable-id alias migration did not report a migrated state.");
+        TutorialTaskSaveData aliasResult = aliasMigration.GetTaskState("validation_new_id");
+        if (aliasMigration.GetTaskState("validation_old_id") != null || aliasResult == null ||
+            aliasResult.status != TutorialTaskStatus.Active || aliasResult.progressValue != 3.5d ||
+            !aliasResult.rewardGranted || aliasMigration.activeStepId != "validation_new_id")
+        {
+            errors.Add("Stable-id alias migration did not preserve active status, progress, reward or active id.");
+        }
+
+        var reorderedState = TutorialSaveData.CreateNew();
+        reorderedState.Normalize(false);
+        reorderedState.MarkTerminal("learn_movement", wasSkipped: false, now: 600);
+        reorderedState.MarkTerminal("find_home", wasSkipped: true, now: 601);
+        reorderedState.taskStates.Reverse();
+        reorderedState.stepIndex = TutorialStepCatalog.Steps.Length - 1;
+        reorderedState.Normalize(false);
+        if (reorderedState.GetTaskState("learn_movement")?.status != TutorialTaskStatus.Completed ||
+            reorderedState.GetTaskState("find_home")?.status != TutorialTaskStatus.Skipped)
+        {
+            errors.Add("Per-step state changed after persisted task order and legacy index were rearranged.");
+        }
     }
 
     private static void ValidateViewPrefab(List<string> errors)

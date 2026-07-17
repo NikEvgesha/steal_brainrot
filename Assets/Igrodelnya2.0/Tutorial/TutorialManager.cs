@@ -46,6 +46,7 @@ public sealed class TutorialManager : MonoBehaviour
     private float _nextStarterOfferAttempt;
     private bool _starterOfferErrorLogged;
     private Egg _starterOfferEgg;
+    private bool _skipHatchCompensationPending;
     private Coroutine _startRoutine;
 #if UNITY_EDITOR
     private bool _editorDebugFreezeProgress;
@@ -235,11 +236,39 @@ public sealed class TutorialManager : MonoBehaviour
         return true;
     }
 
-    private static bool CanActivateDefinition(TutorialStepDefinition definition)
+    private bool CanActivateDefinition(TutorialStepDefinition definition)
     {
-        // V1 definitions are prerequisite-driven. Future contextual handlers can add
-        // gameplay-fact triggers here without changing persisted identity or order.
-        return definition != null;
+        if (definition == null)
+            return false;
+
+        switch (definition.activationTrigger)
+        {
+            case TutorialActivationTrigger.PlayerReady:
+                return G.Player != null;
+            case TutorialActivationTrigger.LocalHomeReady:
+                return ResolveLocalRoot() != null;
+            case TutorialActivationTrigger.LocalConveyorReady:
+                return FindLocalConveyor() != null;
+            case TutorialActivationTrigger.StarterOfferReady:
+                return FindLocalConveyor() != null && G.Storage != null && G.Storage.GetEgg(StarterEggId) != null;
+            case TutorialActivationTrigger.StarterProgressItemPresent:
+                return HasStarterProgressItem();
+            case TutorialActivationTrigger.FreeLocalCellReady:
+                return HasStarterProgressItem() && FindLocalFreeCell() != null;
+            case TutorialActivationTrigger.StarterEggPlaced:
+                return FindLocalEggCell() != null || FindLocalAnimalCell() != null;
+            case TutorialActivationTrigger.StarterAnimalPresent:
+                return FindLocalAnimalCell() != null;
+            case TutorialActivationTrigger.CollectibleIncomeReady:
+                return FindLocalAnimalCell(requireCollectibleIncome: true) != null;
+            case TutorialActivationTrigger.ExpansionTargetReady:
+                return FindNearestExpansionTarget() != null;
+            case TutorialActivationTrigger.AlbumReady:
+                return G.Album != null;
+            case TutorialActivationTrigger.PrerequisitesTerminal:
+            default:
+                return true;
+        }
     }
 
     private void BeginDefinition(TutorialStepDefinition definition, bool emitSessionEvent, bool resumed)
@@ -261,6 +290,8 @@ public sealed class TutorialManager : MonoBehaviour
         _active = true;
         G.Ad?.SetTutorialInterstitialSuppressed(true);
         G.Save.SaveTutorialProgress(false);
+
+        RunStartAction(definition.startAction);
         SaveState();
 
         if (emitSessionEvent)
@@ -271,27 +302,21 @@ public sealed class TutorialManager : MonoBehaviour
     private void EvaluateCurrentStep()
     {
         float activeFor = Time.realtimeSinceStartup - _stepActivatedRealtime;
-        switch (CurrentStep)
+        switch (_currentDefinition.completionTrigger)
         {
-            case TutorialStepId.LearnMovement:
+            case TutorialCompletionTrigger.MovementDistance:
                 EvaluateMovement();
                 break;
 
-            case TutorialStepId.FindHome:
-            case TutorialStepId.ReachConveyor:
-            case TutorialStepId.ReturnHome:
+            case TutorialCompletionTrigger.ReachHintTarget:
                 if (activeFor >= MinimumTargetStepDisplaySeconds && IsPlayerNear(_currentTarget, TargetReachDistance))
                     CompleteCurrentStep();
                 break;
 
-            case TutorialStepId.AcquireStarterEgg:
+            case TutorialCompletionTrigger.StarterEggAcquired:
                 if (HasStarterProgressItem())
                 {
-                    if (!_state.starterEggGranted)
-                    {
-                        _state.starterEggGranted = true;
-                        SaveState();
-                    }
+                    MarkTaskRewardGranted("acquire_starter_egg");
                     CompleteCurrentStep();
                 }
                 else if (activeFor >= 0.4f && Time.unscaledTime >= _nextStarterOfferAttempt)
@@ -301,36 +326,41 @@ public sealed class TutorialManager : MonoBehaviour
                 }
                 break;
 
-            case TutorialStepId.PlaceStarterEgg:
+            case TutorialCompletionTrigger.StarterEggPlaced:
                 if (FindLocalEggCell() != null || FindLocalAnimalCell() != null)
                     CompleteCurrentStep();
                 break;
 
-            case TutorialStepId.HatchStarterEgg:
+            case TutorialCompletionTrigger.StarterAnimalHatched:
                 if (FindLocalAnimalCell() != null)
                 {
-                    _state.starterAnimalGranted = true;
-                    SaveState();
+                    MarkTaskRewardGranted("hatch_starter_egg");
                     CompleteCurrentStep();
                 }
                 break;
 
-            case TutorialStepId.MeetStarterAnimal:
+            case TutorialCompletionTrigger.StarterAnimalObserved:
                 if (activeFor >= 1.4f && FindLocalAnimalCell() != null)
                     CompleteCurrentStep();
                 break;
 
-            case TutorialStepId.WaitForFirstIncome:
+            case TutorialCompletionTrigger.FirstIncomeReady:
                 FieldCell incomeCell = FindLocalAnimalCell(requireCollectibleIncome: true);
                 if (incomeCell != null && incomeCell.CurrentBrainrot != null && incomeCell.CurrentBrainrot.CurrentIncome > 0d)
                     CompleteCurrentStep();
                 break;
 
-            case TutorialStepId.ClaimAlbumReward:
+            case TutorialCompletionTrigger.AlbumRewardClaimed:
                 if (HasClaimedStarterAlbumReward())
                     CompleteCurrentStep();
                 break;
         }
+    }
+
+    private void RunStartAction(TutorialStartAction action)
+    {
+        if (action == TutorialStartAction.EnsureStarterEggOffer)
+            EnsureStarterEggOffer();
     }
 
     private void EvaluateMovement()
@@ -385,6 +415,7 @@ public sealed class TutorialManager : MonoBehaviour
         if (CurrentStep == TutorialStepId.AcquireStarterEgg)
             ClearStarterEggOffer();
 
+        CompleteCurrentProgress();
         Dictionary<string, object> finalParameters = BuildStepParameters();
         LogEvent("tutorial_step_completed", finalParameters);
         _state.MarkTerminal(CurrentStableId, wasSkipped: false, UtcNowUnix());
@@ -414,10 +445,14 @@ public sealed class TutorialManager : MonoBehaviour
         ClearStarterEggOffer();
         _state.Normalize(G.Save != null && G.Save.GetTutorialProgress());
         SaveState();
-        if (_state.AreAllKnownStepsTerminal())
+        bool allKnownTerminal = _state.AreAllKnownStepsTerminal();
+        if (allKnownTerminal)
+        {
             G.Save.SaveTutorialProgress(true);
+            _schedulerReady = false;
+        }
 
-        if (!string.IsNullOrWhiteSpace(eventName))
+        if (allKnownTerminal && !string.IsNullOrWhiteSpace(eventName))
             LogEvent(eventName, parameters);
 
         _active = false;
@@ -516,6 +551,13 @@ public sealed class TutorialManager : MonoBehaviour
             return;
 
         _processingTransition = true;
+        if (!ApplySkipPolicy(_currentDefinition.skipPolicy))
+        {
+            _processingTransition = false;
+            RefreshView();
+            return;
+        }
+
         if (CurrentStep == TutorialStepId.AcquireStarterEgg)
             ClearStarterEggOffer();
 
@@ -525,6 +567,178 @@ public sealed class TutorialManager : MonoBehaviour
         SaveState();
         AdvanceAfterTerminal(parameters, "tutorial_completed");
         _processingTransition = false;
+    }
+
+    private bool ApplySkipPolicy(TutorialSkipPolicy policy)
+    {
+        switch (policy)
+        {
+            case TutorialSkipPolicy.EnsureStarterEggInInventory:
+                return EnsureStarterEggInInventory();
+            case TutorialSkipPolicy.EnsureStarterEggPlaced:
+                return EnsureStarterEggPlaced();
+            case TutorialSkipPolicy.EnsureStarterAnimalHatched:
+                return EnsureStarterAnimalHatched();
+            case TutorialSkipPolicy.MarkSkipped:
+            default:
+                return true;
+        }
+    }
+
+    private bool EnsureStarterEggInInventory()
+    {
+        if (FindLocalEggCell() != null || FindLocalAnimalCell() != null)
+            return true;
+
+        InventoryItem existing = FindInventoryEgg();
+        if (existing != null)
+        {
+            MarkTaskRewardGranted("acquire_starter_egg", saveImmediately: false);
+            return true;
+        }
+
+        Egg prefab = G.Storage != null ? G.Storage.GetEgg(StarterEggId) : null;
+        if (prefab == null || G.Inventory == null)
+        {
+            Debug.LogWarning("[Tutorial] Cannot compensate skipped starter-egg task: storage or inventory is unavailable.");
+            return false;
+        }
+
+        Egg egg = Instantiate(prefab);
+        BrainrotDinamicData data = egg.Data.DinamicData;
+        data.ElementType = ElementType.NoElement;
+        data.WeightMultiplier = 1f;
+        data.ResultIncome = 0d;
+        egg.SetData(data);
+        G.Inventory.Add(egg);
+        MarkTaskRewardGranted("acquire_starter_egg", saveImmediately: false);
+        return true;
+    }
+
+    private bool EnsureStarterEggPlaced()
+    {
+        if (FindLocalEggCell() != null || FindLocalAnimalCell() != null)
+            return true;
+        if (!EnsureStarterEggInInventory())
+            return false;
+
+        InventoryItem item = FindInventoryEgg();
+        FieldCell cell = FindLocalFreeCell();
+        Egg egg = item != null ? item.GetComponent<Egg>() : null;
+        if (item == null || egg == null || cell == null || cell.IsRemoteMode || G.QuickAccess == null)
+        {
+            Debug.LogWarning("[Tutorial] Cannot compensate skipped placement task: no local egg or free cell is available.");
+            return false;
+        }
+
+        G.Inventory.Remove(item);
+        item.transform.SetParent(cell.transform, false);
+        item.transform.localPosition = Vector3.zero;
+        item.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        item.gameObject.SetActive(true);
+        egg.InitTimer(cell);
+        cell.UpdateFieldItem(Item.Egg);
+        TutorialSignals.Raise(TutorialSignalType.EggPlaced, cell, item.Name, Item.Egg);
+        return true;
+    }
+
+    private bool EnsureStarterAnimalHatched()
+    {
+        if (FindLocalAnimalCell() != null)
+        {
+            MarkTaskRewardGranted("hatch_starter_egg", saveImmediately: false);
+            return true;
+        }
+
+        FieldCell cell = FindLocalEggCell();
+        Egg egg = cell != null ? cell.CurrentEgg : null;
+        if (cell == null || egg == null || cell.IsRemoteMode)
+        {
+            Debug.LogWarning("[Tutorial] Cannot compensate skipped hatch task: no local placed egg is available.");
+            return false;
+        }
+
+        _skipHatchCompensationPending = true;
+        egg.SpeedBoostInstant();
+        StartCoroutine(CompleteSkippedHatch(cell, egg));
+        return true;
+    }
+
+    private IEnumerator CompleteSkippedHatch(FieldCell cell, Egg egg)
+    {
+        float readyDeadline = Time.realtimeSinceStartup + 3f;
+        while (egg != null && egg.Status != EggStatus.ReadyToHatch && Time.realtimeSinceStartup < readyDeadline)
+            yield return null;
+
+        if (egg != null && cell != null && egg.Status == EggStatus.ReadyToHatch)
+            cell._Hatch();
+
+        float hatchDeadline = Time.realtimeSinceStartup + 12f;
+        while (FindLocalAnimalCell() == null && Time.realtimeSinceStartup < hatchDeadline)
+            yield return null;
+
+        if (FindLocalAnimalCell() != null)
+            MarkTaskRewardGranted("hatch_starter_egg");
+        else
+            Debug.LogWarning("[Tutorial] Skipped hatch compensation timed out; the placed egg remains ready for manual hatching.");
+
+        _skipHatchCompensationPending = false;
+        _nextActivationScan = 0f;
+    }
+
+    private InventoryItem FindInventoryEgg()
+    {
+        if (G.Inventory == null)
+            return null;
+        var eggs = G.Inventory.GetItems(Item.Egg);
+        if (eggs == null)
+            return null;
+
+        InventoryItem fallback = null;
+        for (int i = 0; i < eggs.Count; i++)
+        {
+            InventoryItem item = eggs[i];
+            if (item == null)
+                continue;
+            if (string.Equals(item.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
+                return item;
+            if (fallback == null)
+                fallback = item;
+        }
+
+        return fallback;
+    }
+
+    private void MarkTaskRewardGranted(string stableId, bool saveImmediately = true)
+    {
+        if (_state == null)
+            return;
+
+        if (string.Equals(stableId, "acquire_starter_egg", StringComparison.Ordinal))
+            _state.starterEggGranted = true;
+        else if (string.Equals(stableId, "hatch_starter_egg", StringComparison.Ordinal))
+            _state.starterAnimalGranted = true;
+
+        TutorialTaskSaveData task = _state.GetTaskState(stableId);
+        if (task != null)
+        {
+            task.rewardGranted = true;
+            task.updatedUnix = UtcNowUnix();
+        }
+
+        if (saveImmediately)
+            SaveState();
+    }
+
+    private void CompleteCurrentProgress()
+    {
+        if (_state == null || _currentDefinition == null || _currentDefinition.progressTarget <= 0d)
+            return;
+        _state.SetProgress(
+            _currentDefinition.stableId,
+            _currentDefinition.progressTarget,
+            string.Empty,
+            UtcNowUnix());
     }
 
     private void SkipCurrentPack()
@@ -600,54 +814,50 @@ public sealed class TutorialManager : MonoBehaviour
         if (_processingTransition || !IsSignalFromLocalGameplay(signal))
             return;
 
-        switch (signal.Type)
+        switch (_currentDefinition.completionTrigger)
         {
-            case TutorialSignalType.ItemAcquired:
-                if (signal.ItemType != Item.Egg)
-                    return;
-
-                if (CurrentStep == TutorialStepId.AcquireStarterEgg)
+            case TutorialCompletionTrigger.StarterEggAcquired:
+                if (signal.Type == TutorialSignalType.ItemAcquired && signal.ItemType == Item.Egg)
                 {
-                    _state.starterEggGranted = true;
-                    SaveState();
-                    CompleteCurrentStep();
-                }
-                else if (CurrentStep == TutorialStepId.MakeFirstExpansion)
-                {
+                    MarkTaskRewardGranted("acquire_starter_egg");
                     CompleteCurrentStep();
                 }
                 break;
 
-            case TutorialSignalType.EggPlaced:
-                if (CurrentStep == TutorialStepId.PlaceStarterEgg)
+            case TutorialCompletionTrigger.StarterEggPlaced:
+                if (signal.Type == TutorialSignalType.EggPlaced)
                     CompleteCurrentStep();
                 break;
 
-            case TutorialSignalType.AnimalHatched:
-                _state.starterAnimalGranted = true;
-                SaveState();
-                if (CurrentStep == TutorialStepId.HatchStarterEgg)
+            case TutorialCompletionTrigger.StarterAnimalHatched:
+                if (signal.Type == TutorialSignalType.AnimalHatched)
+                {
+                    MarkTaskRewardGranted("hatch_starter_egg");
+                    CompleteCurrentStep();
+                }
+                break;
+
+            case TutorialCompletionTrigger.FirstIncomeReady:
+                if (signal.Type == TutorialSignalType.IncomeReady)
                     CompleteCurrentStep();
                 break;
 
-            case TutorialSignalType.IncomeReady:
-                if (CurrentStep == TutorialStepId.WaitForFirstIncome)
+            case TutorialCompletionTrigger.FirstIncomeCollected:
+                if (signal.Type == TutorialSignalType.IncomeCollected && signal.Value > 0d)
                     CompleteCurrentStep();
                 break;
 
-            case TutorialSignalType.IncomeCollected:
-                if (CurrentStep == TutorialStepId.CollectFirstIncome && signal.Value > 0d)
+            case TutorialCompletionTrigger.FirstExpansionMade:
+                if ((signal.Type == TutorialSignalType.ItemAcquired && signal.ItemType == Item.Egg) ||
+                    signal.Type == TutorialSignalType.FieldUnlocked ||
+                    signal.Type == TutorialSignalType.ConveyorUpgraded)
+                {
                     CompleteCurrentStep();
+                }
                 break;
 
-            case TutorialSignalType.FieldUnlocked:
-            case TutorialSignalType.ConveyorUpgraded:
-                if (CurrentStep == TutorialStepId.MakeFirstExpansion)
-                    CompleteCurrentStep();
-                break;
-
-            case TutorialSignalType.AlbumRewardClaimed:
-                if (CurrentStep == TutorialStepId.ClaimAlbumReward)
+            case TutorialCompletionTrigger.AlbumRewardClaimed:
+                if (signal.Type == TutorialSignalType.AlbumRewardClaimed)
                     CompleteCurrentStep();
                 break;
         }
@@ -655,10 +865,10 @@ public sealed class TutorialManager : MonoBehaviour
 
     public int GetHatchDurationSeconds(Egg egg, int originalDurationSeconds)
     {
-        if (!_active || _state == null || egg == null || _state.starterAnimalGranted)
+        if (!_active || _state == null || egg == null || (_state.starterAnimalGranted && !_skipHatchCompensationPending))
             return originalDurationSeconds;
         TutorialTaskSaveData hatchState = _state.GetTaskState("hatch_starter_egg");
-        if (hatchState != null && hatchState.IsTerminal)
+        if (hatchState != null && hatchState.IsTerminal && !_skipHatchCompensationPending)
             return originalDurationSeconds;
         if (!string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
             return originalDurationSeconds;
@@ -669,10 +879,11 @@ public sealed class TutorialManager : MonoBehaviour
     public bool TryGetGuaranteedStarterAnimal(Egg egg, out Brainrot animal)
     {
         animal = null;
-        if (!_active || _state == null || _state.starterAnimalGranted || egg == null)
+        if ((!_active && !_skipHatchCompensationPending) || _state == null ||
+            (_state.starterAnimalGranted && !_skipHatchCompensationPending) || egg == null)
             return false;
         TutorialTaskSaveData hatchState = _state.GetTaskState("hatch_starter_egg");
-        if (hatchState != null && hatchState.IsTerminal)
+        if (hatchState != null && hatchState.IsTerminal && !_skipHatchCompensationPending)
             return false;
         if (!string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -832,40 +1043,39 @@ public sealed class TutorialManager : MonoBehaviour
 
     private Transform ResolveTargetForCurrentStep()
     {
-        switch (CurrentStep)
+        if (_currentDefinition == null)
+            return null;
+
+        switch (_currentDefinition.hintTarget)
         {
-            case TutorialStepId.FindHome:
-            case TutorialStepId.ReturnHome:
+            case TutorialHintTarget.LocalHome:
                 return GetRemoteBases()?.GetLocalSlotEntryPoint() ?? ResolveLocalRoot();
 
-            case TutorialStepId.ReachConveyor:
+            case TutorialHintTarget.LocalConveyor:
                 return FindLocalConveyor()?.transform;
 
-            case TutorialStepId.AcquireStarterEgg:
+            case TutorialHintTarget.StarterEggOffer:
                 return FindStarterEggOnConveyor()?.transform ?? FindLocalConveyor()?.transform;
 
-            case TutorialStepId.MakeFirstExpansion:
+            case TutorialHintTarget.ExpansionTarget:
                 return FindNearestExpansionTarget();
 
-            case TutorialStepId.PlaceStarterEgg:
+            case TutorialHintTarget.FreeLocalCell:
                 return FindLocalFreeCell()?.transform;
 
-            case TutorialStepId.HatchStarterEgg:
+            case TutorialHintTarget.LocalEggCell:
                 return FindLocalEggCell()?.transform;
 
-            case TutorialStepId.MeetStarterAnimal:
-            case TutorialStepId.WaitForFirstIncome:
+            case TutorialHintTarget.LocalAnimalCell:
                 return FindLocalAnimalCell()?.transform;
 
-            case TutorialStepId.CollectFirstIncome:
+            case TutorialHintTarget.CollectibleIncomeCell:
                 return (FindLocalAnimalCell(requireCollectibleIncome: true) ?? FindLocalAnimalCell())?.transform;
 
-            case TutorialStepId.ClaimAlbumReward:
+            case TutorialHintTarget.AlbumTarget:
                 return FindAlbumTarget();
 
-            case TutorialStepId.ContinueIndependently:
-                return FindLocalConveyor()?.transform;
-
+            case TutorialHintTarget.None:
             default:
                 return null;
         }
@@ -1205,6 +1415,10 @@ public sealed class TutorialManager : MonoBehaviour
             ["step_id"] = step.stableId,
             ["step_index"] = CurrentStepIndex,
             ["elapsed_sec"] = Math.Max(0L, now - stepStart),
+            ["progress_value"] = _currentTaskState != null ? _currentTaskState.progressValue : 0d,
+            ["progress_target"] = step.progressTarget,
+            ["activation_trigger"] = step.activationTrigger.ToString(),
+            ["completion_trigger"] = step.completionTrigger.ToString(),
             ["input_mode"] = G.Control != null && G.Control.UseTouchControl ? "touch" : "desktop",
             ["online_mode"] = LobbyClient.Instance != null && LobbyClient.Instance.IsOnline ? "online" : "offline"
         };

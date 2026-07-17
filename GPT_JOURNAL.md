@@ -967,3 +967,12 @@
 - Unity verification completed: compilation/setup validation passed; expanded/collapsed UI was inspected at `1280x720`, `800x600` and `390x844`; skip-current moved only `learn_movement` to `Skipped` and activated `find_home`.
 - Restored the test save to a fresh V2 `learn_movement` state and reset the collapse preference before stopping Play Mode.
 - Tomorrow: approve the new lesson/trigger table, implement individual activation/progress/completion/hint and safe `OnSkip` handlers, add rename/reorder tests, then run confirmation-popup, restart, RU/EN, offline/online and mobile end-to-end acceptance.
+
+### 2026-07-17 (Tutorial V2 task contracts and migration hardening)
+- Added explicit activation, start action, progress type/target, completion trigger, hint target and skip policy fields to every current tutorial definition; runtime activation, completion and target resolution now use those contracts.
+- Added idempotent compensation for critical single-task skips: ensure a starter-progress egg exists, place it into a free local cell, or finish hatching a placed egg so later prerequisites cannot be stranded.
+- Added one-way `stable_id` alias migration with conflict merging for status, progress, revision, reward and timestamps. Editor validation now covers alias correctness, merge preservation, future IDs and order-independent saved state.
+- Verified real confirmation popup flows for skip-current and skip-pack, exact active-ID resume after restart, RU/EN task copy, and live localization of an open popup in a scene without `LocalizationManager`.
+- Fixed `UniversalDecisionPopup` to use the shared localization fallback and react to fallback-language changes.
+- Restored the exact pre-test tutorial JSON (`learn_movement`, zero terminal tasks), legacy completion flag and collapse preference, then stopped Play Mode.
+- Remaining P0 acceptance: agree the revised lesson/content table; run the critical skip side effects on a disposable clean profile; complete desktop offline/online and mobile/touch end-to-end passes with local-target, reward and ad-grace assertions.
