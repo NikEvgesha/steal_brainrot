@@ -28,6 +28,7 @@ public class CurrencyManager : MonoBehaviour
 
     public double Gems { get { return _balance[CurrencyType.Gems]; } }
     public double Coins { get { return _balance[CurrencyType.Coins]; } }
+    public bool IsInitialized { get; private set; }
 
     public UnityEvent<CurrencyType, double> CurrencyChanged;
     public UnityEvent NoGems;
@@ -61,6 +62,7 @@ public class CurrencyManager : MonoBehaviour
         {
             Debug.LogWarning("[CurrencyManager] SaveManager is missing; currency will use runtime defaults only.");
             AddCurrency(CurrencyType.Coins, StartCoinsAmount);
+            IsInitialized = true;
             yield break;
         }
 
@@ -70,6 +72,7 @@ public class CurrencyManager : MonoBehaviour
         else
             AddCurrency(CurrencyType.Coins, coins);
         AddCurrency(CurrencyType.Gems, G.Save.GetGems());
+        IsInitialized = true;
     }
 
     private static IEnumerator WaitForSaveReady()

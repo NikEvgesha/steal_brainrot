@@ -7,16 +7,15 @@ public sealed class TutorialView : MonoBehaviour
 {
     private const string CollapsedPreferenceKey = "Tutorial.UI.Collapsed";
 
-    public event Action PrimaryPressed;
-    public event Action SecondaryPressed;
+    public event Action DonePressed;
 
     private TMP_Text _messageText;
     private TMP_Text _progressText;
-    private TMP_Text _primaryButtonText;
-    private TMP_Text _secondaryButtonText;
+    private TMP_Text _rewardText;
+    private TMP_Text _doneButtonText;
     private TMP_Text _collapseButtonText;
-    private Button _primaryButton;
-    private Button _secondaryButton;
+    private Image _rewardIcon;
+    private Button _doneButton;
     private Button _collapseButton;
     private RectTransform _panelViewport;
     private RectTransform _panelContent;
@@ -50,14 +49,12 @@ public sealed class TutorialView : MonoBehaviour
 
         _messageText = FindNamedComponent<TMP_Text>("Text_Message");
         _progressText = FindChild("Label_Name")?.GetComponentInChildren<TMP_Text>(true);
-        _primaryButton = FindNamedComponent<Button>("Button_SkipTask") ?? FindNamedComponent<Button>("Button_SkipText");
-        _secondaryButton = FindNamedComponent<Button>("Button_SkipAll") ?? FindNamedComponent<Button>("Button_SkipIcon");
+        _rewardText = FindNamedComponent<TMP_Text>("Reward_Text");
+        _rewardIcon = FindNamedComponent<Image>("Reward_Icon");
+        _doneButton = FindNamedComponent<Button>("Button_Done");
         _collapseButton = FindNamedComponent<Button>("Button_Collapse");
-        _primaryButtonText = _primaryButton != null
-            ? _primaryButton.GetComponentInChildren<TMP_Text>(true)
-            : null;
-        _secondaryButtonText = _secondaryButton != null
-            ? _secondaryButton.GetComponentInChildren<TMP_Text>(true)
+        _doneButtonText = _doneButton != null
+            ? _doneButton.GetComponentInChildren<TMP_Text>(true)
             : null;
         _collapseButtonText = _collapseButton != null
             ? _collapseButton.GetComponentInChildren<TMP_Text>(true)
@@ -77,19 +74,19 @@ public sealed class TutorialView : MonoBehaviour
                 progressRect.sizeDelta = new Vector2(Mathf.Max(340f, progressRect.sizeDelta.x), progressRect.sizeDelta.y);
         }
 
-        if (_primaryButton != null)
+        if (_doneButton != null)
         {
-            RectTransform primaryRect = _primaryButton.transform as RectTransform;
-            if (primaryRect != null && _panelContent == null)
-                primaryRect.sizeDelta = new Vector2(210f, 72f);
+            RectTransform doneRect = _doneButton.transform as RectTransform;
+            if (doneRect != null && _panelContent == null)
+                doneRect.sizeDelta = new Vector2(210f, 72f);
         }
 
-        if (_primaryButtonText != null)
+        if (_doneButtonText != null)
         {
-            _primaryButtonText.enableAutoSizing = true;
-            _primaryButtonText.fontSizeMin = 16f;
-            _primaryButtonText.fontSizeMax = 30f;
-            _primaryButtonText.textWrappingMode = TextWrappingModes.NoWrap;
+            _doneButtonText.enableAutoSizing = true;
+            _doneButtonText.fontSizeMin = 16f;
+            _doneButtonText.fontSizeMax = 30f;
+            _doneButtonText.textWrappingMode = TextWrappingModes.NoWrap;
         }
 
         RectTransform bubbleRect = _panelContent != null ? _panelContent : FindChild("SpeechBubble") as RectTransform;
@@ -140,16 +137,10 @@ public sealed class TutorialView : MonoBehaviour
             }
         }
 
-        if (_primaryButton != null)
+        if (_doneButton != null)
         {
-            _primaryButton.onClick.RemoveListener(OnPrimaryPressed);
-            _primaryButton.onClick.AddListener(OnPrimaryPressed);
-        }
-
-        if (_secondaryButton != null)
-        {
-            _secondaryButton.onClick.RemoveListener(OnSecondaryPressed);
-            _secondaryButton.onClick.AddListener(OnSecondaryPressed);
+            _doneButton.onClick.RemoveListener(OnDonePressed);
+            _doneButton.onClick.AddListener(OnDonePressed);
         }
 
         if (_collapseButton != null)
@@ -161,38 +152,26 @@ public sealed class TutorialView : MonoBehaviour
         SetWorldTarget(null);
     }
 
-    public void SetStep(string progress, string message, string primaryLabel, string secondaryLabel, bool isFinalStep)
+    public void SetStep(
+        string progress,
+        string message,
+        string reward,
+        Sprite rewardIcon,
+        string doneLabel,
+        bool isFinalStep)
     {
         if (_progressText != null)
             _progressText.text = progress ?? string.Empty;
         if (_messageText != null)
             _messageText.text = message ?? string.Empty;
-        if (_primaryButtonText != null)
-            _primaryButtonText.text = primaryLabel ?? string.Empty;
-        if (_secondaryButtonText != null)
-            _secondaryButtonText.text = secondaryLabel ?? string.Empty;
-
-        if (_primaryButton != null)
-            _primaryButton.gameObject.SetActive(true);
-        if (_secondaryButton != null)
-            _secondaryButton.gameObject.SetActive(!isFinalStep);
-    }
-
-    public void ShowInlineSkipConfirmation(string progress, string message, string confirmLabel, string cancelLabel)
-    {
-        if (_progressText != null)
-            _progressText.text = progress ?? string.Empty;
-        if (_messageText != null)
-            _messageText.text = message ?? string.Empty;
-        if (_primaryButtonText != null)
-            _primaryButtonText.text = confirmLabel ?? string.Empty;
-        if (_secondaryButtonText != null)
-            _secondaryButtonText.text = cancelLabel ?? string.Empty;
-
-        if (_primaryButton != null)
-            _primaryButton.gameObject.SetActive(true);
-        if (_secondaryButton != null)
-            _secondaryButton.gameObject.SetActive(true);
+        if (_rewardText != null)
+            _rewardText.text = reward ?? string.Empty;
+        if (_rewardIcon != null && rewardIcon != null)
+            _rewardIcon.sprite = rewardIcon;
+        if (_doneButtonText != null)
+            _doneButtonText.text = doneLabel ?? string.Empty;
+        if (_doneButton != null)
+            _doneButton.gameObject.SetActive(isFinalStep);
     }
 
     public void SetWorldTarget(Transform target)
@@ -303,14 +282,9 @@ public sealed class TutorialView : MonoBehaviour
         _directionArrow.gameObject.SetActive(true);
     }
 
-    private void OnPrimaryPressed()
+    private void OnDonePressed()
     {
-        PrimaryPressed?.Invoke();
-    }
-
-    private void OnSecondaryPressed()
-    {
-        SecondaryPressed?.Invoke();
+        DonePressed?.Invoke();
     }
 
     private void OnCollapsePressed()
@@ -335,10 +309,8 @@ public sealed class TutorialView : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_primaryButton != null)
-            _primaryButton.onClick.RemoveListener(OnPrimaryPressed);
-        if (_secondaryButton != null)
-            _secondaryButton.onClick.RemoveListener(OnSecondaryPressed);
+        if (_doneButton != null)
+            _doneButton.onClick.RemoveListener(OnDonePressed);
         if (_collapseButton != null)
             _collapseButton.onClick.RemoveListener(OnCollapsePressed);
     }

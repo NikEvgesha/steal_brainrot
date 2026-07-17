@@ -976,3 +976,13 @@
 - Fixed `UniversalDecisionPopup` to use the shared localization fallback and react to fallback-language changes.
 - Restored the exact pre-test tutorial JSON (`learn_movement`, zero terminal tasks), legacy completion flag and collapse preference, then stopped Play Mode.
 - Remaining P0 acceptance: agree the revised lesson/content table; run the critical skip side effects on a disposable clean profile; complete desktop offline/online and mobile/touch end-to-end passes with local-target, reward and ad-grace assertions.
+
+### 2026-07-17 (Tutorial completion gems; skip removed)
+- Added a definition-level completion reward to every current lesson: `1` gem for steps 1–4, `2` for steps 5–9 and `3` for steps 10–13 (`26` total).
+- Added schema V3 field `completionRewardGranted`, persisted before currency mutation. Repeated delivery of the same completion cannot grant the reward twice.
+- Added an explicit `CurrencyManager.IsInitialized` barrier; tutorial startup now waits until the saved balance is loaded before any completion reward can be granted.
+- V1/V2 terminal tasks migrate as already settled so existing completed/skipped saves do not receive an unexpected retroactive currency payout; historical `Skipped` remains readable only for save compatibility.
+- Removed skip-current, skip-pack, confirmation popup flow, critical skip compensation and all skip buttons from tutorial UI/runtime. The only task button is `Done` on the final manual-confirmation step.
+- Rebuilt the editable upper-right prefab with a gem reward badge and localized `UI/Tutorial/Reward` label.
+- Live Unity check: no skip objects, `Награда: +1` visible, first completion changed gems `14 -> 15`, repeated completion stayed at `15` with `completionRewardGranted=true`.
+- Final Play smoke confirmed `currencyReady=true`, `14` gems and visible `Награда: +1`. Restored the exact pre-test tutorial save, gems and collapse preference; Play Mode stopped. Validator passed for 13 steps, prefab and 31 active RU/EN keys.

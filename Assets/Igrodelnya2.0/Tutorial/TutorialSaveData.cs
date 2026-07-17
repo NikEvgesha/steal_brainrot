@@ -19,6 +19,7 @@ public sealed class TutorialTaskSaveData
     public string progressJson = string.Empty;
     public double progressValue;
     public bool rewardGranted;
+    public bool completionRewardGranted;
     public long startedUnix;
     public long updatedUnix;
     public long completedUnix;
@@ -29,7 +30,7 @@ public sealed class TutorialTaskSaveData
 [Serializable]
 public sealed class TutorialSaveData
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int version = CurrentVersion;
 
@@ -63,17 +64,23 @@ public sealed class TutorialSaveData
     public bool Normalize(bool legacyTutorialCompleted = false)
     {
         bool changed = false;
+        int loadedVersion = version;
+        bool migratedLegacy = false;
         if (taskStates == null)
         {
             taskStates = new List<TutorialTaskSaveData>();
             changed = true;
         }
 
-        if (!perStepInitialized || version < CurrentVersion)
+        if (!perStepInitialized || version < 2)
         {
             MigrateLegacy(legacyTutorialCompleted);
+            migratedLegacy = true;
             changed = true;
         }
+
+        if (migratedLegacy || loadedVersion < 3)
+            changed |= BackfillPreRewardCompletionStates();
 
         changed |= ApplyStableIdAliases();
         changed |= RemoveInvalidAndDuplicateStates();
@@ -344,6 +351,24 @@ public sealed class TutorialSaveData
         return changed;
     }
 
+    private bool BackfillPreRewardCompletionStates()
+    {
+        bool changed = false;
+        for (int i = 0; i < taskStates.Count; i++)
+        {
+            TutorialTaskSaveData state = taskStates[i];
+            if (state == null || !state.IsTerminal || state.completionRewardGranted)
+                continue;
+
+            // Completion rewards did not exist before schema V3. Mark historical
+            // terminal tasks as settled instead of granting currency on migration.
+            state.completionRewardGranted = true;
+            changed = true;
+        }
+
+        return changed;
+    }
+
     private static void MergeTaskState(TutorialTaskSaveData destination, TutorialTaskSaveData source)
     {
         if (destination == null || source == null)
@@ -364,6 +389,7 @@ public sealed class TutorialSaveData
 
         destination.definitionRevision = Math.Max(destination.definitionRevision, source.definitionRevision);
         destination.rewardGranted |= source.rewardGranted;
+        destination.completionRewardGranted |= source.completionRewardGranted;
         destination.startedUnix = MinPositive(destination.startedUnix, source.startedUnix);
         destination.updatedUnix = Math.Max(destination.updatedUnix, source.updatedUnix);
         destination.completedUnix = Math.Max(destination.completedUnix, source.completedUnix);

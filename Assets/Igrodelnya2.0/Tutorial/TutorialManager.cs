@@ -6,13 +6,6 @@ using UnityEngine.UI;
 
 public sealed class TutorialManager : MonoBehaviour
 {
-    private enum SkipRequestScope
-    {
-        None,
-        CurrentTask,
-        CurrentPack
-    }
-
     private const string ViewResourcePath = "Tutorial/TutorialView";
     private const string StarterEggId = "egg1";
     private const string StarterAnimalId = "Capybara";
@@ -41,12 +34,9 @@ public sealed class TutorialManager : MonoBehaviour
     private bool _active;
     private bool _schedulerReady;
     private bool _processingTransition;
-    private bool _inlineSkipConfirmation;
-    private SkipRequestScope _pendingSkipScope;
     private float _nextStarterOfferAttempt;
     private bool _starterOfferErrorLogged;
     private Egg _starterOfferEgg;
-    private bool _skipHatchCompensationPending;
     private Coroutine _startRoutine;
 #if UNITY_EDITOR
     private bool _editorDebugFreezeProgress;
@@ -132,7 +122,7 @@ public sealed class TutorialManager : MonoBehaviour
 
     private IEnumerator StartWhenReady()
     {
-        while (G.Save == null || !G.Save.IsReady || G.Player == null ||
+        while (G.Save == null || !G.Save.IsReady || G.Currency == null || !G.Currency.IsInitialized || G.Player == null ||
                G.Inventory == null || !G.Inventory.IsInitialized || G.Storage == null)
         {
             yield return null;
@@ -316,7 +306,7 @@ public sealed class TutorialManager : MonoBehaviour
             case TutorialCompletionTrigger.StarterEggAcquired:
                 if (HasStarterProgressItem())
                 {
-                    MarkTaskRewardGranted("acquire_starter_egg");
+                    MarkStarterSideEffectGranted("acquire_starter_egg");
                     CompleteCurrentStep();
                 }
                 else if (activeFor >= 0.4f && Time.unscaledTime >= _nextStarterOfferAttempt)
@@ -334,7 +324,7 @@ public sealed class TutorialManager : MonoBehaviour
             case TutorialCompletionTrigger.StarterAnimalHatched:
                 if (FindLocalAnimalCell() != null)
                 {
-                    MarkTaskRewardGranted("hatch_starter_egg");
+                    MarkStarterSideEffectGranted("hatch_starter_egg");
                     CompleteCurrentStep();
                 }
                 break;
@@ -395,8 +385,6 @@ public sealed class TutorialManager : MonoBehaviour
         _lastSavedMovementProgress = _movementDistance;
         _lastMovementPosition = G.Player != null ? G.Player.transform.position : Vector3.zero;
         _nextStarterOfferAttempt = 0f;
-        _inlineSkipConfirmation = false;
-        _pendingSkipScope = SkipRequestScope.None;
 
         _uiBlocker?.SetAlbumAllowed(CurrentStep == TutorialStepId.ClaimAlbumReward);
         RefreshView();
@@ -416,10 +404,11 @@ public sealed class TutorialManager : MonoBehaviour
             ClearStarterEggOffer();
 
         CompleteCurrentProgress();
-        Dictionary<string, object> finalParameters = BuildStepParameters();
-        LogEvent("tutorial_step_completed", finalParameters);
         _state.MarkTerminal(CurrentStableId, wasSkipped: false, UtcNowUnix());
         SaveState();
+        GrantCurrentCompletionReward();
+        Dictionary<string, object> finalParameters = BuildStepParameters();
+        LogEvent("tutorial_step_completed", finalParameters);
         AdvanceAfterTerminal(finalParameters, "tutorial_completed");
         _processingTransition = false;
     }
@@ -467,11 +456,6 @@ public sealed class TutorialManager : MonoBehaviour
         _nextActivationScan = Time.unscaledTime + 1f;
     }
 
-    public void QuickStopTutorial()
-    {
-        RequestSkip(SkipRequestScope.CurrentPack);
-    }
-
 #if UNITY_EDITOR
     public void EditorDebugSetStep(int stepIndex)
     {
@@ -491,225 +475,7 @@ public sealed class TutorialManager : MonoBehaviour
     }
 #endif
 
-    private void RequestSkip(SkipRequestScope scope)
-    {
-        if (!_active || scope == SkipRequestScope.None)
-            return;
-
-        bool skipPack = scope == SkipRequestScope.CurrentPack;
-        string titleKey = skipPack ? "UI/Tutorial/SkipAllTitle" : "UI/Tutorial/SkipTaskTitle";
-        string titleFallback = skipPack ? "Skip all current lessons?" : "Skip this task?";
-        string descriptionKey = skipPack ? "UI/Tutorial/SkipAllDescription" : "UI/Tutorial/SkipTaskDescription";
-        string descriptionFallback = skipPack
-            ? "All currently known lessons will be skipped. New lessons added later may still appear."
-            : "Only this task will be skipped. The next available lesson can still appear.";
-        string confirmKey = skipPack ? "UI/Tutorial/SkipAll" : "UI/Tutorial/SkipTask";
-        string confirmFallback = skipPack ? "Skip all" : "Skip task";
-
-        var request = new UniversalDecisionPopup.Request
-        {
-            title = new UniversalDecisionPopup.LocalizedTextPayload(titleKey, titleFallback),
-            description = new UniversalDecisionPopup.LocalizedTextPayload(descriptionKey, descriptionFallback),
-            confirm = new UniversalDecisionPopup.LocalizedTextPayload(confirmKey, confirmFallback),
-            cancel = new UniversalDecisionPopup.LocalizedTextPayload("UI/Tutorial/SkipCancel", "Continue"),
-            onConfirm = () => ConfirmSkip(scope),
-            onCancel = CancelInlineSkipConfirmation
-        };
-
-        if (FriendsPanelController.TryShowPopup(request))
-            return;
-
-        UniversalDecisionPopup popup = FindAnyObjectByType<UniversalDecisionPopup>(FindObjectsInactive.Include);
-        if (popup != null)
-        {
-            popup.Show(request);
-            return;
-        }
-
-        _inlineSkipConfirmation = true;
-        _pendingSkipScope = scope;
-        _view?.ShowInlineSkipConfirmation(
-            L(titleKey, titleFallback),
-            L(descriptionKey, descriptionFallback),
-            L(confirmKey, confirmFallback),
-            L("UI/Tutorial/SkipCancel", "Continue"));
-    }
-
-    private void ConfirmSkip(SkipRequestScope scope)
-    {
-        _inlineSkipConfirmation = false;
-        _pendingSkipScope = SkipRequestScope.None;
-        if (scope == SkipRequestScope.CurrentPack)
-            SkipCurrentPack();
-        else if (scope == SkipRequestScope.CurrentTask)
-            SkipCurrentTask();
-    }
-
-    private void SkipCurrentTask()
-    {
-        if (!_active || _state == null || _currentDefinition == null || _processingTransition)
-            return;
-
-        _processingTransition = true;
-        if (!ApplySkipPolicy(_currentDefinition.skipPolicy))
-        {
-            _processingTransition = false;
-            RefreshView();
-            return;
-        }
-
-        if (CurrentStep == TutorialStepId.AcquireStarterEgg)
-            ClearStarterEggOffer();
-
-        Dictionary<string, object> parameters = BuildStepParameters();
-        LogEvent("tutorial_step_skipped", parameters);
-        _state.MarkTerminal(CurrentStableId, wasSkipped: true, UtcNowUnix());
-        SaveState();
-        AdvanceAfterTerminal(parameters, "tutorial_completed");
-        _processingTransition = false;
-    }
-
-    private bool ApplySkipPolicy(TutorialSkipPolicy policy)
-    {
-        switch (policy)
-        {
-            case TutorialSkipPolicy.EnsureStarterEggInInventory:
-                return EnsureStarterEggInInventory();
-            case TutorialSkipPolicy.EnsureStarterEggPlaced:
-                return EnsureStarterEggPlaced();
-            case TutorialSkipPolicy.EnsureStarterAnimalHatched:
-                return EnsureStarterAnimalHatched();
-            case TutorialSkipPolicy.MarkSkipped:
-            default:
-                return true;
-        }
-    }
-
-    private bool EnsureStarterEggInInventory()
-    {
-        if (FindLocalEggCell() != null || FindLocalAnimalCell() != null)
-            return true;
-
-        InventoryItem existing = FindInventoryEgg();
-        if (existing != null)
-        {
-            MarkTaskRewardGranted("acquire_starter_egg", saveImmediately: false);
-            return true;
-        }
-
-        Egg prefab = G.Storage != null ? G.Storage.GetEgg(StarterEggId) : null;
-        if (prefab == null || G.Inventory == null)
-        {
-            Debug.LogWarning("[Tutorial] Cannot compensate skipped starter-egg task: storage or inventory is unavailable.");
-            return false;
-        }
-
-        Egg egg = Instantiate(prefab);
-        BrainrotDinamicData data = egg.Data.DinamicData;
-        data.ElementType = ElementType.NoElement;
-        data.WeightMultiplier = 1f;
-        data.ResultIncome = 0d;
-        egg.SetData(data);
-        G.Inventory.Add(egg);
-        MarkTaskRewardGranted("acquire_starter_egg", saveImmediately: false);
-        return true;
-    }
-
-    private bool EnsureStarterEggPlaced()
-    {
-        if (FindLocalEggCell() != null || FindLocalAnimalCell() != null)
-            return true;
-        if (!EnsureStarterEggInInventory())
-            return false;
-
-        InventoryItem item = FindInventoryEgg();
-        FieldCell cell = FindLocalFreeCell();
-        Egg egg = item != null ? item.GetComponent<Egg>() : null;
-        if (item == null || egg == null || cell == null || cell.IsRemoteMode || G.QuickAccess == null)
-        {
-            Debug.LogWarning("[Tutorial] Cannot compensate skipped placement task: no local egg or free cell is available.");
-            return false;
-        }
-
-        G.Inventory.Remove(item);
-        item.transform.SetParent(cell.transform, false);
-        item.transform.localPosition = Vector3.zero;
-        item.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        item.gameObject.SetActive(true);
-        egg.InitTimer(cell);
-        cell.UpdateFieldItem(Item.Egg);
-        TutorialSignals.Raise(TutorialSignalType.EggPlaced, cell, item.Name, Item.Egg);
-        return true;
-    }
-
-    private bool EnsureStarterAnimalHatched()
-    {
-        if (FindLocalAnimalCell() != null)
-        {
-            MarkTaskRewardGranted("hatch_starter_egg", saveImmediately: false);
-            return true;
-        }
-
-        FieldCell cell = FindLocalEggCell();
-        Egg egg = cell != null ? cell.CurrentEgg : null;
-        if (cell == null || egg == null || cell.IsRemoteMode)
-        {
-            Debug.LogWarning("[Tutorial] Cannot compensate skipped hatch task: no local placed egg is available.");
-            return false;
-        }
-
-        _skipHatchCompensationPending = true;
-        egg.SpeedBoostInstant();
-        StartCoroutine(CompleteSkippedHatch(cell, egg));
-        return true;
-    }
-
-    private IEnumerator CompleteSkippedHatch(FieldCell cell, Egg egg)
-    {
-        float readyDeadline = Time.realtimeSinceStartup + 3f;
-        while (egg != null && egg.Status != EggStatus.ReadyToHatch && Time.realtimeSinceStartup < readyDeadline)
-            yield return null;
-
-        if (egg != null && cell != null && egg.Status == EggStatus.ReadyToHatch)
-            cell._Hatch();
-
-        float hatchDeadline = Time.realtimeSinceStartup + 12f;
-        while (FindLocalAnimalCell() == null && Time.realtimeSinceStartup < hatchDeadline)
-            yield return null;
-
-        if (FindLocalAnimalCell() != null)
-            MarkTaskRewardGranted("hatch_starter_egg");
-        else
-            Debug.LogWarning("[Tutorial] Skipped hatch compensation timed out; the placed egg remains ready for manual hatching.");
-
-        _skipHatchCompensationPending = false;
-        _nextActivationScan = 0f;
-    }
-
-    private InventoryItem FindInventoryEgg()
-    {
-        if (G.Inventory == null)
-            return null;
-        var eggs = G.Inventory.GetItems(Item.Egg);
-        if (eggs == null)
-            return null;
-
-        InventoryItem fallback = null;
-        for (int i = 0; i < eggs.Count; i++)
-        {
-            InventoryItem item = eggs[i];
-            if (item == null)
-                continue;
-            if (string.Equals(item.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
-                return item;
-            if (fallback == null)
-                fallback = item;
-        }
-
-        return fallback;
-    }
-
-    private void MarkTaskRewardGranted(string stableId, bool saveImmediately = true)
+    private void MarkStarterSideEffectGranted(string stableId, bool saveImmediately = true)
     {
         if (_state == null)
             return;
@@ -741,65 +507,45 @@ public sealed class TutorialManager : MonoBehaviour
             UtcNowUnix());
     }
 
-    private void SkipCurrentPack()
+    private bool GrantCurrentCompletionReward()
     {
-        if (!_active || _state == null || _currentDefinition == null || _processingTransition)
-            return;
-
-        _processingTransition = true;
-        Dictionary<string, object> parameters = BuildStepParameters();
-        string packId = _currentDefinition.packId;
-        long now = UtcNowUnix();
-        for (int i = 0; i < TutorialStepCatalog.Steps.Length; i++)
+        if (_state == null || _currentDefinition == null || _currentTaskState == null ||
+            _currentTaskState.completionRewardGranted)
         {
-            TutorialStepDefinition definition = TutorialStepCatalog.Steps[i];
-            if (!string.Equals(definition.packId, packId, StringComparison.Ordinal))
-                continue;
-            TutorialTaskSaveData state = _state.GetOrCreateTaskState(definition);
-            if (state != null && !state.IsTerminal)
-                _state.MarkTerminal(definition.stableId, wasSkipped: true, now);
+            return false;
         }
 
-        ClearStarterEggOffer();
+        int amount = Mathf.Clamp(_currentDefinition.completionRewardGems, 1, 3);
+        if (G.Currency == null)
+        {
+            Debug.LogError($"[Tutorial] Cannot grant {amount} gems for '{CurrentStableId}': CurrencyManager is unavailable.");
+            return false;
+        }
+
+        // Persist the idempotence flag before mutating the currency balance. This
+        // prevents duplicate rewards if completion is delivered more than once.
+        _currentTaskState.completionRewardGranted = true;
+        _currentTaskState.updatedUnix = UtcNowUnix();
         SaveState();
-        LogEvent("tutorial_skipped", parameters);
-        AdvanceAfterTerminal(parameters, terminalEventName: null);
-        _processingTransition = false;
+
+        try
+        {
+            G.Currency.AddCurrency(CurrencyType.Gems, amount);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _currentTaskState.completionRewardGranted = false;
+            SaveState();
+            Debug.LogError($"[Tutorial] Failed to grant completion reward for '{CurrentStableId}': {ex.Message}");
+            return false;
+        }
     }
 
-    private void CancelInlineSkipConfirmation()
-    {
-        if (!_inlineSkipConfirmation)
-            return;
-
-        _inlineSkipConfirmation = false;
-        _pendingSkipScope = SkipRequestScope.None;
-        RefreshView();
-    }
-
-    private void OnPrimaryPressed()
+    private void OnDonePressed()
     {
         if (CurrentStep == TutorialStepId.ContinueIndependently)
-        {
             CompleteCurrentStep();
-            return;
-        }
-
-        if (_inlineSkipConfirmation)
-        {
-            ConfirmSkip(_pendingSkipScope);
-            return;
-        }
-
-        RequestSkip(SkipRequestScope.CurrentTask);
-    }
-
-    private void OnSecondaryPressed()
-    {
-        if (_inlineSkipConfirmation)
-            CancelInlineSkipConfirmation();
-        else
-            RequestSkip(SkipRequestScope.CurrentPack);
     }
 
     private void OnTutorialSignal(TutorialSignal signal)
@@ -819,7 +565,7 @@ public sealed class TutorialManager : MonoBehaviour
             case TutorialCompletionTrigger.StarterEggAcquired:
                 if (signal.Type == TutorialSignalType.ItemAcquired && signal.ItemType == Item.Egg)
                 {
-                    MarkTaskRewardGranted("acquire_starter_egg");
+                    MarkStarterSideEffectGranted("acquire_starter_egg");
                     CompleteCurrentStep();
                 }
                 break;
@@ -832,7 +578,7 @@ public sealed class TutorialManager : MonoBehaviour
             case TutorialCompletionTrigger.StarterAnimalHatched:
                 if (signal.Type == TutorialSignalType.AnimalHatched)
                 {
-                    MarkTaskRewardGranted("hatch_starter_egg");
+                    MarkStarterSideEffectGranted("hatch_starter_egg");
                     CompleteCurrentStep();
                 }
                 break;
@@ -865,10 +611,10 @@ public sealed class TutorialManager : MonoBehaviour
 
     public int GetHatchDurationSeconds(Egg egg, int originalDurationSeconds)
     {
-        if (!_active || _state == null || egg == null || (_state.starterAnimalGranted && !_skipHatchCompensationPending))
+        if (!_active || _state == null || egg == null || _state.starterAnimalGranted)
             return originalDurationSeconds;
         TutorialTaskSaveData hatchState = _state.GetTaskState("hatch_starter_egg");
-        if (hatchState != null && hatchState.IsTerminal && !_skipHatchCompensationPending)
+        if (hatchState != null && hatchState.IsTerminal)
             return originalDurationSeconds;
         if (!string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
             return originalDurationSeconds;
@@ -879,11 +625,10 @@ public sealed class TutorialManager : MonoBehaviour
     public bool TryGetGuaranteedStarterAnimal(Egg egg, out Brainrot animal)
     {
         animal = null;
-        if ((!_active && !_skipHatchCompensationPending) || _state == null ||
-            (_state.starterAnimalGranted && !_skipHatchCompensationPending) || egg == null)
+        if (!_active || _state == null || _state.starterAnimalGranted || egg == null)
             return false;
         TutorialTaskSaveData hatchState = _state.GetTaskState("hatch_starter_egg");
-        if (hatchState != null && hatchState.IsTerminal && !_skipHatchCompensationPending)
+        if (hatchState != null && hatchState.IsTerminal)
             return false;
         if (!string.Equals(egg.Name, StarterEggId, StringComparison.OrdinalIgnoreCase))
             return false;
@@ -1334,8 +1079,7 @@ public sealed class TutorialManager : MonoBehaviour
         if (_view == null)
             _view = viewObject.AddComponent<TutorialView>();
         _view.Initialize();
-        _view.PrimaryPressed += OnPrimaryPressed;
-        _view.SecondaryPressed += OnSecondaryPressed;
+        _view.DonePressed += OnDonePressed;
         _uiBlocker?.Begin(_view);
     }
 
@@ -1373,12 +1117,15 @@ public sealed class TutorialManager : MonoBehaviour
             Mathf.Min(TutorialStepCatalog.Steps.Length, _state.CountTerminalKnownSteps() + 1),
             TutorialStepCatalog.Steps.Length);
         bool final = CurrentStep == TutorialStepId.ContinueIndependently;
-        string button = final
-            ? L("UI/Tutorial/Done", "Done")
-            : L("UI/Tutorial/SkipTask", "Skip task");
-        string secondaryButton = L("UI/Tutorial/SkipAll", "Skip all");
+        string reward = LocalizationUtils.Format(
+            "UI/Tutorial/Reward",
+            "Reward: +{0}",
+            step.completionRewardGems);
+        Sprite rewardIcon = G.Currency != null
+            ? G.Currency.GetCurrencyIcon(CurrencyType.Gems)
+            : null;
 
-        _view.SetStep(progress, message, button, secondaryButton, final);
+        _view.SetStep(progress, message, reward, rewardIcon, L("UI/Tutorial/Done", "Done"), final);
         _view.SetWorldTarget(_currentTarget);
     }
 
@@ -1419,6 +1166,8 @@ public sealed class TutorialManager : MonoBehaviour
             ["progress_target"] = step.progressTarget,
             ["activation_trigger"] = step.activationTrigger.ToString(),
             ["completion_trigger"] = step.completionTrigger.ToString(),
+            ["completion_reward_gems"] = step.completionRewardGems,
+            ["completion_reward_granted"] = _currentTaskState != null && _currentTaskState.completionRewardGranted,
             ["input_mode"] = G.Control != null && G.Control.UseTouchControl ? "touch" : "desktop",
             ["online_mode"] = LobbyClient.Instance != null && LobbyClient.Instance.IsOnline ? "online" : "offline"
         };
@@ -1451,22 +1200,6 @@ public sealed class TutorialManager : MonoBehaviour
 
     private void OnLanguageChanged(string _)
     {
-        if (_inlineSkipConfirmation)
-        {
-            bool skipPack = _pendingSkipScope == SkipRequestScope.CurrentPack;
-            _view?.ShowInlineSkipConfirmation(
-                L(skipPack ? "UI/Tutorial/SkipAllTitle" : "UI/Tutorial/SkipTaskTitle",
-                    skipPack ? "Skip all current lessons?" : "Skip this task?"),
-                L(skipPack ? "UI/Tutorial/SkipAllDescription" : "UI/Tutorial/SkipTaskDescription",
-                    skipPack
-                        ? "All currently known lessons will be skipped. New lessons added later may still appear."
-                        : "Only this task will be skipped. The next available lesson can still appear."),
-                L(skipPack ? "UI/Tutorial/SkipAll" : "UI/Tutorial/SkipTask",
-                    skipPack ? "Skip all" : "Skip task"),
-                L("UI/Tutorial/SkipCancel", "Continue"));
-            return;
-        }
-
         RefreshView();
     }
 

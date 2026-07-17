@@ -14,32 +14,10 @@ public static class TutorialV1EditorTools
     private static readonly Dictionary<string, string[]> Translations = new(StringComparer.Ordinal)
     {
         ["UI/Tutorial/Progress"] = new[] { "Обучение {0}/{1}", "Tutorial {0}/{1}" },
-        ["UI/Tutorial/Skip"] = new[] { "Пропустить", "Skip" },
-        ["UI/Tutorial/SkipTask"] = new[] { "Пропустить задание", "Skip task" },
-        ["UI/Tutorial/SkipAll"] = new[] { "Пропустить всё", "Skip all" },
-        ["UI/Tutorial/SkipTaskTitle"] = new[] { "Пропустить это задание?", "Skip this task?" },
-        ["UI/Tutorial/SkipTaskDescription"] = new[]
-        {
-            "Будет пропущено только это задание. Следующее доступное обучение всё ещё сможет появиться.",
-            "Only this task will be skipped. The next available lesson can still appear."
-        },
-        ["UI/Tutorial/SkipAllTitle"] = new[] { "Пропустить все текущие задания?", "Skip all current lessons?" },
-        ["UI/Tutorial/SkipAllDescription"] = new[]
-        {
-            "Все известные сейчас задания будут пропущены. Новое обучение из будущих обновлений всё ещё может появиться.",
-            "All currently known lessons will be skipped. New lessons added later may still appear."
-        },
+        ["UI/Tutorial/Reward"] = new[] { "Награда: +{0}", "Reward: +{0}" },
         ["UI/Tutorial/Collapse"] = new[] { "Свернуть", "Collapse" },
         ["UI/Tutorial/Expand"] = new[] { "Развернуть", "Expand" },
         ["UI/Tutorial/Done"] = new[] { "Готово", "Done" },
-        ["UI/Tutorial/SkipTitle"] = new[] { "Пропустить обучение?", "Skip tutorial?" },
-        ["UI/Tutorial/SkipDescription"] = new[]
-        {
-            "Можно продолжить без подсказок. Стартовая награда не будет выдана повторно.",
-            "You can continue without hints. The starter reward will not be issued again."
-        },
-        ["UI/Tutorial/SkipConfirm"] = new[] { "Пропустить", "Skip" },
-        ["UI/Tutorial/SkipCancel"] = new[] { "Продолжить", "Continue" },
         ["UI/Tutorial/Step/learn_movement/Desktop"] = new[]
         {
             "Используйте WASD, чтобы пройти несколько метров. Удерживайте правую кнопку мыши для обзора.",
@@ -272,11 +250,31 @@ public static class TutorialV1EditorTools
         message.textWrappingMode = TextWrappingModes.Normal;
         message.text = "Текущее задание";
 
-        Button skipTask = CreateButton("Button_SkipTask", panel.transform, font, "Пропустить задание", new Color(0.22f, 0.47f, 0.78f, 1f));
-        SetRect(skipTask.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-190f, 14f), new Vector2(174f, 48f));
+        GameObject rewardBadge = CreateImageObject("RewardBadge", panel.transform, new Color(0.96f, 0.72f, 0.18f, 1f));
+        SetRect(rewardBadge.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-14f, 14f), new Vector2(190f, 48f));
+        Outline rewardOutline = rewardBadge.AddComponent<Outline>();
+        rewardOutline.effectColor = new Color(0.18f, 0.1f, 0.03f, 1f);
+        rewardOutline.effectDistance = new Vector2(3f, -3f);
 
-        Button skipAll = CreateButton("Button_SkipAll", panel.transform, font, "Пропустить всё", new Color(0.58f, 0.3f, 0.22f, 1f));
-        SetRect(skipAll.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-14f, 14f), new Vector2(160f, 48f));
+        GameObject rewardIcon = CreateImageObject("Reward_Icon", rewardBadge.transform, Color.white);
+        SetRect(rewardIcon.transform as RectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(36f, 36f));
+        Image rewardIconImage = rewardIcon.GetComponent<Image>();
+        rewardIconImage.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Sprites/ItemIcon_Gem_Pentagon_Purple.png");
+        rewardIconImage.preserveAspect = true;
+        rewardIconImage.raycastTarget = false;
+
+        TMP_Text rewardText = CreateText("Reward_Text", rewardBadge.transform, font, 22f, FontStyles.Bold, TextAlignmentOptions.Center);
+        SetRect(rewardText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(20f, 0f), new Vector2(-52f, -8f));
+        rewardText.color = new Color(0.16f, 0.08f, 0.02f, 1f);
+        rewardText.enableAutoSizing = true;
+        rewardText.fontSizeMin = 14f;
+        rewardText.fontSizeMax = 22f;
+        rewardText.textWrappingMode = TextWrappingModes.NoWrap;
+        rewardText.text = "Награда: +1";
+
+        Button done = CreateButton("Button_Done", panel.transform, font, "Готово", new Color(0.22f, 0.62f, 0.32f, 1f));
+        SetRect(done.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-214f, 14f), new Vector2(160f, 48f));
+        done.gameObject.SetActive(false);
 
         Button collapse = CreateButton("Button_Collapse", root.transform, font, "<", new Color(0.22f, 0.47f, 0.78f, 1f));
         SetRect(collapse.transform as RectTransform, Vector2.one, Vector2.one, Vector2.one, new Vector2(-14f, -116f), new Vector2(48f, 48f));
@@ -389,25 +387,12 @@ public static class TutorialV1EditorTools
                 errors.Add($"Step '{step.stableId}' has invalid definition revision {step.definitionRevision}.");
             if (step != null && step.progressTarget <= 0d)
                 errors.Add($"Step '{step.stableId}' has no positive progress target.");
+            if (step != null && (step.completionRewardGems < 1 || step.completionRewardGems > 3))
+                errors.Add($"Step '{step.stableId}' has invalid completion reward {step.completionRewardGems}; expected 1..3 gems.");
             if (step != null && step.completionTrigger == TutorialCompletionTrigger.ReachHintTarget &&
                 step.hintTarget == TutorialHintTarget.None)
             {
                 errors.Add($"Step '{step.stableId}' completes at a target but has no hint target resolver.");
-            }
-            if (step != null && step.skipPolicy == TutorialSkipPolicy.EnsureStarterEggInInventory &&
-                step.completionTrigger != TutorialCompletionTrigger.StarterEggAcquired)
-            {
-                errors.Add($"Step '{step.stableId}' has a starter-egg skip policy with an incompatible completion trigger.");
-            }
-            if (step != null && step.skipPolicy == TutorialSkipPolicy.EnsureStarterEggPlaced &&
-                step.completionTrigger != TutorialCompletionTrigger.StarterEggPlaced)
-            {
-                errors.Add($"Step '{step.stableId}' has a placement skip policy with an incompatible completion trigger.");
-            }
-            if (step != null && step.skipPolicy == TutorialSkipPolicy.EnsureStarterAnimalHatched &&
-                step.completionTrigger != TutorialCompletionTrigger.StarterAnimalHatched)
-            {
-                errors.Add($"Step '{step.stableId}' has a hatch skip policy with an incompatible completion trigger.");
             }
         }
 
@@ -479,6 +464,24 @@ public static class TutorialV1EditorTools
         legacyCompleted.Normalize(true);
         if (!legacyCompleted.AreAllKnownStepsTerminal())
             errors.Add("Completed V1 save did not migrate all known tasks to terminal states.");
+        for (int i = 0; i < legacyCompleted.taskStates.Count; i++)
+        {
+            if (!legacyCompleted.taskStates[i].completionRewardGranted)
+                errors.Add($"Historical terminal task '{legacyCompleted.taskStates[i].stableId}' was left eligible for a retroactive completion reward.");
+        }
+
+        var preRewardV2 = TutorialSaveData.CreateNew();
+        preRewardV2.Normalize(false);
+        preRewardV2.MarkTerminal("learn_movement", wasSkipped: false, now: 350);
+        preRewardV2.version = 2;
+        preRewardV2.GetTaskState("learn_movement").completionRewardGranted = false;
+        preRewardV2.Normalize(false);
+        TutorialTaskSaveData migratedReward = preRewardV2.GetTaskState("learn_movement");
+        if (migratedReward == null || migratedReward.status != TutorialTaskStatus.Completed ||
+            !migratedReward.completionRewardGranted)
+        {
+            errors.Add("V2 per-step reward migration replayed or left a historical completed task reward-eligible.");
+        }
 
         var futureDefinition = new TutorialStepDefinition(
             TutorialStepId.ContinueIndependently,
@@ -505,6 +508,7 @@ public static class TutorialV1EditorTools
                     progressValue = 3.5d,
                     progressJson = "{\"stage\":2}",
                     rewardGranted = true,
+                    completionRewardGranted = true,
                     startedUnix = 400,
                     updatedUnix = 500
                 },
@@ -521,9 +525,10 @@ public static class TutorialV1EditorTools
         TutorialTaskSaveData aliasResult = aliasMigration.GetTaskState("validation_new_id");
         if (aliasMigration.GetTaskState("validation_old_id") != null || aliasResult == null ||
             aliasResult.status != TutorialTaskStatus.Active || aliasResult.progressValue != 3.5d ||
-            !aliasResult.rewardGranted || aliasMigration.activeStepId != "validation_new_id")
+            !aliasResult.rewardGranted || !aliasResult.completionRewardGranted ||
+            aliasMigration.activeStepId != "validation_new_id")
         {
-            errors.Add("Stable-id alias migration did not preserve active status, progress, reward or active id.");
+            errors.Add("Stable-id alias migration did not preserve active status, progress, rewards or active id.");
         }
 
         var reorderedState = TutorialSaveData.CreateNew();
@@ -552,7 +557,7 @@ public static class TutorialV1EditorTools
         string[] requiredChildren =
         {
             "PanelViewport", "TutorialPanel", "Text_Message", "Label_Name",
-            "Button_SkipTask", "Button_SkipAll", "Button_Collapse", "Icon_Arrow"
+            "RewardBadge", "Reward_Icon", "Reward_Text", "Button_Done", "Button_Collapse", "Icon_Arrow"
         };
         Transform[] children = prefab.GetComponentsInChildren<Transform>(true);
         foreach (string childName in requiredChildren)

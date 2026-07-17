@@ -1,16 +1,16 @@
 # Localization TODO (separate backlog)
 
 ## Tutorial V1 coverage (2026-07-16)
-- [x] Added 33 editable RU/EN keys for tutorial progress, skip confirmation and all 13 desktop/touch steps.
+- [x] Added editable RU/EN keys for tutorial progress and all 13 desktop/touch steps.
 - [x] Added `Tools/Tutorial V1/Synchronize RU-EN Localization` and setup validation for missing/empty/corrupted values.
 - [x] Updated the starter-egg RU/EN copy to describe the real marked, free conveyor interaction instead of an automatic grant.
 - [x] Live Bridge checks confirmed RU/EN switching and tutorial layout at `1280x720`, `800x600` and portrait `390x844`.
 
 ## Tutorial V2 UI checkpoint (2026-07-17)
-- [x] Added editable RU/EN keys for skip-current, skip-current-pack, their confirmations, collapse and expand actions.
-- [x] Localization synchronization and setup validation cover the new keys.
+- [x] Removed skip controls from the active UI/runtime localization contract and added `UI/Tutorial/Reward`.
+- [x] Localization synchronization and setup validation cover 31 active RU/EN keys.
 - [x] RU layout was checked through Unity Bridge at `1280x720`, `800x600` and portrait `390x844` without clipping.
-- [x] Live RU/EN switching updates the task panel and an already open confirmation popup even in the direct scene without `LocalizationManager`.
+- [x] Live RU/EN switching updates the task panel, including its completion reward label.
 - [ ] Approve the revised lesson table, then add final copy for every new or changed `stable_id`.
 
 ## Priority 0 - stability
