@@ -94,6 +94,12 @@ public class BigPetPoint : MonoBehaviour
         StopIncomeRoutine();
     }
 
+    private void OnDestroy()
+    {
+        if (_setPetUI != null)
+            _setPetUI.PetSlotClicked.RemoveListener(ChangeActivePet);
+    }
+
     private void InitLocal()
     {
         if (_initializedLocal) return;
@@ -116,7 +122,7 @@ public class BigPetPoint : MonoBehaviour
             return;
         }
 
-        _setPetUI.PetSlotClicked.AddListener(ChangeActivePet);
+        BindPetSelection();
 
         CacheSceneRefs();
 
@@ -573,7 +579,10 @@ public class BigPetPoint : MonoBehaviour
         if (_setPetUI == null)
             _setPetUI = GetComponentInChildren<BigPetSetUI>(true);
         if (_setPetUI != null)
+        {
             _setPetUI.SetRemoteMode(false);
+            BindPetSelection();
+        }
 
         CacheSceneRefs();
         _purchased = ResolvePurchaseState();
@@ -581,6 +590,15 @@ public class BigPetPoint : MonoBehaviour
             InitPurchasedState();
         else
             PrepareLockedState();
+    }
+
+    private void BindPetSelection()
+    {
+        if (_setPetUI == null)
+            return;
+
+        _setPetUI.PetSlotClicked.RemoveListener(ChangeActivePet);
+        _setPetUI.PetSlotClicked.AddListener(ChangeActivePet);
     }
 
     public void _TryBuy()

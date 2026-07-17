@@ -17,6 +17,8 @@ public class BigPetSetUI : MonoBehaviour
     [HideInInspector]
     public UnityEvent<Brainrot> ActiveChanged;
 
+    public bool IsOpen => _uiPanel != null && _uiPanel.activeSelf;
+
     public void InitUI(IReadOnlyList<Brainrot> petList)
     {
         ClearSlots();
@@ -110,9 +112,29 @@ public class BigPetSetUI : MonoBehaviour
         _uiPanel.SetActive(open);
         if (open)
         {
+            _uiPanel.transform.SetAsLastSibling();
+            CanvasGroup canvasGroup = _uiPanel.GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+                canvasGroup = _uiPanel.AddComponent<CanvasGroup>();
+            canvasGroup.alpha = 1f;
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+
             RebuildGrid();
             Canvas.ForceUpdateCanvases();
         }
+    }
+
+    public void SetWorldTargeted(bool targeted)
+    {
+        if (_remoteMode)
+            return;
+
+        // Losing the world ray is expected as soon as the player moves the cursor
+        // onto the screen-space menu. Keep the menu pinned until its explicit close
+        // button calls OpenUI(false), otherwise the opening click races the close.
+        if (targeted)
+            OpenUI(true);
     }
 
     public void ChangeActivePet(Brainrot pet)

@@ -1007,3 +1007,11 @@
 - Fixed intermittent BigPet selection by expanding `ChangePetArea` to a `4.5 × 2 × 4.5` trigger with a `5`-unit interaction distance; runtime prefab values were confirmed through Bridge.
 - Live tutorial checks confirmed expanded/collapsed states, the animated UI hand, disabled/active claim states and a single `46 -> 49` payout on `Забрать +3`. The test profile was restored to `46` gems and all ten prior tasks terminal before leaving Play Mode.
 - Remaining P0 acceptance is unchanged: full clean-profile desktop offline/online and mobile/touch passes, including restart while awaiting claim and rewarded-ad/grace-period assertions.
+
+### 2026-07-17 (BigPet menu stability and RemoteProfile visual parity)
+- Rewired the BigPet world target so losing the world ray while moving the cursor onto the screen-space menu no longer closes it; the explicit close button remains authoritative.
+- Corrected interaction distance checks to use the nearest point on the hit collider instead of the listener transform pivot, avoiding false rejections on expanded interaction volumes.
+- Hardened every generated BigPet slot with an interactable `Button`, a valid target graphic and non-blocking child graphics while preserving the prefab's persistent click listener without duplicate invocation. Local state reload also idempotently rebinds the selection event, fixing slots that still rendered but no longer reached `BigPetPoint` after a remote/local ownership transition.
+- Live Bridge verification opened the menu, simulated loss of its world target, confirmed that it stayed pinned, found 18 usable slots, changed the saved BigPet from ID `3` to `0`, restored ID `3`, and closed the menu explicitly.
+- Restyled `RemoteProfilePopup` with the shared tiled `texture` sprite on all panels and buttons, black outlines/shadow, `Gradient2` overlays on Like/Close and Russo One on every label. The editor restyle command now assigns these shared assets to the prefab explicitly.
+- Live Game View verification at `1280x720` confirmed the full textured popup and the gradient Like button in the active scene. Play Mode was stopped after the test.

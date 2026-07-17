@@ -99,9 +99,14 @@ public class InteractionRaycastSource : MonoBehaviour
         if (listener == null)
             return false;
 
-        if (raycastType != RaycastType.Down &&
-            listener.MaxDistance <= Vector3.Distance(transform.position, listener.transform.position))
-            return false;
+        if (raycastType != RaycastType.Down && listener.MaxDistance > 0f)
+        {
+            Vector3 closestPoint = intHit.collider != null
+                ? intHit.collider.ClosestPoint(transform.position)
+                : intHit.point;
+            if (Vector3.Distance(transform.position, closestPoint) > listener.MaxDistance)
+                return false;
+        }
 
         return true;
     }

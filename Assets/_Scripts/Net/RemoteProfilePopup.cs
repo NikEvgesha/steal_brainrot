@@ -34,6 +34,14 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     [SerializeField]
     private Text _likeButtonLabel;
 
+    [Header("Visual Theme")]
+    [SerializeField]
+    private Sprite _textureSprite;
+    [SerializeField]
+    private Sprite _buttonGradientSprite;
+    [SerializeField]
+    private Font _sharedFont;
+
     private Coroutine _noticeRoutine;
     private Coroutine _likeStateRoutine;
     private Coroutine _sendLikeRoutine;
@@ -345,21 +353,104 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     public void ApplyVisualStyle()
     {
         Transform root = _panel != null ? _panel.transform : transform;
-        ApplyPanelStyle(root, "ProfileWindow", BlockyUITheme.BrownBody, studs: true);
-        ApplyPanelStyle(root, "ProfileHeader", BlockyUITheme.GreenHeader, studs: false);
-        ApplyPanelStyle(root, "ProfileContent", BlockyUITheme.DarkBrownPanel, studs: false);
-        ApplyPanelStyle(root, "AvatarCard", BlockyUITheme.BlueHeader, studs: false);
+        ApplyTexturedPanelStyle(root, "ProfileWindow", BlockyUITheme.BrownBody, new Vector2(5f, -5f), addShadow: true);
+        ApplyTexturedPanelStyle(root, "ProfileHeader", BlockyUITheme.GreenHeader, new Vector2(3f, -3f), addShadow: false);
+        ApplyTexturedPanelStyle(root, "ProfileContent", BlockyUITheme.DarkBrownPanel, new Vector2(3f, -3f), addShadow: false);
+        ApplyTexturedPanelStyle(root, "AvatarCard", BlockyUITheme.BlueHeader, new Vector2(3f, -3f), addShadow: false);
         if (_likeButton != null)
-            BlockyUITheme.ApplyButton(_likeButton, BlockyUITheme.GreenHeader);
+            ApplyTexturedButton(_likeButton, BlockyUITheme.GreenHeader);
         if (_closeButton != null)
-            BlockyUITheme.ApplyButton(_closeButton, BlockyUITheme.RedHeader);
+            ApplyTexturedButton(_closeButton, BlockyUITheme.RedHeader);
+
+        foreach (Text text in root.GetComponentsInChildren<Text>(true))
+        {
+            if (text == null)
+                continue;
+            if (_sharedFont != null)
+                text.font = _sharedFont;
+            BlockyUITheme.ApplyText(text, text.color, Mathf.Max(12, text.fontSize));
+        }
     }
 
-    private static void ApplyPanelStyle(Transform root, string name, Color color, bool studs)
+    public void ConfigureVisualAssets(Sprite textureSprite, Sprite buttonGradientSprite, Font sharedFont)
+    {
+        _textureSprite = textureSprite;
+        _buttonGradientSprite = buttonGradientSprite;
+        _sharedFont = sharedFont;
+    }
+
+    private void ApplyTexturedPanelStyle(
+        Transform root,
+        string name,
+        Color color,
+        Vector2 outlineDistance,
+        bool addShadow)
     {
         Transform target = FindChildByName(root, name);
-        if (target != null && target.TryGetComponent(out Image image))
-            BlockyUITheme.ApplyPanel(image, color, studs);
+        if (target == null || !target.TryGetComponent(out Image image))
+            return;
+
+        if (_textureSprite != null)
+            image.sprite = _textureSprite;
+        image.type = image.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.color = color;
+        image.raycastTarget = true;
+        AddOutline(target.gameObject, outlineDistance, BlockyUITheme.BlackStroke);
+        if (addShadow)
+            AddShadow(target.gameObject, new Vector2(0f, -6f), new Color(0f, 0f, 0f, 0.48f));
+    }
+
+    private void ApplyTexturedButton(Button button, Color color)
+    {
+        if (button == null)
+            return;
+
+        BlockyUITheme.ApplyButton(button, color);
+        Image background = button.targetGraphic as Image ?? button.GetComponent<Image>();
+        if (background != null)
+        {
+            if (_textureSprite != null)
+                background.sprite = _textureSprite;
+            background.type = background.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+            background.pixelsPerUnitMultiplier = 1f;
+            background.color = color;
+            background.raycastTarget = true;
+            AddOutline(background.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+        }
+
+        EnsureButtonGradient(button);
+    }
+
+    private void EnsureButtonGradient(Button button)
+    {
+        if (button == null || _buttonGradientSprite == null)
+            return;
+
+        Transform gradientTransform = button.transform.Find("Gradient");
+        if (gradientTransform == null)
+        {
+            var gradientObject = new GameObject("Gradient", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            gradientObject.transform.SetParent(button.transform, false);
+            gradientTransform = gradientObject.transform;
+        }
+
+        Image gradient = gradientTransform.GetComponent<Image>();
+        gradient.sprite = _buttonGradientSprite;
+        gradient.type = Image.Type.Simple;
+        gradient.color = new Color(1f, 1f, 1f, 0.2f);
+        gradient.raycastTarget = false;
+
+        RectTransform rect = gradientTransform as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.localScale = Vector3.one;
+        }
+        gradientTransform.SetAsFirstSibling();
     }
 
     private void RefreshLocalizedContent()
@@ -473,12 +564,14 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         return image;
     }
 
-    private static Text CreateText(string name, Transform parent, Vector2 min, Vector2 max, TextAnchor anchor, int fontSize)
+    private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max, TextAnchor anchor, int fontSize)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
         var text = go.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = _sharedFont != null
+            ? _sharedFont
+            : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.color = Color.white;
         text.alignment = anchor;
         text.fontStyle = FontStyle.Bold;
@@ -497,7 +590,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         return text;
     }
 
-    private static Button CreateButton(string name, Transform parent, string label, Vector2 min, Vector2 max, Color color)
+    private Button CreateButton(string name, Transform parent, string label, Vector2 min, Vector2 max, Color color)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);

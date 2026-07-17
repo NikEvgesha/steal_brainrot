@@ -10,6 +10,7 @@ public class BigPetSetSlot : MonoBehaviour
     private BigPetSetUI _ui;
     private Brainrot _pet;
     private bool _active;
+    private Button _button;
 
     public void Init(BigPetSetUI ui, Brainrot pet)
     {
@@ -33,6 +34,8 @@ public class BigPetSetSlot : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_button != null)
+            _button.onClick.RemoveListener(OnClick);
         if (_ui != null)
             _ui.ActiveChanged.RemoveListener(CheckActiveSlot);
     }
@@ -46,13 +49,34 @@ public class BigPetSetSlot : MonoBehaviour
 
     private void EnsureClickTarget()
     {
-        var button = GetComponent<Button>();
-        var targetGraphic = button != null ? button.targetGraphic : _background;
-        if (button != null && targetGraphic == null && _background != null)
+        _button = GetComponent<Button>();
+        if (_button == null)
+            _button = gameObject.AddComponent<Button>();
+
+        Graphic targetGraphic = _background != null ? _background : GetComponent<Graphic>();
+        if (targetGraphic != null)
         {
-            targetGraphic = _background;
-            button.targetGraphic = _background;
+            targetGraphic.raycastTarget = true;
+            _button.targetGraphic = targetGraphic;
         }
+
+        _button.interactable = true;
+        _button.navigation = new Navigation { mode = Navigation.Mode.None };
+        _button.onClick.RemoveListener(OnClick);
+
+        bool hasPersistentClick = false;
+        for (int i = 0; i < _button.onClick.GetPersistentEventCount(); i++)
+        {
+            if (_button.onClick.GetPersistentTarget(i) == this &&
+                _button.onClick.GetPersistentMethodName(i) == nameof(OnClick))
+            {
+                hasPersistentClick = true;
+                break;
+            }
+        }
+
+        if (!hasPersistentClick)
+            _button.onClick.AddListener(OnClick);
 
         var graphics = GetComponentsInChildren<Graphic>(true);
         for (int i = 0; i < graphics.Length; i++)
