@@ -89,12 +89,15 @@ public class ConveyorUI : MonoBehaviour
     private void OnEnable()
     {
         LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
         SubscribeToLocalizationManager(LocalizationManager.Instance);
     }
 
     private void OnDisable()
     {
         LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
         UnsubscribeFromLocalizationManager();
     }
 
@@ -362,7 +365,10 @@ public class ConveyorUI : MonoBehaviour
 
         if (_levelName != null)
             _levelName.text = ConveyorLevelTab.GetLocalizedName(_currentLevelInfo);
+        UpdateIncomeBonusDisplay();
         RefreshCurrentDropChances();
+        if (_chancesPanel != null && _chancesPanel.IsOpen)
+            _chancesPanel.Refresh();
     }
 
     private void UpdateDropChances(ConveyorLevel level)

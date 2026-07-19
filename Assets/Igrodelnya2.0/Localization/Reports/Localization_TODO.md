@@ -18,7 +18,7 @@
 ## Gameplay UI polish (2026-07-19)
 - [x] Added RU/EN keys `UI/Conveyor/ActivatedBonus`, `UI/EggCatalog/BaseChanceNote` and `UI/Income/BigPetBadge` with non-empty code fallbacks.
 - [x] Confirmed the Russian BigPet income badge and conveyor active-bonus text in the live scene before the final cleanup.
-- [ ] Repeat live RU/EN switching for the full conveyor chance scroll and BigPet badge after Unity Bridge is restarted.
+- [x] Added live language-change refresh for the full conveyor chance scroll, conveyor income row and BigPet badge; RU/EN switching was verified through Unity Bridge.
 
 ## Priority 0 - stability
 - [ ] Add strict fallback behavior: if key exists but selected language value is empty, use fallback language (EN) and never render empty text.

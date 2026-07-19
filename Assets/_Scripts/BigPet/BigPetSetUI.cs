@@ -17,6 +17,7 @@ public class BigPetSetUI : MonoBehaviour
     private float _interactionOpenDistance = 5f;
     private float _nextDistanceCheckTime;
     private Text _incomeBonusText;
+    private LocalizationManager _subscribedLocalizationManager;
 
     [HideInInspector]
     public UnityEvent<Brainrot> PetSlotClicked;
@@ -29,11 +30,19 @@ public class BigPetSetUI : MonoBehaviour
     {
         BigPetPoint.LocalLevelChanged -= OnBigPetLevelChanged;
         BigPetPoint.LocalLevelChanged += OnBigPetLevelChanged;
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
     }
 
     private void OnDisable()
     {
         BigPetPoint.LocalLevelChanged -= OnBigPetLevelChanged;
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        UnsubscribeFromLocalizationManager();
     }
 
     private void Update()
@@ -193,6 +202,35 @@ public class BigPetSetUI : MonoBehaviour
     }
 
     private void OnBigPetLevelChanged(int _)
+    {
+        RefreshIncomeBonusBadge();
+    }
+
+    private void OnLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || manager == _subscribedLocalizationManager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _subscribedLocalizationManager = manager;
+        _subscribedLocalizationManager.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_subscribedLocalizationManager == null)
+            return;
+
+        _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = null;
+    }
+
+    private void OnLanguageChanged(string _)
     {
         RefreshIncomeBonusBadge();
     }

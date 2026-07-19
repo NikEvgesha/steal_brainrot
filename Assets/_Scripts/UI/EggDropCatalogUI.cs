@@ -35,6 +35,7 @@ public class EggDropCatalogUI : MonoBehaviour
 
     private const string GeneratedObjectPrefix = "ConveyorChance_";
     private RectTransform _cardsRoot;
+    private LocalizationManager _subscribedLocalizationManager;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
 
@@ -43,6 +44,22 @@ public class EggDropCatalogUI : MonoBehaviour
         AutoSetupReferences();
         Refresh();
         ToggleOpen(false);
+    }
+
+    private void OnEnable()
+    {
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
+    }
+
+    private void OnDisable()
+    {
+        LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
+        UnsubscribeFromLocalizationManager();
     }
 
     private void OnValidate()
@@ -430,15 +447,38 @@ public class EggDropCatalogUI : MonoBehaviour
         }
     }
 
+    private void OnLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || manager == _subscribedLocalizationManager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _subscribedLocalizationManager = manager;
+        _subscribedLocalizationManager.OnLanguageChanged += OnLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_subscribedLocalizationManager == null)
+            return;
+
+        _subscribedLocalizationManager.OnLanguageChanged -= OnLanguageChanged;
+        _subscribedLocalizationManager = null;
+    }
+
+    private void OnLanguageChanged(string _)
+    {
+        if (IsOpen)
+            Refresh();
+    }
+
     private static string L(string key, string fallback)
     {
-        if (LocalizationManager.Instance != null && LocalizationManager.Instance.LocalizationData != null)
-        {
-            var translated = LocalizationManager.Instance.LocalizationData.GetTranslation(key);
-            if (!string.IsNullOrWhiteSpace(translated) && !string.Equals(translated, key, StringComparison.Ordinal))
-                return translated;
-        }
-
-        return fallback;
+        return LocalizationUtils.T(key, fallback);
     }
 }

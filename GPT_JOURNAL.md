@@ -1024,3 +1024,10 @@
 - Reworked the conveyor information: the income row now distinguishes the selected level bonus from the actually unlocked bonus, while the egg catalog groups base egg chances by every conveyor level with colored headers, alternating rows and a note that luck bonuses are excluded.
 - Added RU/EN keys for the active conveyor bonus, the base-chance note and the BigPet income badge. Unity rebuilt the final scripts into `Assembly-CSharp.dll` without compiler errors.
 - Remaining manual acceptance: restart Unity Bridge and inspect the complete scrollable egg catalog plus camera feel under real mouse/touch input and a WebGL frame spike. The earlier live checks for BigPet distance/selection and `RemoteProfilePopup` passed.
+
+### 2026-07-19 (Bridge acceptance follow-up)
+- Unity Bridge smoke passed after restart. Runtime inspection confirmed all 7 conveyor sections and 24 base-chance rows, a `1308`-pixel content root inside a `536`-pixel scroll viewport, active `RectMask2D`, and the localized selected/active income line.
+- Reconfirmed BigPet distance hysteresis (`5.5` stays open, `7.0` closes), 18 selectable pet slots plus the close button, and the localized `+300%` badge for level 30; player position and UI state were restored by the probe.
+- `RemoteProfilePopup` contains 8 styled text elements with two opposing outlines each and an interactable square `68 × 68` close button. Russian labels were visually inspected in Game View.
+- Camera runtime probe requested a `90°` target change and observed only a `7.666°` first-frame step with all transform/orbit state restored, confirming that the active prefab uses the intended smoothing limits.
+- The smoke exposed that newly added gameplay strings did not all refresh while their window was already open. Added language-change subscriptions for the BigPet badge and egg catalog, and extended `ConveyorUI` refresh to update both the income row and open catalog.
