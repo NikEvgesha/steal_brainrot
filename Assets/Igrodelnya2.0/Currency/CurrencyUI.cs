@@ -1,10 +1,11 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class CurrencyUI : MonoBehaviour
 {
-    [SerializeField] private Text _currencyAmount;
+    [SerializeField] private TMP_Text _currencyAmount;
     [SerializeField] private CurrencyType _type;
     [SerializeField] private UIMoneyChangeAnimation _diffObj;
     [SerializeField] private float _flyDuration = 0.95f;

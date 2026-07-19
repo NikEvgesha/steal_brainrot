@@ -1,4 +1,5 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -12,8 +13,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [SerializeField] private GameObject _hintDesctop;
     [SerializeField] private GameObject _hintTouch;
     [SerializeField] private Image _fillImg;
-    [SerializeField] private Text _priceText;
-    [SerializeField] private Text _actionText;
+    [SerializeField] private TMP_Text _priceText;
+    [SerializeField] private TMP_Text _actionText;
     [SerializeField] private float _speed = 1f;
     [SerializeField] private float _inputDropGraceSec = 0.08f;
     [SerializeField] private float _nearCompleteThreshold = 0.99f;
@@ -43,7 +44,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private float _resumeUntilUnscaledTime;
     private bool _awaitReleaseAfterComplete;
     private Image _rewardedAdBadgeImage;
-    private Text _rewardedAdBadgeLabelText;
+    private TMP_Text _rewardedAdBadgeLabelText;
     private Transform _rewardedAdBadgeParent;
 
     public bool IsInteracting => _interactionInProgress;
@@ -391,7 +392,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             return;
         }
 
-        Text label = EnsureRewardedAdBadgeLabel(badgeTransform);
+        TMP_Text label = EnsureRewardedAdBadgeLabel(badgeTransform);
         if (label == null)
             return;
 
@@ -399,7 +400,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         label.gameObject.SetActive(true);
     }
 
-    private Text EnsureRewardedAdBadgeLabel(Transform badgeTransform)
+    private TMP_Text EnsureRewardedAdBadgeLabel(Transform badgeTransform)
     {
         if (_rewardedAdBadgeLabelText != null)
             return _rewardedAdBadgeLabelText;
@@ -407,33 +408,27 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         Transform labelTransform = badgeTransform.Find(RewardedAdBadgeLabelName);
         if (labelTransform == null)
         {
-            var labelObject = new GameObject(RewardedAdBadgeLabelName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(Outline));
+            var labelObject = new GameObject(RewardedAdBadgeLabelName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             labelObject.transform.SetParent(badgeTransform, false);
             labelTransform = labelObject.transform;
         }
 
-        _rewardedAdBadgeLabelText = labelTransform.GetComponent<Text>();
+        _rewardedAdBadgeLabelText = labelTransform.GetComponent<TMP_Text>();
         if (_rewardedAdBadgeLabelText == null)
-            _rewardedAdBadgeLabelText = labelTransform.gameObject.AddComponent<Text>();
+            _rewardedAdBadgeLabelText = TmpUiTextFactory.Add(labelTransform.gameObject);
 
-        _rewardedAdBadgeLabelText.font = _actionText != null && _actionText.font != null
-            ? _actionText.font
-            : Font.CreateDynamicFontFromOSFont("Arial", _rewardedAdBadgeLabelFontSize);
-        _rewardedAdBadgeLabelText.alignment = TextAnchor.MiddleCenter;
+        TmpUiTextFactory.ApplyDefaults(_rewardedAdBadgeLabelText);
+        if (_actionText != null && _actionText.font != null)
+            _rewardedAdBadgeLabelText.font = _actionText.font;
+        _rewardedAdBadgeLabelText.alignment = TextAlignmentOptions.Center;
         _rewardedAdBadgeLabelText.color = _rewardedAdBadgeLabelColor;
         _rewardedAdBadgeLabelText.fontSize = _rewardedAdBadgeLabelFontSize;
-        _rewardedAdBadgeLabelText.fontStyle = FontStyle.Bold;
+        _rewardedAdBadgeLabelText.fontStyle = FontStyles.Bold;
         _rewardedAdBadgeLabelText.raycastTarget = false;
-        _rewardedAdBadgeLabelText.horizontalOverflow = HorizontalWrapMode.Overflow;
-        _rewardedAdBadgeLabelText.verticalOverflow = VerticalWrapMode.Overflow;
-
-        var outline = labelTransform.GetComponent<Outline>();
-        if (outline != null)
-        {
-            outline.effectColor = _rewardedAdBadgeLabelOutlineColor;
-            outline.effectDistance = new Vector2(1.4f, -1.4f);
-            outline.useGraphicAlpha = true;
-        }
+        _rewardedAdBadgeLabelText.textWrappingMode = TextWrappingModes.NoWrap;
+        _rewardedAdBadgeLabelText.overflowMode = TextOverflowModes.Overflow;
+        _rewardedAdBadgeLabelText.outlineColor = _rewardedAdBadgeLabelOutlineColor;
+        _rewardedAdBadgeLabelText.outlineWidth = 0.14f;
 
         var rect = labelTransform as RectTransform;
         if (rect != null)

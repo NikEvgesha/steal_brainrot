@@ -1,14 +1,15 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 public class QuestUIItem : MonoBehaviour
 {
     [Header("—сылки на UI-элементы (заполните через Inspector)")]
-    [SerializeField] private Text _titleText;
-    [SerializeField] private Text _descriptionText;
+    [SerializeField] private TMP_Text _titleText;
+    [SerializeField] private TMP_Text _descriptionText;
     [SerializeField] private Slider _progressBar;
     [SerializeField] private Button _claimButton;
-    [SerializeField] private Text _claimButtonText;
+    [SerializeField] private TMP_Text _claimButtonText;
     [SerializeField] private GameObject _hint;
     [SerializeField] private GameObject _body;
 

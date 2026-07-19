@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,23 +17,23 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     [SerializeField]
     private GameObject _panel;
     [SerializeField]
-    private Text _title;
+    private TMP_Text _title;
     [SerializeField]
-    private Text _avatarInitial;
+    private TMP_Text _avatarInitial;
     [SerializeField]
-    private Text _friendCode;
+    private TMP_Text _friendCode;
     [SerializeField]
-    private Text _body;
+    private TMP_Text _body;
     [SerializeField]
-    private Text _likes;
+    private TMP_Text _likes;
     [SerializeField]
-    private Text _notice;
+    private TMP_Text _notice;
     [SerializeField]
     private Button _closeButton;
     [SerializeField]
     private Button _likeButton;
     [SerializeField]
-    private Text _likeButtonLabel;
+    private TMP_Text _likeButtonLabel;
 
     [Header("Visual Theme")]
     [SerializeField]
@@ -40,7 +41,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     [SerializeField]
     private Sprite _buttonGradientSprite;
     [SerializeField]
-    private Font _sharedFont;
+    private TMP_FontAsset _sharedFont;
 
     private Coroutine _noticeRoutine;
     private Coroutine _likeStateRoutine;
@@ -276,18 +277,18 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         var avatarCard = CreatePanel("AvatarCard", content.transform, new Vector2(0.045f, 0.34f), new Vector2(0.31f, 0.87f), BlockyUITheme.BlueHeader, false);
         AddOutline(avatarCard.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
 
-        _title = CreateText("Title", header.transform, new Vector2(0.055f, 0.08f), new Vector2(0.82f, 0.93f), TextAnchor.MiddleLeft, 46);
-        _avatarInitial = CreateText("AvatarInitial", avatarCard.transform, new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.88f), TextAnchor.MiddleCenter, 86);
-        _friendCode = CreateText("FriendCode", content.transform, new Vector2(0.04f, 0.16f), new Vector2(0.47f, 0.28f), TextAnchor.MiddleLeft, 23);
-        _body = CreateText("Body", content.transform, new Vector2(0.36f, 0.34f), new Vector2(0.95f, 0.88f), TextAnchor.UpperLeft, 27);
+        _title = CreateText("Title", header.transform, new Vector2(0.055f, 0.08f), new Vector2(0.82f, 0.93f), TextAlignmentOptions.Left, 46);
+        _avatarInitial = CreateText("AvatarInitial", avatarCard.transform, new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.88f), TextAlignmentOptions.Center, 86);
+        _friendCode = CreateText("FriendCode", content.transform, new Vector2(0.04f, 0.16f), new Vector2(0.47f, 0.28f), TextAlignmentOptions.Left, 23);
+        _body = CreateText("Body", content.transform, new Vector2(0.36f, 0.34f), new Vector2(0.95f, 0.88f), TextAlignmentOptions.TopLeft, 27);
         _body.lineSpacing = 1.15f;
-        _likes = CreateText("Likes", content.transform, new Vector2(0.36f, 0.18f), new Vector2(0.62f, 0.31f), TextAnchor.MiddleLeft, 28);
-        _notice = CreateText("Notice", content.transform, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.13f), TextAnchor.MiddleCenter, 23);
+        _likes = CreateText("Likes", content.transform, new Vector2(0.36f, 0.18f), new Vector2(0.62f, 0.31f), TextAlignmentOptions.Left, 28);
+        _notice = CreateText("Notice", content.transform, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.13f), TextAlignmentOptions.Center, 23);
         _notice.color = new Color(1f, 0.92f, 0.48f, 1f);
         _notice.gameObject.SetActive(false);
 
         _likeButton = CreateButton("LikeButton", content.transform, L("UI/Profile/LikeButton", "Like"), new Vector2(0.64f, 0.17f), new Vector2(0.94f, 0.31f), BlockyUITheme.GreenHeader);
-        _likeButtonLabel = _likeButton.GetComponentInChildren<Text>(true);
+        _likeButtonLabel = _likeButton.GetComponentInChildren<TMP_Text>(true);
 
         _closeButton = CreateButton("CloseButton", header.transform, "X", new Vector2(0.88f, 0.16f), new Vector2(0.97f, 0.86f), BlockyUITheme.RedHeader);
     }
@@ -314,23 +315,23 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
         var root = _panel != null ? _panel.transform : _canvas.transform;
         if (_title == null)
-            _title = FindComponentByName<Text>(root, "Title");
+            _title = FindComponentByName<TMP_Text>(root, "Title");
         if (_avatarInitial == null)
-            _avatarInitial = FindComponentByName<Text>(root, "AvatarInitial");
+            _avatarInitial = FindComponentByName<TMP_Text>(root, "AvatarInitial");
         if (_friendCode == null)
-            _friendCode = FindComponentByName<Text>(root, "FriendCode");
+            _friendCode = FindComponentByName<TMP_Text>(root, "FriendCode");
         if (_body == null)
-            _body = FindComponentByName<Text>(root, "Body");
+            _body = FindComponentByName<TMP_Text>(root, "Body");
         if (_likes == null)
-            _likes = FindComponentByName<Text>(root, "Likes");
+            _likes = FindComponentByName<TMP_Text>(root, "Likes");
         if (_notice == null)
-            _notice = FindComponentByName<Text>(root, "Notice");
+            _notice = FindComponentByName<TMP_Text>(root, "Notice");
         if (_closeButton == null)
             _closeButton = FindComponentByName<Button>(root, "CloseButton");
         if (_likeButton == null)
             _likeButton = FindComponentByName<Button>(root, "LikeButton");
         if (_likeButtonLabel == null && _likeButton != null)
-            _likeButtonLabel = FindComponentByName<Text>(_likeButton.transform, "Label");
+            _likeButtonLabel = FindComponentByName<TMP_Text>(_likeButton.transform, "Label");
 
         return _panel != null;
     }
@@ -353,6 +354,19 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     public void ApplyVisualStyle()
     {
         Transform root = _panel != null ? _panel.transform : transform;
+        foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (text == null)
+                continue;
+            if (_sharedFont != null)
+            {
+                text.font = _sharedFont;
+                text.fontSharedMaterial = _sharedFont.material;
+            }
+            BlockyUITheme.ApplyText(text, text.color, Mathf.Max(12, Mathf.RoundToInt(text.fontSize)));
+            ApplyHeavyTextOutline(text);
+        }
+
         ApplyTexturedPanelStyle(root, "ProfileWindow", BlockyUITheme.BrownBody, new Vector2(5f, -5f), addShadow: true);
         ApplyTexturedPanelStyle(root, "ProfileHeader", BlockyUITheme.GreenHeader, new Vector2(3f, -3f), addShadow: false);
         ApplyTexturedPanelStyle(root, "ProfileContent", BlockyUITheme.DarkBrownPanel, new Vector2(3f, -3f), addShadow: false);
@@ -365,18 +379,9 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             EnsureSquareCloseButton(_closeButton);
         }
 
-        foreach (Text text in root.GetComponentsInChildren<Text>(true))
-        {
-            if (text == null)
-                continue;
-            if (_sharedFont != null)
-                text.font = _sharedFont;
-            BlockyUITheme.ApplyText(text, text.color, Mathf.Max(12, text.fontSize));
-            ApplyHeavyTextOutline(text);
-        }
     }
 
-    public void ConfigureVisualAssets(Sprite textureSprite, Sprite buttonGradientSprite, Font sharedFont)
+    public void ConfigureVisualAssets(Sprite textureSprite, Sprite buttonGradientSprite, TMP_FontAsset sharedFont)
     {
         _textureSprite = textureSprite;
         _buttonGradientSprite = buttonGradientSprite;
@@ -470,22 +475,13 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         rect.SetAsLastSibling();
     }
 
-    private static void ApplyHeavyTextOutline(Text text)
+    private static void ApplyHeavyTextOutline(TMP_Text text)
     {
         if (text == null)
             return;
 
-        Outline[] outlines = text.GetComponents<Outline>();
-        Outline primary = outlines.Length > 0 ? outlines[0] : text.gameObject.AddComponent<Outline>();
-        Outline secondary = outlines.Length > 1 ? outlines[1] : text.gameObject.AddComponent<Outline>();
-
-        primary.effectColor = BlockyUITheme.BlackStroke;
-        primary.effectDistance = new Vector2(3f, -3f);
-        primary.useGraphicAlpha = true;
-
-        secondary.effectColor = BlockyUITheme.BlackStroke;
-        secondary.effectDistance = new Vector2(-3f, 3f);
-        secondary.useGraphicAlpha = true;
+        text.outlineColor = BlockyUITheme.BlackStroke;
+        text.outlineWidth = Mathf.Max(text.outlineWidth, 0.18f);
     }
 
     private void RefreshLocalizedContent()
@@ -599,23 +595,22 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         return image;
     }
 
-    private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max, TextAnchor anchor, int fontSize)
+    private TMP_Text CreateText(string name, Transform parent, Vector2 min, Vector2 max, TextAlignmentOptions anchor, int fontSize)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
-        var text = go.AddComponent<Text>();
-        text.font = _sharedFont != null
-            ? _sharedFont
-            : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var text = TmpUiTextFactory.Add(go);
+        if (_sharedFont != null)
+            text.font = _sharedFont;
         text.color = Color.white;
         text.alignment = anchor;
-        text.fontStyle = FontStyle.Bold;
+        text.fontStyle = FontStyles.Bold;
         text.fontSize = fontSize;
-        text.resizeTextForBestFit = true;
-        text.resizeTextMinSize = 12;
-        text.resizeTextMaxSize = fontSize;
-        text.horizontalOverflow = HorizontalWrapMode.Wrap;
-        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 12;
+        text.fontSizeMax = fontSize;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Overflow;
         var rect = text.GetComponent<RectTransform>();
         rect.anchorMin = min;
         rect.anchorMax = max;
@@ -639,10 +634,10 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        var labelText = CreateText("Label", go.transform, Vector2.zero, Vector2.one, TextAnchor.MiddleCenter, 34);
+        var labelText = CreateText("Label", go.transform, Vector2.zero, Vector2.one, TextAlignmentOptions.Center, 34);
         labelText.text = label;
         labelText.color = Color.white;
-        labelText.resizeTextMaxSize = 34;
+        labelText.fontSizeMax = 34;
         BlockyUITheme.ApplyButton(button, color);
 
         return button;

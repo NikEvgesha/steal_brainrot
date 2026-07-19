@@ -1,13 +1,14 @@
 using System;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class BrainrotInfoUI : MonoBehaviour
 {
-    [SerializeField] private Text _income;
-    [SerializeField] private Text _accumulationIncome;
-    [SerializeField] private Text _offlineIncome;
+    [SerializeField] private TMP_Text _income;
+    [SerializeField] private TMP_Text _accumulationIncome;
+    [SerializeField] private TMP_Text _offlineIncome;
     [SerializeField] private float _remoteVisibleDistance = 30f;
     [SerializeField] private float _remoteVisibleDistanceHysteresis = 4f;
     private bool _remoteView;

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,7 +11,7 @@ public class FriendRequestInboxUI : MonoBehaviour
 
     private Canvas _canvas;
     private GameObject _panel;
-    private Text _text;
+    private TMP_Text _text;
     private Button _acceptBtn;
     private Button _declineBtn;
 
@@ -210,17 +211,16 @@ public class FriendRequestInboxUI : MonoBehaviour
         _declineBtn.onClick.AddListener(OnDecline);
     }
 
-    private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
+    private TMP_Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
-        var text = go.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.alignment = TextAnchor.MiddleCenter;
+        var text = TmpUiTextFactory.Add(go);
+        text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
-        text.resizeTextForBestFit = true;
-        text.resizeTextMinSize = 16;
-        text.resizeTextMaxSize = 44;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 16;
+        text.fontSizeMax = 44;
         var rect = text.GetComponent<RectTransform>();
         rect.anchorMin = min;
         rect.anchorMax = max;
@@ -246,7 +246,7 @@ public class FriendRequestInboxUI : MonoBehaviour
         var text = CreateText("Label", go.transform, Vector2.zero, Vector2.one);
         text.text = label;
         text.color = Color.black;
-        text.resizeTextMaxSize = 34;
+        text.fontSizeMax = 34;
 
         return btn;
     }

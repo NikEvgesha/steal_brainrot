@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -30,7 +31,7 @@ public class Roulette : MonoBehaviour
     [SerializeField] private GameObject _wheel;
     [SerializeField] private Transform _rewardsParent;
     [SerializeField] private Transform _iconPoint;
-    [SerializeField] private Text _priceText;
+    [SerializeField] private TMP_Text _priceText;
     
 
     [SerializeField] private Button _adButton;
@@ -38,7 +39,7 @@ public class Roulette : MonoBehaviour
     [SerializeField] private GameObject _freePlayText;
     [SerializeField] private GameObject _unavailableText;
     [SerializeField] private GameObject _adIcon;
-    [SerializeField] private Text _freePlayTimeText;
+    [SerializeField] private TMP_Text _freePlayTimeText;
 
 
 

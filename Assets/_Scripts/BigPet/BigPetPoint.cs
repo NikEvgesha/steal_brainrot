@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -32,8 +33,8 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private int _xpAddintPerLvl;
     [SerializeField] private Slider _xpProgressBar;
     [SerializeField] private Slider _foodTimeBar;
-    [SerializeField] private Text _xpProgressText;
-    [SerializeField] private Text _foodTimeBarText;
+    [SerializeField] private TMP_Text _xpProgressText;
+    [SerializeField] private TMP_Text _foodTimeBarText;
     [SerializeField] private float _foodScaler;
     [SerializeField] private float _petScaler;
     [SerializeField] private float _petGroundOffset;

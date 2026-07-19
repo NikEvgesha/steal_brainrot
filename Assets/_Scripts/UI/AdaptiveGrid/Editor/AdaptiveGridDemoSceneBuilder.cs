@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.IO;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -218,7 +219,7 @@ public static class AdaptiveGridDemoSceneBuilder
         return image;
     }
 
-    private static Text CreateText(
+    private static TextMeshProUGUI CreateText(
         string name,
         Transform parent,
         string value,
@@ -228,7 +229,7 @@ public static class AdaptiveGridDemoSceneBuilder
         TextAnchor alignment,
         Color color)
     {
-        var textObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        var textObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
         textObject.transform.SetParent(parent, false);
 
         var rect = textObject.transform as RectTransform;
@@ -237,22 +238,39 @@ public static class AdaptiveGridDemoSceneBuilder
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        var text = textObject.GetComponent<Text>();
+        var text = TmpUiTextFactory.Add(textObject);
         text.text = value;
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.fontSize = fontSize;
-        text.fontStyle = FontStyle.Bold;
-        text.alignment = alignment;
+        text.fontStyle = FontStyles.Bold;
+        text.alignment = ConvertAlignment(alignment);
         text.color = color;
-        text.resizeTextForBestFit = true;
-        text.resizeTextMinSize = 12;
-        text.resizeTextMaxSize = fontSize;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 12;
+        text.fontSizeMax = fontSize;
         text.raycastTarget = false;
-
-        var outline = textObject.AddComponent<Outline>();
-        outline.effectColor = Color.black;
-        outline.effectDistance = new Vector2(2f, -2f);
+        if (text.fontSharedMaterial != null)
+        {
+            text.outlineColor = Color.black;
+            text.outlineWidth = 0.16f;
+        }
         return text;
+    }
+
+    private static TextAlignmentOptions ConvertAlignment(TextAnchor alignment)
+    {
+        return alignment switch
+        {
+            TextAnchor.UpperLeft => TextAlignmentOptions.TopLeft,
+            TextAnchor.UpperCenter => TextAlignmentOptions.Top,
+            TextAnchor.UpperRight => TextAlignmentOptions.TopRight,
+            TextAnchor.MiddleLeft => TextAlignmentOptions.Left,
+            TextAnchor.MiddleCenter => TextAlignmentOptions.Center,
+            TextAnchor.MiddleRight => TextAlignmentOptions.Right,
+            TextAnchor.LowerLeft => TextAlignmentOptions.BottomLeft,
+            TextAnchor.LowerCenter => TextAlignmentOptions.Bottom,
+            TextAnchor.LowerRight => TextAlignmentOptions.BottomRight,
+            _ => TextAlignmentOptions.Center
+        };
     }
 
     private static void LabelItems(Transform gridRoot, string prefix)

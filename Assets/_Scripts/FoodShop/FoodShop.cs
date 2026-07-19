@@ -2,6 +2,7 @@ using MirraGames.SDK;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,7 +13,7 @@ public class FoodShop : MonoBehaviour
     [SerializeField] private FoodShopUI _ui;
     [SerializeField] private int _resupplyTime;
     [SerializeField] private int _priceResupply;
-    [SerializeField] private Text _updateTimer;
+    [SerializeField] private TMP_Text _updateTimer;
     [SerializeField] private Transform _teleportPoint;
 
     private Dictionary<Food, int> _foodAmount;

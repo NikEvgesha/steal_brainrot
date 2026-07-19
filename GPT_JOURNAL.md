@@ -1031,3 +1031,10 @@
 - `RemoteProfilePopup` contains 8 styled text elements with two opposing outlines each and an interactable square `68 × 68` close button. Russian labels were visually inspected in Game View.
 - Camera runtime probe requested a `90°` target change and observed only a `7.666°` first-frame step with all transform/orbit state restored, confirming that the active prefab uses the intended smoothing limits.
 - The smoke exposed that newly added gameplay strings did not all refresh while their window was already open. Added language-change subscriptions for the BigPet badge and egg catalog, and extended `ConveyorUI` refresh to update both the income row and open catalog.
+
+### 2026-07-19 (first-party UI migrated to TextMesh Pro)
+- Replaced legacy `UnityEngine.UI.Text` components across active first-party scenes and prefabs with `TextMeshProUGUI`, and migrated serialized runtime/editor fields to `TMP_Text` without losing component references.
+- Set Russo One Cyrillic as the project TMP default, added a shared TMP creation helper, and made common blocky styling resilient to missing serialized font materials.
+- Updated localization binding and the Adaptive Grid demo builder so newly generated UI also uses TMP. Vendor VoxelImporter examples and the Unity recovery scene remain intentionally untouched.
+- Repaired three teleporter labels whose migrated outline instances still referenced the Liberation Sans atlas, then restyled and revalidated `RemoteProfilePopup` with the correct Russo One material.
+- Unity Bridge validation reported no first-party legacy Text components. Live Game View smoke confirmed readable `Продать` / `Дом` / `Еда`, currency and inventory labels, plus the fully rendered localized remote-profile popup; no new compiler or missing-reference errors were logged.

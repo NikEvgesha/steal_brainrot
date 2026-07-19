@@ -1,21 +1,20 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class UIMoneyChangeAnimation : MonoBehaviour
 {
     private Animator _animator;
-    private Text _text;
+    private TMP_Text _text;
     private RectTransform _rectTransform;
-    private Outline _outline;
     private Coroutine _flyRoutine;
 
     private void Awake()
     {
         _animator = GetComponent<Animator>();
-        _text = GetComponent<Text>();
+        _text = GetComponent<TMP_Text>();
         _rectTransform = transform as RectTransform;
-        _outline = GetComponent<Outline>();
         ApplyTextStyle();
     }
 
@@ -46,7 +45,7 @@ public class UIMoneyChangeAnimation : MonoBehaviour
             _animator.enabled = false;
 
         if (_text == null)
-            _text = GetComponent<Text>();
+            _text = GetComponent<TMP_Text>();
         if (_rectTransform == null)
             _rectTransform = transform as RectTransform;
 
@@ -100,19 +99,13 @@ public class UIMoneyChangeAnimation : MonoBehaviour
         if (_text == null)
             return;
 
-        _text.resizeTextForBestFit = true;
-        _text.resizeTextMinSize = 9;
-        _text.resizeTextMaxSize = 34;
-        _text.alignment = TextAnchor.MiddleCenter;
-
-        if (_outline == null)
-            _outline = gameObject.GetComponent<Outline>();
-        if (_outline == null)
-            _outline = gameObject.AddComponent<Outline>();
-
-        _outline.effectColor = new Color(0f, 0f, 0f, 0.78f);
-        _outline.effectDistance = new Vector2(2f, -2f);
-        _outline.useGraphicAlpha = true;
+        TmpUiTextFactory.ApplyDefaults(_text);
+        _text.enableAutoSizing = true;
+        _text.fontSizeMin = 9;
+        _text.fontSizeMax = 34;
+        _text.alignment = TextAlignmentOptions.Center;
+        _text.outlineColor = new Color(0f, 0f, 0f, 0.78f);
+        _text.outlineWidth = Mathf.Max(_text.outlineWidth, 0.14f);
     }
 
     private void OnDisable()

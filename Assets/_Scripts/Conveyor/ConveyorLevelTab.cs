@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -10,7 +11,7 @@ public class ConveyorLevelTab : MonoBehaviour
     [SerializeField] private Color _activeTextColor = new Color(0.16f, 0.04f, 0.08f, 1f);
 
     private LocalizedText _localization;
-    private Text _name;
+    private TMP_Text _name;
     private ConveyorLevel _level;
     private string _fallbackName;
     private bool _active;
@@ -20,7 +21,7 @@ public class ConveyorLevelTab : MonoBehaviour
 
     public void Init(ConveyorLevel level)
     {
-        _name = GetComponentInChildren<Text>(true);
+        _name = GetComponentInChildren<TMP_Text>(true);
         _level = level;
         _fallbackName = GetFallbackName(_level);
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -7,7 +8,7 @@ public class FoodShopUI : MonoBehaviour
 {
     [SerializeField] private FoodShopSlot _slotPrefab;
     [SerializeField] private Transform _slotParent;
-    [SerializeField] private Text _resupplyPriceText;
+    [SerializeField] private TMP_Text _resupplyPriceText;
 
     private List<FoodShopSlot> _slots = new();
 

@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -5,7 +6,7 @@ using UnityEngine.UI;
 public class InventorySlot : MonoBehaviour
 {
     [SerializeField] private Image _icon;
-    [SerializeField] private Text _name;
+    [SerializeField] private TMP_Text _name;
     [SerializeField] private GameObject _quickSlotIndicator;
     [SerializeField] private Image _background;
     [SerializeField] private GameObject _sellButtonLockIcon;

@@ -1,15 +1,16 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class RouletteSlot : MonoBehaviour
 {
     private Image _icon;
-    private Text _amount;
+    private TMP_Text _amount;
 
     public void Init(RouletteReward reward)
     {
         _icon = GetComponent<Image>();
-        _amount = GetComponentInChildren<Text>();
+        _amount = GetComponentInChildren<TMP_Text>();
         if (reward.rewardType == RouletteRewardType.Gems)
         {
             _icon.sprite = G.Currency.GetCurrencyIcon(CurrencyType.Gems);

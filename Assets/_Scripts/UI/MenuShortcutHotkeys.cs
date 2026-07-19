@@ -403,18 +403,6 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
         badge.SetAsLastSibling();
 
-        Text legacyText = badge.GetComponentInChildren<Text>(true);
-        if (legacyText != null)
-        {
-            legacyText.text = label;
-            legacyText.gameObject.SetActive(true);
-            legacyText.fontStyle = FontStyle.Bold;
-            legacyText.color = Color.white;
-            legacyText.fontSize = Mathf.Max(legacyText.fontSize, 15);
-            legacyText.alignment = TextAnchor.MiddleCenter;
-            legacyText.raycastTarget = false;
-        }
-
         TMP_Text tmpText = badge.GetComponentInChildren<TMP_Text>(true);
         if (tmpText != null)
         {
@@ -509,14 +497,6 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
     private static void HideNonMenuTextChildren(Transform root)
     {
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
-        {
-            if (IsMenuText(text.transform))
-                continue;
-
-            text.gameObject.SetActive(false);
-        }
-
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
         {
             if (IsMenuText(text.transform))
@@ -562,7 +542,7 @@ public class MenuShortcutHotkeys : MonoBehaviour
         badgeObject.transform.SetParent(buttonTransform, false);
         badge = badgeObject.transform;
 
-        var textObject = new GameObject("Text (Legacy)", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        var textObject = new GameObject("Text (TMP)", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         textObject.transform.SetParent(badge, false);
 
         var textRect = textObject.transform as RectTransform;
@@ -571,19 +551,16 @@ public class MenuShortcutHotkeys : MonoBehaviour
         textRect.offsetMin = new Vector2(2f, 1f);
         textRect.offsetMax = new Vector2(-2f, -1f);
 
-        var text = textObject.GetComponent<Text>();
-        text.font = ResolveFont(buttonTransform);
-        text.alignment = TextAnchor.MiddleCenter;
-        text.fontStyle = FontStyle.Bold;
+        var text = textObject.GetComponent<TMP_Text>();
+        TmpUiTextFactory.ApplyDefaults(text);
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontStyle = FontStyles.Bold;
         text.fontSize = 15;
         text.color = Color.white;
         text.raycastTarget = false;
-        text.supportRichText = true;
-
-        var outline = GetOrAdd<Outline>(textObject);
-        outline.effectColor = Color.black;
-        outline.effectDistance = new Vector2(1f, -1f);
-        outline.useGraphicAlpha = true;
+        text.richText = true;
+        text.outlineColor = Color.black;
+        text.outlineWidth = 0.12f;
 
         return badge;
     }
@@ -640,7 +617,7 @@ public class MenuShortcutHotkeys : MonoBehaviour
         Transform labelTransform = buttonTransform.Find(TitleLabelName);
         if (labelTransform == null)
         {
-            var labelObject = new GameObject(TitleLabelName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var labelObject = new GameObject(TitleLabelName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             labelObject.transform.SetParent(buttonTransform, false);
             labelTransform = labelObject.transform;
         }
@@ -653,33 +630,23 @@ public class MenuShortcutHotkeys : MonoBehaviour
         rect.offsetMax = new Vector2(-4f, 50f);
         rect.SetAsLastSibling();
 
-        Text legacyText = labelTransform.GetComponent<Text>();
-        if (legacyText == null)
-            legacyText = labelTransform.gameObject.AddComponent<Text>();
+        TMP_Text text = labelTransform.GetComponent<TMP_Text>();
+        if (text == null)
+            text = TmpUiTextFactory.Add(labelTransform.gameObject);
 
-        legacyText.text = label;
-        legacyText.font = legacyText.font != null ? legacyText.font : ResolveFont(buttonTransform);
-        legacyText.fontStyle = FontStyle.Bold;
-        legacyText.fontSize = 16;
-        legacyText.resizeTextForBestFit = true;
-        legacyText.resizeTextMinSize = 10;
-        legacyText.resizeTextMaxSize = 17;
-        legacyText.alignment = TextAnchor.MiddleCenter;
-        legacyText.color = Color.white;
-        legacyText.lineSpacing = 1f;
-        legacyText.raycastTarget = false;
-        legacyText.supportRichText = true;
-        legacyText.alignByGeometry = true;
-
-        var outline = GetOrAdd<Outline>(labelTransform.gameObject);
-        outline.effectColor = Color.black;
-        outline.effectDistance = new Vector2(1.5f, -1.5f);
-        outline.useGraphicAlpha = true;
-
-        var shadow = GetOrAddShadow(labelTransform.gameObject);
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
-        shadow.effectDistance = new Vector2(0f, -1.5f);
-        shadow.useGraphicAlpha = true;
+        text.text = label;
+        text.fontStyle = FontStyles.Bold;
+        text.fontSize = 16;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 10;
+        text.fontSizeMax = 17;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.white;
+        text.lineSpacing = 0f;
+        text.raycastTarget = false;
+        text.richText = true;
+        text.outlineColor = Color.black;
+        text.outlineWidth = 0.14f;
     }
 
     private static void EnsureShortcutBadge(Transform buttonTransform, string keyLabel)
@@ -691,7 +658,7 @@ public class MenuShortcutHotkeys : MonoBehaviour
             badgeObject.transform.SetParent(buttonTransform, false);
             badge = badgeObject.transform;
 
-            var textObject = new GameObject("Text (Legacy)", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var textObject = new GameObject("Text (TMP)", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(badge, false);
 
             var textRect = textObject.transform as RectTransform;
@@ -725,26 +692,22 @@ public class MenuShortcutHotkeys : MonoBehaviour
         if (outline != null)
             outline.enabled = false;
 
-        Text text = badge.GetComponentInChildren<Text>(true);
+        TMP_Text text = badge.GetComponentInChildren<TMP_Text>(true);
         if (text != null)
         {
             text.gameObject.SetActive(true);
             text.text = $"[{keyLabel}]";
-            text.font = text.font != null ? text.font : ResolveFont(buttonTransform);
-            text.fontStyle = FontStyle.Bold;
+            TmpUiTextFactory.ApplyDefaults(text);
+            text.fontStyle = FontStyles.Bold;
             text.fontSize = 15;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 10;
-            text.resizeTextMaxSize = 16;
-            text.alignment = TextAnchor.MiddleCenter;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 10;
+            text.fontSizeMax = 16;
+            text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
             text.raycastTarget = false;
-            text.alignByGeometry = true;
-
-            var textOutline = GetOrAdd<Outline>(text.gameObject);
-            textOutline.effectColor = Color.black;
-            textOutline.effectDistance = new Vector2(1.5f, -1.5f);
-            textOutline.useGraphicAlpha = true;
+            text.outlineColor = Color.black;
+            text.outlineWidth = 0.14f;
         }
     }
 
@@ -795,18 +758,6 @@ public class MenuShortcutHotkeys : MonoBehaviour
         var shadow = GetOrAddShadow(iconImage.gameObject);
         shadow.effectColor = new Color(0f, 0f, 0f, 0.38f);
         shadow.effectDistance = new Vector2(0f, -3f);
-    }
-
-    private static Font ResolveFont(Transform root)
-    {
-        if (root != null)
-        {
-            var text = root.GetComponentInChildren<Text>(true);
-            if (text != null && text.font != null)
-                return text.font;
-        }
-
-        return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
     }
 
     private static Shadow GetOrAddShadow(GameObject gameObject)

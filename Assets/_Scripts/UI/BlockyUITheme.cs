@@ -192,8 +192,6 @@ public static class BlockyUITheme
         button.colors = colors;
         button.transition = Selectable.Transition.ColorTint;
 
-        foreach (var text in button.GetComponentsInChildren<Text>(true))
-            ApplyText(text, Color.white, 42);
         foreach (var text in button.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 42);
     }
@@ -211,17 +209,6 @@ public static class BlockyUITheme
             image.color = CurrencyPanel;
             EnsureOutline(root, new Vector2(3f, -3f), new Color(1f, 1f, 1f, 0.92f));
             EnsureShadow(root, new Vector2(0f, -4f), new Color(0f, 0f, 0f, 0.42f));
-        }
-
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
-        {
-            if (!IsCurrencyAmountText(text.transform))
-            {
-                text.gameObject.SetActive(false);
-                continue;
-            }
-
-            ApplyText(text, Color.white, 34);
         }
 
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
@@ -281,7 +268,7 @@ public static class BlockyUITheme
             activeFrame.raycastTarget = false;
         }
 
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
+        foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 22);
     }
 
@@ -301,8 +288,6 @@ public static class BlockyUITheme
         if (button != null)
             ApplyButton(button, GetRareColor(rareType));
 
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
-            ApplyText(text, Color.white, 18);
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 18);
     }
@@ -337,8 +322,6 @@ public static class BlockyUITheme
             ApplyInventoryButtonColors(buyButton);
         }
 
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
-            ApplyText(text, Color.white, 22);
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 22);
     }
@@ -355,7 +338,7 @@ public static class BlockyUITheme
         foreach (var button in root.GetComponentsInChildren<Button>(true))
             ApplyButton(button, button.interactable && available ? GreenHeader : new Color(0.42f, 0.42f, 0.42f, 1f));
 
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
+        foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 20);
     }
 
@@ -427,8 +410,6 @@ public static class BlockyUITheme
         if (button.GetComponent<BlockyUIButtonFeedback>() == null)
             button.gameObject.AddComponent<BlockyUIButtonFeedback>();
 
-        foreach (var text in button.GetComponentsInChildren<Text>(true))
-            ApplyText(text, Color.white, 24);
         foreach (var text in button.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 24);
     }
@@ -444,33 +425,20 @@ public static class BlockyUITheme
         image.color = color;
     }
 
-    public static void ApplyText(Text text, Color fallbackColor, int minimumSize)
-    {
-        if (text == null)
-            return;
-
-        text.fontStyle = FontStyle.Bold;
-        if (ShouldReplaceTextColor(text.color))
-            text.color = fallbackColor;
-        text.supportRichText = true;
-        text.alignByGeometry = true;
-        if (text.fontSize < minimumSize)
-            text.fontSize = minimumSize;
-
-        EnsureOutline(text.gameObject, new Vector2(2f, -2f), BlackStroke);
-        EnsureShadow(text.gameObject, new Vector2(0f, -2f), new Color(0f, 0f, 0f, 0.35f));
-    }
-
     public static void ApplyText(TMP_Text text, Color fallbackColor, int minimumSize)
     {
         if (text == null)
             return;
 
+        TmpUiTextFactory.ApplyDefaults(text);
         text.fontStyle |= FontStyles.Bold;
         if (ShouldReplaceTextColor(text.color))
             text.color = fallbackColor;
-        text.outlineColor = BlackStroke;
-        text.outlineWidth = Mathf.Max(text.outlineWidth, 0.16f);
+        if (text.fontSharedMaterial != null)
+        {
+            text.outlineColor = BlackStroke;
+            text.outlineWidth = Mathf.Max(text.outlineWidth, 0.16f);
+        }
         text.textWrappingMode = TextWrappingModes.Normal;
         if (text.fontSize < minimumSize)
             text.fontSize = minimumSize;
@@ -513,8 +481,6 @@ public static class BlockyUITheme
         EnsureShadow(button.gameObject, new Vector2(0f, -3f), new Color(0f, 0f, 0f, 0.35f));
         ApplyInventoryButtonColors(button);
 
-        foreach (var text in button.GetComponentsInChildren<Text>(true))
-            ApplyText(text, Color.white, selected ? 30 : 26);
         foreach (var text in button.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, selected ? 30 : 26);
     }
@@ -522,15 +488,6 @@ public static class BlockyUITheme
     private static void StyleInventoryText(GameObject root)
     {
         var title = root.transform.Find("Title");
-
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
-        {
-            if (text.GetComponentInParent<InventorySlot>(true) != null)
-                continue;
-
-            int minimumSize = title != null && text.transform == title ? 42 : 20;
-            ApplyText(text, Color.white, minimumSize);
-        }
 
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
         {
@@ -620,12 +577,6 @@ public static class BlockyUITheme
 
     private static void StyleShopText(GameObject panel)
     {
-        foreach (var text in panel.GetComponentsInChildren<Text>(true))
-        {
-            int minimumSize = text.transform.parent == panel.transform ? 54 : 20;
-            ApplyText(text, Color.white, minimumSize);
-        }
-
         foreach (var text in panel.GetComponentsInChildren<TMP_Text>(true))
         {
             int minimumSize = text.transform.parent == panel.transform ? 54 : 20;
@@ -672,32 +623,19 @@ public static class BlockyUITheme
         if (button == null)
             return;
 
-        var legacyText = button.GetComponentInChildren<Text>(true);
         var tmpText = button.GetComponentInChildren<TMP_Text>(true);
 
-        if (legacyText == null && tmpText == null)
+        if (tmpText == null)
         {
-            var textObject = new GameObject("X", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var textObject = new GameObject("X", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(button.transform, false);
             var rect = textObject.transform as RectTransform;
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-            legacyText = textObject.GetComponent<Text>();
-        }
-
-        if (legacyText != null)
-        {
-            legacyText.text = "X";
-            legacyText.font = legacyText.font != null ? legacyText.font : ResolveLegacyFont(button.transform);
-            legacyText.fontStyle = FontStyle.Bold;
-            legacyText.alignment = TextAnchor.MiddleCenter;
-            legacyText.color = BlackStroke;
-            legacyText.raycastTarget = false;
-            legacyText.resizeTextForBestFit = true;
-            legacyText.resizeTextMinSize = 24;
-            legacyText.resizeTextMaxSize = 56;
+            tmpText = textObject.GetComponent<TMP_Text>();
+            TmpUiTextFactory.ApplyDefaults(tmpText);
         }
 
         if (tmpText != null)
@@ -710,20 +648,6 @@ public static class BlockyUITheme
             tmpText.fontSize = Mathf.Max(tmpText.fontSize, 42f);
             tmpText.outlineWidth = 0f;
         }
-    }
-
-    private static Font ResolveLegacyFont(Transform context)
-    {
-        if (context != null && context.root != null)
-        {
-            foreach (var text in context.root.GetComponentsInChildren<Text>(true))
-            {
-                if (text != null && text.font != null)
-                    return text.font;
-            }
-        }
-
-        return Resources.GetBuiltinResource<Font>("Arial.ttf");
     }
 
     private static void ApplyInventoryButtonColors(Button button)
@@ -819,8 +743,6 @@ public static class BlockyUITheme
 
     private static void StyleAllText(GameObject root)
     {
-        foreach (var text in root.GetComponentsInChildren<Text>(true))
-            ApplyText(text, Color.white, 18);
         foreach (var text in root.GetComponentsInChildren<TMP_Text>(true))
             ApplyText(text, Color.white, 18);
     }
@@ -960,8 +882,6 @@ public static class BlockyUITheme
             image.raycastTarget = false;
         }
 
-        foreach (var text in button.GetComponentsInChildren<Text>(true))
-            text.color = BlackStroke;
         foreach (var text in button.GetComponentsInChildren<TMP_Text>(true))
             text.color = BlackStroke;
     }
@@ -972,8 +892,7 @@ public static class BlockyUITheme
         if (tmp != null)
             return tmp.text ?? string.Empty;
 
-        var legacy = button.GetComponentInChildren<Text>(true);
-        return legacy != null ? legacy.text ?? string.Empty : string.Empty;
+        return string.Empty;
     }
 
     private static bool ShouldSkipImage(Image image)

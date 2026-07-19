@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 [DisallowMultipleComponent]
 public class LocalizedText : MonoBehaviour
@@ -9,7 +8,6 @@ public class LocalizedText : MonoBehaviour
     [SerializeField] private string selectedKey;
     [SerializeField] private string currentLanguage;
 
-    private Text uiText;
     private TMP_Text tmpText;
     private LocalizationManager subscribedManager;
 
@@ -19,7 +17,6 @@ public class LocalizedText : MonoBehaviour
 
     private void Awake()
     {
-        TryGetComponent(out uiText);
         TryGetComponent(out tmpText);
     }
 
@@ -69,8 +66,6 @@ public class LocalizedText : MonoBehaviour
         if (string.IsNullOrEmpty(translatedText))
             translatedText = selectedKey;
 
-        if (uiText != null)
-            uiText.text = translatedText;
         if (tmpText != null)
             tmpText.text = translatedText;
     }

@@ -26,6 +26,7 @@
 - [ ] Add validation report before build: missing keys, empty values, duplicate keys.
 
 ## Priority 1 - current UI coverage
+- [x] Active first-party UI components and localization bindings use TMP; legacy `Text` remains only in excluded vendor/recovery content.
 - [ ] Finalize `LocalizationRows_Proposed_UI.csv`: remove unused rows, keep only real UI keys.
 - [ ] Apply `LocalizedText` to static UI labels in active gameplay scenes/prefabs.
 - [ ] Replace hardcoded dynamic strings in code with keys (friends, lobby, conveyor, profile popup).

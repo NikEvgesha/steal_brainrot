@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,7 +12,7 @@ public class GiftInboxUI : MonoBehaviour
 
     private Canvas _canvas;
     private GameObject _panel;
-    private Text _text;
+    private TMP_Text _text;
     private Button _acceptBtn;
     private Button _declineBtn;
 
@@ -310,13 +311,12 @@ public class GiftInboxUI : MonoBehaviour
         _declineBtn.onClick.AddListener(OnDecline);
     }
 
-    private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
+    private TMP_Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
-        var text = go.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.alignment = TextAnchor.MiddleCenter;
+        var text = TmpUiTextFactory.Add(go);
+        text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
         var rect = text.GetComponent<RectTransform>();
         rect.anchorMin = min;

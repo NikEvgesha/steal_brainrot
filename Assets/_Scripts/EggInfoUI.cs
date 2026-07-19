@@ -1,18 +1,19 @@
 using System;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class EggInfoUI : MonoBehaviour
 {
     [SerializeField] private GameObject _buy;
-    [SerializeField] private Text _name;
-    [SerializeField] private Text _luck; 
-    [SerializeField] private Text _price;
+    [SerializeField] private TMP_Text _name;
+    [SerializeField] private TMP_Text _luck;
+    [SerializeField] private TMP_Text _price;
     [SerializeField] private GameObject _hutching;
-    [SerializeField] private Text _time;
+    [SerializeField] private TMP_Text _time;
     [SerializeField] private Slider _progress;
-    [SerializeField] private Text _percent;
+    [SerializeField] private TMP_Text _percent;
     [SerializeField] private float _remoteVisibleDistance = 30f;
     [SerializeField] private float _remoteVisibleDistanceHysteresis = 4f;
 

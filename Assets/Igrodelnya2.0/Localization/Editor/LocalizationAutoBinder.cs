@@ -6,7 +6,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
 public static class LocalizationAutoBinder
 {
@@ -165,19 +164,6 @@ public static class LocalizationAutoBinder
     private static bool ProcessHierarchy(GameObject root, LocalizationData localizationData, string defaultLanguage, string assetPath, ISet<string> unresolved, ref int addedCount)
     {
         var changed = false;
-
-        var uiTexts = root.GetComponentsInChildren<Text>(true);
-        foreach (var text in uiTexts)
-        {
-            if (TryBind(text, text.text, localizationData, defaultLanguage, assetPath, unresolved, out var didBind))
-            {
-                changed = true;
-                addedCount++;
-            }
-
-            if (didBind)
-                EditorUtility.SetDirty(text.gameObject);
-        }
 
         var tmpTexts = root.GetComponentsInChildren<TMP_Text>(true);
         foreach (var text in tmpTexts)

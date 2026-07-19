@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using MirraGames.SDK;
 using MirraGames.SDK.Common;
@@ -9,7 +10,7 @@ public class Leaderboard : MonoBehaviour
     [SerializeField] private LBName LBname;
     [SerializeField] private int topAmount;
 
-    [SerializeField] private Text _lbTitle;
+    [SerializeField] private TMP_Text _lbTitle;
     [SerializeField] private Transform _lb;
     [SerializeField] private LeaderboardRow _rowPrefab;
 

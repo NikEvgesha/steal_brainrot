@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,9 +13,9 @@ public class LobbyDebugPanel : MonoBehaviour
 
     private Transform _menuParent;
     private GameObject _panel;
-    private Text _text;
+    private TMP_Text _text;
     private Button _offlineToggleButton;
-    private Text _offlineToggleText;
+    private TMP_Text _offlineToggleText;
     private LobbyClient _lobby;
     private bool _menuOpen;
 
@@ -238,26 +239,26 @@ public class LobbyDebugPanel : MonoBehaviour
         outline.useGraphicAlpha = true;
 
         var title = CreateText("Title", _panel.transform, new Vector2(0.03f, 0.82f), new Vector2(0.97f, 0.98f));
-        title.alignment = TextAnchor.MiddleLeft;
+        title.alignment = TextAlignmentOptions.Left;
         title.fontSize = 18;
-        title.fontStyle = FontStyle.Bold;
+        title.fontStyle = FontStyles.Bold;
         title.text = "Lobby Debug";
 
         _text = CreateText("DebugText", _panel.transform, new Vector2(0.03f, 0.24f), new Vector2(0.97f, 0.80f));
-        _text.alignment = TextAnchor.UpperLeft;
+        _text.alignment = TextAlignmentOptions.TopLeft;
 
         _offlineToggleButton = CreateButton("OfflineToggleButton", _panel.transform, new Vector2(0.03f, 0.04f), new Vector2(0.97f, 0.20f));
         _offlineToggleText = CreateText("OfflineToggleText", _offlineToggleButton.transform, Vector2.zero, Vector2.one);
-        _offlineToggleText.alignment = TextAnchor.MiddleCenter;
+        _offlineToggleText.alignment = TextAlignmentOptions.Center;
         _offlineToggleText.color = Color.white;
         _offlineToggleButton.onClick.AddListener(ToggleSimulatedOffline);
 
         _panel.SetActive(_menuOpen);
     }
 
-    private static Text FindText(Transform root, string childName)
+    private static TMP_Text FindText(Transform root, string childName)
     {
-        return FindChildComponent<Text>(root, childName);
+        return FindChildComponent<TMP_Text>(root, childName);
     }
 
     private static T FindChildComponent<T>(Transform root, string childName) where T : Component
@@ -279,16 +280,15 @@ public class LobbyDebugPanel : MonoBehaviour
         return null;
     }
 
-    private Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
+    private TMP_Text CreateText(string name, Transform parent, Vector2 min, Vector2 max)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
-        var text = go.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.alignment = TextAnchor.MiddleCenter;
+        var text = TmpUiTextFactory.Add(go);
+        text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;
-        text.horizontalOverflow = HorizontalWrapMode.Wrap;
-        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Overflow;
         var rect = text.GetComponent<RectTransform>();
         rect.anchorMin = min;
         rect.anchorMax = max;

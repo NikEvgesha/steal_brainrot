@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -8,7 +9,7 @@ public class LoadingProgressBarUI : MonoBehaviour
     public static LoadingProgressBarUI Instance { get; private set; }
     [SerializeField] private Image _image;
     [SerializeField] private List<AnimationCurve> _visuals;
-    [SerializeField] private Text _text;
+    [SerializeField] private TMP_Text _text;
     [SerializeField] private float _progress;
     [SerializeField] private float _firstPartProgress = 0.8f;
     [SerializeField] private float _fakeProgressLimit = 0.92f;

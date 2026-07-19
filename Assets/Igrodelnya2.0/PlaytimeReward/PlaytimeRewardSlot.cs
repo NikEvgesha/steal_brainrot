@@ -2,15 +2,16 @@ using MirraGames.SDK;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class PlaytimeRewardSlot : MonoBehaviour
 {
-    [SerializeField] private Text _amountText;
+    [SerializeField] private TMP_Text _amountText;
     [SerializeField] private GameObject _claimText;
     [SerializeField] private GameObject _claimCompleteText;
-    [SerializeField] private Text _timer;
+    [SerializeField] private TMP_Text _timer;
     [SerializeField] private Button _claimButton;
 
     private PlaytimeReward _reward;

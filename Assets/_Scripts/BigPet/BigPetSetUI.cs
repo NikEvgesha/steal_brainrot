@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -16,7 +17,7 @@ public class BigPetSetUI : MonoBehaviour
     private Collider _interactionCollider;
     private float _interactionOpenDistance = 5f;
     private float _nextDistanceCheckTime;
-    private Text _incomeBonusText;
+    private TMP_Text _incomeBonusText;
     private LocalizationManager _subscribedLocalizationManager;
 
     [HideInInspector]
@@ -243,7 +244,7 @@ public class BigPetSetUI : MonoBehaviour
         Transform existing = _uiPanel.transform.Find("IncomeBonusBadge");
         if (existing != null)
         {
-            _incomeBonusText = existing.GetComponentInChildren<Text>(true);
+            _incomeBonusText = existing.GetComponentInChildren<TMP_Text>(true);
             return;
         }
 
@@ -292,7 +293,7 @@ public class BigPetSetUI : MonoBehaviour
         shadow.effectDistance = new Vector2(0f, -4f);
         shadow.useGraphicAlpha = true;
 
-        var textObject = new GameObject("Value", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text), typeof(Outline));
+        var textObject = new GameObject("Value", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         textObject.transform.SetParent(badgeObject.transform, false);
         var textRect = textObject.GetComponent<RectTransform>();
         textRect.anchorMin = Vector2.zero;
@@ -300,22 +301,21 @@ public class BigPetSetUI : MonoBehaviour
         textRect.offsetMin = new Vector2(10f, 4f);
         textRect.offsetMax = new Vector2(-10f, -4f);
 
-        _incomeBonusText = textObject.GetComponent<Text>();
-        Text fontSource = _uiPanel.GetComponentInChildren<Text>(true);
-        _incomeBonusText.font = fontSource != null ? fontSource.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _incomeBonusText = textObject.GetComponent<TMP_Text>();
+        TmpUiTextFactory.ApplyDefaults(_incomeBonusText);
+        TMP_Text fontSource = _uiPanel.GetComponentInChildren<TMP_Text>(true);
+        if (fontSource != null && fontSource.font != null)
+            _incomeBonusText.font = fontSource.font;
         _incomeBonusText.fontSize = 44;
-        _incomeBonusText.fontStyle = FontStyle.Bold;
-        _incomeBonusText.alignment = TextAnchor.MiddleCenter;
+        _incomeBonusText.fontStyle = FontStyles.Bold;
+        _incomeBonusText.alignment = TextAlignmentOptions.Center;
         _incomeBonusText.color = BlockyUITheme.YellowAccent;
         _incomeBonusText.raycastTarget = false;
-        _incomeBonusText.resizeTextForBestFit = true;
-        _incomeBonusText.resizeTextMinSize = 22;
-        _incomeBonusText.resizeTextMaxSize = 48;
-
-        var textOutline = textObject.GetComponent<Outline>();
-        textOutline.effectColor = BlockyUITheme.BlackStroke;
-        textOutline.effectDistance = new Vector2(3f, -3f);
-        textOutline.useGraphicAlpha = true;
+        _incomeBonusText.enableAutoSizing = true;
+        _incomeBonusText.fontSizeMin = 22;
+        _incomeBonusText.fontSizeMax = 48;
+        _incomeBonusText.outlineColor = BlockyUITheme.BlackStroke;
+        _incomeBonusText.outlineWidth = 0.16f;
     }
 
     private void RefreshIncomeBonusBadge()

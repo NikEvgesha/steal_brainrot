@@ -1,7 +1,8 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Text))]
+[RequireComponent(typeof(TextMeshProUGUI))]
 public class FPS_UI : MonoBehaviour
 {
     [SerializeField] private float sampleInterval = 0.5f;
@@ -10,7 +11,7 @@ public class FPS_UI : MonoBehaviour
     [SerializeField] private bool showFrameTime = true;
     [SerializeField] private bool showQuality = true;
 
-    private Text _fpsText;
+    private TMP_Text _fpsText;
     private Canvas _canvas;
     private float _timeAccumulator;
     private float _fpsAccumulator;
@@ -45,8 +46,7 @@ public class FPS_UI : MonoBehaviour
             "FPS",
             typeof(RectTransform),
             typeof(CanvasRenderer),
-            typeof(Text),
-            typeof(Outline),
+            typeof(TextMeshProUGUI),
             typeof(FPS_UI));
         textObject.transform.SetParent(canvasObject.transform, false);
 
@@ -57,23 +57,21 @@ public class FPS_UI : MonoBehaviour
         rect.anchoredPosition = new Vector2(-16f, -48f);
         rect.sizeDelta = new Vector2(300f, 96f);
 
-        Text text = textObject.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        TMP_Text text = textObject.GetComponent<TMP_Text>();
+        TmpUiTextFactory.ApplyDefaults(text);
         text.fontSize = 18;
-        text.alignment = TextAnchor.UpperRight;
+        text.alignment = TextAlignmentOptions.TopRight;
         text.color = Color.white;
         text.raycastTarget = false;
-        text.supportRichText = true;
+        text.richText = true;
+        text.outlineColor = new Color(0f, 0f, 0f, 0.95f);
+        text.outlineWidth = 0.14f;
         text.enabled = false;
-
-        Outline outline = textObject.GetComponent<Outline>();
-        outline.effectColor = new Color(0f, 0f, 0f, 0.95f);
-        outline.effectDistance = new Vector2(2f, -2f);
     }
 
     private void Awake()
     {
-        _fpsText = GetComponent<Text>();
+        _fpsText = GetComponent<TMP_Text>();
         _canvas = GetComponentInParent<Canvas>();
         SetVisible(visibleOnStart);
     }

@@ -1,10 +1,11 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class QuickSlot : MonoBehaviour
 {
     [SerializeField] private Image _img;
-    [SerializeField] private Text _index;
+    [SerializeField] private TMP_Text _index;
     [SerializeField] private Image _activeFrame;
 
     private int _idx;

@@ -1,11 +1,12 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class PushPlatform : MonoBehaviour
 {
     [SerializeField] private GameObject _incomeCanvas;
-    [SerializeField] private Text _incomeText;
+    [SerializeField] private TMP_Text _incomeText;
 
     public Action<bool> PlayerOnPlatform;
 

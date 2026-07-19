@@ -1,10 +1,11 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class SellSlot : MonoBehaviour
 {
     [SerializeField] private Image _icon;
-    [SerializeField] private Text _price;
+    [SerializeField] private TMP_Text _price;
     [SerializeField] private Image _background;
     [SerializeField] private Button _sellButton;
     [SerializeField] private GameObject _lockSellIndicator;

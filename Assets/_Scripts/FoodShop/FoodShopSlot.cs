@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
@@ -5,10 +6,10 @@ using UnityEngine.UI;
 public class FoodShopSlot : MonoBehaviour
 {
     [SerializeField] private Image _icon;
-    [SerializeField] private Text _name;
-    [SerializeField] private Text _amountText;
-    [SerializeField] private Text _coinPrice;
-    [SerializeField] private Text _gemPrice;
+    [SerializeField] private TMP_Text _name;
+    [SerializeField] private TMP_Text _amountText;
+    [SerializeField] private TMP_Text _coinPrice;
+    [SerializeField] private TMP_Text _gemPrice;
     [SerializeField] private Button _coinButton;
     [SerializeField] private Button _gemButton;
     [SerializeField] private GameObject _unavailablePanel;

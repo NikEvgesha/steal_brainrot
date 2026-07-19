@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 
@@ -6,7 +7,7 @@ public static class RemoteProfilePopupEditorTools
     private const string PrefabPath = "Assets/_Prefabs/UI/Resources/RemoteProfilePopup.prefab";
     private const string TexturePath = "Assets/_Sprites/texture.png";
     private const string GradientPath = "Assets/_Sprites/Gradient2.png";
-    private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular.ttf";
+    private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular Cyrillic SDF.asset";
 
     [MenuItem("Tools/UI/Restyle Remote Profile Popup")]
     public static void RestylePrefab()
@@ -20,7 +21,7 @@ public static class RemoteProfilePopupEditorTools
 
             Sprite texture = AssetDatabase.LoadAssetAtPath<Sprite>(TexturePath);
             Sprite gradient = AssetDatabase.LoadAssetAtPath<Sprite>(GradientPath);
-            Font font = AssetDatabase.LoadAssetAtPath<Font>(FontPath);
+            TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
             if (texture == null || gradient == null || font == null)
             {
                 throw new MissingReferenceException(
@@ -29,6 +30,16 @@ public static class RemoteProfilePopupEditorTools
 
             popup.ConfigureVisualAssets(texture, gradient, font);
             popup.ApplyVisualStyle();
+
+            foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true))
+            {
+                var serializedText = new SerializedObject(text);
+                serializedText.FindProperty("m_fontAsset").objectReferenceValue = font;
+                serializedText.FindProperty("m_sharedMaterial").objectReferenceValue = font.material;
+                serializedText.FindProperty("m_fontMaterial").objectReferenceValue = null;
+                serializedText.ApplyModifiedPropertiesWithoutUndo();
+            }
+
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
         }
         finally

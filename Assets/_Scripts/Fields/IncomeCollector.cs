@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -6,7 +7,7 @@ using UnityEngine.UI;
 public class IncomeCollector : MonoBehaviour
 {
     [SerializeField] private int _gemPrice;
-    [SerializeField] private Text _priceText;
+    [SerializeField] private TMP_Text _priceText;
 
     [SerializeField] private GameObject _ui;
     private bool _collectorPurchased;

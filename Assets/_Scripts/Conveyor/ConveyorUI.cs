@@ -1,24 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class ConveyorUI : MonoBehaviour
 {
-    [SerializeField] private Text _levelName;
+    [SerializeField] private TMP_Text _levelName;
     [SerializeField] private Image _icon;
     [SerializeField] private Image _newEggIcon;
-    [SerializeField] private Text _priceCoins;
-    [SerializeField] private Text _priceGems;
-    [SerializeField] private Text _incomeMultiplier;
+    [SerializeField] private TMP_Text _priceCoins;
+    [SerializeField] private TMP_Text _priceGems;
+    [SerializeField] private TMP_Text _incomeMultiplier;
     [SerializeField] private Button _buttonBuyGems;
     [SerializeField] private Button _buttonBuyCoins;
     [SerializeField] private Button _buttonActivate;
     [SerializeField] private GameObject _activeText;
     [SerializeField] private GameObject _notAvailableText;
-    [SerializeField] private Text _dropChancesText;
+    [SerializeField] private TMP_Text _dropChancesText;
     [SerializeField] private bool _showLuckComparison = true;
     [SerializeField] private bool _showEggBreakdown = true;
     [SerializeField] private string _chancesBaseLocalizationKey = "UI/Conveyor/ChancesBase";
@@ -288,22 +289,14 @@ public class ConveyorUI : MonoBehaviour
             rect.offsetMax = Vector2.zero;
         }
 
-        _incomeMultiplier.alignment = TextAnchor.MiddleCenter;
-        _incomeMultiplier.fontStyle = FontStyle.Bold;
+        _incomeMultiplier.alignment = TextAlignmentOptions.Center;
+        _incomeMultiplier.fontStyle |= FontStyles.Bold;
         _incomeMultiplier.color = BlockyUITheme.YellowAccent;
-        _incomeMultiplier.resizeTextForBestFit = true;
-        _incomeMultiplier.resizeTextMinSize = 18;
-        _incomeMultiplier.resizeTextMaxSize = 46;
-
-        Outline[] outlines = _incomeMultiplier.GetComponents<Outline>();
-        Outline primary = outlines.Length > 0 ? outlines[0] : _incomeMultiplier.gameObject.AddComponent<Outline>();
-        Outline secondary = outlines.Length > 1 ? outlines[1] : _incomeMultiplier.gameObject.AddComponent<Outline>();
-        primary.effectColor = BlockyUITheme.BlackStroke;
-        primary.effectDistance = new Vector2(3f, -3f);
-        primary.useGraphicAlpha = true;
-        secondary.effectColor = BlockyUITheme.BlackStroke;
-        secondary.effectDistance = new Vector2(-3f, 3f);
-        secondary.useGraphicAlpha = true;
+        _incomeMultiplier.enableAutoSizing = true;
+        _incomeMultiplier.fontSizeMin = 18;
+        _incomeMultiplier.fontSizeMax = 46;
+        _incomeMultiplier.outlineColor = BlockyUITheme.BlackStroke;
+        _incomeMultiplier.outlineWidth = Mathf.Max(_incomeMultiplier.outlineWidth, 0.16f);
     }
 
     public IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> GetCurrentDropChances()

@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
@@ -5,9 +6,9 @@ using System.Collections;
 
 public class LeaderboardRow : MonoBehaviour
 {
-    [SerializeField] private Text _rank;
-    [SerializeField] private Text _name;
-    [SerializeField] private Text _score;
+    [SerializeField] private TMP_Text _rank;
+    [SerializeField] private TMP_Text _name;
+    [SerializeField] private TMP_Text _score;
     [SerializeField] private Image _img;
 
 
