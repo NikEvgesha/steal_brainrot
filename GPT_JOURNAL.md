@@ -1044,3 +1044,10 @@
 - Assigned the overlay only to the five egg information labels and four shared interaction hints that previously used the legacy overlay material; regular UI remains on the normal Russo One material.
 - Fixed the local purchased BigPet physical trigger so a player exit hides `BrainrotInfoUI`; non-player colliders are ignored on both enter and exit. The wider physical trigger remains the close-distance hysteresis around the raycast interaction zone.
 - Unity Bridge confirmed the material imports with the expected overlay shader and atlas, fresh runtime egg/interaction instances use it, and the BigPet callback changes the information UI from active on enter to inactive on exit. Play Mode was stopped after verification.
+
+### 2026-07-19 (profile-board hitch and snapshot optimization)
+- Unity profiling identified a recurring `LocalProfileBoardPoint.Update` spike of about `239 ms`: every board refresh built a full local-base snapshot, and the local branch built the same statistics twice even while the popup was closed.
+- Split lightweight target/visibility refresh from statistics collection. Local statistics are now calculated only when the player actually opens the profile popup; the periodic board update no longer walks the farm hierarchy.
+- Added a dedicated public-stats path to `ZooBaseSnapshotSync`, cached the static local `Field`/`FieldCell`/`BigPetPoint` hierarchy by resolved slot root, and derived `animalsOnCells` from the already-built cell snapshot instead of scanning and loading every cell a second time.
+- Bridge benchmarks after the change: board update max `0.037 ms`, `PlayerLoop` median `7.71 ms` and p90 `9.98 ms`; cached stats refresh `0.94 ms`, cold full snapshot `31.41 ms` for `26` occupied cells and `22` animals. The real profile popup still opened successfully and test state was restored.
+- The broader scene audit found the next architectural target: six base copies under `RemoteBasesApplier` contain roughly `41.7k` GameObjects, `5.4k` Canvas and `9.5k` TMP components. This should be addressed separately with remote-base LOD/proxies so visual pop-in can be reviewed deliberately.

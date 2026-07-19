@@ -89,6 +89,10 @@ public class ZooBaseSnapshotSync : MonoBehaviour
     [SerializeField] private bool autoPublish = true;
 
     private Coroutine _publishLoop;
+    private Transform _cachedSnapshotRoot;
+    private Field[] _cachedSnapshotFields = Array.Empty<Field>();
+    private FieldCell[] _cachedSnapshotCells = Array.Empty<FieldCell>();
+    private BigPetPoint _cachedSnapshotBigPet;
 
     private void Awake()
     {
@@ -186,9 +190,18 @@ public class ZooBaseSnapshotSync : MonoBehaviour
                 boughtCells = LoadBoughtCells_SOMEHOW()
             },
             cells = cells,
-            animalsOnCells = LoadAnimalsOnCells_SOMEHOW(),
+            animalsOnCells = BuildAnimalsOnCells(cells),
             playerStats = BuildPublicStats(cells, bigPetIncomePerSec)
         };
+    }
+
+    public PlayerPublicStatsDto BuildPublicStatsDto()
+    {
+        if (!CanBuildSnapshot())
+            return null;
+
+        var cells = LoadCells_SOMEHOW();
+        return BuildPublicStats(cells, LoadBigPetIncomePerSecond());
     }
 
     private PlayerPublicStatsDto BuildPublicStats(List<CellSnapshotDto> cells, double bigPetIncomePerSec)
@@ -225,9 +238,8 @@ public class ZooBaseSnapshotSync : MonoBehaviour
             return 0d;
 
         var root = GetSnapshotRoot();
-        BigPetPoint bigPet = null;
-        if (root != null)
-            bigPet = root.GetComponentInChildren<BigPetPoint>(true);
+        EnsureSnapshotHierarchyCache(root);
+        var bigPet = _cachedSnapshotBigPet;
         if (bigPet == null)
             bigPet = FindAnyObjectByType<BigPetPoint>();
         if (bigPet == null)
@@ -305,47 +317,59 @@ public class ZooBaseSnapshotSync : MonoBehaviour
         return list;
     }
 
-    private List<AnimalOnCellDto> LoadAnimalsOnCells_SOMEHOW()
+    private static List<AnimalOnCellDto> BuildAnimalsOnCells(List<CellSnapshotDto> cells)
     {
         var list = new List<AnimalOnCellDto>();
-        var seen = new HashSet<string>();
-        var cells = GetSnapshotCells();
+        if (cells == null)
+            return list;
+
         foreach (var cell in cells)
         {
-            if (cell == null || string.IsNullOrEmpty(cell.Id))
-                continue;
-            if (!seen.Add(cell.Id))
-                continue;
-
-            var data = save.LoadCellData(cell.Id);
-            if (data == null || data.Status != Item.Brainrot)
+            if (cell == null || cell.kind != "brainrot" || string.IsNullOrEmpty(cell.cell))
                 continue;
 
             list.Add(new AnimalOnCellDto
             {
-                cell = cell.Id,
-                animalId = data.ID,
+                cell = cell.cell,
+                animalId = cell.id,
                 lvl = 1
             });
         }
-        list.Sort((a, b) => string.CompareOrdinal(a.cell, b.cell));
+
         return list;
     }
 
     private Field[] GetSnapshotFields()
     {
         var root = GetSnapshotRoot();
-        return root != null
-            ? root.GetComponentsInChildren<Field>(true)
-            : Array.Empty<Field>();
+        EnsureSnapshotHierarchyCache(root);
+        return _cachedSnapshotFields;
     }
 
     private FieldCell[] GetSnapshotCells()
     {
         var root = GetSnapshotRoot();
-        return root != null
-            ? root.GetComponentsInChildren<FieldCell>(true)
-            : Array.Empty<FieldCell>();
+        EnsureSnapshotHierarchyCache(root);
+        return _cachedSnapshotCells;
+    }
+
+    private void EnsureSnapshotHierarchyCache(Transform root)
+    {
+        if (root != null && _cachedSnapshotRoot == root)
+            return;
+
+        _cachedSnapshotRoot = root;
+        if (root == null)
+        {
+            _cachedSnapshotFields = Array.Empty<Field>();
+            _cachedSnapshotCells = Array.Empty<FieldCell>();
+            _cachedSnapshotBigPet = null;
+            return;
+        }
+
+        _cachedSnapshotFields = root.GetComponentsInChildren<Field>(true);
+        _cachedSnapshotCells = root.GetComponentsInChildren<FieldCell>(true);
+        _cachedSnapshotBigPet = root.GetComponentInChildren<BigPetPoint>(true);
     }
 
     private Transform GetSnapshotRoot()

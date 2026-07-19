@@ -103,7 +103,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         if (!_playerInside)
             return;
 
-        RefreshTargetData(force: true);
+        RefreshTargetData(force: true, refreshStats: true);
         if (!_hasTarget)
             return;
 
@@ -129,11 +129,11 @@ public class LocalProfileBoardPoint : MonoBehaviour
         if (sync == null)
             return false;
 
-        var dto = sync.BuildSnapshotDto();
-        if (dto?.playerStats == null)
+        var snapshotStats = sync.BuildPublicStatsDto();
+        if (snapshotStats == null)
             return false;
 
-        stats = dto.playerStats;
+        stats = snapshotStats;
         return true;
     }
 
@@ -322,7 +322,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         }
     }
 
-    private void RefreshTargetData(bool force = false)
+    private void RefreshTargetData(bool force = false, bool refreshStats = false)
     {
         var now = Time.unscaledTime;
         if (!force && now < _nextTargetRefreshAt)
@@ -335,6 +335,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         var prevFriendCode = _targetFriendCode;
 
         var hasTarget = TryResolveSlotTarget(
+            refreshStats,
             out var playerId,
             out var friendCode,
             out var displayName,
@@ -360,9 +361,15 @@ public class LocalProfileBoardPoint : MonoBehaviour
         _targetPlayerId = string.IsNullOrWhiteSpace(playerId) ? null : playerId;
         _targetFriendCode = string.IsNullOrWhiteSpace(friendCode) ? null : friendCode;
         _targetDisplayName = string.IsNullOrWhiteSpace(displayName) ? ResolveDisplayName() : displayName;
-        _targetStats = _targetIsLocal
-            ? BuildStats()
-            : (stats ?? new PlayerPublicStatsDto());
+        if (_targetIsLocal)
+        {
+            if (refreshStats)
+                _targetStats = stats ?? BuildStats();
+        }
+        else
+        {
+            _targetStats = stats ?? new PlayerPublicStatsDto();
+        }
         RefreshVisibilityState();
 
         var targetChanged = !string.Equals(prevPlayerId, _targetPlayerId, StringComparison.Ordinal) ||
@@ -372,6 +379,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
     }
 
     private bool TryResolveSlotTarget(
+        bool includeLocalStats,
         out string playerId,
         out string friendCode,
         out string displayName,
@@ -412,7 +420,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
 
             if (allowLocalSlotFallback && bases.IsLocalSlotForClient(slotIndex))
             {
-                if (TryResolveLocalTarget(out playerId, out friendCode, out displayName, out stats))
+                if (TryResolveLocalTarget(includeLocalStats, out playerId, out friendCode, out displayName, out stats))
                 {
                     isLocalTarget = true;
                     return true;
@@ -425,7 +433,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         if (!allowLocalSlotFallback)
             return false;
 
-        if (!TryResolveLocalTarget(out playerId, out friendCode, out displayName, out stats))
+        if (!TryResolveLocalTarget(includeLocalStats, out playerId, out friendCode, out displayName, out stats))
             return false;
 
         isLocalTarget = true;
@@ -459,6 +467,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
     }
 
     private bool TryResolveLocalTarget(
+        bool includeStats,
         out string playerId,
         out string friendCode,
         out string displayName,
@@ -467,7 +476,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         playerId = null;
         friendCode = null;
         displayName = ResolveDisplayName();
-        stats = BuildStats();
+        stats = includeStats ? BuildStats() : null;
 
         if (G.Save != null)
         {
