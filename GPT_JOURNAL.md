@@ -1038,3 +1038,9 @@
 - Updated localization binding and the Adaptive Grid demo builder so newly generated UI also uses TMP. Vendor VoxelImporter examples and the Unity recovery scene remain intentionally untouched.
 - Repaired three teleporter labels whose migrated outline instances still referenced the Liberation Sans atlas, then restyled and revalidated `RemoteProfilePopup` with the correct Russo One material.
 - Unity Bridge validation reported no first-party legacy Text components and `179/179` active TMP labels using `RussoOne-Regular SDF`. Live Game View smoke confirmed readable `Продать` / `Дом` / `Еда`, currency and inventory labels, plus the fully rendered localized remote-profile popup; no new compiler or missing-reference errors were logged.
+
+### 2026-07-19 (TMP world overlay restored and BigPet trigger exit fixed)
+- Restored the legacy through-geometry behavior after the TMP migration with a dedicated `RussoOne-Regular SDF Overlay` material using `TextMeshPro/Distance Field Overlay` and the original Russo One atlas.
+- Assigned the overlay only to the five egg information labels and four shared interaction hints that previously used the legacy overlay material; regular UI remains on the normal Russo One material.
+- Fixed the local purchased BigPet physical trigger so a player exit hides `BrainrotInfoUI`; non-player colliders are ignored on both enter and exit. The wider physical trigger remains the close-distance hysteresis around the raycast interaction zone.
+- Unity Bridge confirmed the material imports with the expected overlay shader and atlas, fresh runtime egg/interaction instances use it, and the BigPet callback changes the information UI from active on enter to inactive on exit. Play Mode was stopped after verification.

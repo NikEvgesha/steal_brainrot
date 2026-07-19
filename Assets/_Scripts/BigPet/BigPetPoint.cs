@@ -471,6 +471,7 @@ public class BigPetPoint : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (_remoteMode || !_purchased) return;
+        if (!other.CompareTag("Player")) return;
         if (_petInfoUI != null)
             _petInfoUI.gameObject.SetActive(true);
     }
@@ -478,8 +479,9 @@ public class BigPetPoint : MonoBehaviour
     private void OnTriggerExit(Collider other)
     {
         if (_remoteMode || !_purchased) return;
+        if (!other.CompareTag("Player")) return;
         if (_petInfoUI != null)
-            _petInfoUI.gameObject.SetActive(true);
+            _petInfoUI.gameObject.SetActive(false);
     }
 
     public void ApplyRemoteState(int petId, int lvl, int xp, bool purchased = true)
