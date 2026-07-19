@@ -17,7 +17,7 @@ using UnityEngine.UI;
 public static class LegacyTextToTmpMigration
 {
     private const string LegacyTextGuid = "5f7201a12d95ffc409449d95f23cf332";
-    private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular Cyrillic SDF.asset";
+    private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular SDF.asset";
     private const string ManifestPath = "Library/LegacyTextToTmpMigration.json";
 
     [Serializable]

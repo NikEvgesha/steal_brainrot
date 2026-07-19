@@ -1034,7 +1034,7 @@
 
 ### 2026-07-19 (first-party UI migrated to TextMesh Pro)
 - Replaced legacy `UnityEngine.UI.Text` components across active first-party scenes and prefabs with `TextMeshProUGUI`, and migrated serialized runtime/editor fields to `TMP_Text` without losing component references.
-- Set Russo One Cyrillic as the project TMP default, added a shared TMP creation helper, and made common blocky styling resilient to missing serialized font materials.
+- Set the project's existing `RussoOne-Regular SDF` as the TMP default while retaining its configured Cyrillic fallback, normalized pre-existing first-party TMP assets to the same font, added a shared TMP creation helper, and made common blocky styling resilient to missing serialized font materials.
 - Updated localization binding and the Adaptive Grid demo builder so newly generated UI also uses TMP. Vendor VoxelImporter examples and the Unity recovery scene remain intentionally untouched.
 - Repaired three teleporter labels whose migrated outline instances still referenced the Liberation Sans atlas, then restyled and revalidated `RemoteProfilePopup` with the correct Russo One material.
-- Unity Bridge validation reported no first-party legacy Text components. Live Game View smoke confirmed readable `Продать` / `Дом` / `Еда`, currency and inventory labels, plus the fully rendered localized remote-profile popup; no new compiler or missing-reference errors were logged.
+- Unity Bridge validation reported no first-party legacy Text components and `179/179` active TMP labels using `RussoOne-Regular SDF`. Live Game View smoke confirmed readable `Продать` / `Дом` / `Еда`, currency and inventory labels, plus the fully rendered localized remote-profile popup; no new compiler or missing-reference errors were logged.

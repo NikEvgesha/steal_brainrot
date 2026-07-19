@@ -7,7 +7,7 @@ public static class RemoteProfilePopupEditorTools
     private const string PrefabPath = "Assets/_Prefabs/UI/Resources/RemoteProfilePopup.prefab";
     private const string TexturePath = "Assets/_Sprites/texture.png";
     private const string GradientPath = "Assets/_Sprites/Gradient2.png";
-    private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular Cyrillic SDF.asset";
+    private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular SDF.asset";
 
     [MenuItem("Tools/UI/Restyle Remote Profile Popup")]
     public static void RestylePrefab()
