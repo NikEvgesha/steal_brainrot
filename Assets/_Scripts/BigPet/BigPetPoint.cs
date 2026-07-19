@@ -651,6 +651,9 @@ public class BigPetPoint : MonoBehaviour
             Vector3 center = interactionCollider.center;
             interactionCollider.center = new Vector3(center.x, Mathf.Max(0.9f, center.y), center.z);
         }
+
+        if (_setPetUI != null)
+            _setPetUI.ConfigureWorldInteraction(interactionCollider, _changePetInteractionDistance);
     }
 
     private bool ResolvePurchaseState()

@@ -38,6 +38,7 @@ public class ConveyorUI : MonoBehaviour
     private ConveyorLevel _currentLevelInfo;
     private int _currentActiveIdx;
     private List<ConveyorLevelTab> _tabs;
+    private Conveyor _conveyor;
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChances = new();
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChancesWithLuck = new();
     private readonly List<ConveyorDropChanceCalculator.EggBreakdownEntry> _cachedEggBreakdown = new();
@@ -80,7 +81,9 @@ public class ConveyorUI : MonoBehaviour
 
     private void Awake()
     {
+        _conveyor = GetComponentInParent<Conveyor>(true);
         EnsurePanel();
+        StyleIncomeBonusDisplay();
     }
 
     private void OnEnable()
@@ -153,8 +156,7 @@ public class ConveyorUI : MonoBehaviour
             }
         }
 
-        if (_incomeMultiplier != null)
-            _incomeMultiplier.text = "+" + Mathf.RoundToInt((level.IncomeMultiplier - 1f) * 100f) + "%";
+        UpdateIncomeBonusDisplay();
         UpdateDropChances(level);
 
         SetButtons();
@@ -238,6 +240,67 @@ public class ConveyorUI : MonoBehaviour
 
         if (_tabs[_currentActiveIdx] != null)
             _tabs[_currentActiveIdx].SetLvlActive(true);
+
+        UpdateIncomeBonusDisplay();
+    }
+
+    private void UpdateIncomeBonusDisplay()
+    {
+        if (_incomeMultiplier == null || _currentLevelInfo == null)
+            return;
+
+        if (_conveyor == null)
+            _conveyor = GetComponentInParent<Conveyor>(true);
+
+        int selectedBonus = Mathf.Max(0, Mathf.RoundToInt((_currentLevelInfo.IncomeMultiplier - 1f) * 100f));
+        float activeMultiplier = _conveyor != null
+            ? _conveyor.UnlockedIncomeMultiplier
+            : _currentLevelInfo.IncomeMultiplier;
+        int activeBonus = Mathf.Max(0, Mathf.RoundToInt((activeMultiplier - 1f) * 100f));
+        string label = LocalizationUtils.T("UI/Conveyor/IncomeIncrease", "Income increase:");
+        string activeLabel = LocalizationUtils.Format(
+            "UI/Conveyor/ActivatedBonus",
+            "active +{0}%",
+            activeBonus);
+
+        _incomeMultiplier.text = $"{label} +{selectedBonus}% ({activeLabel})";
+    }
+
+    private void StyleIncomeBonusDisplay()
+    {
+        if (_incomeMultiplier == null)
+            return;
+
+        Transform label = transform.Find("Panel/Income");
+        if (label == null && _incomeMultiplier.transform.parent != null)
+            label = _incomeMultiplier.transform.parent.Find("Income");
+        if (label != null && label.gameObject != _incomeMultiplier.gameObject)
+            label.gameObject.SetActive(false);
+
+        if (_incomeMultiplier.transform is RectTransform rect)
+        {
+            rect.anchorMin = new Vector2(0.05f, rect.anchorMin.y);
+            rect.anchorMax = new Vector2(0.963f, rect.anchorMax.y);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        _incomeMultiplier.alignment = TextAnchor.MiddleCenter;
+        _incomeMultiplier.fontStyle = FontStyle.Bold;
+        _incomeMultiplier.color = BlockyUITheme.YellowAccent;
+        _incomeMultiplier.resizeTextForBestFit = true;
+        _incomeMultiplier.resizeTextMinSize = 18;
+        _incomeMultiplier.resizeTextMaxSize = 46;
+
+        Outline[] outlines = _incomeMultiplier.GetComponents<Outline>();
+        Outline primary = outlines.Length > 0 ? outlines[0] : _incomeMultiplier.gameObject.AddComponent<Outline>();
+        Outline secondary = outlines.Length > 1 ? outlines[1] : _incomeMultiplier.gameObject.AddComponent<Outline>();
+        primary.effectColor = BlockyUITheme.BlackStroke;
+        primary.effectDistance = new Vector2(3f, -3f);
+        primary.useGraphicAlpha = true;
+        secondary.effectColor = BlockyUITheme.BlackStroke;
+        secondary.effectDistance = new Vector2(-3f, 3f);
+        secondary.useGraphicAlpha = true;
     }
 
     public IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> GetCurrentDropChances()

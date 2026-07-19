@@ -1015,3 +1015,12 @@
 - Live Bridge verification opened the menu, simulated loss of its world target, confirmed that it stayed pinned, found 18 usable slots, changed the saved BigPet from ID `3` to `0`, restored ID `3`, and closed the menu explicitly.
 - Restyled `RemoteProfilePopup` with the shared tiled `texture` sprite on all panels and buttons, black outlines/shadow, `Gradient2` overlays on Like/Close and Russo One on every label. The editor restyle command now assigns these shared assets to the prefab explicitly.
 - Live Game View verification at `1280x720` confirmed the full textured popup and the gradient Like button in the active scene. Play Mode was stopped after the test.
+
+### 2026-07-19 (Camera smoothing and gameplay information polish)
+- Reworked `TPCameraController` around target yaw/pitch and `SmoothDampAngle`: long frames and pointer-lock recenter deltas no longer become abrupt turns, raw look input is bounded, and collision recovery uses a clamped unscaled timestep. The camera prefab now exposes the smoothing limits used by the active scene.
+- Added distance hysteresis to the BigPet selector. It remains open while the player is near the interaction collider and closes only beyond the original interaction radius plus `1.5` units. A live Bridge probe confirmed that it stayed open at the intermediate distance and closed after the larger threshold.
+- Added a localized BigPet farm-income badge using the same `+10%` per saved level formula as the global income modifier. Live UI showed `+300%` for the test profile's level 30.
+- Made `RemoteProfilePopup` text heavier with opposing black outlines and persisted an exact square `68 × 68` close button in its prefab. The live popup remained correctly localized and visually matched the shared blocky theme.
+- Reworked the conveyor information: the income row now distinguishes the selected level bonus from the actually unlocked bonus, while the egg catalog groups base egg chances by every conveyor level with colored headers, alternating rows and a note that luck bonuses are excluded.
+- Added RU/EN keys for the active conveyor bonus, the base-chance note and the BigPet income badge. Unity rebuilt the final scripts into `Assembly-CSharp.dll` without compiler errors.
+- Remaining manual acceptance: restart Unity Bridge and inspect the complete scrollable egg catalog plus camera feel under real mouse/touch input and a WebGL frame spike. The earlier live checks for BigPet distance/selection and `RemoteProfilePopup` passed.

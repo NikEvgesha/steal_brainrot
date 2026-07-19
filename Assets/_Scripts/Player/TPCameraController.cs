@@ -1,301 +1,211 @@
 using UnityEngine;
 
-
-
 /// <summary>
-
-/// Камера 3-го лица с зумом и анти-клиппингом через SphereCast.
-
-/// Оптимизировано: LateUpdate, без лишних аллокаций, игнор триггеров и слоя игрока.
-
-/// Управление: ПКМ удерживать для вращения, колесо мыши — зум.
-
+/// РљР°РјРµСЂР° С‚СЂРµС‚СЊРµРіРѕ Р»РёС†Р° СЃ РїР»Р°РІРЅС‹Рј РѕСЂР±РёС‚Р°Р»СЊРЅС‹Рј СѓРїСЂР°РІР»РµРЅРёРµРј, Р·СѓРјРѕРј Рё SphereCast-Р°РЅС‚РёРєР»РёРїРїРёРЅРіРѕРј.
+/// Р”Р»РёРЅРЅС‹Р№ РєР°РґСЂ РЅРµ РјРѕР¶РµС‚ РїСЂРµРІСЂР°С‚РёС‚СЊСЃСЏ РІ СЂРµР·РєРёР№ РїРѕРІРѕСЂРѕС‚: РІРІРѕРґ Рё СЃРіР»Р°Р¶РёРІР°РЅРёРµ РёСЃРїРѕР»СЊР·СѓСЋС‚
+/// РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Р№ unscaled timestep, Р° С„Р°РєС‚РёС‡РµСЃРєРёР№ СѓРіРѕР» РґРѕРіРѕРЅСЏРµС‚ С†РµР»РµРІРѕР№ РЅРµР·Р°РІРёСЃРёРјРѕ РѕС‚ FPS.
 /// </summary>
-
 [DefaultExecutionOrder(50)]
-
 public class TPCameraController : MonoBehaviour
-
 {
-
     [Header("Target & Orbit")]
-
-    [SerializeField] private Transform target;          // Пивот у головы (CameraPivot)
-
-    [SerializeField] private float yaw = 0f;            // Горизонтальный угол (в градусах)
-
-    [SerializeField] private float pitch = 15f;         // Вертикальный угол (в градусах)
-
+    [SerializeField] private Transform target;
+    [SerializeField] private float yaw;
+    [SerializeField] private float pitch = 15f;
     [SerializeField] private Vector2 pitchLimits = new Vector2(-40f, 70f);
 
-
-
     [Header("Sensitivity")]
-
-    [SerializeField] private float yawSpeed = 180f;     // °/сек на 1.0 единицу Mouse X
-
-    [SerializeField] private float pitchSpeed = 120f;   // °/сек на 1.0 единицу Mouse Y
-
+    [SerializeField] private float yawSpeed = 180f;
+    [SerializeField] private float pitchSpeed = 120f;
     [SerializeField] private bool rotateOnRightMouse = true;
 
-
-
     [Header("Zoom")]
-
     [SerializeField] private float minDistance = 1.6f;
-
-    [SerializeField] private float maxDistance = 18.0f;
-
-    [SerializeField] private float zoomSpeed = 3.0f;    // Чем больше, тем быстрее реакция на колесо
-
-    [SerializeField] private float backReturnSpeed = 8f;// Скорость возврата к желаемой дистанции без препятствий
-
-
+    [SerializeField] private float maxDistance = 18f;
+    [SerializeField] private float zoomSpeed = 3f;
+    [SerializeField] private float backReturnSpeed = 8f;
 
     [Header("Collision")]
-
     [SerializeField] private float collisionRadius = 0.25f;
-
     [SerializeField] private float collisionPadding = 0.1f;
-
-    [SerializeField] private LayerMask collisionMask = ~0; // Выключи тут слой Player
-
-
+    [SerializeField] private LayerMask collisionMask = ~0;
     [SerializeField] private bool ignoreEggsInCollision = true;
 
     [Header("Smoothing")]
+    [SerializeField, Min(0.01f)] private float rotationSmoothTime = 0.045f;
+    [SerializeField, Min(90f)] private float maxAngularSpeed = 720f;
+    [SerializeField, Min(0.001f)] private float maxInputDeltaTime = 0.0333f;
+    [SerializeField, Min(0.1f)] private float maxLookInputPerFrame = 4f;
     [SerializeField] private bool freezeOnSpike = true;
-    [SerializeField] private float spikeThreshold = 0.05f;
+    [SerializeField, Min(0.01f)] private float spikeThreshold = 0.05f;
 
     private float _desiredDistance;
-
     private float _currentDistance;
-
-    private Camera _cam;
-
-    private RaycastHit _hit; // поле, чтобы не аллоцировать в стеке каждый кадр
-
-
+    private float _targetYaw;
+    private float _targetPitch;
+    private float _yawVelocity;
+    private float _pitchVelocity;
+    private bool _orbitInitialized;
+    private RaycastHit _hit;
     private readonly RaycastHit[] _collisionHits = new RaycastHit[32];
 
-
-
-
     private void Awake()
-
     {
-
-        _cam = GetComponent<Camera>();
-
-        //if (target == null)
-
-        //{
-
-        //    Debug.LogWarning("[TPCameraController] Target not set. Disabling.");
-
-        //    enabled = false;
-
-        //    return;
-
-        //}
-
-
-
-        // Инициализация дистанции от текущего положения камеры
-
-        //_desiredDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), minDistance, maxDistance);
-
-        //_currentDistance = _desiredDistance;
-
-
-
-        //// Начальный yaw берём из поворота таргета
-
-        //yaw = target.eulerAngles.y;
-
+        InitializeOrbitAngles();
     }
 
-
-
-
-
-    public void SetTarget(Transform t)
-
+    public void SetTarget(Transform value)
     {
-
-        target = t;
+        target = value;
+        if (target == null)
+            return;
 
         _desiredDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), minDistance, maxDistance);
-
         _currentDistance = _desiredDistance;
-
-
-
-        // Начальный yaw берём из поворота таргета
-
         yaw = target.eulerAngles.y;
-
+        _targetYaw = yaw;
+        _targetPitch = Mathf.Clamp(pitch, pitchLimits.x, pitchLimits.y);
+        _orbitInitialized = true;
+        ResetAngularVelocity();
     }
-
-
 
     private void Update()
-
     {
-        bool spikeUpdate = freezeOnSpike && Time.unscaledDeltaTime > spikeThreshold;
-        if (spikeUpdate)
-        {
-            if (rotateOnRightMouse && Input.GetMouseButtonUp(1))
-            {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-            }
-            return;
-        }
-
-
-        // Вращение — только при удержании ПКМ (удобно для WebGL), либо всегда, если отключить флаг
+        InitializeOrbitAngles();
 
         bool useTouchInput = G.Control != null && G.Control.UseTouchControl && G.Input != null;
+        bool pressedThisFrame = !useTouchInput && rotateOnRightMouse && Input.GetMouseButtonDown(1);
         bool canRotate = useTouchInput || !rotateOnRightMouse || Input.GetMouseButton(1);
 
-
-
-        if (canRotate)
-
+        if (pressedThisFrame)
         {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            ResetAngularVelocity();
+        }
 
+        float rawDeltaTime = Mathf.Max(0f, Time.unscaledDeltaTime);
+        float stableDeltaTime = Mathf.Min(rawDeltaTime, Mathf.Max(0.001f, maxInputDeltaTime));
+        bool rejectSpikeInput = freezeOnSpike && rawDeltaTime > Mathf.Max(spikeThreshold, maxInputDeltaTime);
+
+        // The first locked-cursor frame often contains the pointer recenter delta.
+        if (canRotate && !pressedThisFrame && !rejectSpikeInput)
+        {
             Vector2 lookInput = useTouchInput
                 ? G.Input.Rotation
-                : new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
-            float mx = lookInput.x;
+                : new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
 
-            float my = lookInput.y;
+            lookInput.x = Mathf.Clamp(lookInput.x, -maxLookInputPerFrame, maxLookInputPerFrame);
+            lookInput.y = Mathf.Clamp(lookInput.y, -maxLookInputPerFrame, maxLookInputPerFrame);
 
-
-
-            yaw += mx * yawSpeed * Time.deltaTime;
-
-            pitch -= my * pitchSpeed * Time.deltaTime;
-
-            pitch = Mathf.Clamp(pitch, pitchLimits.x, pitchLimits.y);
-
-
-
-            // Захват/освобождение курсора под WebGL — только при действий пользователя
-
-            if (rotateOnRightMouse && !useTouchInput)
-
-            {
-
-                if (Input.GetMouseButtonDown(1))
-
-                {
-
-                    Cursor.lockState = CursorLockMode.Locked;
-
-                    Cursor.visible = false;
-
-                }
-
-            }
-
+            _targetYaw += lookInput.x * yawSpeed * stableDeltaTime;
+            _targetPitch -= lookInput.y * pitchSpeed * stableDeltaTime;
+            _targetPitch = Mathf.Clamp(_targetPitch, pitchLimits.x, pitchLimits.y);
         }
-
-
 
         if (!useTouchInput && rotateOnRightMouse && Input.GetMouseButtonUp(1))
-
         {
-
             Cursor.lockState = CursorLockMode.None;
-
             Cursor.visible = true;
-
         }
-
-
-
-        // Зум (колесо мыши), экспоненциально-плавный
 
         float scroll = Input.GetAxis("Mouse ScrollWheel");
-
         if (Mathf.Abs(scroll) > 0.0001f)
-
         {
-
-            float zoomDelta = -scroll * (_desiredDistance * 0.5f + 1f) * zoomSpeed; // немного лог-подобного ощущения
-
+            float zoomDelta = -scroll * (_desiredDistance * 0.5f + 1f) * zoomSpeed;
             _desiredDistance = Mathf.Clamp(_desiredDistance + zoomDelta, minDistance, maxDistance);
-
         }
-
     }
-
-
 
     private void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+            return;
 
-        // ????????? ???????? ??????? ?????? ???????????? ???????
-        Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
+        InitializeOrbitAngles();
+        float stableDeltaTime = Mathf.Min(
+            Mathf.Max(0.0001f, Time.unscaledDeltaTime),
+            Mathf.Max(0.001f, maxInputDeltaTime));
+
+        yaw = Mathf.SmoothDampAngle(
+            yaw,
+            _targetYaw,
+            ref _yawVelocity,
+            Mathf.Max(0.01f, rotationSmoothTime),
+            Mathf.Max(90f, maxAngularSpeed),
+            stableDeltaTime);
+        pitch = Mathf.SmoothDampAngle(
+            pitch,
+            _targetPitch,
+            ref _pitchVelocity,
+            Mathf.Max(0.01f, rotationSmoothTime),
+            Mathf.Max(90f, maxAngularSpeed),
+            stableDeltaTime);
+        pitch = Mathf.Clamp(pitch, pitchLimits.x, pitchLimits.y);
+
+        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
         Vector3 pivot = target.position;
-        Vector3 desiredCameraPos = pivot - (rot * Vector3.forward) * _desiredDistance;
+        Vector3 desiredCameraPosition = pivot - rotation * Vector3.forward * _desiredDistance;
+        Vector3 toCamera = desiredCameraPosition - pivot;
+        float maxDistanceToCamera = toCamera.magnitude;
+        Vector3 direction = maxDistanceToCamera > 0.0001f ? toCamera / maxDistanceToCamera : Vector3.back;
 
-        // ????-????????: SphereCast ?? pivot ? ???????? ???????
-        Vector3 toCam = desiredCameraPos - pivot;
-        float maxDist = toCam.magnitude;
-        Vector3 dir = maxDist > 0.0001f ? toCam / maxDist : Vector3.back;
-
-        bool hitSomething = TryGetNearestCameraCollision(pivot, dir, maxDist, out _hit);
-        float targetDistance = _desiredDistance;
-
+        bool hitSomething = TryGetNearestCameraCollision(pivot, direction, maxDistanceToCamera, out _hit);
         if (hitSomething)
         {
-            float safeDist = Mathf.Max(_hit.distance - collisionPadding, minDistance);
-            targetDistance = Mathf.Min(safeDist, _desiredDistance);
-            _currentDistance = targetDistance; // ????????? ?????????, ????? ?? ??????? ? ?????
+            float safeDistance = Mathf.Max(_hit.distance - collisionPadding, minDistance);
+            _currentDistance = Mathf.Min(safeDistance, _desiredDistance);
         }
         else
         {
-            // ?????? ???????????? ????? ? _desiredDistance ??? ?????? (fps-??????????)
-            _currentDistance = Mathf.Lerp(_currentDistance, _desiredDistance, 1f - Mathf.Exp(-backReturnSpeed * Time.deltaTime));
+            float blend = 1f - Mathf.Exp(-Mathf.Max(0.01f, backReturnSpeed) * stableDeltaTime);
+            _currentDistance = Mathf.Lerp(_currentDistance, _desiredDistance, blend);
         }
 
-        // ????????? ????????? ??????
-        Vector3 finalPos = pivot - (rot * Vector3.forward) * _currentDistance;
-        transform.SetPositionAndRotation(finalPos, rot);
-
-        // Safety: prevent roll drift
-        var e = transform.eulerAngles;
-        if (Mathf.Abs(e.z) > 0.01f)
-            transform.rotation = Quaternion.Euler(e.x, e.y, 0f);
+        Vector3 finalPosition = pivot - rotation * Vector3.forward * _currentDistance;
+        transform.SetPositionAndRotation(finalPosition, rotation);
     }
 
-    private bool TryGetNearestCameraCollision(Vector3 pivot, Vector3 dir, float maxDist, out RaycastHit nearestHit)
+    private void InitializeOrbitAngles()
     {
-        nearestHit = default(RaycastHit);
+        if (_orbitInitialized)
+            return;
+
+        pitch = Mathf.Clamp(pitch, pitchLimits.x, pitchLimits.y);
+        _targetYaw = yaw;
+        _targetPitch = pitch;
+        _orbitInitialized = true;
+    }
+
+    private void ResetAngularVelocity()
+    {
+        _yawVelocity = 0f;
+        _pitchVelocity = 0f;
+    }
+
+    private bool TryGetNearestCameraCollision(Vector3 pivot, Vector3 direction, float distance, out RaycastHit nearestHit)
+    {
+        nearestHit = default;
+        if (distance <= 0.0001f)
+            return false;
 
         int hitCount = Physics.SphereCastNonAlloc(
             pivot,
             collisionRadius,
-            dir,
+            direction,
             _collisionHits,
-            maxDist,
+            distance,
             collisionMask,
             QueryTriggerInteraction.Ignore);
 
         bool found = false;
         float nearestDistance = float.PositiveInfinity;
-
         for (int i = 0; i < hitCount; i++)
         {
             RaycastHit hit = _collisionHits[i];
             Collider hitCollider = hit.collider;
             if (hitCollider == null || hit.distance <= 0.001f || ShouldIgnoreCameraCollision(hitCollider))
                 continue;
-
             if (hit.distance >= nearestDistance)
                 continue;
 
@@ -314,21 +224,6 @@ public class TPCameraController : MonoBehaviour
 
         return ignoreEggsInCollision && hitCollider.GetComponentInParent<Egg>() != null;
     }
-#if UNITY_EDITOR
-
-    private void OnDrawGizmosSelected()
-
-    {
-
-        if (target == null) return;
-
-        Gizmos.color = new Color(0f, 0.8f, 1f, 0.35f);
-
-        Gizmos.DrawWireSphere(target.position, collisionRadius);
-
-    }
-
-#endif
 
     public void ResetCamera()
     {
@@ -336,10 +231,23 @@ public class TPCameraController : MonoBehaviour
             return;
 
         yaw = target.eulerAngles.y;
+        _targetYaw = yaw;
+        pitch = Mathf.Clamp(pitch, pitchLimits.x, pitchLimits.y);
+        _targetPitch = pitch;
         _desiredDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), minDistance, maxDistance);
         _currentDistance = _desiredDistance;
+        _orbitInitialized = true;
+        ResetAngularVelocity();
     }
 
+#if UNITY_EDITOR
+    private void OnDrawGizmosSelected()
+    {
+        if (target == null)
+            return;
+
+        Gizmos.color = new Color(0f, 0.8f, 1f, 0.35f);
+        Gizmos.DrawWireSphere(target.position, collisionRadius);
+    }
+#endif
 }
-
-

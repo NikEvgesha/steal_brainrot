@@ -360,7 +360,10 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         if (_likeButton != null)
             ApplyTexturedButton(_likeButton, BlockyUITheme.GreenHeader);
         if (_closeButton != null)
+        {
             ApplyTexturedButton(_closeButton, BlockyUITheme.RedHeader);
+            EnsureSquareCloseButton(_closeButton);
+        }
 
         foreach (Text text in root.GetComponentsInChildren<Text>(true))
         {
@@ -369,6 +372,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             if (_sharedFont != null)
                 text.font = _sharedFont;
             BlockyUITheme.ApplyText(text, text.color, Mathf.Max(12, text.fontSize));
+            ApplyHeavyTextOutline(text);
         }
     }
 
@@ -451,6 +455,37 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             rect.localScale = Vector3.one;
         }
         gradientTransform.SetAsFirstSibling();
+    }
+
+    private static void EnsureSquareCloseButton(Button button)
+    {
+        if (button == null || !(button.transform is RectTransform rect))
+            return;
+
+        rect.anchorMin = new Vector2(0.925f, 0.51f);
+        rect.anchorMax = rect.anchorMin;
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(68f, 68f);
+        rect.localScale = Vector3.one;
+        rect.SetAsLastSibling();
+    }
+
+    private static void ApplyHeavyTextOutline(Text text)
+    {
+        if (text == null)
+            return;
+
+        Outline[] outlines = text.GetComponents<Outline>();
+        Outline primary = outlines.Length > 0 ? outlines[0] : text.gameObject.AddComponent<Outline>();
+        Outline secondary = outlines.Length > 1 ? outlines[1] : text.gameObject.AddComponent<Outline>();
+
+        primary.effectColor = BlockyUITheme.BlackStroke;
+        primary.effectDistance = new Vector2(3f, -3f);
+        primary.useGraphicAlpha = true;
+
+        secondary.effectColor = BlockyUITheme.BlackStroke;
+        secondary.effectDistance = new Vector2(-3f, 3f);
+        secondary.useGraphicAlpha = true;
     }
 
     private void RefreshLocalizedContent()

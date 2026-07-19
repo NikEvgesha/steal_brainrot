@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class EggDropCatalogUI : MonoBehaviour
 {
@@ -11,6 +12,7 @@ public class EggDropCatalogUI : MonoBehaviour
     [SerializeField] private TMP_Text titleText;
     [SerializeField] private TMP_Text contentText;
     [SerializeField] private ItemPrefabStorage itemStorage;
+    [SerializeField] private Conveyor conveyor;
 
     [Header("Display")]
     [SerializeField] private bool autoRefreshOnOpen = true;
@@ -28,6 +30,11 @@ public class EggDropCatalogUI : MonoBehaviour
     [SerializeField] private string eggWithoutPetsFallback = "No animals configured.";
     [SerializeField] private string luckLabelLocalizationKey = "UI/EggCatalog/LuckLabel";
     [SerializeField] private string luckLabelFallback = "Luck";
+    [SerializeField] private string baseChanceNoteLocalizationKey = "UI/EggCatalog/BaseChanceNote";
+    [SerializeField] private string baseChanceNoteFallback = "The chances below are shown without luck bonuses.";
+
+    private const string GeneratedObjectPrefix = "ConveyorChance_";
+    private RectTransform _cardsRoot;
 
     public bool IsOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
 
@@ -54,6 +61,12 @@ public class EggDropCatalogUI : MonoBehaviour
 
         if (contentText == null)
             return;
+
+        if (TryRefreshConveyorCards())
+            return;
+
+        ClearConveyorCards();
+        contentText.gameObject.SetActive(true);
 
         var storage = itemStorage != null ? itemStorage : G.Storage;
         if (storage == null)
@@ -117,7 +130,7 @@ public class EggDropCatalogUI : MonoBehaviour
         else
             gameObject.SetActive(open);
 
-        if (open && autoRefreshOnOpen)
+        if (open && (autoRefreshOnOpen || conveyor != null))
             Refresh();
     }
 
@@ -182,6 +195,203 @@ public class EggDropCatalogUI : MonoBehaviour
         return ItemDisplayNameResolver.ResolveItemName(id, fallback);
     }
 
+    private bool TryRefreshConveyorCards()
+    {
+        if (conveyor == null || conveyor.Levels == null || conveyor.Levels.Count == 0 || contentText == null)
+            return false;
+
+        var contentRoot = contentText.transform.parent as RectTransform;
+        if (contentRoot == null)
+            return false;
+
+        _cardsRoot = contentRoot;
+
+        ConfigureViewportMask(contentRoot.parent);
+        ConfigureCardsRoot(contentRoot);
+        ClearConveyorCards();
+        contentText.gameObject.SetActive(true);
+        ConfigureCatalogText(contentText);
+        contentText.text = BuildConveyorCatalogText();
+        contentText.ForceMeshUpdate();
+
+        var textLayout = contentText.GetComponent<LayoutElement>();
+        if (textLayout == null)
+            textLayout = contentText.gameObject.AddComponent<LayoutElement>();
+        textLayout.preferredHeight = Mathf.Max(120f, contentText.preferredHeight + 24f);
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(contentRoot);
+        Canvas.ForceUpdateCanvases();
+        return true;
+    }
+
+    private static void ConfigureCatalogText(TMP_Text text)
+    {
+        if (text == null)
+            return;
+
+        text.fontSize = 29f;
+        text.fontStyle = FontStyles.Bold;
+        text.alignment = TextAlignmentOptions.TopLeft;
+        text.color = Color.white;
+        text.richText = true;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.raycastTarget = false;
+    }
+
+    private string BuildConveyorCatalogText()
+    {
+        var sb = new StringBuilder(2048);
+        sb.Append("<align=center><color=#18E9FF><b>");
+        sb.Append(EscapeRichText(L(baseChanceNoteLocalizationKey, baseChanceNoteFallback)));
+        sb.Append("</b></color></align>\n<size=10>\n</size>");
+
+        for (var levelIndex = 0; levelIndex < conveyor.Levels.Count; levelIndex++)
+        {
+            var level = conveyor.Levels[levelIndex];
+            if (level == null)
+                continue;
+
+            var headerColor = BlockyUITheme.GetRareColor(level.RareType);
+            var headerHex = ColorUtility.ToHtmlStringRGB(headerColor);
+            sb.Append("<mark=#").Append(headerHex).Append("FF><color=#FFFFFF><size=34><b><space=12>");
+            sb.Append(EscapeRichText(GetLocalizedLevelTitle(level)));
+            sb.Append("<pos=98%><space=4></b></size></color></mark>\n");
+
+            var chances = ConveyorDropChanceCalculator.BuildEggChances(level);
+            if (chances == null || chances.Count == 0)
+            {
+                AppendChanceTextRow(sb, L(emptyListLocalizationKey, emptyListFallback), string.Empty, 0);
+            }
+            else
+            {
+                for (var rowIndex = 0; rowIndex < chances.Count; rowIndex++)
+                {
+                    var chance = chances[rowIndex];
+                    if (chance == null)
+                        continue;
+
+                    AppendChanceTextRow(
+                        sb,
+                        L("Item/" + chance.id, chance.name),
+                        (chance.chance * 100d).ToString("0.00") + "%",
+                        rowIndex);
+                }
+            }
+
+            if (levelIndex < conveyor.Levels.Count - 1)
+                sb.Append("<size=11>\n</size>");
+        }
+
+        return sb.ToString();
+    }
+
+    private string GetLocalizedLevelTitle(ConveyorLevel level)
+    {
+        if (level == null)
+            return L("UI/Conveyor/Title", "Conveyor");
+
+        var fallback = !string.IsNullOrWhiteSpace(level.Name)
+            ? level.Name.Trim()
+            : level.RareType.ToString();
+        var levelName = level.RareType == RareType.RareType
+            ? fallback
+            : L("Boost/RareType/" + level.RareType, fallback);
+        return levelName + " " + L("UI/Conveyor/Title", "Conveyor");
+    }
+
+    private static void AppendChanceTextRow(StringBuilder sb, string eggName, string chance, int rowIndex)
+    {
+        var background = rowIndex % 2 == 0 ? "190A05F2" : "2D1208E8";
+        sb.Append("<mark=#").Append(background).Append("><color=#FFFFFF><space=12>");
+        sb.Append(EscapeRichText(string.IsNullOrWhiteSpace(eggName) ? "-" : eggName));
+        sb.Append("<pos=82%>");
+        sb.Append(EscapeRichText(chance));
+        sb.Append("<pos=98%><space=4></color></mark>\n");
+    }
+
+    private static string EscapeRichText(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        return value.Replace("<", "&lt;").Replace(">", "&gt;");
+    }
+
+    private static void ConfigureCardsRoot(RectTransform root)
+    {
+        if (root == null)
+            return;
+
+        var layout = root.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
+            layout = root.gameObject.AddComponent<VerticalLayoutGroup>();
+
+        layout.padding = new RectOffset(16, 16, 14, 18);
+        layout.spacing = 14f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        var fitter = root.GetComponent<ContentSizeFitter>();
+        if (fitter == null)
+            fitter = root.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+    }
+
+    private static void ConfigureViewportMask(Transform viewport)
+    {
+        if (viewport == null)
+            return;
+
+        // The legacy UIMask sprite has transparent regions. A regular Mask uses
+        // that alpha for the stencil and can cut the list into a narrow strip.
+        var legacyMask = viewport.GetComponent<Mask>();
+        if (legacyMask != null)
+            legacyMask.enabled = false;
+
+        var maskGraphic = viewport.GetComponent<Image>();
+        if (maskGraphic != null)
+            maskGraphic.enabled = false;
+
+        var scrollBackground = viewport.parent != null
+            ? viewport.parent.GetComponent<Image>()
+            : null;
+        if (scrollBackground != null)
+        {
+            scrollBackground.sprite = null;
+            scrollBackground.type = Image.Type.Simple;
+            scrollBackground.color = new Color(0.105f, 0.045f, 0.018f, 0.97f);
+        }
+
+        if (viewport.GetComponent<RectMask2D>() == null)
+            viewport.gameObject.AddComponent<RectMask2D>();
+    }
+
+    private void ClearConveyorCards()
+    {
+        if (_cardsRoot == null && contentText != null)
+            _cardsRoot = contentText.transform.parent as RectTransform;
+        if (_cardsRoot == null)
+            return;
+
+        for (var i = _cardsRoot.childCount - 1; i >= 0; i--)
+        {
+            var child = _cardsRoot.GetChild(i);
+            if (child == null || !child.name.StartsWith(GeneratedObjectPrefix, StringComparison.Ordinal))
+                continue;
+
+            child.gameObject.SetActive(false);
+            if (Application.isPlaying)
+                Destroy(child.gameObject);
+            else
+                DestroyImmediate(child.gameObject);
+        }
+    }
+
     private static string GetId(Egg egg)
     {
         if (egg == null)
@@ -198,6 +408,9 @@ public class EggDropCatalogUI : MonoBehaviour
 
         if (itemStorage == null && G.Storage != null)
             itemStorage = G.Storage;
+
+        if (conveyor == null)
+            conveyor = GetComponentInParent<Conveyor>(true);
 
         if (titleText == null || contentText == null)
         {
