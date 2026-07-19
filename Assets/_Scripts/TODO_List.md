@@ -73,7 +73,7 @@
 
 ### P1 — стабильность сети
 - [x] Усилить reconnect-стратегию после `server_unreachable` без ломки локальной базы (ручной прогон online/offline пройден, критичных регрессий не найдено).
-- [~] Пилот WebSocket для лобби: серверный `/ws/lobby` + Unity `LobbyClient` (WS с fallback на HTTP polling) готовы; осталось прогнать smoke/soak и собрать метрики нагрузки.
+- [~] Пилот WebSocket для лобби: серверный `/ws/lobby` + Unity `LobbyClient` (WS с fallback на HTTP polling) готовы. Серверный broadcast-path оптимизирован и развёрнут: одна загрузка friend/meta на всё лобби с 5-секундным кешем, общий snapshot строится один раз, отправки идут параллельно, одинаковые update не повышают version, а `sync_request` отвечает только инициатору. Серверный soak прошёл на 6 клиентах × 100 duplicate + 100 unique update: duplicate ACK p95 `2.17 ms`, полный unique broadcast p95 `8.30 ms`, без лишних broadcast/sync leak/restart/OOM. Остался живой Unity smoke двух клиентов и reconnect/длинная сессия.
 - [x] При уходе в offline гарантированно убирать remote-сущности и временный state (прогон подтвержден).
 - [x] Добавлена debug-галочка симуляции оффлайна (`NET OFF`) для ручных тестов reconnect/offline UX (прогон подтвержден).
 - [x] Добавлен grace-period для отметки remote-игрока оффлайн: `remoteMemberStaleOfflineSec >= 30s` (клиентский clamp + дефолт); на текущем smoke пропаданий не выявлено.
