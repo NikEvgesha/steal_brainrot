@@ -33,6 +33,11 @@ public class SpecialShopSlot : MonoBehaviour
     private PurchaseData _productData;
     private float _nextTimerRefresh;
 
+    private void Awake()
+    {
+        ApplyCardLayout();
+    }
+
     public void Init(SpecialShop shop, ShopPackData pack, PurchaseData purchaseData)
     {
         _shop = shop;
@@ -48,7 +53,10 @@ public class SpecialShopSlot : MonoBehaviour
         if (_name != null)
             _name.text = LocalizationUtils.T(pack.Name, pack.Name);
         if (_description != null)
+        {
             _description.text = LocalizationUtils.T(pack.DescriptionKey, pack.DescriptionFallback);
+            _description.gameObject.SetActive(false);
+        }
         bool hasMultipleRewards = pack.Rewards != null && pack.Rewards.Count > 1;
         if (_effectText != null)
         {
@@ -65,9 +73,10 @@ public class SpecialShopSlot : MonoBehaviour
         }
 
         if (_cardBackground != null)
-            _cardBackground.color = pack.AccentColor;
+            _cardBackground.color = Color.Lerp(pack.AccentColor, Color.white, 0.18f);
 
         BuildRewardIcons(pack);
+        ConfigureActionLayout(pack.HasConsumableReward);
         RefreshPrice();
         RefreshState();
     }
@@ -240,5 +249,69 @@ public class SpecialShopSlot : MonoBehaviour
         if (reward.Type == ShopRewardType.Item && reward.Item != null)
             return reward.Item.Icon;
         return reward.Icon;
+    }
+
+    [ContextMenu("Apply shop card layout")]
+    public void ApplyCardLayout()
+    {
+        var layout = GetComponent<LayoutElement>();
+        if (layout == null)
+            layout = gameObject.AddComponent<LayoutElement>();
+        layout.minHeight = 250f;
+        layout.preferredHeight = 250f;
+
+        ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0f, 0.78f), Vector2.one, new Vector2(12f, 4f), new Vector2(-12f, -6f));
+        ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.03f, 0.25f), new Vector2(0.34f, 0.75f), new Vector2(10f, 8f), new Vector2(-10f, -8f));
+        ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.36f, 0.48f), new Vector2(0.97f, 0.74f), new Vector2(6f, 2f), new Vector2(-6f, -2f));
+        ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.36f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
+        ConfigureRect(_rewardParent as RectTransform, new Vector2(0.35f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
+        ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.36f, 0.04f), new Vector2(0.97f, 0.24f), Vector2.zero, Vector2.zero);
+        ConfigureRect(_useButton != null ? _useButton.transform as RectTransform : null, new Vector2(0.03f, 0.04f), new Vector2(0.47f, 0.24f), Vector2.zero, Vector2.zero);
+        ConfigureRect(_ownedText != null ? _ownedText.rectTransform : null, new Vector2(0.03f, 0.24f), new Vector2(0.47f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+        ConfigureRect(_activeTimerText != null ? _activeTimerText.rectTransform : null, new Vector2(0.52f, 0.24f), new Vector2(0.97f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+
+        ConfigureText(_name, 20f, 32f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_effectText, 17f, 27f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_ownedText, 13f, 19f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_activeTimerText, 13f, 19f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+
+        if (_productIcon != null)
+            _productIcon.preserveAspect = true;
+    }
+
+    private void ConfigureActionLayout(bool hasConsumableReward)
+    {
+        if (_buyButton == null)
+            return;
+
+        Vector2 min = hasConsumableReward ? new Vector2(0.52f, 0.04f) : new Vector2(0.36f, 0.04f);
+        ConfigureRect(_buyButton.transform as RectTransform, min, new Vector2(0.97f, 0.24f), Vector2.zero, Vector2.zero);
+    }
+
+    private static void ConfigureRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
+    {
+        if (rect == null)
+            return;
+
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = offsetMin;
+        rect.offsetMax = offsetMax;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ConfigureText(TextMeshProUGUI text, float minSize, float maxSize, TextAlignmentOptions alignment, TextOverflowModes overflow)
+    {
+        if (text == null)
+            return;
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minSize;
+        text.fontSizeMax = maxSize;
+        text.alignment = alignment;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = overflow;
+        text.raycastTarget = false;
     }
 }

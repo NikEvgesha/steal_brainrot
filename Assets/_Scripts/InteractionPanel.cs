@@ -325,7 +325,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private Image EnsureRewardedAdBadge()
     {
-        Transform badgeParent = _rewardedAdBadgeParent != null ? _rewardedAdBadgeParent : transform;
+        Transform badgeParent = ResolveRewardedAdBadgeParent();
         if (_rewardedAdBadgeImage != null)
         {
             if (_rewardedAdBadgeImage.transform.parent != badgeParent)
@@ -354,6 +354,20 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         layoutElement.ignoreLayout = true;
 
         return _rewardedAdBadgeImage;
+    }
+
+    private Transform ResolveRewardedAdBadgeParent()
+    {
+        if (_rewardedAdBadgeParent != null && _rewardedAdBadgeParent != transform)
+            return _rewardedAdBadgeParent;
+
+        // InteractionCanvas faces the camera through a 180-degree UI container.
+        // Keep dynamically-created decorations beside the action text so they
+        // inherit the same correction instead of appearing mirrored in world space.
+        if (_actionText != null && _actionText.transform.parent != null)
+            return _actionText.transform.parent;
+
+        return transform;
     }
 
     private void ConfigureRewardedAdBadgeImage(Image badgeImage)

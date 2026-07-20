@@ -21,7 +21,7 @@ public class FieldCell : MonoBehaviour
     [SerializeField] private Sprite _speedBoostAdIcon;
     [SerializeField] private string _speedBoostAdLabel = "-30";
     [SerializeField] private Vector2 _speedBoostAdBadgeSize = new Vector2(42f, 42f);
-    [SerializeField] private Vector2 _speedBoostAdBadgeOffset = new Vector2(10f, -8f);
+    [SerializeField] private Vector2 _speedBoostAdBadgeOffset = new Vector2(-8f, -8f);
 
     [HideInInspector] public UnityEvent PlayerEnter;
     [HideInInspector] public UnityEvent PlayerExit;
@@ -126,7 +126,7 @@ public class FieldCell : MonoBehaviour
                             true,
                             _speedBoostAdIcon,
                             _speedBoostAdLabel,
-                            _addSpeedButton.transform,
+                            null,
                             _speedBoostAdBadgeSize,
                             _speedBoostAdBadgeOffset);
                         break;

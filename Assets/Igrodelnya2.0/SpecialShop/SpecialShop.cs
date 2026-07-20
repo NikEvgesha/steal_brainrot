@@ -1,7 +1,7 @@
 using MirraGames.SDK.Common;
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,31 +14,34 @@ public class SpecialShop : MonoBehaviour
     [SerializeField] private Transform _content;
     [SerializeField] private SpecialShopSlot _slotPrefab;
     [SerializeField] private ShopRow _rowPrefab;
-    [SerializeField] private SpecialShopSectionHeader _sectionHeaderPrefab;
     [SerializeField] private int _maxItemsPerRow = 2;
     [SerializeField] private ShopCategory _defaultCategory = ShopCategory.Featured;
     [SerializeField] private List<Button> _categoryButtons = new();
     [SerializeField] private Color _selectedTabColor = new Color(0.2f, 0.84f, 0.08f, 1f);
     [SerializeField] private Color _normalTabColor = new Color(0.31f, 0.16f, 0.07f, 1f);
     [SerializeField] private Sprite _rewardedAdIcon;
-    [SerializeField, Min(0.05f)] private float _scrollDuration = 0.3f;
     [SerializeField] private bool _forceRewardedAdsForTesting;
 
     private readonly Dictionary<string, ShopPackData> _purchaseData = new();
     private readonly List<string> _pendingRestoredPurchaseIds = new();
     private readonly List<ShopRow> _rows = new();
     private readonly List<SpecialShopSlot> _slots = new();
-    private readonly List<SpecialShopSectionHeader> _sectionHeaders = new();
-    private readonly Dictionary<ShopCategory, RectTransform> _sectionAnchors = new();
     private ShopEffectsService _effects;
     private ShopCategory _currentCategory;
     private bool _isOpen;
     private bool _slotsInitialized;
     private bool _lastPurchasesAvailable;
     private bool _rewardedAdPurchasePending;
-    private Coroutine _scrollCoroutine;
     private float _nextPlatformRefresh;
     private LocalizationManager _subscribedLocalizationManager;
+
+    private static readonly ShopCategory[] Categories =
+    {
+        ShopCategory.Featured,
+        ShopCategory.Boosts,
+        ShopCategory.Permanent,
+        ShopCategory.Currency
+    };
 
     public bool Opened => _isOpen;
     public ShopCategory CurrentCategory => _currentCategory;
@@ -58,6 +61,7 @@ public class SpecialShop : MonoBehaviour
         LocalizationUtils.ConfigureFallback(_localizationData);
         _effects = ShopEffectsService.EnsureExists();
         _currentCategory = _defaultCategory;
+        ApplyLayout();
     }
 
     private void Start()
@@ -151,34 +155,17 @@ public class SpecialShop : MonoBehaviour
         _slotsInitialized = false;
         _purchaseData.Clear();
 
-        if (_content == null || _slotPrefab == null || _rowPrefab == null || _sectionHeaderPrefab == null)
+        if (_content == null || _slotPrefab == null || _rowPrefab == null)
         {
-            Debug.LogError("[SpecialShop] Content, slot, row or section header prefab is missing.");
+            Debug.LogError("[SpecialShop] Content, slot or row prefab is missing.");
             return;
         }
 
         _lastPurchasesAvailable = PurchasesAvailable();
-        var categories = new[]
+        EnsureCurrentCategoryAvailable();
+        var sectionPacks = GetSectionPacks(_currentCategory);
+        if (sectionPacks.Count > 0)
         {
-            ShopCategory.Featured,
-            ShopCategory.Boosts,
-            ShopCategory.Permanent,
-            ShopCategory.Currency
-        };
-
-        for (int categoryIndex = 0; categoryIndex < categories.Length; categoryIndex++)
-        {
-            ShopCategory category = categories[categoryIndex];
-            var sectionPacks = GetSectionPacks(category);
-            if (sectionPacks.Count == 0)
-                continue;
-
-            var header = Instantiate(_sectionHeaderPrefab, _content);
-            GetSectionTitle(category, out string key, out string fallback);
-            header.Init(key, fallback);
-            _sectionHeaders.Add(header);
-            _sectionAnchors[category] = header.RectTransform;
-
             var sectionRows = new List<ShopRow>();
             for (int i = 0; i < sectionPacks.Count; i++)
             {
@@ -202,16 +189,24 @@ public class SpecialShop : MonoBehaviour
         UpdateCategoryButtons();
         FlushPendingRestores();
         Canvas.ForceUpdateCanvases();
+        ResetScrollPosition();
     }
 
-    public void ShowFeatured() => ScrollToSection(ShopCategory.Featured);
-    public void ShowBoosts() => ScrollToSection(ShopCategory.Boosts);
-    public void ShowPermanent() => ScrollToSection(ShopCategory.Permanent);
-    public void ShowCurrency() => ScrollToSection(ShopCategory.Currency);
+    public void ShowFeatured() => SetCategory(ShopCategory.Featured);
+    public void ShowBoosts() => SetCategory(ShopCategory.Boosts);
+    public void ShowPermanent() => SetCategory(ShopCategory.Permanent);
+    public void ShowCurrency() => SetCategory(ShopCategory.Currency);
 
     public void SetCategory(ShopCategory category)
     {
-        ScrollToSection(category);
+        if (_currentCategory == category && _slotsInitialized)
+        {
+            ResetScrollPosition();
+            return;
+        }
+
+        _currentCategory = category;
+        InitSlots();
     }
 
     public void ToggleOpen()
@@ -237,7 +232,7 @@ public class SpecialShop : MonoBehaviour
         G.Currency?.ShowGems?.Invoke(true);
         G.Input?.AOpenWindow?.Invoke(this);
         RefreshSlots();
-        ScrollToSection(ShopCategory.Featured, false);
+        ResetScrollPosition();
     }
 
     public void Close()
@@ -402,56 +397,28 @@ public class SpecialShop : MonoBehaviour
         return newRow.transform;
     }
 
-    private void ScrollToSection(ShopCategory category, bool animated = true)
+    private void EnsureCurrentCategoryAvailable()
     {
-        if (!_slotsInitialized || _scrollRect == null)
+        if (GetSectionPacks(_currentCategory).Count > 0)
             return;
 
-        _currentCategory = category;
-        UpdateCategoryButtons();
-
-        if (_scrollCoroutine != null)
-            StopCoroutine(_scrollCoroutine);
-        _scrollCoroutine = StartCoroutine(ScrollToSectionRoutine(category, animated));
-    }
-
-    private IEnumerator ScrollToSectionRoutine(ShopCategory category, bool animated)
-    {
-        yield return null;
-        Canvas.ForceUpdateCanvases();
-
-        float target = 1f;
-        if (_sectionAnchors.TryGetValue(category, out var anchor) && anchor != null)
+        for (int i = 0; i < Categories.Length; i++)
         {
-            float contentHeight = (_content as RectTransform)?.rect.height ?? 0f;
-            float viewportHeight = _scrollRect.viewport != null ? _scrollRect.viewport.rect.height : 0f;
-            float scrollableHeight = Mathf.Max(0f, contentHeight - viewportHeight);
-            if (scrollableHeight > 0.01f)
+            if (GetSectionPacks(Categories[i]).Count > 0)
             {
-                float sectionTop = Mathf.Max(0f, -anchor.anchoredPosition.y - anchor.rect.height * (1f - anchor.pivot.y));
-                target = 1f - Mathf.Clamp01(sectionTop / scrollableHeight);
+                _currentCategory = Categories[i];
+                return;
             }
         }
+    }
 
-        if (!animated)
-        {
-            _scrollRect.verticalNormalizedPosition = target;
-            _scrollCoroutine = null;
-            yield break;
-        }
+    private void ResetScrollPosition()
+    {
+        if (_scrollRect == null)
+            return;
 
-        float start = _scrollRect.verticalNormalizedPosition;
-        float elapsed = 0f;
-        while (elapsed < _scrollDuration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _scrollDuration));
-            _scrollRect.verticalNormalizedPosition = Mathf.Lerp(start, target, t);
-            yield return null;
-        }
-
-        _scrollRect.verticalNormalizedPosition = target;
-        _scrollCoroutine = null;
+        _scrollRect.StopMovement();
+        _scrollRect.verticalNormalizedPosition = 1f;
     }
 
     private void TryRewardedAdPurchase(ShopPackData packData)
@@ -567,8 +534,6 @@ public class SpecialShop : MonoBehaviour
 
         _rows.Clear();
         _slots.Clear();
-        _sectionHeaders.Clear();
-        _sectionAnchors.Clear();
     }
 
     private void RefreshSlots()
@@ -582,10 +547,154 @@ public class SpecialShop : MonoBehaviour
         for (int i = 0; i < _categoryButtons.Count; i++)
         {
             var button = _categoryButtons[i];
-            if (button == null || button.targetGraphic == null)
+            if (button == null)
                 continue;
 
-            button.targetGraphic.color = i == (int)_currentCategory ? _selectedTabColor : _normalTabColor;
+            ShopCategory category = i < Categories.Length ? Categories[i] : (ShopCategory)i;
+            bool available = GetSectionPacks(category).Count > 0;
+            button.gameObject.SetActive(available);
+            if (!available)
+                continue;
+
+            if (button.targetGraphic != null)
+                button.targetGraphic.color = category == _currentCategory ? _selectedTabColor : _normalTabColor;
+
+            Transform labelTransform = button.transform.Find("Label");
+            var label = labelTransform != null ? labelTransform.GetComponent<TextMeshProUGUI>() : null;
+            if (label != null)
+            {
+                GetSectionTitle(category, out string key, out string fallback);
+                label.text = LocalizationUtils.T(key, fallback);
+            }
+        }
+    }
+
+    [ContextMenu("Apply shop layout")]
+    public void ApplyLayout()
+    {
+        if (_shopCanvas == null)
+            return;
+
+        Transform window = _shopCanvas.transform.Find("Window");
+        if (window == null)
+            return;
+
+        if (window is RectTransform windowRect)
+        {
+            windowRect.anchorMin = windowRect.anchorMax = new Vector2(0.5f, 0.5f);
+            windowRect.pivot = new Vector2(0.5f, 0.5f);
+            windowRect.anchoredPosition = Vector2.zero;
+            windowRect.sizeDelta = new Vector2(1120f, 760f);
+        }
+
+        Transform header = window.Find("Header");
+        if (header is RectTransform headerRect)
+        {
+            headerRect.anchorMin = new Vector2(0f, 1f);
+            headerRect.anchorMax = Vector2.one;
+            headerRect.pivot = new Vector2(0.5f, 1f);
+            headerRect.anchoredPosition = Vector2.zero;
+            headerRect.sizeDelta = new Vector2(0f, 86f);
+        }
+
+        Transform tabs = window.Find("CategoryTabs");
+        if (tabs is RectTransform tabsRect)
+        {
+            tabsRect.anchorMin = new Vector2(0f, 1f);
+            tabsRect.anchorMax = Vector2.one;
+            tabsRect.pivot = new Vector2(0.5f, 1f);
+            tabsRect.anchoredPosition = new Vector2(0f, -96f);
+            tabsRect.sizeDelta = new Vector2(-48f, 68f);
+
+            var verticalLayout = tabs.GetComponent<VerticalLayoutGroup>();
+            if (verticalLayout != null)
+                verticalLayout.enabled = false;
+
+            var horizontalLayout = tabs.GetComponent<HorizontalLayoutGroup>();
+            if (horizontalLayout == null)
+                horizontalLayout = tabs.gameObject.AddComponent<HorizontalLayoutGroup>();
+            horizontalLayout.padding = new RectOffset(0, 0, 0, 0);
+            horizontalLayout.spacing = 12f;
+            horizontalLayout.childAlignment = TextAnchor.MiddleCenter;
+            horizontalLayout.childControlWidth = true;
+            horizontalLayout.childControlHeight = true;
+            horizontalLayout.childForceExpandWidth = true;
+            horizontalLayout.childForceExpandHeight = true;
+        }
+
+        for (int i = 0; i < _categoryButtons.Count; i++)
+            ConfigureCategoryButton(_categoryButtons[i]);
+
+        if (_scrollRect != null && _scrollRect.transform is RectTransform scrollRect)
+        {
+            scrollRect.anchorMin = Vector2.zero;
+            scrollRect.anchorMax = Vector2.one;
+            scrollRect.offsetMin = new Vector2(24f, 24f);
+            scrollRect.offsetMax = new Vector2(-24f, -176f);
+            _scrollRect.horizontal = false;
+        }
+
+        if (_content != null)
+        {
+            var contentLayout = _content.GetComponent<VerticalLayoutGroup>();
+            if (contentLayout != null)
+            {
+                contentLayout.padding = new RectOffset(8, 8, 8, 8);
+                contentLayout.spacing = 14f;
+                contentLayout.childAlignment = TextAnchor.UpperCenter;
+                contentLayout.childControlWidth = true;
+                contentLayout.childControlHeight = true;
+                contentLayout.childForceExpandWidth = true;
+                contentLayout.childForceExpandHeight = false;
+            }
+        }
+    }
+
+    private static void ConfigureCategoryButton(Button button)
+    {
+        if (button == null)
+            return;
+
+        var layout = button.GetComponent<LayoutElement>();
+        if (layout == null)
+            layout = button.gameObject.AddComponent<LayoutElement>();
+        layout.minHeight = 68f;
+        layout.preferredHeight = 68f;
+        layout.flexibleWidth = 1f;
+
+        Transform iconTransform = button.transform.Find("NavigationIcon");
+        if (iconTransform is RectTransform iconRect)
+        {
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(0f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.anchoredPosition = new Vector2(34f, 0f);
+            iconRect.sizeDelta = new Vector2(42f, 42f);
+            var icon = iconTransform.GetComponent<Image>();
+            if (icon != null)
+                icon.preserveAspect = true;
+        }
+
+        Transform labelTransform = button.transform.Find("Label");
+        if (labelTransform is RectTransform labelRect)
+        {
+            labelTransform.gameObject.SetActive(true);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            var label = labelTransform.GetComponent<TextMeshProUGUI>();
+            if (label != null)
+            {
+                label.alignment = TextAlignmentOptions.Center;
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 15f;
+                label.fontSizeMax = 24f;
+                label.textWrappingMode = TextWrappingModes.NoWrap;
+                label.overflowMode = TextOverflowModes.Ellipsis;
+                label.margin = new Vector4(iconTransform != null ? 58f : 8f, 5f, 8f, 5f);
+                label.raycastTarget = false;
+            }
         }
     }
 
