@@ -1079,3 +1079,9 @@
 - Generated a separate neutral `UIWindowTexture_SoftStuds_v1` raster asset from the existing block texture reference. It keeps a subtle 2x2 toy-block motif, imports as a 64x64 tiled sprite at 100 PPU and preserves all existing UI tint colors.
 - Limited the texture pilot to SpecialShop: the root window, header, close button, category tabs, scroll background, section headers, reward slots and generated product cards now reference the new sprite. Inventories and other windows remain unchanged pending visual approval.
 - Unity rebuilt `FieldCell` without new compiler errors. Runtime verification created the maturing-egg interaction state without invoking or saving gameplay events and confirmed an active 42x42 `Icon_ImageIcon_Ad_00_l` badge. The live shop reported `0` old and `59` new texture instances and was visually checked at 1280x720.
+
+### 2026-07-20 (soft UI texture rollout)
+- Accepted the SpecialShop texture pilot and replaced 135 remaining first-party UI references across the main scene, inventory, album, food shop, conveyor, BigPet, sell UI, friends, roulette, playtime rewards, menu, loading UI, ads overlay and remote-profile popup.
+- Preserved the original texture for eight references in 3D world materials and three references in Unity's recovery scene; those are not UI sprites and changing them would alter world geometry or the editor backup.
+- Refreshed all affected assets, safely reloaded the clean active scene from disk and ran a full inactive-inclusive runtime image audit: `23,645` images inspected, `0` old texture sprites and `434` new soft texture sprites.
+- Visual smoke at 1280x720 confirmed the new pattern and existing tint/gradient colors in inventory (`16` new images), album (`55`) and conveyor (`24`), in addition to the previously accepted SpecialShop (`59`). No new compiler errors or runtime exceptions were logged.
