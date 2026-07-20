@@ -155,9 +155,12 @@ public class SpecialShopSlot : MonoBehaviour
         {
             Sprite icon = rewardedAdFallback
                 ? _shop.RewardedAdIcon
-                : G.Currency != null ? G.Currency.GetCurrencyIcon(_shopPackData.PriceCurrencyType) : null;
+                : realPurchase
+                    ? null
+                    : G.Currency != null ? G.Currency.GetCurrencyIcon(_shopPackData.PriceCurrencyType) : null;
             _currencyIcon.sprite = icon;
             _currencyIcon.enabled = icon != null;
+            _currencyIcon.gameObject.SetActive(icon != null);
         }
 
         if (_currencyText != null)

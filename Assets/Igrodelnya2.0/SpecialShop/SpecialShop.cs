@@ -1,5 +1,6 @@
 using MirraGames.SDK.Common;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -14,28 +15,46 @@ public class SpecialShop : MonoBehaviour
     [SerializeField] private Transform _content;
     [SerializeField] private SpecialShopSlot _slotPrefab;
     [SerializeField] private ShopRow _rowPrefab;
+    [SerializeField] private SpecialShopSectionHeader _sectionHeaderPrefab;
     [SerializeField] private int _maxItemsPerRow = 2;
     [SerializeField] private ShopCategory _defaultCategory = ShopCategory.Featured;
     [SerializeField] private List<Button> _categoryButtons = new();
     [SerializeField] private Color _selectedTabColor = new Color(0.2f, 0.84f, 0.08f, 1f);
     [SerializeField] private Color _normalTabColor = new Color(0.31f, 0.16f, 0.07f, 1f);
     [SerializeField] private Sprite _rewardedAdIcon;
-    [SerializeField] private bool _forceRewardedAdsForTesting;
+    [SerializeField, Min(0.05f)] private float _scrollDuration = 0.3f;
+    [Header("Purchase Preview (Editor Only)")]
+    [SerializeField, Tooltip("Forces the rewarded-ad fallback even when platform purchases are available.")]
+    private bool _forceRewardedAdsForTesting;
+    [SerializeField, Tooltip("Shows real-money products without invoking a platform purchase provider.")]
+    private bool _forceInAppPurchasesForTesting;
+    [SerializeField, Tooltip("Test label displayed on real-money buttons while in-app preview is active.")]
+    private string _inAppPreviewPrice = "1.99 USD";
 
     private readonly Dictionary<string, ShopPackData> _purchaseData = new();
     private readonly List<string> _pendingRestoredPurchaseIds = new();
     private readonly List<ShopRow> _rows = new();
     private readonly List<SpecialShopSlot> _slots = new();
+    private readonly List<SpecialShopSectionHeader> _sectionHeaders = new();
+    private readonly Dictionary<ShopCategory, RectTransform> _sectionAnchors = new();
     private ShopEffectsService _effects;
     private ShopCategory _currentCategory;
     private bool _isOpen;
     private bool _slotsInitialized;
     private bool _lastPurchasesAvailable;
     private bool _rewardedAdPurchasePending;
+    private Coroutine _scrollCoroutine;
     private float _nextPlatformRefresh;
     private LocalizationManager _subscribedLocalizationManager;
 
-    private static readonly ShopCategory[] Categories =
+    private static readonly ShopCategory[] SectionCategories =
+    {
+        ShopCategory.Featured,
+        ShopCategory.Boosts,
+        ShopCategory.Currency
+    };
+
+    private static readonly ShopCategory[] ButtonCategories =
     {
         ShopCategory.Featured,
         ShopCategory.Boosts,
@@ -155,17 +174,26 @@ public class SpecialShop : MonoBehaviour
         _slotsInitialized = false;
         _purchaseData.Clear();
 
-        if (_content == null || _slotPrefab == null || _rowPrefab == null)
+        if (_content == null || _slotPrefab == null || _rowPrefab == null || _sectionHeaderPrefab == null)
         {
-            Debug.LogError("[SpecialShop] Content, slot or row prefab is missing.");
+            Debug.LogError("[SpecialShop] Content, slot, row or section header prefab is missing.");
             return;
         }
 
         _lastPurchasesAvailable = PurchasesAvailable();
-        EnsureCurrentCategoryAvailable();
-        var sectionPacks = GetSectionPacks(_currentCategory);
-        if (sectionPacks.Count > 0)
+        for (int categoryIndex = 0; categoryIndex < SectionCategories.Length; categoryIndex++)
         {
+            ShopCategory category = SectionCategories[categoryIndex];
+            var sectionPacks = GetSectionPacks(category);
+            if (sectionPacks.Count == 0)
+                continue;
+
+            var header = Instantiate(_sectionHeaderPrefab, _content);
+            GetSectionTitle(category, out string key, out string fallback);
+            header.Init(key, fallback);
+            _sectionHeaders.Add(header);
+            _sectionAnchors[category] = header.RectTransform;
+
             var sectionRows = new List<ShopRow>();
             for (int i = 0; i < sectionPacks.Count; i++)
             {
@@ -173,9 +201,7 @@ public class SpecialShop : MonoBehaviour
                 Transform row = GetOrCreateAvailableRow(item.SlotType == ShopSlotType.Big, sectionRows);
                 var slot = Instantiate(_slotPrefab, row);
                 string purchaseId = GetPurchaseId(item);
-                PurchaseData data = item.PriceCurrencyType == CurrencyType.Real && _lastPurchasesAvailable && G.Purchases != null
-                    ? G.Purchases.GetPurchaseData(purchaseId)
-                    : PurchaseData.Fallback(purchaseId);
+                PurchaseData data = ResolvePurchaseData(item, purchaseId);
 
                 if (!_purchaseData.ContainsKey(purchaseId))
                     _purchaseData.Add(purchaseId, item);
@@ -189,24 +215,16 @@ public class SpecialShop : MonoBehaviour
         UpdateCategoryButtons();
         FlushPendingRestores();
         Canvas.ForceUpdateCanvases();
-        ResetScrollPosition();
     }
 
-    public void ShowFeatured() => SetCategory(ShopCategory.Featured);
-    public void ShowBoosts() => SetCategory(ShopCategory.Boosts);
-    public void ShowPermanent() => SetCategory(ShopCategory.Permanent);
-    public void ShowCurrency() => SetCategory(ShopCategory.Currency);
+    public void ShowFeatured() => ScrollToSection(ShopCategory.Featured);
+    public void ShowBoosts() => ScrollToSection(ShopCategory.Boosts);
+    public void ShowPermanent() => ScrollToSection(ShopCategory.Permanent);
+    public void ShowCurrency() => ScrollToSection(ShopCategory.Currency);
 
     public void SetCategory(ShopCategory category)
     {
-        if (_currentCategory == category && _slotsInitialized)
-        {
-            ResetScrollPosition();
-            return;
-        }
-
-        _currentCategory = category;
-        InitSlots();
+        ScrollToSection(category);
     }
 
     public void ToggleOpen()
@@ -232,7 +250,7 @@ public class SpecialShop : MonoBehaviour
         G.Currency?.ShowGems?.Invoke(true);
         G.Input?.AOpenWindow?.Invoke(this);
         RefreshSlots();
-        ResetScrollPosition();
+        ScrollToSection(ShopCategory.Featured, false);
     }
 
     public void Close()
@@ -262,6 +280,12 @@ public class SpecialShop : MonoBehaviour
     {
         if (packData == null)
             return;
+
+        if (packData.PriceCurrencyType == CurrencyType.Real && IsInAppPreviewActive())
+        {
+            Debug.Log($"[SpecialShop] In-app preview only: purchase '{packData.Id}' was not sent.");
+            return;
+        }
 
         if (_effects != null && _effects.IsPermanentPackOwned(packData))
         {
@@ -397,28 +421,70 @@ public class SpecialShop : MonoBehaviour
         return newRow.transform;
     }
 
-    private void EnsureCurrentCategoryAvailable()
+    private PurchaseData ResolvePurchaseData(ShopPackData pack, string purchaseId)
     {
-        if (GetSectionPacks(_currentCategory).Count > 0)
-            return;
+        if (pack == null || pack.PriceCurrencyType != CurrencyType.Real || !_lastPurchasesAvailable)
+            return PurchaseData.Fallback(purchaseId);
 
-        for (int i = 0; i < Categories.Length; i++)
-        {
-            if (GetSectionPacks(Categories[i]).Count > 0)
-            {
-                _currentCategory = Categories[i];
-                return;
-            }
-        }
+        if (G.Purchases != null && G.Purchases.PurchasesAvailable())
+            return G.Purchases.GetPurchaseData(purchaseId);
+
+        if (IsInAppPreviewActive())
+            return new PurchaseData(purchaseId, string.Empty, string.Empty, _inAppPreviewPrice, string.Empty);
+
+        return PurchaseData.Fallback(purchaseId);
     }
 
-    private void ResetScrollPosition()
+    private void ScrollToSection(ShopCategory category, bool animated = true)
     {
-        if (_scrollRect == null)
+        if (!_slotsInitialized || _scrollRect == null || !_sectionAnchors.ContainsKey(category))
             return;
 
-        _scrollRect.StopMovement();
-        _scrollRect.verticalNormalizedPosition = 1f;
+        _currentCategory = category;
+        UpdateCategoryButtons();
+
+        if (_scrollCoroutine != null)
+            StopCoroutine(_scrollCoroutine);
+        _scrollCoroutine = StartCoroutine(ScrollToSectionRoutine(category, animated));
+    }
+
+    private IEnumerator ScrollToSectionRoutine(ShopCategory category, bool animated)
+    {
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        float target = 1f;
+        if (_sectionAnchors.TryGetValue(category, out var anchor) && anchor != null)
+        {
+            float contentHeight = (_content as RectTransform)?.rect.height ?? 0f;
+            float viewportHeight = _scrollRect.viewport != null ? _scrollRect.viewport.rect.height : 0f;
+            float scrollableHeight = Mathf.Max(0f, contentHeight - viewportHeight);
+            if (scrollableHeight > 0.01f)
+            {
+                float sectionTop = Mathf.Max(0f, -anchor.anchoredPosition.y - anchor.rect.height * (1f - anchor.pivot.y));
+                target = 1f - Mathf.Clamp01(sectionTop / scrollableHeight);
+            }
+        }
+
+        if (!animated)
+        {
+            _scrollRect.verticalNormalizedPosition = target;
+            _scrollCoroutine = null;
+            yield break;
+        }
+
+        float start = _scrollRect.verticalNormalizedPosition;
+        float elapsed = 0f;
+        while (elapsed < _scrollDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / _scrollDuration));
+            _scrollRect.verticalNormalizedPosition = Mathf.Lerp(start, target, t);
+            yield return null;
+        }
+
+        _scrollRect.verticalNormalizedPosition = target;
+        _scrollCoroutine = null;
     }
 
     private void TryRewardedAdPurchase(ShopPackData packData)
@@ -440,7 +506,54 @@ public class SpecialShop : MonoBehaviour
 
     private bool PurchasesAvailable()
     {
-        return !_forceRewardedAdsForTesting && G.Purchases != null && G.Purchases.PurchasesAvailable();
+        if (_forceRewardedAdsForTesting)
+            return false;
+        if (IsInAppPreviewActive())
+            return true;
+        return G.Purchases != null && G.Purchases.PurchasesAvailable();
+    }
+
+    private bool IsInAppPreviewActive()
+    {
+#if UNITY_EDITOR
+        return _forceInAppPurchasesForTesting && !_forceRewardedAdsForTesting;
+#else
+        return false;
+#endif
+    }
+
+    [ContextMenu("Preview/Use Platform Mode")]
+    private void UsePlatformPurchasePreview()
+    {
+        _forceRewardedAdsForTesting = false;
+        _forceInAppPurchasesForTesting = false;
+        RefreshPurchasePreview();
+    }
+
+    [ContextMenu("Preview/Force Rewarded Ads")]
+    private void UseRewardedAdPreview()
+    {
+        _forceRewardedAdsForTesting = true;
+        _forceInAppPurchasesForTesting = false;
+        RefreshPurchasePreview();
+    }
+
+    [ContextMenu("Preview/Force In-App Purchases")]
+    private void UseInAppPurchasePreview()
+    {
+        _forceRewardedAdsForTesting = false;
+        _forceInAppPurchasesForTesting = true;
+        RefreshPurchasePreview();
+    }
+
+    private void RefreshPurchasePreview()
+    {
+        if (Application.isPlaying)
+            InitSlots();
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
     }
 
     private static void GetSectionTitle(ShopCategory category, out string key, out string fallback)
@@ -534,6 +647,8 @@ public class SpecialShop : MonoBehaviour
 
         _rows.Clear();
         _slots.Clear();
+        _sectionHeaders.Clear();
+        _sectionAnchors.Clear();
     }
 
     private void RefreshSlots()
@@ -550,8 +665,8 @@ public class SpecialShop : MonoBehaviour
             if (button == null)
                 continue;
 
-            ShopCategory category = i < Categories.Length ? Categories[i] : (ShopCategory)i;
-            bool available = GetSectionPacks(category).Count > 0;
+            ShopCategory category = i < ButtonCategories.Length ? ButtonCategories[i] : (ShopCategory)i;
+            bool available = category != ShopCategory.Permanent && GetSectionPacks(category).Count > 0;
             button.gameObject.SetActive(available);
             if (!available)
                 continue;

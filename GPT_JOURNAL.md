@@ -1112,3 +1112,10 @@
 - Replaced SpecialShop's long all-category feed with true category filters. Each tab rebuilds only its own products, resets scrolling to the top and hides unavailable categories; existing RU/EN section keys now also label the navigation buttons.
 - Rebuilt the editable shop prefabs around a 1120x760 window, horizontal icon-plus-text tabs and a wider scroll area. Product cards now show only the title, product/reward artwork, concrete effect and purchase/use state; redundant descriptions and duplicate in-list category headers were removed.
 - Unity compilation completed without new errors. Live Bridge verified localized labels, `Featured` as 2 rows / 3 products, `Boosts` as 2 rows / 3 products, top-scroll reset and final 1280x720 rendering. A forced maturing-egg state confirmed `AdIconBadge` under rotated `buyInfo`, offset `(-8,-8)`, size `42x42`, scale `(1,1,1)` and label `-30`. No new localization keys were required.
+
+### 2026-07-20 (SpecialShop anchor navigation and purchase preview)
+- Reverted category filtering after visual review: `Featured`, `Boosts` and `Currency` are again sections in one continuous feed, while the horizontal controls smoothly scroll to their anchors.
+- Temporarily removed `Permanent` from both the feed and navigation. The remaining three controls share the available width equally through the existing horizontal layout.
+- Added Editor-only context previews for platform mode, forced rewarded ads and forced in-app purchases. IAP preview supplies a configurable provider-style price but blocks `TryBuy`, so UI can be inspected without invoking a provider or granting products.
+- Real-money buttons no longer display the internal `CurrencyType.Real` icon; rewarded-ad and soft-currency icons are restored normally when modes change.
+- Unity Bridge verified 3 section headers / 7 products in ad-only mode, `Currency` anchor scroll at normalized position `0`, and 8 products with two `1.99 USD` gem cards in IAP preview. Returning to ad mode restored the single `+5` card and its active rewarded-ad icon.
