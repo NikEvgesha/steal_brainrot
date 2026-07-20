@@ -80,6 +80,13 @@ public class ChestClaimResponse
 
 public class ZooBackendClient : MonoBehaviour
 {
+    private enum LocationsPollingMode
+    {
+        Default,
+        Suspended,
+        CapacitySnapshot
+    }
+
     [Header("Server")]
     public string baseUrl = "https://api.igrodelnya-zoogame.ru";
 
@@ -105,6 +112,8 @@ public class ZooBackendClient : MonoBehaviour
     public bool IsInitialLocationsLoaded { get; private set; }
 
     private Coroutine _locationsLoop;
+    private LocationsPollingMode _locationsPollingMode;
+    private bool _capacitySnapshotPending;
 
     private void Awake()
     {
@@ -258,9 +267,45 @@ public class ZooBackendClient : MonoBehaviour
     {
         while (true)
         {
+            if (_locationsPollingMode == LocationsPollingMode.Suspended)
+            {
+                yield return new WaitForSeconds(1f);
+                continue;
+            }
+
+            if (_locationsPollingMode == LocationsPollingMode.CapacitySnapshot)
+            {
+                if (_capacitySnapshotPending)
+                {
+                    _capacitySnapshotPending = false;
+                    yield return GetLocations(locationsLimit, locationsOnlineSec);
+                }
+
+                yield return new WaitForSeconds(1f);
+                continue;
+            }
+
             yield return GetLocations(locationsLimit, locationsOnlineSec);
             yield return new WaitForSeconds(locationsRefreshSec);
         }
+    }
+
+    public void SetRealtimeLobbyMode()
+    {
+        _locationsPollingMode = LocationsPollingMode.Suspended;
+        _capacitySnapshotPending = false;
+    }
+
+    public void SetOfflineLocalOnlyMode()
+    {
+        _locationsPollingMode = LocationsPollingMode.Suspended;
+        _capacitySnapshotPending = false;
+    }
+
+    public void RequestCapacitySnapshotOnce()
+    {
+        _locationsPollingMode = LocationsPollingMode.CapacitySnapshot;
+        _capacitySnapshotPending = true;
     }
 
     public IEnumerator GetLocations(int limit, int onlineSec, Action<List<ZooLocationItem>> onOk = null, Action<long, string> onErr = null)

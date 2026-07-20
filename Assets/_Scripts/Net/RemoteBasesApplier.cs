@@ -237,6 +237,19 @@ public class RemoteBasesApplier : MonoBehaviour
         EnsureLocalSlot();
     }
 
+    public void ApplyCachedLocationsFallback()
+    {
+        // First restore the authoritative local save and clear live lobby objects.
+        ApplyOfflineLocalOnly();
+
+        // Capacity fallback is snapshot-based, so allow the low-frequency locations
+        // feed again after the live lobby state has been cleared.
+        _lobbyModeActive = false;
+        _didInitialFullLobbySync = false;
+        if (backend != null && backend.LastLocations != null && backend.LastLocations.Count > 0)
+            ApplyLocations(new List<ZooLocationItem>(backend.LastLocations));
+    }
+
     private int ResolveOfflineLocalSlotIndex()
     {
         if (slots == null || slots.Count == 0)

@@ -87,8 +87,22 @@ public class LobbyJoinResponseDto
     public List<int> availableSlots = new();
 }
 
+public enum LobbyNetworkMode
+{
+    OfflineLocal,
+    CapacitySnapshot,
+    Online
+}
+
 public class LobbyClient : MonoBehaviour
 {
+    private enum LobbyJoinResult
+    {
+        Failed,
+        CapacityDegraded,
+        Success
+    }
+
     private struct PositionHistorySample
     {
         public float t;
@@ -142,11 +156,13 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private ZooBaseSnapshotSync snapshotSync;
 
     public bool IsOnline { get; private set; }
+    public LobbyNetworkMode NetworkMode { get; private set; } = LobbyNetworkMode.OfflineLocal;
     public bool DebugSimulateOffline => debugSimulateOffline;
     public string LobbyId { get; private set; }
     public IReadOnlyList<LobbyMemberStateDto> LastMembers => _lastMembers;
 
     public event Action<List<LobbyMemberStateDto>> LobbyStateUpdated;
+    public event Action<LobbyNetworkMode> NetworkModeChanged;
 
     private readonly List<LobbyMemberStateDto> _lastMembers = new();
     private Coroutine _updateLoop;
@@ -180,6 +196,7 @@ public class LobbyClient : MonoBehaviour
     private bool _isAppPaused;
     private bool _hasAppFocus = true;
     private bool _forceSnapshotUpload;
+    private float _capacityRetryAfterSec = 60f;
     private bool _wsReady;
     private float _nextWsPingAt;
     private float _nextWsSyncRequestAt;
@@ -714,21 +731,25 @@ public class LobbyClient : MonoBehaviour
 
         yield return backend.EnsureGuest();
 
-        var joinOk = false;
-        yield return JoinLobby(ok => joinOk = ok);
-        if (!joinOk)
+        var joinResult = LobbyJoinResult.Failed;
+        yield return JoinLobby(result => joinResult = result);
+        if (joinResult != LobbyJoinResult.Success)
         {
-            DisableOnline("join_failed");
+            DisableOnline(joinResult == LobbyJoinResult.CapacityDegraded
+                ? "capacity_degraded"
+                : "join_failed");
             yield break;
         }
 
         IsOnline = true;
+        SetNetworkMode(LobbyNetworkMode.Online);
         ResetErrors();
         _forceSnapshotUpload = true;
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
         if (_remoteBases != null)
             _remoteBases.SetOfflineLocalOnly(false);
+        backend.SetRealtimeLobbyMode();
 
         if (snapshotSync != null)
             snapshotSync.SetAutoPublish(false);
@@ -775,22 +796,27 @@ public class LobbyClient : MonoBehaviour
 
         yield return backend.EnsureGuest();
 
-        var ok = false;
-        yield return JoinLobbyWith(friendCode, v => ok = v);
-        if (!ok)
+        var joinResult = LobbyJoinResult.Failed;
+        yield return JoinLobbyWith(friendCode, result => joinResult = result);
+        if (joinResult != LobbyJoinResult.Success)
         {
-            RegisterError("JoinWithFriend failed");
+            if (joinResult == LobbyJoinResult.CapacityDegraded)
+                DisableOnline("capacity_degraded");
+            else
+                RegisterError("JoinWithFriend failed");
             onDone?.Invoke(false);
             yield break;
         }
 
         IsOnline = true;
+        SetNetworkMode(LobbyNetworkMode.Online);
         ResetErrors();
         _forceSnapshotUpload = true;
         if (_remoteBases == null)
             _remoteBases = FindAnyObjectByType<RemoteBasesApplier>();
         if (_remoteBases != null)
             _remoteBases.SetOfflineLocalOnly(false);
+        backend.SetRealtimeLobbyMode();
         if (snapshotSync != null)
             snapshotSync.SetAutoPublish(false);
         if (_updateLoop == null)
@@ -852,7 +878,9 @@ public class LobbyClient : MonoBehaviour
 
     private void DisableOnline(string reason)
     {
+        var capacityDegraded = string.Equals(reason, "capacity_degraded", StringComparison.Ordinal);
         IsOnline = false;
+        SetNetworkMode(capacityDegraded ? LobbyNetworkMode.CapacitySnapshot : LobbyNetworkMode.OfflineLocal);
         LobbyId = null;
         ResetErrors();
         _lastVersion = 0;
@@ -895,11 +923,31 @@ public class LobbyClient : MonoBehaviour
         {
             if (ShouldSuppressReconnectTeleport(reason))
                 _remoteBases.SuppressNextAutoTeleport();
-            _remoteBases.ApplyOfflineLocalOnly();
+            if (capacityDegraded)
+                _remoteBases.ApplyCachedLocationsFallback();
+            else
+                _remoteBases.ApplyOfflineLocalOnly();
+        }
+
+        if (backend != null)
+        {
+            if (capacityDegraded)
+                backend.RequestCapacitySnapshotOnce();
+            else
+                backend.SetOfflineLocalOnlyMode();
         }
 
         if (_reconnectLoop == null && !debugSimulateOffline)
             _reconnectLoop = StartCoroutine(ReconnectLoop());
+    }
+
+    private void SetNetworkMode(LobbyNetworkMode mode)
+    {
+        if (NetworkMode == mode)
+            return;
+
+        NetworkMode = mode;
+        NetworkModeChanged?.Invoke(mode);
     }
 
     private static bool ShouldSuppressReconnectTeleport(string reason)
@@ -951,9 +999,11 @@ public class LobbyClient : MonoBehaviour
                 continue;
             }
 
-            var delay = firstAttempt
-                ? Mathf.Max(1f, Mathf.Min(reconnectFirstDelaySec, reconnectIntervalSec))
-                : Mathf.Max(1f, reconnectIntervalSec);
+            var delay = NetworkMode == LobbyNetworkMode.CapacitySnapshot
+                ? Mathf.Max(5f, _capacityRetryAfterSec) + UnityEngine.Random.Range(0f, 5f)
+                : firstAttempt
+                    ? Mathf.Max(1f, Mathf.Min(reconnectFirstDelaySec, reconnectIntervalSec))
+                    : Mathf.Max(1f, reconnectIntervalSec);
             firstAttempt = false;
 
             yield return new WaitForSeconds(delay);
@@ -1279,7 +1329,7 @@ public class LobbyClient : MonoBehaviour
             req.SetRequestHeader("X-Player-Id", pid);
     }
 
-    private IEnumerator JoinLobby(Action<bool> onDone = null)
+    private IEnumerator JoinLobby(Action<LobbyJoinResult> onDone = null)
     {
         var url = $"{BaseUrl}/lobby/join";
         using var req = new UnityWebRequest(url, "POST");
@@ -1290,7 +1340,7 @@ public class LobbyClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            onDone?.Invoke(false);
+            onDone?.Invoke(ParseJoinFailure(req));
             yield break;
         }
 
@@ -1327,11 +1377,11 @@ public class LobbyClient : MonoBehaviour
             }
 
             if (debugSlots) Debug.Log($"[Lobby] join slotIndex={slotIndex} available={availableSlotsCache.Count} auto={needAutoClaim}");
-            onDone?.Invoke(true);
+            onDone?.Invoke(LobbyJoinResult.Success);
         }
         catch
         {
-            onDone?.Invoke(false);
+            onDone?.Invoke(LobbyJoinResult.Failed);
         }
 
         if (slotPick >= 0)
@@ -1354,7 +1404,7 @@ public class LobbyClient : MonoBehaviour
         }
     }
 
-    private IEnumerator JoinLobbyWith(string friendCode, Action<bool> onDone = null)
+    private IEnumerator JoinLobbyWith(string friendCode, Action<LobbyJoinResult> onDone = null)
     {
         var url = $"{BaseUrl}/lobby/join-with";
         var payload = new JObject
@@ -1373,7 +1423,7 @@ public class LobbyClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            onDone?.Invoke(false);
+            onDone?.Invoke(ParseJoinFailure(req));
             yield break;
         }
 
@@ -1410,11 +1460,11 @@ public class LobbyClient : MonoBehaviour
             }
 
             if (debugSlots) Debug.Log($"[Lobby] join slotIndex={slotIndex} available={availableSlotsCache.Count} auto={needAutoClaim}");
-            onDone?.Invoke(true);
+            onDone?.Invoke(LobbyJoinResult.Success);
         }
         catch
         {
-            onDone?.Invoke(false);
+            onDone?.Invoke(LobbyJoinResult.Failed);
         }
 
         if (slotPick >= 0)
@@ -1428,6 +1478,30 @@ public class LobbyClient : MonoBehaviour
         {
             yield return ClaimSlotAuto();
             yield return FetchState();
+        }
+    }
+
+    private LobbyJoinResult ParseJoinFailure(UnityWebRequest request)
+    {
+        var body = request.downloadHandler != null ? request.downloadHandler.text : null;
+        if (request.responseCode != 429 || string.IsNullOrWhiteSpace(body))
+            return LobbyJoinResult.Failed;
+
+        try
+        {
+            var payload = JObject.Parse(body);
+            if (!string.Equals(payload["error"]?.ToString(), "capacity_degraded", StringComparison.Ordinal))
+                return LobbyJoinResult.Failed;
+
+            _capacityRetryAfterSec = Mathf.Clamp(
+                payload["retryAfterSec"]?.Value<float>() ?? reconnectIntervalSec,
+                5f,
+                3600f);
+            return LobbyJoinResult.CapacityDegraded;
+        }
+        catch
+        {
+            return LobbyJoinResult.Failed;
         }
     }
 
@@ -1938,15 +2012,19 @@ public class LobbyClient : MonoBehaviour
     private IEnumerator RecoverAfterStateNotFound()
     {
         _stateRecoverInProgress = true;
-        bool ok = false;
-        yield return JoinLobby(v => ok = v);
+        var joinResult = LobbyJoinResult.Failed;
+        yield return JoinLobby(result => joinResult = result);
 
-        if (ok)
+        if (joinResult == LobbyJoinResult.Success)
         {
             _state404Count = 0;
             _stateBackoffUntil = 0f;
             ResetErrors();
             Debug.Log("[Lobby] Recovered after state 404 via rejoin");
+        }
+        else if (joinResult == LobbyJoinResult.CapacityDegraded)
+        {
+            DisableOnline("capacity_degraded");
         }
         else
         {
