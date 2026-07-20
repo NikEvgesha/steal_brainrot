@@ -84,6 +84,8 @@ public class ConveyorUI : MonoBehaviour
     {
         _conveyor = GetComponentInParent<Conveyor>(true);
         EnsurePanel();
+        ConfigureResponsiveLayout();
+        ConfigureInfoCardVisuals();
         StyleIncomeBonusDisplay();
     }
 
@@ -138,6 +140,7 @@ public class ConveyorUI : MonoBehaviour
         {
             _newEggIcon.sprite = newEgg != null ? newEgg.Icon : null;
             _newEggIcon.gameObject.SetActive(newEgg != null && newEgg.Icon != null);
+            ApplyAlbumCardStyle(_newEggIcon.transform.parent, newEgg != null ? newEgg.RareType : RareType.Common);
         }
 
         if (_newEggPetsPanel != null)
@@ -153,10 +156,19 @@ public class ConveyorUI : MonoBehaviour
                         continue;
 
                     GameObject icon = Instantiate(_newEggPetIcon, _newEggPetsPanel);
-                    var image = icon.GetComponentInChildren<Image>();
+                    var image = ResolveCardIcon(icon.transform);
                     if (image != null)
+                    {
                         image.sprite = pet.Icon;
+                        image.preserveAspect = true;
+                        image.raycastTarget = false;
+                    }
+
+                    ApplyAlbumCardStyle(icon.transform, pet.RareType);
                 }
+
+                if (_newEggPetsPanel is RectTransform petsRect)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(petsRect);
             }
         }
 
@@ -297,6 +309,131 @@ public class ConveyorUI : MonoBehaviour
         _incomeMultiplier.fontSizeMax = 46;
         _incomeMultiplier.outlineColor = BlockyUITheme.BlackStroke;
         _incomeMultiplier.outlineWidth = Mathf.Max(_incomeMultiplier.outlineWidth, 0.16f);
+    }
+
+    private void ConfigureResponsiveLayout()
+    {
+        var container = transform.Find("container") as RectTransform;
+        if (container != null)
+        {
+            container.pivot = new Vector2(0.5f, 0.5f);
+            container.anchoredPosition = Vector2.zero;
+        }
+
+        var infoPanel = transform.Find("container/Panel/Panel") as RectTransform;
+        if (infoPanel == null)
+            return;
+
+        // The old layout placed the animal block 149 reference pixels below the
+        // egg block. That looked correct only at the authoring resolution.
+        // Use normalized vertical bands so both sections stay aligned when the
+        // window is resized or shown on a different aspect ratio.
+        var eggSection = infoPanel.Find("NewEgg") as RectTransform;
+        if (eggSection != null)
+        {
+            eggSection.anchorMin = new Vector2(0.36f, 0.64f);
+            eggSection.anchorMax = new Vector2(0.98f, 0.90f);
+            eggSection.anchoredPosition = Vector2.zero;
+            eggSection.sizeDelta = Vector2.zero;
+        }
+
+        var petsSection = infoPanel.Find("Brainrots") as RectTransform;
+        if (petsSection != null)
+        {
+            petsSection.anchorMin = new Vector2(0.36f, 0.38f);
+            petsSection.anchorMax = new Vector2(0.98f, 0.64f);
+            petsSection.anchoredPosition = Vector2.zero;
+            petsSection.sizeDelta = Vector2.zero;
+        }
+
+        CenterStretchChild(infoPanel.Find("Info") as RectTransform);
+        CenterStretchChild(infoPanel.Find("Name") as RectTransform);
+    }
+
+    private void ConfigureInfoCardVisuals()
+    {
+        var infoPanel = transform.Find("container/Panel/Panel");
+        if (infoPanel == null)
+            return;
+
+        var panelImage = infoPanel.GetComponent<Image>();
+        if (panelImage != null)
+        {
+            panelImage.color = BlockyUITheme.BrownBody;
+            panelImage.raycastTarget = true;
+        }
+
+        ApplyAlbumCardStyle(_newEggIcon != null ? _newEggIcon.transform.parent : null, RareType.Common);
+        ConfigureTextBacking(infoPanel.Find("NewEgg/HeaderBackground"));
+        ConfigureTextBacking(infoPanel.Find("Brainrots/HeaderBackground"));
+        ConfigureTextBacking(infoPanel.Find("IncomeBackground"));
+    }
+
+    private static void CenterStretchChild(RectTransform rect)
+    {
+        if (rect == null)
+            return;
+
+        rect.anchoredPosition = new Vector2(0f, rect.anchoredPosition.y);
+    }
+
+    private static Image ResolveCardIcon(Transform root)
+    {
+        if (root == null)
+            return null;
+
+        var icon = root.Find("Container/Icon") ?? root.Find("Icon");
+        if (icon != null)
+            return icon.GetComponent<Image>();
+
+        var images = root.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            if (images[i] != null && images[i].gameObject.name.Equals("Icon", StringComparison.OrdinalIgnoreCase))
+                return images[i];
+        }
+
+        return images.Length > 0 ? images[images.Length - 1] : null;
+    }
+
+    private static void ApplyAlbumCardStyle(Transform root, RareType rareType)
+    {
+        if (root == null)
+            return;
+
+        var container = root.Find("Container") ?? root;
+        var background = container.GetComponent<Image>();
+        if (background == null)
+            return;
+
+        // Keep the same serialized soft-stud sprite and gradient as the Album
+        // card prefab. Only the rarity tint is dynamic; ApplyPanel would swap
+        // the sprite for the older generated BlockyStudPanel.
+        background.color = BlockyUITheme.GetRareColor(rareType);
+        background.type = Image.Type.Tiled;
+        background.pixelsPerUnitMultiplier = 1f;
+        background.raycastTarget = false;
+
+        var gradient = container.Find("Gradient")?.GetComponent<Image>();
+        if (gradient != null)
+            gradient.raycastTarget = false;
+    }
+
+    private static void ConfigureTextBacking(Transform backingTransform)
+    {
+        if (backingTransform == null)
+            return;
+
+        var image = backingTransform.GetComponent<Image>();
+        if (image == null)
+            return;
+
+        image.color = new Color(
+            BlockyUITheme.DarkBrownPanel.r,
+            BlockyUITheme.DarkBrownPanel.g,
+            BlockyUITheme.DarkBrownPanel.b,
+            0.88f);
+        image.raycastTarget = false;
     }
 
     public IReadOnlyList<ConveyorDropChanceCalculator.ChanceEntry> GetCurrentDropChances()

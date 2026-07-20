@@ -1092,3 +1092,9 @@
 - Replaced the ordinary color texture that four zoo materials had previously stored in `_DetailNormalMap`; their existing detail scales were preserved, including scale `2` on `Prodat_0.mat`.
 - Live Bridge 1280x720 comparison and close-up confirmed light-reactive relief on road, path and border studs without changing the new soft UI texture. Final artistic strength remains open for the user's visual review.
 - Follow-up visual review found the initial height polarity concave. Inverted all RGB height-source channels while preserving alpha and importer/material settings; the repeated blocks now shade as outward LEGO studs at the same `0.12` strength.
+
+### 2026-07-20 (conveyor information layout and chance annotation)
+- Corrected the RU/EN conveyor-catalog annotation: player luck changes animal chances inside an egg and does not change the conveyor's egg-drop probabilities.
+- Replaced the fixed `Brainrots` vertical offset with normalized egg/pet layout bands so the main information panel stays aligned at different resolutions and aspect ratios.
+- Styled the egg and generated animal icons as Album-like cards without names: `UIWindowTexture_SoftStuds_v1`, rarity tint, `Gradient2`, outline and padded aspect-preserving icons. Added dark soft-stud backings behind both section headers and the income line.
+- Restarted Play Mode and verified the freshly instantiated UI through Unity Bridge: all card/backing sprites remain `UIWindowTexture_SoftStuds_v1`, four animal cards resolve to `97.59 × 97.59`, both sections have zero pixel offset, and the catalog opens with the updated Russian note.

@@ -31,7 +31,7 @@ public class EggDropCatalogUI : MonoBehaviour
     [SerializeField] private string luckLabelLocalizationKey = "UI/EggCatalog/LuckLabel";
     [SerializeField] private string luckLabelFallback = "Luck";
     [SerializeField] private string baseChanceNoteLocalizationKey = "UI/EggCatalog/BaseChanceNote";
-    [SerializeField] private string baseChanceNoteFallback = "The chances below are shown without luck bonuses.";
+    [SerializeField] private string baseChanceNoteFallback = "Luck affects animal chances inside eggs, not the egg drop chances.";
 
     private const string GeneratedObjectPrefix = "ConveyorChance_";
     private RectTransform _cardsRoot;
