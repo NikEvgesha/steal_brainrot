@@ -1094,7 +1094,8 @@
 - Follow-up visual review found the initial height polarity concave. Inverted all RGB height-source channels while preserving alpha and importer/material settings; the repeated blocks now shade as outward LEGO studs at the same `0.12` strength.
 
 ### 2026-07-20 (conveyor information layout and chance annotation)
-- Corrected the RU/EN conveyor-catalog annotation: player luck changes animal chances inside an egg and does not change the conveyor's egg-drop probabilities.
+- Initially corrected only the RU/EN conveyor-catalog annotation, but follow-up review clarified that the data source itself also had to change.
 - Replaced the fixed `Brainrots` vertical offset with normalized egg/pet layout bands so the main information panel stays aligned at different resolutions and aspect ratios.
 - Styled the egg and generated animal icons as Album-like cards without names: `UIWindowTexture_SoftStuds_v1`, rarity tint, `Gradient2`, outline and padded aspect-preserving icons. Added dark soft-stud backings behind both section headers and the income line.
 - Restarted Play Mode and verified the freshly instantiated UI through Unity Bridge: all card/backing sprites remain `UIWindowTexture_SoftStuds_v1`, four animal cards resolve to `97.59 × 97.59`, both sections have zero pixel offset, and the catalog opens with the updated Russian note.
+- Replaced the catalog's per-conveyor egg-drop rows with per-egg animal hatch rows. It now enumerates eight unique conveyor eggs, shows each egg's luck and uses `BuildBrainrotChances(egg, true)` for the four localized animals beneath it. Live validation confirmed every egg sums to `100%` and the rendered content contains no conveyor headers.

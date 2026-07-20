@@ -23,7 +23,7 @@ public class EggDropCatalogUI : MonoBehaviour
 
     [Header("Localization")]
     [SerializeField] private string titleLocalizationKey = "UI/EggCatalog/Title";
-    [SerializeField] private string titleTextFallback = "Egg Drop Chances";
+    [SerializeField] private string titleTextFallback = "Animal Chances in Eggs";
     [SerializeField] private string emptyListLocalizationKey = "UI/EggCatalog/Empty";
     [SerializeField] private string emptyListFallback = "No eggs configured.";
     [SerializeField] private string eggWithoutPetsLocalizationKey = "UI/EggCatalog/NoPets";
@@ -31,7 +31,7 @@ public class EggDropCatalogUI : MonoBehaviour
     [SerializeField] private string luckLabelLocalizationKey = "UI/EggCatalog/LuckLabel";
     [SerializeField] private string luckLabelFallback = "Luck";
     [SerializeField] private string baseChanceNoteLocalizationKey = "UI/EggCatalog/BaseChanceNote";
-    [SerializeField] private string baseChanceNoteFallback = "Luck affects animal chances inside eggs, not the egg drop chances.";
+    [SerializeField] private string baseChanceNoteFallback = "Animal chances already include the egg's luck.";
 
     private const string GeneratedObjectPrefix = "ConveyorChance_";
     private RectTransform _cardsRoot;
@@ -259,26 +259,41 @@ public class EggDropCatalogUI : MonoBehaviour
     private string BuildConveyorCatalogText()
     {
         var sb = new StringBuilder(2048);
-        sb.Append("<align=center><color=#18E9FF><b>");
+        sb.Append("<align=center><size=24><color=#18E9FF><b>");
         sb.Append(EscapeRichText(L(baseChanceNoteLocalizationKey, baseChanceNoteFallback)));
-        sb.Append("</b></color></align>\n<size=10>\n</size>");
+        sb.Append("</b></color></size></align>\n<size=10>\n</size>");
 
-        for (var levelIndex = 0; levelIndex < conveyor.Levels.Count; levelIndex++)
+        var eggs = GetConveyorEggs();
+        if (eggs.Count == 0)
         {
-            var level = conveyor.Levels[levelIndex];
-            if (level == null)
+            AppendChanceTextRow(sb, L(emptyListLocalizationKey, emptyListFallback), string.Empty, 0);
+            return sb.ToString();
+        }
+
+        for (var eggIndex = 0; eggIndex < eggs.Count; eggIndex++)
+        {
+            var egg = eggs[eggIndex];
+            if (egg == null)
                 continue;
 
-            var headerColor = BlockyUITheme.GetRareColor(level.RareType);
+            var headerColor = BlockyUITheme.GetRareColor(egg.RareType);
             var headerHex = ColorUtility.ToHtmlStringRGB(headerColor);
             sb.Append("<mark=#").Append(headerHex).Append("FF><color=#FFFFFF><size=34><b><space=12>");
-            sb.Append(EscapeRichText(GetLocalizedLevelTitle(level)));
+            sb.Append(EscapeRichText(GetDisplayName(egg)));
+            if (showEggLuckInHeader)
+            {
+                sb.Append("  [");
+                sb.Append(EscapeRichText(L(luckLabelLocalizationKey, luckLabelFallback)));
+                sb.Append(": x");
+                sb.Append(Mathf.Clamp(egg.Data.Luck, 1, 10));
+                sb.Append(']');
+            }
             sb.Append("<pos=98%><space=4></b></size></color></mark>\n");
 
-            var chances = ConveyorDropChanceCalculator.BuildEggChances(level);
+            var chances = ConveyorDropChanceCalculator.BuildBrainrotChances(egg, applyLuckBonus);
             if (chances == null || chances.Count == 0)
             {
-                AppendChanceTextRow(sb, L(emptyListLocalizationKey, emptyListFallback), string.Empty, 0);
+                AppendChanceTextRow(sb, L(eggWithoutPetsLocalizationKey, eggWithoutPetsFallback), string.Empty, 0);
             }
             else
             {
@@ -296,25 +311,42 @@ public class EggDropCatalogUI : MonoBehaviour
                 }
             }
 
-            if (levelIndex < conveyor.Levels.Count - 1)
+            if (eggIndex < eggs.Count - 1)
                 sb.Append("<size=11>\n</size>");
         }
 
         return sb.ToString();
     }
 
-    private string GetLocalizedLevelTitle(ConveyorLevel level)
+    private List<Egg> GetConveyorEggs()
     {
-        if (level == null)
-            return L("UI/Conveyor/Title", "Conveyor");
+        var eggs = new List<Egg>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (conveyor == null || conveyor.Levels == null)
+            return eggs;
 
-        var fallback = !string.IsNullOrWhiteSpace(level.Name)
-            ? level.Name.Trim()
-            : level.RareType.ToString();
-        var levelName = level.RareType == RareType.RareType
-            ? fallback
-            : L("Boost/RareType/" + level.RareType, fallback);
-        return levelName + " " + L("UI/Conveyor/Title", "Conveyor");
+        for (var levelIndex = 0; levelIndex < conveyor.Levels.Count; levelIndex++)
+        {
+            var level = conveyor.Levels[levelIndex];
+            if (level == null || level.Eggs == null)
+                continue;
+
+            for (var eggIndex = 0; eggIndex < level.Eggs.Count; eggIndex++)
+            {
+                var egg = level.Eggs[eggIndex].egg;
+                if (egg == null)
+                    continue;
+
+                var id = GetId(egg);
+                if (seen.Add(id))
+                    eggs.Add(egg);
+            }
+        }
+
+        if (sortEggsByName)
+            eggs.Sort((a, b) => string.Compare(GetDisplayName(a), GetDisplayName(b), StringComparison.OrdinalIgnoreCase));
+
+        return eggs;
     }
 
     private static void AppendChanceTextRow(StringBuilder sb, string eggName, string chance, int rowIndex)
