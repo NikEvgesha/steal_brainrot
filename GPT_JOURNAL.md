@@ -1085,3 +1085,9 @@
 - Preserved the original texture for eight references in 3D world materials and three references in Unity's recovery scene; those are not UI sprites and changing them would alter world geometry or the editor backup.
 - Refreshed all affected assets, safely reloaded the clean active scene from disk and ran a full inactive-inclusive runtime image audit: `23,645` images inspected, `0` old texture sprites and `434` new soft texture sprites.
 - Visual smoke at 1280x720 confirmed the new pattern and existing tint/gradient colors in inventory (`16` new images), album (`55`) and conveyor (`24`), in addition to the previously accepted SpecialShop (`59`). No new compiler errors or runtime exceptions were logged.
+
+### 2026-07-20 (legacy 3D texture normal-map pilot)
+- Created `Assets/_Sprites/texture_Normal.png` as a deterministic Unity normal-from-height companion to the original 64x64 stud texture. The importer uses normal-map conversion, `heightScale 0.12`, repeat wrapping and mipmaps so the tile remains suitable for world materials.
+- Assigned it as `_BumpMap` with `_NORMALMAP` enabled on `texture.mat` and `New Material 2.mat`.
+- Replaced the ordinary color texture that four zoo materials had previously stored in `_DetailNormalMap`; their existing detail scales were preserved, including scale `2` on `Prodat_0.mat`.
+- Live Bridge 1280x720 comparison and close-up confirmed light-reactive relief on road, path and border studs without changing the new soft UI texture. Final artistic strength remains open for the user's visual review.
