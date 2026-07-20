@@ -121,10 +121,9 @@ public class FieldCell : MonoBehaviour
                 {
                     case EggStatus.Maturing:
                         _addSpeedButton.SetActive(true);
-                        bool freeSpeedup = G.Tutorial != null && G.Tutorial.IsFreeEggSpeedupAvailable;
                         SetPanelRewardedAdBadge(
                             _addSpeedButton,
-                            !freeSpeedup,
+                            true,
                             _speedBoostAdIcon,
                             _speedBoostAdLabel,
                             _addSpeedButton.transform,

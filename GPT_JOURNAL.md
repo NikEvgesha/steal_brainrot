@@ -1073,3 +1073,9 @@
 - Installed the external watchdog in the `roman` user crontab. Its first run reported API/container state `ok`; production-like admission settings were restored to `hard=20`, `soft=19`, one premium slot, CPU `85%` and API working-set `260 MiB` pressure thresholds.
 - Live Unity Bridge confirmed `CapacitySnapshot|False` with five cached public locations while the soft cap was occupied, then `Online|True` after capacity was restored and admission retried without restarting Play Mode. Play Mode was stopped after the check.
 - Remaining setup is only an owner-provided Telegram bot/chat pair or SMTP destination, plus future platform receipt verification for automatic premium entitlement.
+
+### 2026-07-20 (egg rewarded badge and softer SpecialShop texture pilot)
+- Restored the rewarded-ad badge on every maturing-egg speed-up interaction. The first tutorial speed-up is still consumed for free by `Egg`, but its global tutorial flag no longer suppresses the interaction artwork.
+- Generated a separate neutral `UIWindowTexture_SoftStuds_v1` raster asset from the existing block texture reference. It keeps a subtle 2x2 toy-block motif, imports as a 64x64 tiled sprite at 100 PPU and preserves all existing UI tint colors.
+- Limited the texture pilot to SpecialShop: the root window, header, close button, category tabs, scroll background, section headers, reward slots and generated product cards now reference the new sprite. Inventories and other windows remain unchanged pending visual approval.
+- Unity rebuilt `FieldCell` without new compiler errors. Runtime verification created the maturing-egg interaction state without invoking or saving gameplay events and confirmed an active 42x42 `Icon_ImageIcon_Ad_00_l` badge. The live shop reported `0` old and `59` new texture instances and was visually checked at 1280x720.
