@@ -11,6 +11,8 @@ public static class TutorialV1EditorTools
     private const string LocalizationPath = "Assets/Igrodelnya2.0/Localization/LocalizationData.asset";
     private const string ViewPrefabPath = "Assets/Resources/Tutorial/TutorialView.prefab";
     private const string HandPointerPath = "Assets/Resources/Tutorial/UIHandPointer.png";
+    private const string PanelTexturePath = "Assets/_Sprites/UIWindowTexture_SoftStuds_v1.png";
+    private const string ButtonGradientPath = "Assets/_Sprites/Gradient2.png";
 
     private static readonly Dictionary<string, string[]> Translations = new(StringComparer.Ordinal)
     {
@@ -294,6 +296,13 @@ public static class TutorialV1EditorTools
         root.layer = LayerMask.NameToLayer("UI");
         RectTransform rootRect = root.GetComponent<RectTransform>();
         SetRect(rootRect, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+
+        var viewSerialized = new SerializedObject(root.GetComponent<TutorialView>());
+        viewSerialized.FindProperty("_panelTexture").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Sprite>(PanelTexturePath);
+        viewSerialized.FindProperty("_buttonGradient").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Sprite>(ButtonGradientPath);
+        viewSerialized.ApplyModifiedPropertiesWithoutUndo();
 
         GameObject viewport = CreateRectObject("PanelViewport", root.transform);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();

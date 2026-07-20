@@ -1119,3 +1119,10 @@
 - Added Editor-only context previews for platform mode, forced rewarded ads and forced in-app purchases. IAP preview supplies a configurable provider-style price but blocks `TryBuy`, so UI can be inspected without invoking a provider or granting products.
 - Real-money buttons no longer display the internal `CurrencyType.Real` icon; rewarded-ad and soft-currency icons are restored normally when modes change.
 - Unity Bridge verified 3 section headers / 7 products in ad-only mode, `Currency` anchor scroll at normalized position `0`, and 8 products with two `1.99 USD` gem cards in IAP preview. Returning to ad mode restored the single `+5` card and its active rewarded-ad icon.
+
+### 2026-07-21 (Tutorial V2 shared visual style)
+- Restyled the compact upper-right tutorial panel without changing its placement, safe-area handling, target arrows or slide-to-the-right collapse behavior.
+- The panel now uses the accepted `UIWindowTexture_SoftStuds_v1`, a green gradient header, translucent dark task plate, RussoOne text with shared outlines, a textured orange collapse button and shared blocky outlines/shadows.
+- Converted the reward area into a visually explicit action state: incomplete tasks show a muted disabled button, completed tasks show a bright green button with yellow outline, and zero-reward steps center a full-width `Continue` label without leaving an icon gap.
+- Added serialized shared texture/gradient references to `TutorialView.prefab` and taught the prefab rebuild tool to restore them on future regeneration.
+- Unity compilation completed without new errors. Live Bridge at `1280×720` verified rewarded, zero-reward, completed and collapsed states; the collapsed panel reached its `626`-pixel off-screen target and retained only the expand control.
