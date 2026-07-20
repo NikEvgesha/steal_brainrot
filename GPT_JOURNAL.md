@@ -1099,3 +1099,10 @@
 - Styled the egg and generated animal icons as Album-like cards without names: `UIWindowTexture_SoftStuds_v1`, rarity tint, `Gradient2`, outline and padded aspect-preserving icons. Added dark soft-stud backings behind both section headers and the income line.
 - Restarted Play Mode and verified the freshly instantiated UI through Unity Bridge: all card/backing sprites remain `UIWindowTexture_SoftStuds_v1`, four animal cards resolve to `97.59 × 97.59`, both sections have zero pixel offset, and the catalog opens with the updated Russian note.
 - Replaced the catalog's per-conveyor egg-drop rows with per-egg animal hatch rows. It now enumerates eight unique conveyor eggs, shows each egg's luck and uses `BuildBrainrotChances(egg, true)` for the four localized animals beneath it. Live validation confirmed every egg sums to `100%` and the rendered content contains no conveyor headers.
+
+### 2026-07-20 (BigPet selection window redesign)
+- Rebuilt the BigPet selection panel in the shared blocky UI style: blue header, dark soft-stud body, separate farm-income badge and square red close button.
+- Added a responsive scroll grid: four columns on wide layouts, three/two on narrower and portrait layouts. The window itself now expands for portrait screens instead of keeping the old fixed landscape proportions.
+- Restyled animal slots as Album-like rarity cards with localized names on dark plates. The selected animal now has a white frame plus a code-native check mark that does not depend on a missing font glyph.
+- Updated `UI/BigPet/ChoosePet` to the explicit RU/EN wording `Выбери большого питомца` / `Choose a big pet`.
+- Unity compiled without errors. Live Bridge instantiated 18 selectable slots, visually verified the final 1280x720 window and confirmed the close button is interactable, targets its visible red image and closes the panel.

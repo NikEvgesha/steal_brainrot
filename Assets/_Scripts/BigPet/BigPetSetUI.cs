@@ -18,6 +18,8 @@ public class BigPetSetUI : MonoBehaviour
     private float _interactionOpenDistance = 5f;
     private float _nextDistanceCheckTime;
     private TMP_Text _incomeBonusText;
+    private TMP_Text _titleText;
+    private ScrollRect _scrollRect;
     private LocalizationManager _subscribedLocalizationManager;
 
     [HideInInspector]
@@ -26,6 +28,11 @@ public class BigPetSetUI : MonoBehaviour
     public UnityEvent<Brainrot> ActiveChanged;
 
     public bool IsOpen => _uiPanel != null && _uiPanel.activeSelf;
+
+    private void Awake()
+    {
+        ConfigureWindowVisuals();
+    }
 
     private void OnEnable()
     {
@@ -112,7 +119,24 @@ public class BigPetSetUI : MonoBehaviour
     private void RebuildGrid()
     {
         if (_slotParent != null && _slotParent.TryGetComponent<AdaptiveGridSpawner>(out var grid))
+        {
+            var parentRect = _slotParent as RectTransform;
+            float width = parentRect != null && parentRect.parent is RectTransform viewport
+                ? viewport.rect.width
+                : Screen.width;
+            bool portrait = Screen.height > Screen.width;
+            int columns = portrait
+                ? width >= 720f ? 3 : 2
+                : width >= 560f ? 4 : width >= 390f ? 3 : 2;
+            grid.ConfigureFitItemCount(
+                0,
+                new Vector2(12f, 12f),
+                new RectOffset(12, 12, 12, 12),
+                new Vector2(92f, 92f),
+                new Vector2(158f, 158f),
+                columns);
             grid.Rebuild();
+        }
 
         if (_slotParent is RectTransform rectTransform)
             LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
@@ -156,6 +180,7 @@ public class BigPetSetUI : MonoBehaviour
         _uiPanel.SetActive(open);
         if (open)
         {
+            ConfigureWindowVisuals();
             _uiPanel.transform.SetAsLastSibling();
             CanvasGroup canvasGroup = _uiPanel.GetComponent<CanvasGroup>();
             if (canvasGroup == null)
@@ -234,6 +259,129 @@ public class BigPetSetUI : MonoBehaviour
     private void OnLanguageChanged(string _)
     {
         RefreshIncomeBonusBadge();
+        RefreshLocalizedText();
+    }
+
+    private void ConfigureWindowVisuals()
+    {
+        if (_remoteMode || _uiPanel == null)
+            return;
+
+        var panelRect = _uiPanel.transform as RectTransform;
+        if (panelRect != null)
+        {
+            bool portrait = Screen.height > Screen.width;
+            panelRect.anchorMin = portrait ? new Vector2(0.04f, 0.08f) : new Vector2(0.18f, 0.10f);
+            panelRect.anchorMax = portrait ? new Vector2(0.96f, 0.92f) : new Vector2(0.82f, 0.90f);
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = Vector2.zero;
+        }
+
+        var panelImage = _uiPanel.GetComponent<Image>();
+        Sprite textureSprite = ResolveTextureSprite(panelImage);
+        StyleImage(panelImage, BlockyUITheme.BrownBody, textureSprite, true);
+        EnsureOutline(_uiPanel, new Vector2(5f, -5f), BlockyUITheme.BlackStroke);
+        EnsureShadow(_uiPanel, new Vector2(0f, -5f), new Color(0f, 0f, 0f, 0.42f));
+
+        Transform body = _uiPanel.transform.Find("Body") ?? _uiPanel.transform.Find("Image");
+        if (body != null)
+        {
+            body.name = "Body";
+            SetRect(body as RectTransform, new Vector2(0.02f, 0.04f), new Vector2(0.98f, 0.83f));
+            StyleImage(body.GetComponent<Image>(), BlockyUITheme.DarkBrownPanel, textureSprite, false);
+            body.SetAsFirstSibling();
+        }
+
+        Transform header = _uiPanel.transform.Find("Header") ?? _uiPanel.transform.Find("Image (1)");
+        if (header != null)
+        {
+            header.name = "Header";
+            SetRect(header as RectTransform, new Vector2(0f, 0.84f), Vector2.one);
+            StyleImage(header.GetComponent<Image>(), BlockyUITheme.BlueHeader, textureSprite, false);
+            EnsureOutline(header.gameObject, new Vector2(4f, -4f), BlockyUITheme.BlackStroke);
+            header.SetSiblingIndex(Mathf.Min(1, header.parent.childCount - 1));
+        }
+
+        Transform title = _uiPanel.transform.Find("Title") ?? _uiPanel.transform.Find("Text (Legacy)");
+        if (title != null)
+        {
+            title.name = "Title";
+            SetRect(title as RectTransform, new Vector2(0.04f, 0.855f), new Vector2(0.82f, 0.985f));
+            _titleText = title.GetComponent<TMP_Text>();
+            if (_titleText != null)
+            {
+                TmpUiTextFactory.ApplyDefaults(_titleText);
+                _titleText.fontStyle = FontStyles.Bold;
+                _titleText.fontSize = 52f;
+                _titleText.enableAutoSizing = true;
+                _titleText.fontSizeMin = 28f;
+                _titleText.fontSizeMax = 56f;
+                _titleText.alignment = TextAlignmentOptions.MidlineLeft;
+                _titleText.color = Color.white;
+                _titleText.outlineColor = BlockyUITheme.BlackStroke;
+                _titleText.outlineWidth = Mathf.Max(_titleText.outlineWidth, 0.16f);
+                _titleText.raycastTarget = false;
+            }
+            title.SetAsLastSibling();
+        }
+
+        _scrollRect = _uiPanel.GetComponentInChildren<ScrollRect>(true);
+        if (_scrollRect != null)
+        {
+            SetRect(_scrollRect.transform as RectTransform, new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.70f));
+            StyleImage(
+                _scrollRect.GetComponent<Image>(),
+                new Color(BlockyUITheme.DarkBrownPanel.r, BlockyUITheme.DarkBrownPanel.g, BlockyUITheme.DarkBrownPanel.b, 0.96f),
+                textureSprite,
+                false);
+            EnsureOutline(_scrollRect.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+            _scrollRect.horizontal = false;
+            _scrollRect.vertical = true;
+        }
+
+        Button closeButton = FindDirectChildButton(_uiPanel.transform);
+        if (closeButton != null)
+        {
+            closeButton.gameObject.name = "CloseButton";
+            SetRect(closeButton.transform as RectTransform, new Vector2(0.885f, 0.855f), new Vector2(0.98f, 0.985f));
+            var closeImage = closeButton.GetComponent<Image>();
+            if (closeImage == null)
+                closeImage = closeButton.gameObject.AddComponent<Image>();
+            closeImage.enabled = true;
+            StyleImage(closeImage, BlockyUITheme.RedHeader, textureSprite, true);
+            EnsureOutline(closeButton.gameObject, new Vector2(4f, -4f), BlockyUITheme.BlackStroke);
+
+            var closeVisual = closeButton.transform.Find("Image")?.GetComponent<Image>();
+            if (closeVisual != null)
+            {
+                StyleImage(closeVisual, BlockyUITheme.RedHeader, textureSprite, true);
+                EnsureOutline(closeVisual.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+                closeButton.targetGraphic = closeVisual;
+            }
+            else
+            {
+                closeButton.targetGraphic = closeImage;
+            }
+
+            closeButton.transition = Selectable.Transition.ColorTint;
+            closeButton.navigation = new Navigation { mode = Navigation.Mode.None };
+            closeButton.transform.SetAsLastSibling();
+        }
+
+        EnsureIncomeBonusBadge();
+        RefreshLocalizedText();
+    }
+
+    private void RefreshLocalizedText()
+    {
+        if (_titleText != null)
+            _titleText.text = LocalizationUtils.T("UI/BigPet/ChoosePet", "Choose a big pet");
+
+        for (int i = 0; i < _slots.Count; i++)
+        {
+            if (_slots[i] != null)
+                _slots[i].RefreshLocalizedText();
+        }
     }
 
     private void EnsureIncomeBonusBadge()
@@ -245,6 +393,7 @@ public class BigPetSetUI : MonoBehaviour
         if (existing != null)
         {
             _incomeBonusText = existing.GetComponentInChildren<TMP_Text>(true);
+            ConfigureIncomeBonusBadge(existing.gameObject);
             return;
         }
 
@@ -258,40 +407,7 @@ public class BigPetSetUI : MonoBehaviour
         badgeObject.transform.SetParent(_uiPanel.transform, false);
         badgeObject.transform.SetAsLastSibling();
 
-        var badgeRect = badgeObject.GetComponent<RectTransform>();
-        badgeRect.anchorMin = new Vector2(0.29f, 0.89f);
-        badgeRect.anchorMax = new Vector2(0.82f, 0.985f);
-        badgeRect.offsetMin = Vector2.zero;
-        badgeRect.offsetMax = Vector2.zero;
-
-        var panelImage = _uiPanel.GetComponent<Image>();
-        var badgeImage = badgeObject.GetComponent<Image>();
-        if (panelImage != null)
-            badgeImage.sprite = panelImage.sprite;
-        badgeImage.type = badgeImage.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
-        badgeImage.color = new Color(0.11f, 0.075f, 0.02f, 0.96f);
-        badgeImage.raycastTarget = false;
-
-        var outline = badgeObject.GetComponent<Outline>();
-        outline.effectColor = BlockyUITheme.BlackStroke;
-        outline.effectDistance = new Vector2(4f, -4f);
-        outline.useGraphicAlpha = true;
-
-        Shadow shadow = null;
-        var shadows = badgeObject.GetComponents<Shadow>();
-        for (int i = 0; i < shadows.Length; i++)
-        {
-            if (shadows[i] != null && !(shadows[i] is Outline))
-            {
-                shadow = shadows[i];
-                break;
-            }
-        }
-        if (shadow == null)
-            shadow = badgeObject.AddComponent<Shadow>();
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.4f);
-        shadow.effectDistance = new Vector2(0f, -4f);
-        shadow.useGraphicAlpha = true;
+        ConfigureIncomeBonusBadge(badgeObject);
 
         var textObject = new GameObject("Value", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         textObject.transform.SetParent(badgeObject.transform, false);
@@ -316,6 +432,110 @@ public class BigPetSetUI : MonoBehaviour
         _incomeBonusText.fontSizeMax = 48;
         _incomeBonusText.outlineColor = BlockyUITheme.BlackStroke;
         _incomeBonusText.outlineWidth = 0.16f;
+    }
+
+    private void ConfigureIncomeBonusBadge(GameObject badgeObject)
+    {
+        if (badgeObject == null || _uiPanel == null)
+            return;
+
+        SetRect(
+            badgeObject.transform as RectTransform,
+            new Vector2(0.16f, 0.72f),
+            new Vector2(0.84f, 0.815f));
+        badgeObject.transform.SetAsLastSibling();
+
+        var panelImage = _uiPanel.GetComponent<Image>();
+        var badgeImage = badgeObject.GetComponent<Image>();
+        StyleImage(
+            badgeImage,
+            new Color(0.10f, 0.055f, 0.015f, 0.97f),
+            ResolveTextureSprite(panelImage),
+            false);
+        EnsureOutline(badgeObject, new Vector2(4f, -4f), BlockyUITheme.BlackStroke);
+        EnsureShadow(badgeObject, new Vector2(0f, -4f), new Color(0f, 0f, 0f, 0.4f));
+    }
+
+    private static Sprite ResolveTextureSprite(Image source)
+    {
+        if (source != null && source.sprite != null)
+            return source.sprite;
+        return null;
+    }
+
+    private static void StyleImage(Image image, Color color, Sprite sprite, bool raycastTarget)
+    {
+        if (image == null)
+            return;
+
+        if (sprite != null)
+            image.sprite = sprite;
+        image.type = image.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.color = color;
+        image.raycastTarget = raycastTarget;
+    }
+
+    private static void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax)
+    {
+        if (rect == null)
+            return;
+
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
+    }
+
+    private static Button FindDirectChildButton(Transform root)
+    {
+        if (root == null)
+            return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var button = root.GetChild(i).GetComponent<Button>();
+            if (button != null)
+                return button;
+        }
+
+        return null;
+    }
+
+    private static void EnsureOutline(GameObject target, Vector2 distance, Color color)
+    {
+        if (target == null)
+            return;
+
+        var outline = target.GetComponent<Outline>();
+        if (outline == null)
+            outline = target.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = distance;
+        outline.useGraphicAlpha = true;
+    }
+
+    private static void EnsureShadow(GameObject target, Vector2 distance, Color color)
+    {
+        if (target == null)
+            return;
+
+        Shadow shadow = null;
+        var shadows = target.GetComponents<Shadow>();
+        for (int i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] != null && !(shadows[i] is Outline))
+            {
+                shadow = shadows[i];
+                break;
+            }
+        }
+
+        if (shadow == null)
+            shadow = target.AddComponent<Shadow>();
+        shadow.effectColor = color;
+        shadow.effectDistance = distance;
+        shadow.useGraphicAlpha = true;
     }
 
     private void RefreshIncomeBonusBadge()
