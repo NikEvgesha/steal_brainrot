@@ -1091,3 +1091,4 @@
 - Assigned it as `_BumpMap` with `_NORMALMAP` enabled on `texture.mat` and `New Material 2.mat`.
 - Replaced the ordinary color texture that four zoo materials had previously stored in `_DetailNormalMap`; their existing detail scales were preserved, including scale `2` on `Prodat_0.mat`.
 - Live Bridge 1280x720 comparison and close-up confirmed light-reactive relief on road, path and border studs without changing the new soft UI texture. Final artistic strength remains open for the user's visual review.
+- Follow-up visual review found the initial height polarity concave. Inverted all RGB height-source channels while preserving alpha and importer/material settings; the repeated blocks now shade as outward LEGO studs at the same `0.12` strength.
