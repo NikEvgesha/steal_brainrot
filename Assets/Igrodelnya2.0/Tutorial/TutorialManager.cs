@@ -1048,7 +1048,7 @@ public sealed class TutorialManager : MonoBehaviour
     private void ResolveConveyorUpgradeContext(out string message, out Transform primary, out Transform highlight)
     {
         Conveyor conveyor = FindLocalConveyor();
-        primary = highlight = conveyor != null ? conveyor.transform : null;
+        primary = highlight = null;
         double price = conveyor?.NextUpgradePriceCoins ?? 0d;
         if ((G.Currency?.Coins ?? 0d) < price)
         {
@@ -1057,8 +1057,6 @@ public sealed class TutorialManager : MonoBehaviour
                 "Save {0} coins for the next conveyor upgrade ({1}/{0}).",
                 FormatCoins(price),
                 FormatCoins(G.Currency?.Coins ?? 0d));
-            primary = FindIncomeTeachingTarget();
-            highlight = primary;
             return;
         }
 
@@ -1072,6 +1070,8 @@ public sealed class TutorialManager : MonoBehaviour
         else
         {
             message = L("UI/Tutorial/Context/ApproachConveyorUpgrade", "Go to your conveyor to open its upgrades.");
+            primary = conveyor != null ? conveyor.UpgradeInteractionTarget : null;
+            highlight = primary;
         }
     }
 

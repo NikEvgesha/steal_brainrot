@@ -787,7 +787,8 @@ public sealed class TutorialView : MonoBehaviour
         ArrowLine arrowLine = guideObject.AddComponent<ArrowLine>();
         arrowLine.textureScrollSpeed = 1.35f;
         arrowLine.arrowWidth = 1.15f;
-        arrowLine.ConfigureGroundPath(true, 0.12f, 1.1f, 0.75f);
+        arrowLine.ConfigureGroundPath(true, 0.12f, 1.1f, 0.75f, 14f, 1.5f);
+        arrowLine.SetGroundMask(LayerMask.GetMask("Default", "Ground"));
         arrowLine.SetColor(color);
 
         AutoArrowLine autoArrowLine = guideObject.AddComponent<AutoArrowLine>();

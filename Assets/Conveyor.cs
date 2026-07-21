@@ -57,6 +57,14 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         ? _levels[_lastUnlockedLevel + 1]
         : null;
     public double NextUpgradePriceCoins => NextUpgradeLevel != null ? NextUpgradeLevel.PriceCoin : 0d;
+    public Transform UpgradeInteractionTarget
+    {
+        get
+        {
+            GameObject levelsArea = ResolveLevelsArea();
+            return levelsArea != null ? levelsArea.transform : transform;
+        }
+    }
 
     private void Awake()
     {

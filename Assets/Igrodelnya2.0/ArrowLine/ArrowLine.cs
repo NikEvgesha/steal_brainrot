@@ -14,6 +14,8 @@ public class ArrowLine : MonoBehaviour
     [SerializeField, Min(0f)] private float _groundOffset = 0.12f;
     [SerializeField, Min(0f)] private float _startPadding = 1.1f;
     [SerializeField, Min(0f)] private float _endPadding = 0.75f;
+    [SerializeField, Min(0f)] private float _maxVisibleDistance = 14f;
+    [SerializeField, Min(0.25f)] private float _groundSampleSpacing = 1.5f;
     [SerializeField, Min(0.02f)] private float _pathRefreshInterval = 0.1f;
     [SerializeField] private LayerMask _groundMask = ~0;
 
@@ -89,9 +91,11 @@ public class ArrowLine : MonoBehaviour
             return;
         }
 
-        Vector3 start = _startTransform.position;
-        Vector3 end = _endTransform.position;
-        Vector3 flatDirection = end - start;
+        Vector3 rawStart = _startTransform.position;
+        Vector3 rawEnd = _endTransform.position;
+        Vector3 start = rawStart;
+        Vector3 end = rawEnd;
+        Vector3 flatDirection = rawEnd - rawStart;
         flatDirection.y = 0f;
         float flatDistance = flatDirection.magnitude;
         if (flatDistance > 0.001f)
@@ -99,25 +103,49 @@ public class ArrowLine : MonoBehaviour
             Vector3 direction = flatDirection / flatDistance;
             float availablePadding = Mathf.Max(0f, flatDistance - 0.2f);
             float startPadding = Mathf.Min(_startPadding, availablePadding * 0.55f);
-            float endPadding = Mathf.Min(_endPadding, availablePadding - startPadding);
-            start += direction * startPadding;
-            end -= direction * endPadding;
+            bool reachesTarget = _maxVisibleDistance <= 0f || flatDistance <= _maxVisibleDistance;
+            start = rawStart + direction * startPadding;
+            if (reachesTarget)
+            {
+                float endPadding = Mathf.Min(_endPadding, availablePadding - startPadding);
+                end = rawEnd - direction * endPadding;
+            }
+            else
+            {
+                end = rawStart + direction * _maxVisibleDistance;
+                end.y = Mathf.Lerp(rawStart.y, rawEnd.y, _maxVisibleDistance / flatDistance);
+            }
         }
 
-        if (_projectToGround)
+        int pointCount = 2;
+        if (_projectToGround && _groundSampleSpacing > 0f)
+            pointCount = Mathf.Max(2, Mathf.CeilToInt(Vector3.Distance(start, end) / _groundSampleSpacing) + 1);
+
+        _lineRenderer.positionCount = pointCount;
+        float pathLength = 0f;
+        Vector3 previousPoint = default;
+        float rayOriginY = Mathf.Max(rawStart.y, rawEnd.y) + 20f;
+        for (int i = 0; i < pointCount; i++)
         {
-            float rayOriginY = Mathf.Max(start.y, end.y) + 20f;
-            start = ProjectPointToGround(start, rayOriginY);
-            end = ProjectPointToGround(end, rayOriginY);
+            float t = pointCount <= 1 ? 0f : i / (float)(pointCount - 1);
+            Vector3 point = Vector3.Lerp(start, end, t);
+            if (_projectToGround)
+                point = ProjectPointToGround(point, rayOriginY);
+
+            _lineRenderer.SetPosition(i, point);
+            if (i > 0)
+                pathLength += Vector3.Distance(previousPoint, point);
+            previousPoint = point;
         }
 
-        _lineRenderer.positionCount = 2;
-        _lineRenderer.SetPosition(0, start);
-        _lineRenderer.SetPosition(1, end);
-
-        float distance = Vector3.Distance(start, end);
         if (_lineMaterial != null)
-            _lineMaterial.mainTextureScale = new Vector2(distance / Mathf.Max(0.05f, arrowWidth), 1f);
+        {
+            float safeArrowWidth = Mathf.Max(0.05f, arrowWidth);
+            float textureScaleX = _lineRenderer.textureMode == LineTextureMode.Tile
+                ? 1f / safeArrowWidth
+                : pathLength / safeArrowWidth;
+            _lineMaterial.mainTextureScale = new Vector2(textureScaleX, 1f);
+        }
     }
 
     private Vector3 ProjectPointToGround(Vector3 point, float rayOriginY)
@@ -186,12 +214,22 @@ public class ArrowLine : MonoBehaviour
         bool projectToGround,
         float groundOffset = 0.12f,
         float startPadding = 1.1f,
-        float endPadding = 0.75f)
+        float endPadding = 0.75f,
+        float maxVisibleDistance = 14f,
+        float groundSampleSpacing = 1.5f)
     {
         _projectToGround = projectToGround;
         _groundOffset = Mathf.Max(0f, groundOffset);
         _startPadding = Mathf.Max(0f, startPadding);
         _endPadding = Mathf.Max(0f, endPadding);
+        _maxVisibleDistance = Mathf.Max(0f, maxVisibleDistance);
+        _groundSampleSpacing = Mathf.Max(0.25f, groundSampleSpacing);
+        _nextPathRefresh = 0f;
+    }
+
+    public void SetGroundMask(LayerMask groundMask)
+    {
+        _groundMask = groundMask;
         _nextPathRefresh = 0f;
     }
 
