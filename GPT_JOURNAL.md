@@ -1126,3 +1126,9 @@
 - Converted the reward area into a visually explicit action state: incomplete tasks show a muted disabled button, completed tasks show a bright green button with yellow outline, and zero-reward steps center a full-width `Continue` label without leaving an icon gap.
 - Added serialized shared texture/gradient references to `TutorialView.prefab` and taught the prefab rebuild tool to restore them on future regeneration.
 - Unity compilation completed without new errors. Live Bridge at `1280×720` verified rewarded, zero-reward, completed and collapsed states; the collapsed panel reached its `626`-pixel off-screen target and retained only the expand control.
+
+### 2026-07-21 (Tutorial HUD restoration and layout alignment)
+- Traced the missing HUD to a serialized `m_Enabled: 0` on the root `GameCanvas` Canvas, left by an editor diagnostic rather than tutorial blocking logic. Restored that Canvas and the diagnostic-only prefab serialization changes while preserving the pre-existing toolbar, album and world-material worktree edits.
+- Rebalanced TutorialView into three non-overlapping horizontal zones. The dark task plate now ends above a full-width claim/continue action, all inner surfaces share the same side margins, and reward icons/text remain centered for rewarded and zero-reward steps.
+- Aligned the orange collapse control flush with the right edge and to the full 64-pixel green-header height. Updated the editable prefab and its rebuild tool so future regeneration keeps the same geometry.
+- Unity compilation and Tutorial validation passed. Live Bridge Play Mode at `1121×639` confirmed `GameCanvas(Clone)` enabled with currency, quick slots, inventory, menu, shop and album active, and visually confirmed the final tutorial alignment. Play Mode was stopped after verification.

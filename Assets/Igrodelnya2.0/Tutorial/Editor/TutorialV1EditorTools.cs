@@ -306,12 +306,12 @@ public static class TutorialV1EditorTools
 
         GameObject viewport = CreateRectObject("PanelViewport", root.transform);
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
-        SetRect(viewportRect, Vector2.one, Vector2.one, Vector2.one, new Vector2(0f, -108f), new Vector2(560f, 250f));
+        SetRect(viewportRect, Vector2.one, Vector2.one, Vector2.one, new Vector2(0f, -108f), new Vector2(610f, 290f));
         viewport.AddComponent<RectMask2D>();
 
         GameObject panel = CreateImageObject("TutorialPanel", viewport.transform, new Color(0.015f, 0.018f, 0.024f, 0.82f));
         RectTransform panelRect = panel.GetComponent<RectTransform>();
-        SetRect(panelRect, Vector2.one, Vector2.one, Vector2.one, Vector2.zero, new Vector2(560f, 250f));
+        SetRect(panelRect, Vector2.one, Vector2.one, Vector2.one, Vector2.zero, new Vector2(610f, 290f));
         BlockyUITheme.ApplyPanel(panel.GetComponent<Image>(), new Color(0.015f, 0.018f, 0.024f, 0.82f), studs: false);
         Outline panelOutline = panel.AddComponent<Outline>();
         panelOutline.effectColor = new Color(0.68f, 0.72f, 0.8f, 0.75f);
@@ -326,7 +326,7 @@ public static class TutorialV1EditorTools
         progress.text = "Обучение 1/13";
 
         TMP_Text message = CreateText("Text_Message", panel.transform, font, 27f, FontStyles.Bold, TextAlignmentOptions.TopLeft);
-        SetRect(message.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(-32f, -112f));
+        SetRect(message.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(-64f, -180f));
         message.color = Color.white;
         message.enableAutoSizing = true;
         message.fontSizeMin = 18f;
@@ -335,7 +335,7 @@ public static class TutorialV1EditorTools
         message.text = "Текущее задание";
 
         GameObject rewardBadge = CreateImageObject("RewardBadge", panel.transform, new Color(0.96f, 0.72f, 0.18f, 1f));
-        SetRect(rewardBadge.transform as RectTransform, Vector2.right, Vector2.right, Vector2.right, new Vector2(-14f, 14f), new Vector2(190f, 48f));
+        SetRect(rewardBadge.transform as RectTransform, Vector2.zero, Vector2.right, new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(-36f, 56f));
         Button rewardButton = rewardBadge.AddComponent<Button>();
         rewardButton.targetGraphic = rewardBadge.GetComponent<Image>();
         rewardButton.interactable = false;
@@ -344,14 +344,14 @@ public static class TutorialV1EditorTools
         rewardOutline.effectDistance = new Vector2(3f, -3f);
 
         GameObject rewardIcon = CreateImageObject("Reward_Icon", rewardBadge.transform, Color.white);
-        SetRect(rewardIcon.transform as RectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(36f, 36f));
+        SetRect(rewardIcon.transform as RectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-118f, 0f), new Vector2(40f, 40f));
         Image rewardIconImage = rewardIcon.GetComponent<Image>();
         rewardIconImage.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/_Sprites/ItemIcon_Gem_Pentagon_Purple.png");
         rewardIconImage.preserveAspect = true;
         rewardIconImage.raycastTarget = false;
 
         TMP_Text rewardText = CreateText("Reward_Text", rewardBadge.transform, font, 22f, FontStyles.Bold, TextAlignmentOptions.Center);
-        SetRect(rewardText.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(20f, 0f), new Vector2(-52f, -8f));
+        SetRect(rewardText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(26f, 0f), new Vector2(280f, 48f));
         rewardText.color = new Color(0.16f, 0.08f, 0.02f, 1f);
         rewardText.enableAutoSizing = true;
         rewardText.fontSizeMin = 14f;
@@ -364,7 +364,7 @@ public static class TutorialV1EditorTools
         done.gameObject.SetActive(false);
 
         Button collapse = CreateButton("Button_Collapse", root.transform, font, ">", new Color(0.22f, 0.47f, 0.78f, 1f));
-        SetRect(collapse.transform as RectTransform, Vector2.one, Vector2.one, Vector2.one, new Vector2(-14f, -116f), new Vector2(48f, 48f));
+        SetRect(collapse.transform as RectTransform, Vector2.one, Vector2.one, Vector2.one, new Vector2(0f, -108f), new Vector2(64f, 64f));
         collapse.transform.SetAsLastSibling();
 
         GameObject arrow = CreateImageObject("Icon_Arrow", root.transform, Color.white);

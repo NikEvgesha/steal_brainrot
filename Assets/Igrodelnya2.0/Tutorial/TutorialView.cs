@@ -343,8 +343,8 @@ public sealed class TutorialView : MonoBehaviour
                     Vector2.zero,
                     Vector2.one,
                     new Vector2(0.5f, 0.5f),
-                    new Vector2(0f, -4f),
-                    new Vector2(-32f, -142f));
+                    new Vector2(0f, 4f),
+                    new Vector2(-36f, -154f));
                 ConfigureSurface(messagePlate, new Color(0.055f, 0.025f, 0.012f, 0.76f));
                 EnsureOutline(messagePlate.gameObject, new Color(0.02f, 0.01f, 0.005f, 0.95f), new Vector2(3f, -3f));
                 messagePlate.transform.SetSiblingIndex(1);
@@ -374,8 +374,8 @@ public sealed class TutorialView : MonoBehaviour
                 Vector2.zero,
                 Vector2.one,
                 new Vector2(0.5f, 0.5f),
-                new Vector2(0f, -4f),
-                new Vector2(-60f, -166f));
+                new Vector2(0f, 4f),
+                new Vector2(-64f, -180f));
             BlockyUITheme.ApplyText(_messageText, Color.white, 24);
             _messageText.color = Color.white;
             _messageText.enableAutoSizing = true;
@@ -391,11 +391,11 @@ public sealed class TutorialView : MonoBehaviour
             {
                 SetRect(
                     rect,
+                    Vector2.zero,
                     Vector2.right,
-                    Vector2.right,
-                    Vector2.right,
-                    new Vector2(-18f, 18f),
-                    new Vector2(260f, 56f));
+                    new Vector2(0.5f, 0f),
+                    new Vector2(0f, 18f),
+                    new Vector2(-36f, 56f));
             }
             StyleButton(_rewardClaimButton, BlockyUITheme.GreenHeader);
         }
@@ -417,10 +417,10 @@ public sealed class TutorialView : MonoBehaviour
             RectTransform iconRect = _rewardIcon.rectTransform;
             SetRect(
                 iconRect,
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                new Vector2(14f, 0f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(-118f, 0f),
                 new Vector2(40f, 40f));
         }
 
@@ -436,8 +436,8 @@ public sealed class TutorialView : MonoBehaviour
                     Vector2.one,
                     Vector2.one,
                     Vector2.one,
-                    new Vector2(-18f, -116f),
-                    new Vector2(56f, 56f));
+                    new Vector2(0f, -108f),
+                    new Vector2(64f, 64f));
             }
             StyleButton(_collapseButton, BlockyUITheme.OrangeHeader);
         }
@@ -613,13 +613,26 @@ public sealed class TutorialView : MonoBehaviour
             return;
 
         RectTransform rect = _rewardText.rectTransform;
-        SetRect(
-            rect,
-            Vector2.zero,
-            Vector2.one,
-            new Vector2(0.5f, 0.5f),
-            hasIcon ? new Vector2(22f, 0f) : Vector2.zero,
-            hasIcon ? new Vector2(-62f, -8f) : new Vector2(-20f, -8f));
+        if (hasIcon)
+        {
+            SetRect(
+                rect,
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(26f, 0f),
+                new Vector2(280f, 48f));
+        }
+        else
+        {
+            SetRect(
+                rect,
+                Vector2.zero,
+                Vector2.one,
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(-24f, -8f));
+        }
     }
 
     private void SetRewardButtonReady(bool ready)
