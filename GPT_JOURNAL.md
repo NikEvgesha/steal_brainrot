@@ -1147,3 +1147,9 @@
 - Migrated `ArrowMaterial` from the legacy opaque Standard shader to transparent URP Unlit with the original `ArrowTexture`, no depth writing and culling disabled. This removed the black/opaque fallback and makes the floor ribbon visible from either side.
 - Clamped an invalid Editor `Screen.safeArea` fallback. During the live reproduction Unity reported a `2250x1107` safe area for a `1118x629` Game View, which placed the hand at anchor `1.07`; the corrected hand stayed at `0.94`, used `UIHandPointer`, disabled its outline and rendered above the tutorial panel.
 - Unity compiled without new C# errors. Live Bridge confirmed the active world guide uses `Universal Render Pipeline/Unlit`, `ArrowTexture`, transparent queue `3000`, cull `0`, and a visible yellow floor path; the UI case disabled the world guide and showed the animated hand. Play Mode was stopped after verification.
+
+### 2026-07-21 (BigPet feed interaction label repair)
+- Traced the reported `Купить` prompt while holding food to a broken nested-prefab reference left by the TMP migration: `FeedInteractionCanvas._actionText` referenced a different interaction instance instead of its own visible action label.
+- Added the missing stripped TMP reference for the feed prefab instance, restored the serialized `Кормить` override, kept its price field null and verified that the same panel still invokes `_Feed`.
+- `BigPetPoint.CheckPlayer` now refreshes the localized `Feed` label before showing the action, always hides a stale purchase panel for owned pets, and only permits `_Feed` while the purchased local pet is actually targeted/in range.
+- Added the RU/EN `Feed` localization key. Unity reimported the assets without compiler errors; Bridge prefab inspection returned `_Feed action=Кормить price=null` and `_TryBuy action=Купить price=$100`.

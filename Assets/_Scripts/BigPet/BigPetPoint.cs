@@ -201,14 +201,25 @@ public class BigPetPoint : MonoBehaviour
     private void CheckPlayer(InventoryItem item = null)
     {
         if (_remoteMode) return;
-        if (_feeding || !_playerInArea) return;
-        if (_feedButton != null)
-            _feedButton.SetActive(item != null && item.Type == Item.Food);
+        if (_feedButton == null) return;
+
+        bool canFeed = _purchased && !_feeding && _playerInArea && item != null && item.Type == Item.Food;
+        if (canFeed)
+        {
+            InteractionPanel feedPanel = _feedButton.GetComponent<InteractionPanel>();
+            if (feedPanel != null)
+                feedPanel.SetInfo(LocalizationUtils.T("Feed", "Кормить"));
+
+            if (_buyPanel != null)
+                _buyPanel.gameObject.SetActive(false);
+        }
+
+        _feedButton.SetActive(canFeed);
     }
 
     public void _Feed()
     {
-        if (_remoteMode) return;
+        if (_remoteMode || !_purchased || !_playerInArea) return;
         if (_feeding) return;
 
         InventoryItem currentItem = G.QuickAccess.CurrentActive;
