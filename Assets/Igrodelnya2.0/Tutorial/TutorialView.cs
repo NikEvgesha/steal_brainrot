@@ -12,6 +12,9 @@ public sealed class TutorialView : MonoBehaviour
     [SerializeField] private Sprite _panelTexture;
     [SerializeField] private Sprite _buttonGradient;
 
+    [Header("World Guidance")]
+    [SerializeField] private Material _worldArrowLineMaterial;
+
     public event Action RewardClaimPressed;
 
     private TMP_Text _messageText;
@@ -31,9 +34,9 @@ public sealed class TutorialView : MonoBehaviour
     private RectTransform _secondaryDirectionArrow;
     private Transform _worldTarget;
     private Transform _secondaryWorldTarget;
-    private Camera _camera;
-    private Sprite _worldArrowSprite;
     private Sprite _handPointerSprite;
+    private AutoArrowLine _primaryWorldGuide;
+    private AutoArrowLine _secondaryWorldGuide;
     private Coroutine _completionPulse;
     private Vector3 _panelBaseScale = Vector3.one;
     private bool _collapsed;
@@ -168,6 +171,7 @@ public sealed class TutorialView : MonoBehaviour
             if (_directionArrow != null)
             {
                 _directionArrow.SetParent(transform, false);
+                _directionArrow.SetAsLastSibling();
                 _directionArrow.anchorMin = new Vector2(0.5f, 0.5f);
                 _directionArrow.anchorMax = new Vector2(0.5f, 0.5f);
                 _directionArrow.pivot = new Vector2(0.5f, 0.5f);
@@ -175,7 +179,6 @@ public sealed class TutorialView : MonoBehaviour
                 Image arrowImage = _directionArrow.GetComponent<Image>();
                 if (arrowImage != null)
                 {
-                    _worldArrowSprite = arrowImage.sprite;
                     _handPointerSprite = Resources.Load<Sprite>("Tutorial/UIHandPointer");
                     arrowImage.color = Color.white;
                     Outline outline = _directionArrow.GetComponent<Outline>();
@@ -195,6 +198,8 @@ public sealed class TutorialView : MonoBehaviour
                     secondaryOutline.effectColor = new Color(0.05f, 0.45f, 0.9f, 1f);
             }
         }
+
+        CreateWorldArrowGuides();
 
         if (_doneButton != null)
         {
@@ -255,10 +260,9 @@ public sealed class TutorialView : MonoBehaviour
     {
         _worldTarget = primary;
         _secondaryWorldTarget = secondary;
-        if (_directionArrow != null)
-            _directionArrow.gameObject.SetActive(_worldTarget != null);
-        if (_secondaryDirectionArrow != null)
-            _secondaryDirectionArrow.gameObject.SetActive(_secondaryWorldTarget != null);
+        UpdateDirectionArrow(_directionArrow, _worldTarget);
+        UpdateDirectionArrow(_secondaryDirectionArrow, _secondaryWorldTarget);
+        RefreshWorldArrowGuides();
     }
 
     public void ShowCompleted(string label, string reward, Sprite rewardIcon)
@@ -656,7 +660,7 @@ public sealed class TutorialView : MonoBehaviour
 
     private void ApplySafeArea(bool force)
     {
-        Rect safeArea = Screen.safeArea;
+        Rect safeArea = GetEffectiveSafeArea();
         if (!force && _lastScreenWidth == Screen.width && _lastScreenHeight == Screen.height && _lastSafeArea == safeArea)
             return;
 
@@ -689,110 +693,148 @@ public sealed class TutorialView : MonoBehaviour
 
     private void UpdateDirectionArrow(RectTransform directionArrow, Transform worldTarget)
     {
-        if (directionArrow == null || worldTarget == null)
+        if (directionArrow == null || worldTarget == null ||
+            !IsScreenUiTarget(worldTarget) || _handPointerSprite == null)
         {
             if (directionArrow != null)
                 directionArrow.gameObject.SetActive(false);
             return;
         }
 
-        Vector3 viewport;
         RectTransform uiTarget = worldTarget as RectTransform;
-        Canvas targetCanvas = uiTarget != null ? uiTarget.GetComponentInParent<Canvas>() : null;
-        bool isScreenUi = uiTarget != null && targetCanvas != null && targetCanvas.renderMode != RenderMode.WorldSpace;
-        if (isScreenUi)
-        {
-            Camera eventCamera = targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay
-                ? null
-                : targetCanvas.worldCamera;
-            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(eventCamera, uiTarget.position);
-            viewport = new Vector3(
-                Screen.width > 0 ? screenPoint.x / Screen.width : 0.5f,
-                Screen.height > 0 ? screenPoint.y / Screen.height : 0.5f,
-                1f);
-        }
-        else
-        {
-            if (_camera == null)
-                _camera = Camera.main;
-            if (_camera == null)
-                return;
-            viewport = _camera.WorldToViewportPoint(worldTarget.position);
-        }
+        Canvas targetCanvas = uiTarget.GetComponentInParent<Canvas>();
+        Camera eventCamera = targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+            ? null
+            : targetCanvas.worldCamera;
+        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(eventCamera, uiTarget.position);
+        Vector3 viewport = new Vector3(
+            Screen.width > 0 ? screenPoint.x / Screen.width : 0.5f,
+            Screen.height > 0 ? screenPoint.y / Screen.height : 0.5f,
+            1f);
 
-        if (viewport.z < 0f)
-        {
-            viewport.x = 1f - viewport.x;
-            viewport.y = 1f - viewport.y;
-        }
-
-        Rect safe = Screen.safeArea;
-        float minX = Screen.width > 0 ? safe.xMin / Screen.width : 0f;
-        float maxX = Screen.width > 0 ? safe.xMax / Screen.width : 1f;
-        float minY = Screen.height > 0 ? safe.yMin / Screen.height : 0f;
-        float maxY = Screen.height > 0 ? safe.yMax / Screen.height : 1f;
-        minX = Mathf.Clamp01(minX + 0.06f);
-        maxX = Mathf.Clamp01(maxX - 0.06f);
-        minY = Mathf.Clamp01(minY + 0.09f);
-        maxY = Mathf.Clamp01(maxY - 0.09f);
-
-        Vector2 direction = new Vector2(viewport.x - 0.5f, viewport.y - 0.5f);
-        Vector2 clamped = new Vector2(
-            Mathf.Clamp(viewport.x, minX, maxX),
-            Mathf.Clamp(viewport.y, minY, maxY));
+        Rect safe = GetEffectiveSafeArea();
 
         Image pointerImage = directionArrow.GetComponent<Image>();
         Outline pointerOutline = directionArrow.GetComponent<Outline>();
-        if (isScreenUi && _handPointerSprite != null)
-        {
-            Vector2 targetPixels = new Vector2(viewport.x * Screen.width, viewport.y * Screen.height);
-            Vector2 fromCenterPixels = targetPixels - safe.center;
-            Vector2 pointingDirection = fromCenterPixels.sqrMagnitude > 1f
-                ? fromCenterPixels.normalized
-                : Vector2.up;
-            float tapPulse = Mathf.Sin(Time.unscaledTime * 6.5f) * 7f;
-            Vector2 pointerPixels = targetPixels - pointingDirection * (76f - tapPulse);
-            pointerPixels.x = Mathf.Clamp(pointerPixels.x, safe.xMin + 58f, safe.xMax - 58f);
-            pointerPixels.y = Mathf.Clamp(pointerPixels.y, safe.yMin + 58f, safe.yMax - 58f);
-            clamped = new Vector2(
-                Screen.width > 0 ? pointerPixels.x / Screen.width : 0.5f,
-                Screen.height > 0 ? pointerPixels.y / Screen.height : 0.5f);
+        Vector2 targetPixels = new Vector2(viewport.x * Screen.width, viewport.y * Screen.height);
+        Vector2 fromCenterPixels = targetPixels - safe.center;
+        Vector2 pointingDirection = fromCenterPixels.sqrMagnitude > 1f
+            ? fromCenterPixels.normalized
+            : Vector2.up;
+        float tapPulse = Mathf.Sin(Time.unscaledTime * 6.5f) * 7f;
+        Vector2 pointerPixels = targetPixels - pointingDirection * (76f - tapPulse);
+        pointerPixels.x = Mathf.Clamp(pointerPixels.x, safe.xMin + 58f, safe.xMax - 58f);
+        pointerPixels.y = Mathf.Clamp(pointerPixels.y, safe.yMin + 58f, safe.yMax - 58f);
+        Vector2 clamped = new Vector2(
+            Screen.width > 0 ? pointerPixels.x / Screen.width : 0.5f,
+            Screen.height > 0 ? pointerPixels.y / Screen.height : 0.5f);
 
-            directionArrow.sizeDelta = new Vector2(112f, 112f);
-            directionArrow.localRotation = Quaternion.Euler(
-                0f,
-                0f,
-                Mathf.Atan2(pointingDirection.y, pointingDirection.x) * Mathf.Rad2Deg - 90f);
-            if (pointerImage != null)
-            {
-                pointerImage.sprite = _handPointerSprite;
-                pointerImage.preserveAspect = true;
-                pointerImage.color = Color.white;
-            }
-            if (pointerOutline != null)
-                pointerOutline.enabled = false;
-        }
-        else
+        directionArrow.sizeDelta = new Vector2(112f, 112f);
+        directionArrow.localRotation = Quaternion.Euler(
+            0f,
+            0f,
+            Mathf.Atan2(pointingDirection.y, pointingDirection.x) * Mathf.Rad2Deg - 90f);
+        if (pointerImage != null)
         {
-            directionArrow.sizeDelta = new Vector2(88f, 80f);
-            if (pointerImage != null)
-            {
-                pointerImage.sprite = _worldArrowSprite;
-                pointerImage.preserveAspect = true;
-                pointerImage.color = directionArrow == _secondaryDirectionArrow
-                    ? new Color(0.35f, 0.9f, 1f, 1f)
-                    : Color.white;
-            }
-            if (pointerOutline != null)
-                pointerOutline.enabled = true;
-            if (direction.sqrMagnitude > 0.0001f)
-                directionArrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg + 90f);
+            pointerImage.sprite = _handPointerSprite;
+            pointerImage.preserveAspect = true;
+            pointerImage.color = Color.white;
         }
+        if (pointerOutline != null)
+            pointerOutline.enabled = false;
 
         directionArrow.anchorMin = clamped;
         directionArrow.anchorMax = clamped;
         directionArrow.anchoredPosition = Vector2.zero;
         directionArrow.gameObject.SetActive(true);
+    }
+
+    private void CreateWorldArrowGuides()
+    {
+        if (_worldArrowLineMaterial == null)
+        {
+            Debug.LogError("[Tutorial] World arrow line material is not assigned.");
+            return;
+        }
+
+        _primaryWorldGuide = CreateWorldArrowGuide(
+            "TutorialWorldGuide_Primary",
+            new Color(1f, 0.8f, 0.08f, 1f));
+        _secondaryWorldGuide = CreateWorldArrowGuide(
+            "TutorialWorldGuide_Secondary",
+            new Color(0.35f, 0.9f, 1f, 1f));
+    }
+
+    private AutoArrowLine CreateWorldArrowGuide(string objectName, Color color)
+    {
+        GameObject guideObject = new GameObject(objectName);
+        guideObject.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+
+        LineRenderer lineRenderer = guideObject.AddComponent<LineRenderer>();
+        lineRenderer.sharedMaterial = _worldArrowLineMaterial;
+        lineRenderer.useWorldSpace = true;
+        lineRenderer.widthMultiplier = 0.92f;
+        lineRenderer.positionCount = 2;
+        lineRenderer.textureMode = LineTextureMode.Tile;
+        lineRenderer.alignment = LineAlignment.TransformZ;
+        lineRenderer.numCornerVertices = 2;
+        lineRenderer.numCapVertices = 0;
+        lineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lineRenderer.receiveShadows = false;
+        lineRenderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+        lineRenderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+
+        ArrowLine arrowLine = guideObject.AddComponent<ArrowLine>();
+        arrowLine.textureScrollSpeed = 1.35f;
+        arrowLine.arrowWidth = 1.15f;
+        arrowLine.ConfigureGroundPath(true, 0.12f, 1.1f, 0.75f);
+        arrowLine.SetColor(color);
+
+        AutoArrowLine autoArrowLine = guideObject.AddComponent<AutoArrowLine>();
+        guideObject.SetActive(false);
+        return autoArrowLine;
+    }
+
+    private void RefreshWorldArrowGuides()
+    {
+        ConfigureWorldArrowGuide(_primaryWorldGuide, _worldTarget);
+        ConfigureWorldArrowGuide(_secondaryWorldGuide, _secondaryWorldTarget);
+    }
+
+    private static void ConfigureWorldArrowGuide(AutoArrowLine guide, Transform target)
+    {
+        if (guide == null)
+            return;
+
+        bool shouldShow = target != null && !IsScreenUiTarget(target);
+        if (!shouldShow)
+        {
+            guide.StopArrowLine();
+            guide.gameObject.SetActive(false);
+            return;
+        }
+
+        guide.gameObject.SetActive(true);
+        guide.SetTarget(target);
+    }
+
+    private static bool IsScreenUiTarget(Transform target)
+    {
+        RectTransform rectTransform = target as RectTransform;
+        Canvas canvas = rectTransform != null ? rectTransform.GetComponentInParent<Canvas>() : null;
+        return canvas != null && canvas.renderMode != RenderMode.WorldSpace;
+    }
+
+    private static Rect GetEffectiveSafeArea()
+    {
+        float screenWidth = Mathf.Max(1f, Screen.width);
+        float screenHeight = Mathf.Max(1f, Screen.height);
+        Rect safeArea = Screen.safeArea;
+
+        bool invalid = safeArea.width <= 0f || safeArea.height <= 0f ||
+                       safeArea.xMin < 0f || safeArea.yMin < 0f ||
+                       safeArea.xMax > screenWidth + 1f || safeArea.yMax > screenHeight + 1f;
+        return invalid ? new Rect(0f, 0f, screenWidth, screenHeight) : safeArea;
     }
 
     private IEnumerator CompletionPulse()
@@ -812,6 +854,30 @@ public sealed class TutorialView : MonoBehaviour
         }
         _panelContent.localScale = _panelBaseScale;
         _completionPulse = null;
+    }
+
+    private void OnEnable()
+    {
+        if (_primaryWorldGuide != null || _secondaryWorldGuide != null)
+            RefreshWorldArrowGuides();
+    }
+
+    private void OnDisable()
+    {
+        DisableWorldArrowGuide(_primaryWorldGuide);
+        DisableWorldArrowGuide(_secondaryWorldGuide);
+        if (_directionArrow != null)
+            _directionArrow.gameObject.SetActive(false);
+        if (_secondaryDirectionArrow != null)
+            _secondaryDirectionArrow.gameObject.SetActive(false);
+    }
+
+    private static void DisableWorldArrowGuide(AutoArrowLine guide)
+    {
+        if (guide == null)
+            return;
+        guide.StopArrowLine();
+        guide.gameObject.SetActive(false);
     }
 
     private void OnRewardClaimPressed()
@@ -847,6 +913,10 @@ public sealed class TutorialView : MonoBehaviour
             _rewardClaimButton.onClick.RemoveListener(OnRewardClaimPressed);
         if (_collapseButton != null)
             _collapseButton.onClick.RemoveListener(OnCollapsePressed);
+        if (_primaryWorldGuide != null)
+            Destroy(_primaryWorldGuide.gameObject);
+        if (_secondaryWorldGuide != null)
+            Destroy(_secondaryWorldGuide.gameObject);
     }
 
     private void SetNamedObjectActive(string objectName, bool active)

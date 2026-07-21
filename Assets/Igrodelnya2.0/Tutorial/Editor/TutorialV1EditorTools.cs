@@ -13,6 +13,7 @@ public static class TutorialV1EditorTools
     private const string HandPointerPath = "Assets/Resources/Tutorial/UIHandPointer.png";
     private const string PanelTexturePath = "Assets/_Sprites/UIWindowTexture_SoftStuds_v1.png";
     private const string ButtonGradientPath = "Assets/_Sprites/Gradient2.png";
+    private const string WorldArrowLineMaterialPath = "Assets/Igrodelnya2.0/ArrowLine/ArrowMaterial.mat";
 
     private static readonly Dictionary<string, string[]> Translations = new(StringComparer.Ordinal)
     {
@@ -302,6 +303,8 @@ public static class TutorialV1EditorTools
             AssetDatabase.LoadAssetAtPath<Sprite>(PanelTexturePath);
         viewSerialized.FindProperty("_buttonGradient").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Sprite>(ButtonGradientPath);
+        viewSerialized.FindProperty("_worldArrowLineMaterial").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Material>(WorldArrowLineMaterialPath);
         viewSerialized.ApplyModifiedPropertiesWithoutUndo();
 
         GameObject viewport = CreateRectObject("PanelViewport", root.transform);
