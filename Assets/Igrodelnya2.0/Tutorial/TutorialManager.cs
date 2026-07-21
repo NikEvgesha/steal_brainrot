@@ -904,8 +904,6 @@ public sealed class TutorialManager : MonoBehaviour
                 "Save {0} coins for the big animal ({1}/{0}). Collect coins from placed animals.",
                 FormatCoins(price),
                 FormatCoins(G.Currency?.Coins ?? 0d));
-            primary = FindIncomeTeachingTarget();
-            highlight = primary;
             return;
         }
 

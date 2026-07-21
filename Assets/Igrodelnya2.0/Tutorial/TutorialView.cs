@@ -38,7 +38,7 @@ public sealed class TutorialView : MonoBehaviour
     private AutoArrowLine _primaryWorldGuide;
     private AutoArrowLine _secondaryWorldGuide;
     private Coroutine _completionPulse;
-    private Vector3 _panelBaseScale = Vector3.one;
+    private Vector3 _rewardBadgeBaseScale = Vector3.one;
     private bool _collapsed;
     private float _expandedPanelX;
     private float _collapsedPanelX;
@@ -70,6 +70,7 @@ public sealed class TutorialView : MonoBehaviour
         _rewardBadge = FindChild("RewardBadge")?.gameObject;
         if (_rewardBadge != null)
         {
+            _rewardBadgeBaseScale = _rewardBadge.transform.localScale;
             _rewardClaimButton = _rewardBadge.GetComponent<Button>();
             if (_rewardClaimButton == null)
                 _rewardClaimButton = _rewardBadge.AddComponent<Button>();
@@ -148,7 +149,6 @@ public sealed class TutorialView : MonoBehaviour
             Vector2 panelPosition = _panelContent.anchoredPosition;
             _panelContent.anchoredPosition = new Vector2(0f, panelPosition.y);
 
-            _panelBaseScale = _panelContent.localScale;
             _expandedPanelX = _panelContent.anchoredPosition.x;
             _collapsedPanelX = _expandedPanelX + Mathf.Max(300f, _panelContent.rect.width + 16f);
             SetCollapsed(PlayerPrefs.GetInt(CollapsedPreferenceKey, 0) == 1, immediate: true);
@@ -287,9 +287,7 @@ public sealed class TutorialView : MonoBehaviour
 
         SetCollapsed(false, immediate: false);
         SetWorldTargets(null, null);
-        if (_completionPulse != null)
-            StopCoroutine(_completionPulse);
-        _completionPulse = StartCoroutine(CompletionPulse());
+        PlayCompletionPulse();
     }
 
     public void ShowClaimed(string label)
@@ -300,9 +298,7 @@ public sealed class TutorialView : MonoBehaviour
             _messageText.text = label ?? string.Empty;
         SetRewardButtonReady(false);
 
-        if (_completionPulse != null)
-            StopCoroutine(_completionPulse);
-        _completionPulse = StartCoroutine(CompletionPulse());
+        PlayCompletionPulse();
     }
 
     private void ApplyVisualStyle()
@@ -840,21 +836,38 @@ public sealed class TutorialView : MonoBehaviour
 
     private IEnumerator CompletionPulse()
     {
-        if (_panelContent == null)
+        if (_rewardBadge == null)
             yield break;
 
-        const float duration = 0.72f;
+        Transform rewardTransform = _rewardBadge.transform;
+        const float duration = 0.48f;
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
-            float pulse = Mathf.Sin(t * Mathf.PI) * (1f - t * 0.35f);
-            _panelContent.localScale = _panelBaseScale * (1f + pulse * 0.1f);
+            float eased = 1f - Mathf.Pow(1f - t, 3f);
+            rewardTransform.localScale = _rewardBadgeBaseScale * Mathf.Lerp(0.9f, 1f, eased);
             yield return null;
         }
-        _panelContent.localScale = _panelBaseScale;
+        rewardTransform.localScale = _rewardBadgeBaseScale;
         _completionPulse = null;
+    }
+
+    private void PlayCompletionPulse()
+    {
+        StopCompletionPulse();
+        if (_rewardBadge != null)
+            _completionPulse = StartCoroutine(CompletionPulse());
+    }
+
+    private void StopCompletionPulse()
+    {
+        if (_completionPulse != null)
+            StopCoroutine(_completionPulse);
+        _completionPulse = null;
+        if (_rewardBadge != null)
+            _rewardBadge.transform.localScale = _rewardBadgeBaseScale;
     }
 
     private void OnEnable()
@@ -865,6 +878,7 @@ public sealed class TutorialView : MonoBehaviour
 
     private void OnDisable()
     {
+        StopCompletionPulse();
         DisableWorldArrowGuide(_primaryWorldGuide);
         DisableWorldArrowGuide(_secondaryWorldGuide);
         if (_directionArrow != null)
@@ -908,8 +922,7 @@ public sealed class TutorialView : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_completionPulse != null)
-            StopCoroutine(_completionPulse);
+        StopCompletionPulse();
         if (_rewardClaimButton != null)
             _rewardClaimButton.onClick.RemoveListener(OnRewardClaimPressed);
         if (_collapseButton != null)
