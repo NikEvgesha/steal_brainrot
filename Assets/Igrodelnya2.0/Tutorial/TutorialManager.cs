@@ -131,7 +131,8 @@ public sealed class TutorialManager : MonoBehaviour
         _state = G.Save.LoadTutorialState() ?? TutorialSaveData.CreateNew();
         bool normalized = _state.Normalize(G.Save.GetTutorialProgress());
         CaptureKnownTutorialEntities();
-        if (normalized)
+        bool repairedGameplayFacts = RepairInvalidEggLessonProgress();
+        if (normalized || repairedGameplayFacts)
             SaveState();
 
         CreateView();
@@ -150,6 +151,13 @@ public sealed class TutorialManager : MonoBehaviour
 
     private void Update()
     {
+        if (_state != null && _state.gameplayFactsVersion < TutorialSaveData.CurrentGameplayFactsVersion)
+        {
+            CaptureKnownTutorialEntities();
+            if (RepairInvalidEggLessonProgress())
+                SaveState();
+        }
+
         if (!_schedulerReady || _state == null || _processingTransition)
             return;
 
@@ -236,11 +244,11 @@ public sealed class TutorialManager : MonoBehaviour
             case TutorialActivationTrigger.OwnedEggAvailable:
                 return ResolveLocalRoot() != null || FindLocalConveyor() != null;
             case TutorialActivationTrigger.MaturingEggAvailable:
-                return !_state.freeEggSpeedupUsed && FindLocalEggCell(EggStatus.Maturing) != null;
+                return !_state.eggSpeedupObserved && FindLocalEggCell(EggStatus.Maturing) != null;
             case TutorialActivationTrigger.ReadyEggAvailable:
-                return FindLocalEggCell(EggStatus.ReadyToHatch) != null || HasHatchedOrLaterProgress();
+                return FindLocalEggCell(EggStatus.ReadyToHatch) != null || HasVerifiedHatchedProgress();
             case TutorialActivationTrigger.AlbumRewardsReady:
-                return G.Album != null && HasHatchedOrLaterProgress();
+                return G.Album != null && HasVerifiedHatchedProgress();
             case TutorialActivationTrigger.BigPetReady:
                 return FindLocalBigPet() != null;
             case TutorialActivationTrigger.FoodLessonReady:
@@ -315,7 +323,7 @@ public sealed class TutorialManager : MonoBehaviour
         if (CurrentStep == TutorialStepId.LearnMovement)
             EvaluateMovement();
 
-        if (CurrentStep == TutorialStepId.UseFreeEggSpeedup && !_state.freeEggSpeedupUsed &&
+        if (CurrentStep == TutorialStepId.UseFreeEggSpeedup && !_state.eggSpeedupObserved &&
             FindLocalEggCell(EggStatus.Maturing) == null)
         {
             SuspendCurrentStep();
@@ -351,13 +359,13 @@ public sealed class TutorialManager : MonoBehaviour
                 return _movementDistance >= MovementDistanceRequired ||
                        (_establishedPlayerAtSessionStart && HasAnyEstablishedProgress());
             case TutorialCompletionTrigger.EggPurchased:
-                return HasOwnedEggOrLaterProgress();
+                return HasVerifiedEggAcquiredProgress();
             case TutorialCompletionTrigger.EggPlaced:
-                return HasPlacedEggOrLaterProgress();
+                return HasVerifiedEggPlacedProgress();
             case TutorialCompletionTrigger.EggSpeedupUsed:
-                return _state.freeEggSpeedupUsed;
+                return _state.eggSpeedupObserved;
             case TutorialCompletionTrigger.EggHatched:
-                return HasHatchedOrLaterProgress();
+                return HasVerifiedHatchedProgress();
             case TutorialCompletionTrigger.AlbumRewardsClaimed:
                 return AreTutorialAlbumRewardsClaimed();
             case TutorialCompletionTrigger.BigPetPurchased:
@@ -392,7 +400,9 @@ public sealed class TutorialManager : MonoBehaviour
             return;
 
         _awaitingRewardClaim = true;
-        int reward = Math.Max(0, _currentDefinition.completionRewardGems);
+        int reward = _currentTaskState.completionRewardGranted
+            ? 0
+            : Math.Max(0, _currentDefinition.completionRewardGems);
         SetTargets(null, null, null);
         _view?.ShowCompleted(
             L("UI/Tutorial/Completed", "TASK COMPLETE!"),
@@ -408,14 +418,20 @@ public sealed class TutorialManager : MonoBehaviour
             return;
 
         _processingTransition = true;
-        int reward = Math.Max(0, _currentDefinition.completionRewardGems);
+        int reward = _currentTaskState != null && _currentTaskState.completionRewardGranted
+            ? 0
+            : Math.Max(0, _currentDefinition.completionRewardGems);
+        bool rewardGrantedNow = false;
         if (!_currentTaskState.completionRewardGranted)
         {
             _currentTaskState.completionRewardGranted = true;
             _currentTaskState.rewardGranted = true;
             SaveState();
             if (reward > 0)
+            {
                 G.Currency?.AddCurrency(CurrencyType.Gems, reward);
+                rewardGrantedNow = true;
+            }
         }
 
         bool autoCompleted = _currentTaskState.objectiveAutoCompleted;
@@ -427,7 +443,7 @@ public sealed class TutorialManager : MonoBehaviour
 
         _awaitingRewardClaim = false;
         SetTargets(null, null, null);
-        _view?.ShowClaimed(reward > 0
+        _view?.ShowClaimed(rewardGrantedNow
             ? L("UI/Tutorial/RewardClaimed", "REWARD CLAIMED!")
             : L("UI/Tutorial/Completed", "TASK COMPLETE!"));
         StartCoroutine(AdvanceAfterCompletion());
@@ -487,9 +503,11 @@ public sealed class TutorialManager : MonoBehaviour
         if (_state == null)
             return;
 
-        CaptureTutorialEntity(signal);
+        bool isLocalGameplay = IsSignalFromLocalGameplay(signal);
+        if (isLocalGameplay)
+            CaptureTutorialEntity(signal);
 
-        if (!_active || _processingTransition || _currentDefinition == null || !IsSignalFromLocalGameplay(signal))
+        if (!_active || _processingTransition || _currentDefinition == null || !isLocalGameplay)
             return;
 
         bool completes = false;
@@ -530,10 +548,26 @@ public sealed class TutorialManager : MonoBehaviour
 
     public bool TryUseFreeEggSpeedup(Egg egg)
     {
-        if (_state == null || egg == null || egg.Status != EggStatus.Maturing || _state.freeEggSpeedupUsed)
+        FieldCell eggCell = egg != null ? egg.GetComponentInParent<FieldCell>() : null;
+        if (_state == null || egg == null || eggCell == null || eggCell.IsRemoteMode ||
+            egg.Status != EggStatus.Maturing || _state.freeEggSpeedupUsed || !IsWithinLocalRoot(eggCell.transform))
             return false;
 
+        TutorialTaskSaveData placeTask = _state.GetTaskState("place_first_egg");
+        TutorialTaskSaveData speedupTask = _state.GetTaskState("use_first_egg_speedup");
+        if (placeTask == null || (!placeTask.IsTerminal && !placeTask.objectiveCompleted) ||
+            speedupTask == null || speedupTask.IsTerminal)
+            return false;
+        if (!string.IsNullOrWhiteSpace(_state.tutorialEggId) &&
+            !string.Equals(_state.tutorialEggId, egg.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         _state.freeEggSpeedupUsed = true;
+        _state.eggAcquiredObserved = true;
+        _state.eggPlacedObserved = true;
+        _state.eggSpeedupObserved = true;
         SaveState();
         return true;
     }
@@ -543,7 +577,7 @@ public sealed class TutorialManager : MonoBehaviour
         animal = null;
         if (_state == null || egg == null || _state.starterAnimalGranted || G.Storage == null)
             return false;
-        if (_establishedPlayerAtSessionStart && HasHatchedOrLaterProgress())
+        if (_establishedPlayerAtSessionStart && HasVerifiedHatchedProgress())
             return false;
         if (!string.IsNullOrWhiteSpace(_state.tutorialEggId) &&
             !string.Equals(_state.tutorialEggId, egg.Name, StringComparison.OrdinalIgnoreCase))
@@ -567,6 +601,11 @@ public sealed class TutorialManager : MonoBehaviour
         bool changed = false;
         if (signal.Type == TutorialSignalType.ItemAcquired && signal.ItemType == Item.Egg && signal.Context is Egg egg)
         {
+            if (!_state.eggAcquiredObserved)
+            {
+                _state.eggAcquiredObserved = true;
+                changed = true;
+            }
             if (string.IsNullOrWhiteSpace(_state.tutorialEggId))
             {
                 _state.tutorialEggId = egg.Name;
@@ -576,6 +615,12 @@ public sealed class TutorialManager : MonoBehaviour
         }
         else if (signal.Type == TutorialSignalType.EggPlaced && signal.Context is FieldCell eggCell)
         {
+            if (!_state.eggAcquiredObserved || !_state.eggPlacedObserved)
+            {
+                _state.eggAcquiredObserved = true;
+                _state.eggPlacedObserved = true;
+                changed = true;
+            }
             Egg placed = eggCell.CurrentEgg;
             if (placed != null && string.IsNullOrWhiteSpace(_state.tutorialEggId))
             {
@@ -584,8 +629,25 @@ public sealed class TutorialManager : MonoBehaviour
                 changed = true;
             }
         }
+        else if (signal.Type == TutorialSignalType.EggSpeedupUsed)
+        {
+            _state.eggAcquiredObserved = true;
+            _state.eggPlacedObserved = true;
+            _state.eggSpeedupObserved = true;
+            changed = true;
+
+            Egg spedUpEgg = (signal.Context as FieldCell)?.CurrentEgg;
+            if (spedUpEgg != null && string.IsNullOrWhiteSpace(_state.tutorialEggId))
+            {
+                _state.tutorialEggId = spedUpEgg.Name;
+                _state.tutorialEggElement = (int)NormalizeElement(spedUpEgg.Data.DinamicData.ElementType);
+            }
+        }
         else if (signal.Type == TutorialSignalType.AnimalHatched)
         {
+            _state.eggAcquiredObserved = true;
+            _state.eggPlacedObserved = true;
+            _state.animalHatchedObserved = true;
             Brainrot animal = (signal.Context as FieldCell)?.CurrentBrainrot;
             _state.tutorialAnimalId = !string.IsNullOrWhiteSpace(signal.ItemId)
                 ? signal.ItemId
@@ -604,9 +666,16 @@ public sealed class TutorialManager : MonoBehaviour
         if (_state == null)
             return;
 
+        Egg ownedEgg = FindOwnedItem(Item.Egg) as Egg;
+        Egg placedEgg = FindLocalEggCell(null)?.CurrentEgg;
+        if (ownedEgg != null || placedEgg != null)
+            _state.eggAcquiredObserved = true;
+        if (placedEgg != null)
+            _state.eggPlacedObserved = true;
+
         if (string.IsNullOrWhiteSpace(_state.tutorialEggId))
         {
-            Egg egg = FindOwnedItem(Item.Egg) as Egg ?? FindLocalEggCell(null)?.CurrentEgg;
+            Egg egg = ownedEgg ?? placedEgg;
             if (egg != null)
             {
                 _state.tutorialEggId = egg.Name;
@@ -614,9 +683,9 @@ public sealed class TutorialManager : MonoBehaviour
             }
         }
 
-        if (string.IsNullOrWhiteSpace(_state.tutorialAnimalId))
+        if (string.IsNullOrWhiteSpace(_state.tutorialAnimalId) && _state.animalHatchedObserved)
         {
-            Brainrot animal = FindLocalAnimalCell()?.CurrentBrainrot ?? FindOwnedItem(Item.Brainrot) as Brainrot;
+            Brainrot animal = FindDiscoveredCurrentAnimal();
             if (animal != null)
             {
                 _state.tutorialAnimalId = animal.Name;
@@ -634,6 +703,9 @@ public sealed class TutorialManager : MonoBehaviour
     {
         if (G.Album == null)
             return false;
+
+        if (_state.albumRewardsClaimedObserved)
+            return true;
 
         CaptureKnownTutorialEntities();
         bool hasKnownReward = false;
@@ -655,7 +727,10 @@ public sealed class TutorialManager : MonoBehaviour
                 NormalizeElement((ElementType)_state.tutorialAnimalElement));
         }
 
-        return hasKnownReward && allClaimed;
+        bool claimed = hasKnownReward && allClaimed;
+        if (claimed)
+            _state.albumRewardsClaimedObserved = true;
+        return claimed;
     }
 
     private void RefreshContext()
@@ -1342,25 +1417,137 @@ public sealed class TutorialManager : MonoBehaviour
         return false;
     }
 
-    private bool HasOwnedEggOrLaterProgress()
+    private bool HasVerifiedEggAcquiredProgress()
     {
-        return FindOwnedItem(Item.Egg) != null || HasPlacedEggOrLaterProgress();
+        return _state != null && (_state.eggAcquiredObserved ||
+               FindOwnedItem(Item.Egg) != null || FindLocalEggCell(null) != null ||
+               HasVerifiedHatchedProgress());
     }
 
-    private bool HasPlacedEggOrLaterProgress()
+    private bool HasVerifiedEggPlacedProgress()
     {
-        return FindLocalEggCell(null) != null || HasHatchedOrLaterProgress();
+        return _state != null && (_state.eggPlacedObserved || FindLocalEggCell(null) != null ||
+               HasVerifiedHatchedProgress());
     }
 
-    private bool HasHatchedOrLaterProgress()
+    private bool HasVerifiedHatchedProgress()
     {
-        return FindLocalAnimalCell() != null || FindOwnedItem(Item.Brainrot) != null ||
-               FindLocalBigPet()?.IsPurchased == true || HasUnlockedExpansion() || FindLocalConveyor()?.HasAnyUpgrade == true;
+        return _state != null && _state.animalHatchedObserved;
+    }
+
+    private Brainrot FindDiscoveredCurrentAnimal()
+    {
+        if (G.Album == null)
+            return null;
+
+        FieldCell[] cells = GetLocalCells();
+        for (int i = 0; i < cells.Length; i++)
+        {
+            Brainrot animal = cells[i] != null && !cells[i].IsRemoteMode ? cells[i].CurrentBrainrot : null;
+            if (animal != null && G.Album.IsDiscovered(AlbumEntityType.Animal, animal.Name))
+                return animal;
+        }
+
+        Brainrot owned = FindOwnedItem(Item.Brainrot) as Brainrot;
+        return owned != null && G.Album.IsDiscovered(AlbumEntityType.Animal, owned.Name) ? owned : null;
+    }
+
+    private bool RepairInvalidEggLessonProgress()
+    {
+        if (_state == null || _state.gameplayFactsVersion >= TutorialSaveData.CurrentGameplayFactsVersion)
+            return false;
+
+        bool changed = false;
+        long now = UtcNowUnix();
+        bool hasPlaced = FindLocalEggCell(null) != null;
+        bool hasAcquired = FindOwnedItem(Item.Egg) != null || hasPlaced;
+        const bool usedSpeedup = false;
+        const bool hasHatched = false;
+
+        changed |= AssignObservedFact(ref _state.eggAcquiredObserved, hasAcquired);
+        changed |= AssignObservedFact(ref _state.eggPlacedObserved, hasPlaced);
+        changed |= AssignObservedFact(ref _state.eggSpeedupObserved, usedSpeedup);
+        changed |= AssignObservedFact(ref _state.animalHatchedObserved, hasHatched);
+
+        if (!hasAcquired)
+        {
+            changed |= _state.ReopenPreservingRewards("buy_first_egg", now);
+            changed |= _state.ReopenPreservingRewards("place_first_egg", now);
+            changed |= _state.ReopenPreservingRewards("hatch_first_egg", now);
+            changed |= _state.ReopenPreservingRewards("claim_first_album_rewards", now);
+        }
+        else if (!hasPlaced)
+        {
+            changed |= _state.ReopenPreservingRewards("place_first_egg", now);
+            changed |= _state.ReopenPreservingRewards("hatch_first_egg", now);
+            changed |= _state.ReopenPreservingRewards("claim_first_album_rewards", now);
+        }
+        else if (!hasHatched)
+        {
+            changed |= _state.ReopenPreservingRewards("hatch_first_egg", now);
+            changed |= _state.ReopenPreservingRewards("claim_first_album_rewards", now);
+        }
+
+        if (!usedSpeedup)
+        {
+            changed |= _state.ReopenPreservingRewards("use_first_egg_speedup", now);
+            if (_state.freeEggSpeedupUsed)
+            {
+                _state.freeEggSpeedupUsed = false;
+                changed = true;
+            }
+        }
+        if (!hasHatched && _state.starterAnimalGranted)
+        {
+            _state.starterAnimalGranted = false;
+            changed = true;
+        }
+
+        const bool albumRewardsClaimed = false;
+        changed |= AssignObservedFact(ref _state.albumRewardsClaimedObserved, albumRewardsClaimed);
+        if (!albumRewardsClaimed)
+            changed |= _state.ReopenPreservingRewards("claim_first_album_rewards", now);
+
+        if (!IsCurrentEgg(_state.tutorialEggId))
+        {
+            _state.tutorialEggId = string.Empty;
+            _state.tutorialEggElement = (int)ElementType.NoElement;
+            changed = true;
+        }
+        if (!string.IsNullOrWhiteSpace(_state.tutorialAnimalId))
+        {
+            _state.tutorialAnimalId = string.Empty;
+            _state.tutorialAnimalElement = (int)ElementType.NoElement;
+            changed = true;
+        }
+
+        _state.gameplayFactsVersion = TutorialSaveData.CurrentGameplayFactsVersion;
+        return true;
+    }
+
+    private bool IsCurrentEgg(string eggId)
+    {
+        if (string.IsNullOrWhiteSpace(eggId))
+            return false;
+        if (FindOwnedItem(Item.Egg, eggId) != null)
+            return true;
+        FieldCell localEgg = FindLocalEggCell(null);
+        if (localEgg?.CurrentEgg != null && string.Equals(localEgg.CurrentEgg.Name, eggId, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private static bool AssignObservedFact(ref bool destination, bool value)
+    {
+        if (destination == value)
+            return false;
+        destination = value;
+        return true;
     }
 
     private bool HasAnyEstablishedProgress()
     {
-        return HasOwnedEggOrLaterProgress() || FindLocalBigPet()?.IsPurchased == true ||
+        return HasVerifiedEggAcquiredProgress() || FindLocalBigPet()?.IsPurchased == true ||
                HasUnlockedExpansion() || FindLocalConveyor()?.HasAnyUpgrade == true;
     }
 
@@ -1496,7 +1683,9 @@ public sealed class TutorialManager : MonoBehaviour
 
         int index = TutorialStepCatalog.FindIndex(CurrentStableId, 0) + 1;
         string progress = FormatLocalized("UI/Tutorial/Progress", "Tutorial {0}/{1}", index, TutorialStepCatalog.Steps.Length);
-        int reward = Math.Max(0, _currentDefinition.completionRewardGems);
+        int reward = _currentTaskState != null && _currentTaskState.completionRewardGranted
+            ? 0
+            : Math.Max(0, _currentDefinition.completionRewardGems);
         string rewardText = reward > 0
             ? FormatLocalized("UI/Tutorial/Reward", "Reward: +{0}", reward)
             : L("UI/Tutorial/NoReward", "Training task");

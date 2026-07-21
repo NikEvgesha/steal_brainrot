@@ -32,7 +32,8 @@ public sealed class TutorialTaskSaveData
 [Serializable]
 public sealed class TutorialSaveData
 {
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 7;
+    public const int CurrentGameplayFactsVersion = 2;
 
     public int version = CurrentVersion;
 
@@ -49,6 +50,12 @@ public sealed class TutorialSaveData
     public bool starterEggGranted;
     public bool starterAnimalGranted;
     public bool freeEggSpeedupUsed;
+    public int gameplayFactsVersion;
+    public bool eggAcquiredObserved;
+    public bool eggPlacedObserved;
+    public bool eggSpeedupObserved;
+    public bool animalHatchedObserved;
+    public bool albumRewardsClaimedObserved;
     public string tutorialEggId = string.Empty;
     public int tutorialEggElement;
     public string tutorialAnimalId = string.Empty;
@@ -62,6 +69,7 @@ public sealed class TutorialSaveData
         return new TutorialSaveData
         {
             version = CurrentVersion,
+            gameplayFactsVersion = CurrentGameplayFactsVersion,
             perStepInitialized = false,
             stepId = TutorialStepCatalog.Steps[0].stableId,
             stepIndex = 0
@@ -236,6 +244,33 @@ public sealed class TutorialSaveData
         if (string.Equals(activeStepId, stableId, StringComparison.Ordinal))
             activeStepId = string.Empty;
         RefreshLegacyProjection();
+    }
+
+    public bool ReopenPreservingRewards(string stableId, long now)
+    {
+        TutorialTaskSaveData state = GetTaskState(stableId);
+        if (state == null)
+            return false;
+
+        bool changed = state.status != TutorialTaskStatus.Unseen ||
+                       state.objectiveCompleted || state.objectiveAutoCompleted ||
+                       state.progressValue != 0d || !string.IsNullOrEmpty(state.progressJson) ||
+                       state.startedUnix != 0 || state.completedUnix != 0;
+        if (!changed)
+            return false;
+
+        state.status = TutorialTaskStatus.Unseen;
+        state.progressJson = string.Empty;
+        state.progressValue = 0d;
+        state.objectiveCompleted = false;
+        state.objectiveAutoCompleted = false;
+        state.startedUnix = 0;
+        state.updatedUnix = now;
+        state.completedUnix = 0;
+        if (string.Equals(activeStepId, stableId, StringComparison.Ordinal))
+            activeStepId = string.Empty;
+        RefreshLegacyProjection();
+        return true;
     }
 
     public int CountTerminalKnownSteps()

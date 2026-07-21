@@ -1132,3 +1132,11 @@
 - Rebalanced TutorialView into three non-overlapping horizontal zones. The dark task plate now ends above a full-width claim/continue action, all inner surfaces share the same side margins, and reward icons/text remain centered for rewarded and zero-reward steps.
 - Aligned the orange collapse control flush with the right edge and to the full 64-pixel green-header height. Updated the editable prefab and its rebuild tool so future regeneration keeps the same geometry.
 - Unity compilation and Tutorial validation passed. Live Bridge Play Mode at `1121×639` confirmed `GameCanvas(Clone)` enabled with currency, quick slots, inventory, menu, shop and album active, and visually confirmed the final tutorial alignment. Play Mode was stopped after verification.
+
+### 2026-07-21 (Tutorial egg-chain false auto-completion repair)
+- Reproduced the reported skip on the existing profile: tutorial tasks for buying, placing, hatching and album rewards were terminal while inventory/local cells contained zero eggs. The previous cascade treated any local animal, unlocked expansion, purchased BigPet or conveyor upgrade as proof of the entire egg chain.
+- Replaced that cascade with durable per-mechanic facts (`eggAcquiredObserved`, `eggPlacedObserved`, `eggSpeedupObserved`, `animalHatchedObserved`, `albumRewardsClaimedObserved`) written only from local tutorial gameplay signals. Historical Album discoveries are intentionally not accepted as proof for the current tutorial run.
+- Moved entity capture behind the local-gameplay guard and constrained the free first speed-up to a non-remote local `FieldCell`, the tracked tutorial egg and an eligible place/speed-up task.
+- Added Save V7 / gameplay-facts V2 repair. Invalid terminal egg-chain tasks reopen with objective/progress timestamps cleared while `completionRewardGranted` and `rewardGranted` stay settled; recovered tasks therefore show Continue and cannot grant duplicate gems.
+- Added editor validation for reward-preserving reopen behavior. Unity compiled without errors and `TutorialV1EditorTools.ValidateSetup()` passed.
+- Live verification on the affected save changed the active task from `buy_big_pet` to `buy_first_egg`, cleared stale `egg1/Capybara` tutorial IDs and all five unsupported facts, reset the free speed-up, and kept the already settled rewards. Play Mode was stopped after the check.

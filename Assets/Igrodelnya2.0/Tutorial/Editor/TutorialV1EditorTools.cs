@@ -645,6 +645,26 @@ public static class TutorialV1EditorTools
         {
             errors.Add("Per-step state changed after persisted task order and legacy index were rearranged.");
         }
+
+        var repairedState = TutorialSaveData.CreateNew();
+        repairedState.Normalize(false);
+        TutorialTaskSaveData repairedTask = repairedState.GetTaskState("buy_first_egg");
+        repairedTask.status = TutorialTaskStatus.Completed;
+        repairedTask.objectiveCompleted = true;
+        repairedTask.objectiveAutoCompleted = true;
+        repairedTask.rewardGranted = true;
+        repairedTask.completionRewardGranted = true;
+        repairedTask.startedUnix = 700;
+        repairedTask.completedUnix = 710;
+        repairedState.activeStepId = repairedTask.stableId;
+        if (!repairedState.ReopenPreservingRewards(repairedTask.stableId, 720) ||
+            repairedTask.status != TutorialTaskStatus.Unseen || repairedTask.objectiveCompleted ||
+            repairedTask.objectiveAutoCompleted || repairedTask.startedUnix != 0 || repairedTask.completedUnix != 0 ||
+            !repairedTask.rewardGranted || !repairedTask.completionRewardGranted ||
+            !string.IsNullOrEmpty(repairedState.activeStepId))
+        {
+            errors.Add("Tutorial fact repair did not reopen a false completion while preserving settled rewards.");
+        }
     }
 
     private static void ValidateViewPrefab(List<string> errors)
