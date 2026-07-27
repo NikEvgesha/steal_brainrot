@@ -15,7 +15,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private const int BaselineBigPetLevel = 1;
     private const int BaselineBigPetXp = 0;
     private const bool BaselineBigPetPurchased = false;
-    private const bool AllowRandomFallbackBigPetProgress = false;
+    private const int ShowcaseFallbackVersion = 3;
 
     private class SlotSnapshotCache
     {
@@ -93,6 +93,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private bool[] _slotHadSnapshot;
     private SlotSnapshotCache[] _slotSnapshotCaches;
     private BaseSnapshotDto[] _slotFallbackSnapshots;
+    private int _fallbackSnapshotLocalSlotIndex = int.MinValue;
     private string _lastLocalPlayerId;
     private int _serverLocalSlotIndex = -1;
     private int _lastTeleportedSlotIndex = -2;
@@ -897,6 +898,14 @@ public class RemoteBasesApplier : MonoBehaviour
             return false;
 
         EnsureSlotState();
+        var localSlotIndex = GetLocalSlotIndex();
+        if (_fallbackSnapshotLocalSlotIndex != localSlotIndex)
+        {
+            if (_slotFallbackSnapshots != null)
+                Array.Clear(_slotFallbackSnapshots, 0, _slotFallbackSnapshots.Length);
+            _fallbackSnapshotLocalSlotIndex = localSlotIndex;
+        }
+
         if (_slotFallbackSnapshots != null &&
             slotIndex < _slotFallbackSnapshots.Length &&
             _slotFallbackSnapshots[slotIndex] != null)
@@ -917,6 +926,7 @@ public class RemoteBasesApplier : MonoBehaviour
         EnsureFieldIds(slot);
 
         var rng = new System.Random(BuildFallbackSeed(slotIndex, slot));
+        var showcaseProgress = IsShowcaseFallbackSlot(slotIndex);
         var fields = GetFields(slot)
             .Where(field => field != null)
             .OrderBy(field => field.ID)
@@ -925,17 +935,23 @@ public class RemoteBasesApplier : MonoBehaviour
         if (fields.Count == 0)
             return null;
 
-        var boughtFieldIds = PickFallbackBoughtFieldIds(fields, rng);
+        var boughtFieldIds = PickFallbackBoughtFieldIds(fields, rng, showcaseProgress);
         var availableCells = CollectFallbackCells(slot, fields, boughtFieldIds);
         var eggs = G.Storage != null ? GetNamedPrefabs(G.Storage.GetAllEggPrefabs()) : new List<Egg>();
         var pets = G.Storage != null ? GetNamedPrefabs(G.Storage.GetAllPetPrefabs()) : new List<Brainrot>();
+        if (showcaseProgress)
+            pets = pets.OrderByDescending(pet => pet.Data.StartIncome).ToList();
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var cells = new List<CellSnapshotDto>();
         if (availableCells.Count > 0 && (eggs.Count > 0 || pets.Count > 0))
         {
-            var minCells = Mathf.Clamp(Mathf.Min(randomRemoteMinCells, randomRemoteMaxCells), 0, availableCells.Count);
-            var maxCells = Mathf.Clamp(Mathf.Max(randomRemoteMinCells, randomRemoteMaxCells), minCells, availableCells.Count);
+            var minCells = showcaseProgress
+                ? Mathf.Clamp(Mathf.Max(randomRemoteMinCells, 10), 0, Mathf.Min(availableCells.Count, 18))
+                : Mathf.Clamp(Mathf.Min(randomRemoteMinCells, randomRemoteMaxCells), 0, availableCells.Count);
+            var maxCells = showcaseProgress
+                ? Mathf.Clamp(Mathf.Max(minCells, 16), minCells, Mathf.Min(availableCells.Count, 22))
+                : Mathf.Clamp(Mathf.Max(randomRemoteMinCells, randomRemoteMaxCells), minCells, availableCells.Count);
             var targetCells = maxCells > minCells ? rng.Next(minCells, maxCells + 1) : minCells;
             if (targetCells == 0)
                 targetCells = 1;
@@ -946,7 +962,8 @@ public class RemoteBasesApplier : MonoBehaviour
                 var cell = availableCells[cellIndex];
                 availableCells.RemoveAt(cellIndex);
 
-                var useEgg = eggs.Count > 0 && (pets.Count == 0 || rng.NextDouble() < randomRemoteEggChance);
+                var eggChance = showcaseProgress ? Math.Min(0.15d, randomRemoteEggChance) : randomRemoteEggChance;
+                var useEgg = eggs.Count > 0 && (pets.Count == 0 || rng.NextDouble() < eggChance);
                 if (useEgg)
                 {
                     var prefab = eggs[rng.Next(eggs.Count)];
@@ -956,19 +973,22 @@ public class RemoteBasesApplier : MonoBehaviour
                         cell = cell.Id,
                         kind = "egg",
                         id = prefab.Name,
-                        dinamic = CreateFallbackDinamic(rng, prefab.Data.Price),
+                        dinamic = CreateFallbackDinamic(rng, prefab.Data.Price, showcaseProgress),
                         hatchingTimestamp = now + rng.Next(60, hatchDelay + 1)
                     });
                 }
                 else
                 {
-                    var prefab = pets[rng.Next(pets.Count)];
+                    var petPoolCount = showcaseProgress
+                        ? Mathf.Clamp(Mathf.CeilToInt(pets.Count * 0.4f), 1, pets.Count)
+                        : pets.Count;
+                    var prefab = pets[rng.Next(petPoolCount)];
                     cells.Add(new CellSnapshotDto
                     {
                         cell = cell.Id,
                         kind = "brainrot",
                         id = prefab.Name,
-                        dinamic = CreateFallbackDinamic(rng, prefab.Data.StartIncome),
+                        dinamic = CreateFallbackDinamic(rng, prefab.Data.StartIncome, showcaseProgress),
                         incomeLastTime = now - rng.Next(60, 7200)
                     });
                 }
@@ -976,13 +996,13 @@ public class RemoteBasesApplier : MonoBehaviour
         }
 
         cells.Sort((a, b) => string.CompareOrdinal(a.cell, b.cell));
-        var bigPet = BuildFallbackBigPet(rng);
+        var bigPet = BuildFallbackBigPet(rng, showcaseProgress, pets.Count);
         var stats = BuildFallbackPlayerStats(cells, bigPet);
 
         return new BaseSnapshotDto
         {
-            updatedAt = $"fallback:{randomRemoteProgressSeed}:{slotIndex}",
-            conveyor = new ConveyorDto { lvl = GetFallbackConveyorLevel(slot, rng) },
+            updatedAt = $"fallback:{ShowcaseFallbackVersion}:{randomRemoteProgressSeed}:{slotIndex}",
+            conveyor = new ConveyorDto { lvl = GetFallbackConveyorLevel(slot, rng, showcaseProgress) },
             bigPet = bigPet,
             land = new LandDto { boughtCells = boughtFieldIds.OrderBy(id => id).ToList() },
             cells = cells,
@@ -1006,7 +1026,27 @@ public class RemoteBasesApplier : MonoBehaviour
         }
     }
 
-    private HashSet<int> PickFallbackBoughtFieldIds(List<Field> fields, System.Random rng)
+    private bool IsShowcaseFallbackSlot(int slotIndex)
+    {
+        if (slots == null || slotIndex < 0 || slotIndex >= slots.Count || IsLocalSlotIndex(slotIndex))
+            return false;
+
+        // Pick two deterministic remote neighbours regardless of which physical
+        // slot is currently owned by the local player.
+        var remoteOrdinal = 0;
+        for (var i = 0; i < slots.Count; i++)
+        {
+            if (IsLocalSlotIndex(i))
+                continue;
+            if (i == slotIndex)
+                return remoteOrdinal == 1 || remoteOrdinal == 3;
+            remoteOrdinal++;
+        }
+
+        return false;
+    }
+
+    private HashSet<int> PickFallbackBoughtFieldIds(List<Field> fields, System.Random rng, bool showcaseProgress)
     {
         var bought = new HashSet<int>();
         for (var i = 0; i < fields.Count; i++)
@@ -1016,7 +1056,9 @@ public class RemoteBasesApplier : MonoBehaviour
         }
 
         var targetFieldCount = Mathf.Clamp(
-            Mathf.CeilToInt(fields.Count * Mathf.Lerp(0.3f, 0.85f, (float)rng.NextDouble())),
+            showcaseProgress
+                ? Mathf.CeilToInt(fields.Count * Mathf.Lerp(0.88f, 1f, (float)rng.NextDouble()))
+                : Mathf.CeilToInt(fields.Count * Mathf.Lerp(0.3f, 0.85f, (float)rng.NextDouble())),
             1,
             fields.Count);
         targetFieldCount = Mathf.Max(targetFieldCount, bought.Count);
@@ -1067,23 +1109,38 @@ public class RemoteBasesApplier : MonoBehaviour
         return false;
     }
 
-    private int GetFallbackConveyorLevel(RemoteBaseSlot slot, System.Random rng)
+    private int GetFallbackConveyorLevel(RemoteBaseSlot slot, System.Random rng, bool showcaseProgress)
     {
         var maxLevel = Mathf.Max(0, randomRemoteMaxConveyorLevel);
         var conveyor = slot.root.GetComponentInChildren<Conveyor>(true);
         if (conveyor != null)
-            maxLevel = Mathf.Min(maxLevel, conveyor.MaxLevelIndex);
+            maxLevel = showcaseProgress
+                ? conveyor.MaxLevelIndex
+                : Mathf.Min(maxLevel, conveyor.MaxLevelIndex);
 
-        return maxLevel > 0 ? rng.Next(0, maxLevel + 1) : 0;
+        if (maxLevel <= 0)
+            return 0;
+
+        var minLevel = showcaseProgress ? Mathf.Max(0, maxLevel - 1) : 0;
+        return rng.Next(minLevel, maxLevel + 1);
     }
 
-    private BigPetDto BuildFallbackBigPet(System.Random rng)
+    private BigPetDto BuildFallbackBigPet(System.Random rng, bool showcaseProgress, int basePetCount)
     {
-        var purchased = AllowRandomFallbackBigPetProgress &&
-                        randomRemoteBigPetProgress &&
-                        rng.NextDouble() < 0.65d;
-        var lvl = purchased ? rng.Next(1, Mathf.Max(1, randomRemoteMaxBigPetLevel) + 1) : BaselineBigPetLevel;
-        var petId = purchased ? rng.Next(0, Mathf.Max(1, lvl)) : BaselineBigPetId;
+        var purchased = showcaseProgress ||
+                        (randomRemoteBigPetProgress && rng.NextDouble() < 0.65d);
+        var firstElementalLevel = Mathf.Max(1, basePetCount) * 5 + 1;
+        var maxLevel = showcaseProgress
+            ? Mathf.Max(randomRemoteMaxBigPetLevel, firstElementalLevel + 55)
+            : Mathf.Max(1, randomRemoteMaxBigPetLevel);
+        var minLevel = showcaseProgress
+            ? Mathf.Min(maxLevel, firstElementalLevel + 4)
+            : 1;
+        var lvl = purchased ? rng.Next(minLevel, maxLevel + 1) : BaselineBigPetLevel;
+        var maxVariantId = Mathf.Max(0, (lvl - 1) / 5);
+        var petId = purchased
+            ? showcaseProgress ? Mathf.Max(0, maxVariantId - rng.Next(0, 3)) : rng.Next(0, maxVariantId + 1)
+            : BaselineBigPetId;
         var income = purchased ? Mathf.Max(1, lvl) * 25f : 0f;
 
         return new BigPetDto
@@ -1127,10 +1184,12 @@ public class RemoteBasesApplier : MonoBehaviour
         };
     }
 
-    private BrainrotDinamicData CreateFallbackDinamic(System.Random rng, double baseIncome)
+    private BrainrotDinamicData CreateFallbackDinamic(System.Random rng, double baseIncome, bool showcaseProgress)
     {
-        var element = PickFallbackElement(rng);
-        var weight = Mathf.Round((1f + (float)rng.NextDouble() * 4f) * 10f) / 10f;
+        var element = PickFallbackElement(rng, showcaseProgress);
+        var minWeight = showcaseProgress ? 3.4f : 1f;
+        var weightRange = showcaseProgress ? 2.1f : 4f;
+        var weight = Mathf.Round((minWeight + (float)rng.NextDouble() * weightRange) * 10f) / 10f;
         var multiplier = G.Elements != null ? G.Elements.GetMultiplaer(element) : 1f;
 
         return new BrainrotDinamicData
@@ -1141,9 +1200,9 @@ public class RemoteBasesApplier : MonoBehaviour
         };
     }
 
-    private static ElementType PickFallbackElement(System.Random rng)
+    private static ElementType PickFallbackElement(System.Random rng, bool showcaseProgress)
     {
-        if (rng.NextDouble() < 0.45d)
+        if (rng.NextDouble() < (showcaseProgress ? 0.08d : 0.45d))
             return ElementType.NoElement;
 
         var elements = new[]

@@ -22,6 +22,14 @@ public class BigPetPoint : MonoBehaviour
         "TungTungSahur",
         "GlorboFruttodrillo",
     };
+    private static readonly ElementType[] ProgressionElements =
+    {
+        ElementType.NoElement,
+        ElementType.Gold,
+        ElementType.Diamond,
+        ElementType.Electric,
+        ElementType.Fire
+    };
 
     [SerializeField] private bool _remoteMode;
     [SerializeField] private double _unlockPrice;
@@ -107,7 +115,7 @@ public class BigPetPoint : MonoBehaviour
         if (_remoteMode) return;
         _initializedLocal = true;
 
-        _setPetUI = GetComponentInChildren<BigPetSetUI>();
+        _setPetUI = GetComponentInChildren<BigPetSetUI>(true);
         if (_setPetUI == null)
         {
             Debug.LogWarning("[BigPetPoint] BigPetSetUI not found.");
@@ -306,7 +314,7 @@ public class BigPetPoint : MonoBehaviour
             if (newMaxAvailablePetIdx != _maxAvailablePetIdx)
             {
                 _maxAvailablePetIdx = newMaxAvailablePetIdx;
-                _currentIncome = _activePets[_maxAvailablePetIdx].Data.StartIncome;
+                _currentIncome = GetVariantIncome(_maxAvailablePetIdx);
                 if (_setPetUI != null)
                     _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
                 if (_petInfoUI != null)
@@ -347,7 +355,9 @@ public class BigPetPoint : MonoBehaviour
         if (_activePets == null || _activePets.Count == 0)
             return;
 
-        idx = Mathf.Clamp(idx, 0, _activePets.Count - 1);
+        idx = Mathf.Clamp(idx, 0, GetBigPetVariantCount() - 1);
+        int basePetIndex = GetBasePetIndex(idx);
+        ElementType element = GetVariantElement(idx);
 
         if (_currentPet != null)
             Destroy(_currentPet.gameObject);
@@ -360,14 +370,74 @@ public class BigPetPoint : MonoBehaviour
 
         if (_petPoint != null)
         {
-            _currentPet = Instantiate(_activePets[idx].Model, _petPoint, false);
+            _currentPet = Instantiate(_activePets[basePetIndex].Model, _petPoint, false);
             _currentPet.transform.localPosition = Vector3.zero;
+            ApplyBigPetElementVisual(_currentPet, element);
         }
 
         if (_setPetUI != null)
-            _setPetUI.ChangeActivePet(_activePets[idx]);
+            _setPetUI.ChangeActivePet(idx);
 
         CheckScale();
+    }
+
+    private void ApplyBigPetElementVisual(GameObject petModel, ElementType element)
+    {
+        if (petModel == null)
+            return;
+
+        Color tint = GetElementTint(element);
+        if (element != ElementType.NoElement && element != ElementType.ElementType)
+        {
+            Renderer[] renderers = petModel.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null)
+                    continue;
+
+                Material[] materials = renderer.materials;
+                for (int j = 0; j < materials.Length; j++)
+                {
+                    Material material = materials[j];
+                    if (material == null)
+                        continue;
+
+                    if (material.HasProperty("_BaseColor"))
+                    {
+                        Color baseColor = material.GetColor("_BaseColor");
+                        material.SetColor("_BaseColor", Color.Lerp(baseColor, tint, 0.72f));
+                    }
+                    else if (material.HasProperty("_Color"))
+                    {
+                        material.color = Color.Lerp(material.color, tint, 0.72f);
+                    }
+                }
+            }
+        }
+
+        ElementTypeVfx.Ensure(
+            this,
+            petModel.transform,
+            element,
+            sizeMultiplier: 1.45f,
+            emissionMultiplier: 1.35f,
+            rayAlphaMultiplier: 0.8f,
+            particleRadiusMultiplier: 1.15f,
+            raySpinSpeed: 25f,
+            groundAlphaMultiplier: 0.75f);
+    }
+
+    private static Color GetElementTint(ElementType element)
+    {
+        return element switch
+        {
+            ElementType.Gold => new Color(1f, 0.82f, 0.08f),
+            ElementType.Diamond => new Color(0.22f, 0.88f, 1f),
+            ElementType.Electric => new Color(0.78f, 0.28f, 1f),
+            ElementType.Fire => new Color(1f, 0.22f, 0.08f),
+            _ => Color.white
+        };
     }
 
     private void AlignCurrentPetToGround()
@@ -404,13 +474,11 @@ public class BigPetPoint : MonoBehaviour
             _currentPet.transform.position += Vector3.up * deltaY;
     }
 
-    private void ChangeActivePet(Brainrot pet)
+    private void ChangeActivePet(int variantIndex)
     {
         if (_remoteMode) return;
-        int idx = _activePets.IndexOf(pet);
-        if (idx < 0) return;
-        if (idx > _maxAvailablePetIdx) return;
-        SetPet(idx);
+        if (variantIndex < 0 || variantIndex > _maxAvailablePetIdx) return;
+        SetPet(variantIndex);
     }
 
     private void GetIncome()
@@ -528,7 +596,7 @@ public class BigPetPoint : MonoBehaviour
         _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
 
         _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
-        _maxLvl = _activePets.Count * Mathf.Max(1, _lvlsPerPet);
+        _maxLvl = GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet);
 
         if (_setPetUI != null)
             _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
@@ -536,7 +604,7 @@ public class BigPetPoint : MonoBehaviour
         petId = Mathf.Clamp(petId, 0, _maxAvailablePetIdx);
         SetPet(petId);
 
-        _currentIncome = _activePets[_maxAvailablePetIdx].Data.StartIncome;
+        _currentIncome = GetVariantIncome(_maxAvailablePetIdx);
         if (_petInfoUI != null)
         {
             _petInfoUI.SetInfo(_currentIncome);
@@ -651,23 +719,67 @@ public class BigPetPoint : MonoBehaviour
 
         InteractionRaycastListener listener = _changePetArea.GetComponent<InteractionRaycastListener>();
         if (listener != null)
-            listener.MaxDistance = Mathf.Max(listener.MaxDistance, _changePetInteractionDistance);
+            listener.MaxDistance = Mathf.Max(0.5f, _changePetInteractionDistance);
 
         BoxCollider interactionCollider = _changePetArea.GetComponent<BoxCollider>();
         if (interactionCollider != null)
         {
             interactionCollider.isTrigger = true;
-            Vector3 size = interactionCollider.size;
-            interactionCollider.size = new Vector3(
-                Mathf.Max(4.5f, size.x),
-                Mathf.Max(2f, size.y),
-                Mathf.Max(4.5f, size.z));
-            Vector3 center = interactionCollider.center;
-            interactionCollider.center = new Vector3(center.x, Mathf.Max(0.9f, center.y), center.z);
+            FitChangePetColliderToPad(interactionCollider);
         }
 
         if (_setPetUI != null)
             _setPetUI.ConfigureWorldInteraction(interactionCollider, _changePetInteractionDistance);
+    }
+
+    private static void FitChangePetColliderToPad(BoxCollider interactionCollider)
+    {
+        if (interactionCollider == null)
+            return;
+
+        Transform area = interactionCollider.transform;
+        Renderer[] renderers = area.GetComponentsInChildren<Renderer>(true);
+        bool hasBounds = false;
+        Bounds localBounds = default;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            Bounds worldBounds = renderer.bounds;
+            Vector3 min = worldBounds.min;
+            Vector3 max = worldBounds.max;
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 worldPoint = new Vector3(
+                    (corner & 1) == 0 ? min.x : max.x,
+                    (corner & 2) == 0 ? min.y : max.y,
+                    (corner & 4) == 0 ? min.z : max.z);
+                Vector3 localPoint = area.InverseTransformPoint(worldPoint);
+                if (!hasBounds)
+                {
+                    localBounds = new Bounds(localPoint, Vector3.zero);
+                    hasBounds = true;
+                }
+                else
+                {
+                    localBounds.Encapsulate(localPoint);
+                }
+            }
+        }
+
+        if (!hasBounds)
+            return;
+
+        const float horizontalPadding = 0.08f;
+        const float verticalPadding = 0.12f;
+        interactionCollider.center = localBounds.center;
+        interactionCollider.size = new Vector3(
+            Mathf.Max(0.5f, localBounds.size.x + horizontalPadding),
+            Mathf.Max(0.25f, localBounds.size.y + verticalPadding),
+            Mathf.Max(0.5f, localBounds.size.z + horizontalPadding));
     }
 
     private bool ResolvePurchaseState()
@@ -699,7 +811,7 @@ public class BigPetPoint : MonoBehaviour
         _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
         _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
         _currentPetIdx = Mathf.Clamp(G.Save.LoadBigPetId(), 0, _maxAvailablePetIdx);
-        _maxLvl = _activePets.Count * Mathf.Max(1, _lvlsPerPet);
+        _maxLvl = GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet);
 
         if (_setPetUI != null)
         {
@@ -719,7 +831,7 @@ public class BigPetPoint : MonoBehaviour
         SetPet(_currentPetIdx);
         CheckLvl();
 
-        _currentIncome = _activePets[_maxAvailablePetIdx].Data.StartIncome;
+        _currentIncome = GetVariantIncome(_maxAvailablePetIdx);
         if (_petInfoUI != null)
         {
             _petInfoUI.SetInfo(_currentIncome);
@@ -838,7 +950,46 @@ public class BigPetPoint : MonoBehaviour
 
         var levelsPerPet = Mathf.Max(1, _lvlsPerPet);
         var safeLevel = Mathf.Max(1, level);
-        return Mathf.Clamp((safeLevel - 1) / levelsPerPet, 0, _activePets.Count - 1);
+        return Mathf.Clamp((safeLevel - 1) / levelsPerPet, 0, GetBigPetVariantCount() - 1);
+    }
+
+    private int GetBigPetVariantCount()
+    {
+        return Mathf.Max(1, _activePets.Count * ProgressionElements.Length);
+    }
+
+    private int GetBasePetIndex(int variantIndex)
+    {
+        if (_activePets == null || _activePets.Count == 0)
+            return 0;
+
+        return Mathf.Clamp(variantIndex, 0, GetBigPetVariantCount() - 1) % _activePets.Count;
+    }
+
+    private ElementType GetVariantElement(int variantIndex)
+    {
+        if (_activePets == null || _activePets.Count == 0)
+            return ElementType.NoElement;
+
+        int elementIndex = Mathf.Clamp(
+            variantIndex / _activePets.Count,
+            0,
+            ProgressionElements.Length - 1);
+        return ProgressionElements[elementIndex];
+    }
+
+    private double GetVariantIncome(int variantIndex)
+    {
+        if (_activePets == null || _activePets.Count == 0)
+            return 0d;
+
+        Brainrot pet = _activePets[GetBasePetIndex(variantIndex)];
+        if (pet == null)
+            return 0d;
+
+        ElementType element = GetVariantElement(variantIndex);
+        float multiplier = G.Elements != null ? G.Elements.GetMultiplaer(element) : 1f;
+        return Math.Max(0d, pet.Data.StartIncome * multiplier);
     }
 
     private static bool TryParseIncomeTimestamp(string raw, out long timestamp)

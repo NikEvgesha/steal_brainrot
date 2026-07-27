@@ -41,6 +41,7 @@ public sealed class TutorialManager : MonoBehaviour
     private bool _awaitingRewardClaim;
     private bool _establishedPlayerAtSessionStart;
     private bool _sessionEventLogged;
+    private bool _conveyorUpgradeUiWasOpen;
     private Coroutine _startRoutine;
 
 #if UNITY_EDITOR
@@ -1050,6 +1051,7 @@ public sealed class TutorialManager : MonoBehaviour
         double price = conveyor?.NextUpgradePriceCoins ?? 0d;
         if ((G.Currency?.Coins ?? 0d) < price)
         {
+            _conveyorUpgradeUiWasOpen = false;
             message = FormatLocalized(
                 "UI/Tutorial/Context/SaveConveyor",
                 "Save {0} coins for the next conveyor upgrade ({1}/{0}).",
@@ -1060,13 +1062,16 @@ public sealed class TutorialManager : MonoBehaviour
 
         if (conveyor?.Ui != null && conveyor.Ui.IsOpen)
         {
-            conveyor.Ui.ShowLevel(conveyor.NextUpgradeLevel);
+            if (!_conveyorUpgradeUiWasOpen)
+                conveyor.Ui.ShowLevel(conveyor.NextUpgradeLevel);
+            _conveyorUpgradeUiWasOpen = true;
             message = FormatLocalized("UI/Tutorial/Context/BuyConveyorAction", "Buy this conveyor upgrade for {0} coins.", FormatCoins(price));
             primary = conveyor.Ui.CoinBuyTarget;
             highlight = conveyor.transform;
         }
         else
         {
+            _conveyorUpgradeUiWasOpen = false;
             message = L("UI/Tutorial/Context/ApproachConveyorUpgrade", "Go to your conveyor to open its upgrades.");
             primary = conveyor != null ? conveyor.UpgradeInteractionTarget : null;
             highlight = primary;

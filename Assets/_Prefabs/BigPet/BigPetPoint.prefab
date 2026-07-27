@@ -1816,7 +1816,7 @@ MonoBehaviour:
   _audio: {fileID: 2864573618113148850}
   _buyPanel: {fileID: 3307459438238229988}
   _changePetArea: {fileID: 0}
-  _changePetInteractionDistance: 5
+  _changePetInteractionDistance: 3.25
   PlayerEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -2679,8 +2679,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 4.5, y: 2, z: 4.5}
-  m_Center: {x: 0, y: 0.9, z: 0}
+  m_Size: {x: 3.12, y: 0.86, z: 3.12}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &8317297664833403691
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2723,7 +2723,7 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  MaxDistance: 5
+  MaxDistance: 3.25
 --- !u!1 &6425528216913230085
 GameObject:
   m_ObjectHideFlags: 0
@@ -3777,8 +3777,15 @@ MonoBehaviour:
   _slotPrefab: {fileID: 2481257662351031075, guid: 4fc6b4c018f7cd645b1d612232c8a33f, type: 3}
   _slotParent: {fileID: 42968414612379064}
   _remoteMode: 0
-  _closeDistanceBuffer: 1.5
+  _closeDistanceBuffer: 0.4
   _distanceCheckInterval: 0.1
+  _normalElementIcon: {fileID: 21300000, guid: 336b6dd2690f7354d84735be10c69529, type: 3}
+  _goldElementIcon: {fileID: 21300000, guid: b054c6226d718074b9495d0cc01093cc, type: 3}
+  _diamondElementIcon: {fileID: 21300000, guid: 97c5e3abeb66d5542bb55b76c152fdb0, type: 3}
+  _electricElementIcon: {fileID: 21300000, guid: e3d6994121597fd44835c671df0ec8a9, type: 3}
+  _fireElementIcon: {fileID: 21300000, guid: 35f65cd888b208e4ab2fc576496fa046, type: 3}
+  _lockIcon: {fileID: 21300000, guid: 729e7cb4d9e57ad47a6c57af83a5315b, type: 3}
+  _buttonGradientSprite: {fileID: 21300000, guid: b0ca618c1cb5fc044b595b7b3abcad55, type: 3}
   PetSlotClicked:
     m_PersistentCalls:
       m_Calls: []

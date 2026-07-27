@@ -14,18 +14,30 @@ public class BigPetSetSlot : MonoBehaviour
     private Brainrot _pet;
     private bool _active;
     private Button _button;
+    private int _variantIndex;
+    private ElementType _element;
 
-    public void Init(BigPetSetUI ui, Brainrot pet)
+    public int VariantIndex => _variantIndex;
+    public ElementType Element => _element;
+
+    public void Init(BigPetSetUI ui, Brainrot pet, int variantIndex, ElementType element)
     {
         _ui = ui;
         _pet = pet;
+        _variantIndex = Mathf.Max(0, variantIndex);
+        _element = element;
         EnsureClickTarget();
         ConfigureVisuals();
 
         if (_ui != null)
             _ui.ActiveChanged.AddListener(CheckActiveSlot);
         if (_icon != null)
+        {
             _icon.sprite = pet != null ? pet.Icon : null;
+            _icon.color = element == ElementType.NoElement
+                ? Color.white
+                : Color.Lerp(Color.white, BigPetSetUI.GetElementButtonColor(element), 0.42f);
+        }
         if (_background == null)
             Debug.LogWarning("[BigPetSetSlot] Background is not assigned.", this);
 
@@ -35,7 +47,7 @@ public class BigPetSetSlot : MonoBehaviour
     public void OnClick()
     {
         if (_active || _ui == null || _pet == null) return;
-        _ui.OnPetClicked(_pet);
+        _ui.OnPetClicked(_variantIndex);
     }
 
     private void OnDestroy()
@@ -46,9 +58,9 @@ public class BigPetSetSlot : MonoBehaviour
             _ui.ActiveChanged.RemoveListener(CheckActiveSlot);
     }
 
-    private void CheckActiveSlot(Brainrot activePet)
+    private void CheckActiveSlot(int activeVariantIndex)
     {
-        _active = activePet != null && activePet == _pet;
+        _active = activeVariantIndex == _variantIndex;
         if (_activeIndicator != null)
             _activeIndicator.SetActive(_active);
         if (_selectedBadge != null)
@@ -68,9 +80,12 @@ public class BigPetSetSlot : MonoBehaviour
     {
         if (_background != null)
         {
-            _background.color = _pet != null
+            Color rarityColor = _pet != null
                 ? BlockyUITheme.GetRareColor(_pet.RareType)
                 : BlockyUITheme.BrownBody;
+            _background.color = _element == ElementType.NoElement
+                ? rarityColor
+                : Color.Lerp(rarityColor, BigPetSetUI.GetElementButtonColor(_element), 0.32f);
             _background.type = _background.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
             _background.pixelsPerUnitMultiplier = 1f;
         }
