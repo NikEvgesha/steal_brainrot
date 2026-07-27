@@ -106,6 +106,7 @@ public class ConveyorUI : MonoBehaviour
 
     public void ToggleOpen(bool open)
     {
+        bool changed = _isOpen != open;
         _isOpen = open;
         EnsurePanel();
         if (_panel == null) return;
@@ -113,6 +114,8 @@ public class ConveyorUI : MonoBehaviour
         _chancesPanel?.Close();
         if (open)
             RefreshCurrentDropChances();
+        if (changed)
+            G.Sound?.Play(open ? GameAudioId.SFX_UI_OPEN : GameAudioId.SFX_UI_CLOSE);
     }
 
     private void EnsurePanel()
@@ -129,7 +132,10 @@ public class ConveyorUI : MonoBehaviour
             return;
         if (_currentLevelInfo == level) return;
 
+        bool switchingExistingLevel = _currentLevelInfo != null;
         _currentLevelInfo = level;
+        if (switchingExistingLevel)
+            G.Sound?.Play(GameAudioId.SFX_UI_TAB);
         if (_levelName != null)
             _levelName.text = ConveyorLevelTab.GetLocalizedName(level);
         if (_icon != null)
@@ -214,6 +220,7 @@ public class ConveyorUI : MonoBehaviour
 
         if (_currentLevelInfo.IsPurchased)
         {
+            G.Sound?.PlayAt(GameAudioId.SFX_CONVEYOR_UPGRADE, _conveyor != null ? _conveyor.transform.position : transform.position);
             SetButtons();
         }
     }
@@ -227,6 +234,7 @@ public class ConveyorUI : MonoBehaviour
 
         if (_currentLevelInfo.IsPurchased)
         {
+            G.Sound?.PlayAt(GameAudioId.SFX_CONVEYOR_UPGRADE, _conveyor != null ? _conveyor.transform.position : transform.position);
             SetButtons();
         }
     }
@@ -237,6 +245,7 @@ public class ConveyorUI : MonoBehaviour
             return;
 
         LevelActivated?.Invoke(_currentLevelInfo);
+        G.Sound?.PlayAt(GameAudioId.SFX_CONVEYOR_ACTIVATE, _conveyor != null ? _conveyor.transform.position : transform.position);
         SetButtons();
     }
 

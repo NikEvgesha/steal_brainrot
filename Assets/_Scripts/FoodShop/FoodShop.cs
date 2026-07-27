@@ -19,6 +19,7 @@ public class FoodShop : MonoBehaviour
     private Dictionary<Food, int> _foodAmount;
     private int _timeToResupply;
     private bool _playerInside;
+    private AudioSource _shopAmbience;
 
 
     public Transform TeleportPoint => _teleportPoint;
@@ -78,18 +79,29 @@ public class FoodShop : MonoBehaviour
         _ui.UpdateUI(_foodAmount);
         StopAllCoroutines();
         StartCoroutine(ResupplyTimer());
+        if (_playerInside)
+            G.Sound?.Play(GameAudioId.SFX_SHOP_RESTOCK);
     }
 
 
     private void Open()
     {
         _ui.gameObject.SetActive(true);
+        G.Sound?.Play(GameAudioId.SFX_UI_OPEN);
+        if (_shopAmbience == null)
+            _shopAmbience = G.Sound?.PlayLoop(GameAudioId.AMB_FOOD_SHOP, transform);
     }
 
 
     private void Close()
     {
         _ui.gameObject.SetActive(false);
+        G.Sound?.Play(GameAudioId.SFX_UI_CLOSE);
+        if (_shopAmbience != null)
+        {
+            G.Sound?.StopLoop(_shopAmbience);
+            _shopAmbience = null;
+        }
     }
 
 
@@ -110,7 +122,11 @@ public class FoodShop : MonoBehaviour
 
     private void TryBuy(Food food, bool forGems)
     {
-        if (!_foodAmount.ContainsKey(food) || _foodAmount[food] == 0) return;
+        if (!_foodAmount.ContainsKey(food) || _foodAmount[food] == 0)
+        {
+            G.Sound?.Play(GameAudioId.SFX_UI_LOCKED);
+            return;
+        }
 
         if (G.Currency.RemoveCurrency(forGems ? CurrencyType.Gems : CurrencyType.Coins, forGems ? food.Data.GemPrice : food.Data.MoneyPrice))
         {

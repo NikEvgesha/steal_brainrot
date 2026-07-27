@@ -46,6 +46,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private Image _rewardedAdBadgeImage;
     private TMP_Text _rewardedAdBadgeLabelText;
     private Transform _rewardedAdBadgeParent;
+    private AudioSource _interactionLoopSource;
 
     public bool IsInteracting => _interactionInProgress;
 
@@ -98,6 +99,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             _interactionHold = true;
             _interactionInProgress = true;
             _hasResumeProgress = false;
+            _interactionLoopSource = G.Sound?.PlayLoop(GameAudioId.SFX_INTERACT_LOOP);
             StartCoroutine(InteractionProcess());
             return;
         }
@@ -108,6 +110,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void OnDisable()
     {
+        bool wasInterrupted = _interactionInProgress && _progress > 0f && _progress < _nearCompleteThreshold;
         var canResumeAfterDisable =
             _interactionInProgress &&
             _progress > 0f &&
@@ -129,6 +132,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         _interactionHold = false;
         _pointerHold = false;
         StopAllCoroutines();
+        StopInteractionAudio(wasInterrupted && !canResumeAfterDisable);
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -173,6 +177,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         _awaitReleaseAfterComplete = false;
         _interactionInProgress = true;
         _progress = 0;
+        G.Sound?.Play(GameAudioId.SFX_INTERACT_START);
+        _interactionLoopSource = G.Sound?.PlayLoop(GameAudioId.SFX_INTERACT_LOOP);
         InteractionStarted?.Invoke();
         StartCoroutine(InteractionProcess());
     }
@@ -236,7 +242,9 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             NotifyInteractionCompleted();
         }
 
+        bool cancelled = !completed && _progress > 0f && _progress < 1f;
         ResetProgress();
+        StopInteractionAudio(cancelled);
     }
     private void ResetProgress()
     {
@@ -249,7 +257,21 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private void NotifyInteractionCompleted()
     {
         _awaitReleaseAfterComplete = true;
+        StopInteractionAudio(false);
+        G.Sound?.Play(GameAudioId.SFX_INTERACT_COMPLETE);
         InteractionComplete?.Invoke();
+    }
+
+    private void StopInteractionAudio(bool playCancel)
+    {
+        if (_interactionLoopSource != null)
+        {
+            G.Sound?.StopLoop(_interactionLoopSource);
+            _interactionLoopSource = null;
+        }
+
+        if (playCancel)
+            G.Sound?.Play(GameAudioId.SFX_INTERACT_CANCEL);
     }
 
     public void SetInfo(string actionText, string price = null)

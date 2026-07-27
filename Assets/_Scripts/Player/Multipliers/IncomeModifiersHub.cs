@@ -120,7 +120,7 @@ public sealed class IncomeModifiersHub : MonoBehaviour
         TryAddCoins(baseIncome);
     }
 
-    public bool TryAddCoins(double baseIncome)
+    public bool TryAddCoins(double baseIncome, bool playAudio = true)
     {
         var currencyManager = ResolveCurrencyManager();
         if (currencyManager == null)
@@ -130,7 +130,7 @@ public sealed class IncomeModifiersHub : MonoBehaviour
         }
 
         double final = Apply(baseIncome);
-        currencyManager.AddCurrency(CurrencyType.Coins, final);
+        currencyManager.AddCurrency(CurrencyType.Coins, final, playAudio);
         return true;
     }
 

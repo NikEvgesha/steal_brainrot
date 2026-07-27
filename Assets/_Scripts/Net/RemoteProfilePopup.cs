@@ -832,7 +832,9 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         _likedToday = response.likedToday || !response.canLike || response.ok;
         UpdateLikeUi();
 
-        if (!response.ok)
+        if (response.ok)
+            G.Sound?.Play(GameAudioId.SFX_LIKE);
+        else
             ShowNotice(BuildAlreadyLikedText(response.nextLikeAtUtc), ExtraLikeNoticeSeconds);
     }
 

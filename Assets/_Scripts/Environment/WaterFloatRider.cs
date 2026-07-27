@@ -40,12 +40,19 @@ public sealed class WaterFloatRider : MonoBehaviour
     private float _nextWallJumpTime;
     private float _nextWaterJumpTime;
     private float _suspendFloatUntil;
+    private float _nextMoveSoundAt;
+    private AudioSource _waterLoop;
 
     private void Awake()
     {
         _controller = GetComponent<CharacterController>();
         _playerController = GetComponent<TPPlayerController>();
         _playerManager = GetComponent<PlayerManager>();
+    }
+
+    private void OnDisable()
+    {
+        ResetWaterState();
     }
 
     private void LateUpdate()
@@ -77,9 +84,18 @@ public sealed class WaterFloatRider : MonoBehaviour
             _completedFirstSink = false;
             _floatPhase = Mathf.PI;
             _floatVelocity = 0f;
+            _nextMoveSoundAt = Time.time + 0.35f;
+            G.Sound?.PlayAt(GameAudioId.SFX_WATER_SPLASH, transform.position);
         }
 
         _inWater = true;
+        if (_waterLoop == null)
+            _waterLoop = G.Sound?.PlayLoop(GameAudioId.AMB_WATER_LOOP, transform);
+        if (_controller.velocity.sqrMagnitude > 1f && Time.time >= _nextMoveSoundAt)
+        {
+            _nextMoveSoundAt = Time.time + 0.65f;
+            G.Sound?.PlayAt(GameAudioId.SFX_WATER_MOVE, transform.position);
+        }
         if (TryWaterJump())
             return;
 
@@ -193,6 +209,7 @@ public sealed class WaterFloatRider : MonoBehaviour
             _controller.Move(Vector3.up * (waterJumpVerticalVelocity * Time.deltaTime));
         }
 
+        G.Sound?.PlayAt(GameAudioId.SFX_WATER_JUMP, transform.position);
         return true;
     }
 
@@ -221,6 +238,8 @@ public sealed class WaterFloatRider : MonoBehaviour
         {
             _controller.Move((Vector3.up * 0.2f + direction * 0.08f));
         }
+
+        G.Sound?.PlayAt(GameAudioId.SFX_WATER_JUMP, transform.position);
     }
 
     private bool IsJumpTriggered()
@@ -233,6 +252,11 @@ public sealed class WaterFloatRider : MonoBehaviour
 
     private void ResetWaterState()
     {
+        if (_waterLoop != null)
+        {
+            G.Sound?.StopLoop(_waterLoop);
+            _waterLoop = null;
+        }
         _inWater = false;
         _completedFirstSink = false;
         _floatPhase = 0f;

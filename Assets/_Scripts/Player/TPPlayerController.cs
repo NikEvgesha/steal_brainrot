@@ -25,6 +25,10 @@ public class TPPlayerController : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private Transform cameraTransform; // Камера для направления движения
+    [Header("Audio")]
+    [SerializeField] private float footstepMinSpeed = 1.2f;
+    [SerializeField] private float footstepProbeDistance = 1.5f;
+    [SerializeField] private float footstepEventMinInterval = 0.075f;
 
     // === Animation ===
     public enum AnimParamName
@@ -38,6 +42,7 @@ public class TPPlayerController : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private float speedDampTime = 0.08f;  // сглаживание параметра Speed
     [SerializeField] private float animatorSpeedMultiplier = 2f;
+    [SerializeField] private float sprintAnimatorSpeedMultiplier = 3f;
     //[SerializeField] private bool useHoldTriggerOnToggle = true; // жать триггер при смене hold
     //[SerializeField] private bool debugToggleHoldWithKey = false;
     //[SerializeField] private KeyCode debugHoldKey = KeyCode.E;
@@ -49,12 +54,15 @@ public class TPPlayerController : MonoBehaviour
     private float _verticalVelocityOverride;
     private float _currentSpeed;
     private bool _isHolding; // текущее логическое состояние "держать"
+    private bool _wasGrounded;
+    private float _nextFootstepAt;
     //private bool _teleportiong;
     //private Transform _teleportPoint;
 
     private void Awake()
     {
         _cc = GetComponent<CharacterController>();
+        _wasGrounded = _cc.isGrounded;
 
         //if (cameraTransform == null && Camera.main != null)
         //    cameraTransform = Camera.main.transform;
@@ -146,7 +154,16 @@ public class TPPlayerController : MonoBehaviour
         }
 
         // ===== Движение =====
+        float verticalVelocityBeforeMove = _verticalVel;
         _cc.Move(velocity * dt);
+        bool groundedNow = _cc.isGrounded;
+        if (!_wasGrounded && groundedNow && verticalVelocityBeforeMove < -2.5f)
+        {
+            float landingVolume = Mathf.Lerp(0.45f, 1f, Mathf.InverseLerp(2.5f, 16f, -verticalVelocityBeforeMove));
+            G.Sound?.PlayAt(GameAudioId.SFX_PLAYER_LAND, transform.position, landingVolume);
+        }
+
+        _wasGrounded = groundedNow;
         _externalHorizontalVelocity = Vector3.MoveTowards(
             _externalHorizontalVelocity,
             Vector3.zero,
@@ -155,7 +172,9 @@ public class TPPlayerController : MonoBehaviour
         // ===== Анимация =====
         if (animator != null)
         {
-            animator.speed = Mathf.Max(0.01f, animatorSpeedMultiplier);
+            animator.speed = Mathf.Max(
+                0.01f,
+                running ? sprintAnimatorSpeedMultiplier : animatorSpeedMultiplier);
             // Нормализуем скорость в [0..1] относительно runSpeed (один и тот же BlendTree param для обычного/hold набора)
             float normalized = runSpeed > 0.0001f ? (_currentSpeed / runSpeed) : 0f;
             animator.SetFloat(AnimParamName.Speed.ToString(), normalized, speedDampTime, dt);
@@ -209,6 +228,47 @@ public class TPPlayerController : MonoBehaviour
             _externalHorizontalVelocity = velocity;
         else
             _externalHorizontalVelocity += velocity;
+    }
+
+    public void OnFootstepAnimationEvent()
+    {
+        if (_cc == null || !_cc.isGrounded || _currentSpeed < footstepMinSpeed || Time.time < _nextFootstepAt)
+            return;
+
+        float speedRatio = Mathf.Clamp01(_currentSpeed / Mathf.Max(0.01f, runSpeed));
+        _nextFootstepAt = Time.time + Mathf.Max(0.04f, footstepEventMinInterval);
+        G.Sound?.PlayAt(ResolveFootstepCue(), transform.position, Mathf.Lerp(0.75f, 1f, speedRatio));
+    }
+
+    private GameAudioId ResolveFootstepCue()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.3f;
+        if (!Physics.Raycast(
+                origin,
+                Vector3.down,
+                out RaycastHit hit,
+                Mathf.Max(0.5f, footstepProbeDistance),
+                ~0,
+                QueryTriggerInteraction.Ignore))
+        {
+            return GameAudioId.SFX_STEP_GRASS;
+        }
+
+        string surfaceName = hit.collider != null ? hit.collider.name.ToLowerInvariant() : string.Empty;
+        Renderer renderer = hit.collider != null ? hit.collider.GetComponentInParent<Renderer>() : null;
+        if (renderer != null && renderer.sharedMaterial != null)
+            surfaceName += " " + renderer.sharedMaterial.name.ToLowerInvariant();
+
+        return surfaceName.Contains("road") ||
+               surfaceName.Contains("stone") ||
+               surfaceName.Contains("concrete") ||
+               surfaceName.Contains("tile") ||
+               surfaceName.Contains("wood") ||
+               surfaceName.Contains("floor") ||
+               surfaceName.Contains("path") ||
+               surfaceName.Contains("platform")
+            ? GameAudioId.SFX_STEP_HARD
+            : GameAudioId.SFX_STEP_GRASS;
     }
 
 }

@@ -19,6 +19,7 @@ public class GiftInboxUI : MonoBehaviour
     private GiftItemDto _current;
     private bool _inFlight;
     private bool _autoAcceptInFlight;
+    private string _lastNotifiedGiftId;
 
     private void Awake()
     {
@@ -79,6 +80,11 @@ public class GiftInboxUI : MonoBehaviour
                     else
                     {
                         var first = list[0];
+                        if (!string.Equals(_lastNotifiedGiftId, first.giftId, System.StringComparison.Ordinal))
+                        {
+                            _lastNotifiedGiftId = first.giftId;
+                            G.Sound?.Play(GameAudioId.SFX_GIFT_RECEIVE);
+                        }
                         if (!TryShowGiftInUniversalPopup(first))
                             ShowGift(first);
                     }
@@ -138,6 +144,7 @@ public class GiftInboxUI : MonoBehaviour
         yield return LobbyClient.Instance.AcceptGift(gift.giftId, r => resp = r);
         if (resp != null && resp.ok)
         {
+            G.Sound?.Play(GameAudioId.SFX_GIFT_OPEN);
             SpawnGiftItem(resp.itemType, resp.itemId);
         }
         Hide();
@@ -147,6 +154,8 @@ public class GiftInboxUI : MonoBehaviour
     {
         bool ok = false;
         yield return LobbyClient.Instance.DeclineGift(gift.giftId, v => ok = v);
+        if (ok)
+            G.Sound?.Play(GameAudioId.SFX_GIFT_RETURN);
         Hide();
     }
 
@@ -159,7 +168,10 @@ public class GiftInboxUI : MonoBehaviour
         GiftAcceptResponseDto resp = null;
         yield return LobbyClient.Instance.AcceptGift(gift.giftId, r => resp = r);
         if (resp != null && resp.ok)
+        {
+            G.Sound?.Play(GameAudioId.SFX_GIFT_RETURN);
             SpawnGiftItem(resp.itemType, resp.itemId);
+        }
 
         _autoAcceptInFlight = false;
         Hide();

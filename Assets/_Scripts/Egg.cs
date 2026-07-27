@@ -255,6 +255,7 @@ public class Egg : InventoryItem
             {
                 _purchaseInProgress = false;
                 if (!success) return;
+                G.Sound?.Play(GameAudioId.SFX_AD_SUCCESS);
                 G.Inventory.Add(this);
                 EggPurchased.Invoke(this);
             });
@@ -299,6 +300,7 @@ public class Egg : InventoryItem
         _endUtc = DateTimeOffset.UtcNow.AddSeconds(_totalDurationSec); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
 
+        G.Sound?.PlayAt(GameAudioId.SFX_TIMER_START, transform.position);
 
         StartTicker();
 
@@ -376,6 +378,7 @@ public class Egg : InventoryItem
         _endUtc = DateTimeOffset.UtcNow;
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
         _currentCell?.SaveData();
+        G.Sound?.PlayAt(GameAudioId.SFX_EGG_SPEEDUP, transform.position);
         //SaveDeadline();
     }
     public void SpeedBoost()
@@ -445,6 +448,7 @@ public class Egg : InventoryItem
                 _currentCell.HatchEgg.AddListener(Hatching);
                 _status = EggStatus.ReadyToHatch;
                 _ticker = null;
+                G.Sound?.PlayAt(GameAudioId.SFX_EGG_READY, transform.position);
                 _currentCell.CheckPlayer();
                 //Hatching();
                 yield break;
@@ -476,6 +480,7 @@ public class Egg : InventoryItem
     {
         _status = EggStatus.Hatching;
         _infoUI.SetStatus(_status);
+        G.Sound?.PlayAt(GameAudioId.SFX_HATCH_START, transform.position);
         _currentCell.CheckPlayer();
         /*
         PlayerPrefs.DeleteKey(SaveKey);
@@ -503,10 +508,12 @@ public class Egg : InventoryItem
                 _rouleteObjects[idx].SetActive(false);
             idx = (idx + 1) % _rouleteObjects.Count;
             _rouleteObjects[idx].SetActive(true);
+            G.Sound?.PlayAt(GameAudioId.SFX_HATCH_TICK, transform.position);
             _animationHatchingTime -= _animationHatchingSpeed;
             _animationCurve.Evaluate(_animationHatchingTime/ startTime);
             yield return new WaitForSecondsRealtime(_animationHatchingSpeed);
         }
+        G.Sound?.PlayAt(GameAudioId.SFX_EGG_CRACK, transform.position);
         SpawnBrainrot();
     }
     private void SpawnBrainrot()
@@ -524,6 +531,7 @@ public class Egg : InventoryItem
         Brainrot brainrot = Instantiate(brainrotPrefab, _currentCell.transform, false);
         brainrot.transform.localPosition = Vector3.zero;
         brainrot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        PlayHatchReveal(brainrot);
         brainrot.Init(_data.DinamicData, _currentCell);
         brainrot.transform.SetParent(_currentCell.transform, false);
         brainrot.transform.localPosition = Vector3.zero;
@@ -542,6 +550,31 @@ public class Egg : InventoryItem
             Item.Brainrot);
         Destroy(gameObject);
         _currentCell.LockCell(false);
+    }
+
+    private void PlayHatchReveal(Brainrot brainrot)
+    {
+        if (brainrot == null || G.Sound == null)
+            return;
+
+        bool rareReveal =
+            brainrot.RareType >= RareType.Rare ||
+            _data.DinamicData.ElementType != ElementType.NoElement;
+        G.Sound.PlayAt(
+            rareReveal ? GameAudioId.SFX_RARE_REVEAL : GameAudioId.SFX_HATCH_REVEAL,
+            transform.position);
+
+        GameAudioId? elementCue = _data.DinamicData.ElementType switch
+        {
+            ElementType.Fire => GameAudioId.SFX_ELEMENT_FIRE,
+            ElementType.Electric => GameAudioId.SFX_ELEMENT_ELECTRIC,
+            ElementType.Gold => GameAudioId.SFX_ELEMENT_GOLD,
+            ElementType.Diamond => GameAudioId.SFX_ELEMENT_DIAMOND,
+            _ => null
+        };
+
+        if (elementCue.HasValue)
+            G.Sound.PlayAt(elementCue.Value, transform.position);
     }
     private Brainrot GetRandomBrainrot()
     {

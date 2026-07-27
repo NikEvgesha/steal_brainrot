@@ -363,6 +363,7 @@ public class AlbumScreenController : MonoBehaviour
         if (open && G.Tutorial != null && G.Tutorial.IsTutorialActive && !G.Tutorial.AllowsAlbum)
             return;
 
+        var wasOpen = IsOpen;
         if (open && !gameObject.activeSelf)
             gameObject.SetActive(true);
 
@@ -385,6 +386,9 @@ public class AlbumScreenController : MonoBehaviour
 
         if (updateCursor && G.Control != null)
             G.Control.CursorActive = open;
+
+        if (wasOpen != open)
+            G.Sound?.Play(open ? GameAudioId.SFX_ALBUM_OPEN : GameAudioId.SFX_UI_CLOSE);
     }
 
     private void HideEmbeddedOpenButton()
@@ -437,12 +441,15 @@ public class AlbumScreenController : MonoBehaviour
 
     private void SetTab(AlbumEntityType tab, bool preserveSelection)
     {
+        var changed = _currentTab != tab;
         _currentTab = tab;
         _selectedElementFilter = ResolveDefaultElementFilter(tab);
         if (!preserveSelection)
             _selectedEntryId = null;
 
         Refresh();
+        if (changed && IsOpen)
+            G.Sound?.Play(GameAudioId.SFX_UI_TAB);
     }
 
     private void BuildCatalog()
@@ -767,6 +774,7 @@ public class AlbumScreenController : MonoBehaviour
 
     private void OnElementPressed(ElementType elementType, bool unlocked)
     {
+        G.Sound?.Play(unlocked ? GameAudioId.SFX_UI_TAB : GameAudioId.SFX_UI_LOCKED);
         _selectedElementFilter = elementType;
 
         if (progressService != null && unlocked)
@@ -842,6 +850,7 @@ public class AlbumScreenController : MonoBehaviour
         if (entry == null)
             return;
 
+        G.Sound?.Play(IsEntryDiscovered(entry) ? GameAudioId.SFX_ALBUM_CARD : GameAudioId.SFX_UI_LOCKED);
         _selectedEntryId = entry.id;
         if (progressService != null)
             ExecuteWithoutProgressRefresh(() => progressService.MarkCardViewed(entry.type, entry.id));
@@ -1432,6 +1441,8 @@ public class AlbumScreenController : MonoBehaviour
         var rewardAmount = ResolveRewardAmount(entry);
         if (rewardAmount > 0 && G.Currency != null)
             G.Currency.AddCurrency(CurrencyType.Gems, rewardAmount);
+        else
+            G.Sound?.Play(GameAudioId.SFX_REWARD_CLAIM);
 
         TutorialSignals.Raise(
             TutorialSignalType.AlbumRewardClaimed,

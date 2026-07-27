@@ -17,6 +17,14 @@ public class CurrencyManager : MonoBehaviour
     [SerializeField] private AudioClip _audioBuy;
     [SerializeField] private AudioClip _audioSell;
     [SerializeField] private AudioSource _audioSource;
+    [Header("Coin collection audio")]
+    [SerializeField, Min(0.1f)] private float _coinComboWindow = 1f;
+    [SerializeField, Range(0f, 0.2f)] private float _coinComboPitchStep = 0.055f;
+    [SerializeField, Min(0)] private int _coinComboMaxSteps = 8;
+    [SerializeField, Range(0f, 2f)] private float _coinGainVolumeScale = 1.15f;
+
+    private float _lastCoinGainAudioAt = float.NegativeInfinity;
+    private int _coinGainComboStep;
 
     private Dictionary<CurrencyType, double> _balance = new() 
     {
@@ -90,12 +98,28 @@ public class CurrencyManager : MonoBehaviour
         AddCurrency(CurrencyType.Coins, StartCoinsAmount);
     }
 
-    public void AddCurrency(CurrencyType type, double amount)
+    public void AddCurrency(CurrencyType type, double amount, bool playAudio = true)
     {
         amount = Math.Round(amount);
-        if (_audioSource)
-            if(_audioSell)
+        if (IsInitialized && playAudio)
+        {
+            bool played;
+            if (type == CurrencyType.Coins)
+            {
+                float pitchScale = GetNextCoinGainPitchScale();
+                played = G.Sound != null && G.Sound.Play(
+                    GameAudioId.SFX_COIN_GAIN,
+                    volumeScale: _coinGainVolumeScale,
+                    pitchScale: pitchScale);
+            }
+            else
+            {
+                played = G.Sound != null && G.Sound.Play(GameAudioId.SFX_REWARD_CLAIM);
+            }
+
+            if (G.Sound == null && !played && _audioSource && _audioSell)
                 _audioSource.PlayOneShot(_audioSell);
+        }
         _balance[type] += amount;
         _balance[type] = (double.IsInfinity(_balance[type])) ? float.MaxValue : _balance[type];
         CurrencyChanged?.Invoke(type, _balance[type]);
@@ -105,12 +129,25 @@ public class CurrencyManager : MonoBehaviour
             G.Save?.SaveGameCoin(_balance[type]);
     }
 
+    private float GetNextCoinGainPitchScale()
+    {
+        float now = Time.unscaledTime;
+        if (now - _lastCoinGainAudioAt < Mathf.Max(0.1f, _coinComboWindow))
+            _coinGainComboStep = Mathf.Min(_coinGainComboStep + 1, Mathf.Max(0, _coinComboMaxSteps));
+        else
+            _coinGainComboStep = 0;
+
+        _lastCoinGainAudioAt = now;
+        return 1f + _coinGainComboStep * Mathf.Max(0f, _coinComboPitchStep);
+    }
+
     public bool RemoveCurrency(CurrencyType type, double amount)
     {
         if (_balance[type] >= amount)
         {
-            if (_audioSource)
-                if (_audioBuy)
+            bool played = G.Sound != null && G.Sound.Play(
+                type == CurrencyType.Gems ? GameAudioId.SFX_GEM_SPEND : GameAudioId.SFX_COIN_SPEND);
+            if (!played && _audioSource && _audioBuy)
                     _audioSource.PlayOneShot(_audioBuy);
 
             _balance[type] -= amount;
@@ -123,6 +160,7 @@ public class CurrencyManager : MonoBehaviour
         }
         if (type == CurrencyType.Gems)
             NoGems.Invoke();
+        G.Sound?.Play(GameAudioId.SFX_CURRENCY_FAIL);
         return false;
     }
 
@@ -146,6 +184,7 @@ public class CurrencyManager : MonoBehaviour
         {
             NoCoins?.Invoke();
         }
+        G.Sound?.Play(GameAudioId.SFX_CURRENCY_FAIL);
         return false;
     }
 

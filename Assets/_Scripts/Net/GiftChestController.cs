@@ -287,7 +287,10 @@ public class GiftChestController : MonoBehaviour
         UpdatePanel();
 
         if (chestUI != null)
+        {
+            G.Sound?.PlayAt(GameAudioId.SFX_CHEST_OPEN, transform.position);
             chestUI.Open(lastChest, slot => StartCoroutine(ClaimSlot(slot)));
+        }
 
         actionInFlight = false;
     }

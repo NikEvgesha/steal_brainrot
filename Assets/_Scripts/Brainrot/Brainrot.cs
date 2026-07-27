@@ -71,6 +71,7 @@ public class Brainrot : InventoryItem
     public Action Stealed;
     private Coroutine _incomeCorutine;
     private bool _incomeReadySignaled;
+    private bool _hasOfflineIncomePending;
     private Animator[] _animators;
     private Animation[] _legacyAnimations;
     private bool _animationsSubscribed;
@@ -171,6 +172,7 @@ public class Brainrot : InventoryItem
         _lastIncomeTime = effectiveLastIncomeTs;
         var incomeAccumulationTime = Math.Max(0L, nowTs - effectiveLastIncomeTs);
         _currentIncome = Math.Max(0d, Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome));
+        _hasOfflineIncomePending = incomeAccumulationTime >= 60L && _currentIncome > 0d;
         _incomeReadySignaled = _currentIncome > 0d;
         if (floor != null)
             NewPlace(floor);
@@ -291,8 +293,12 @@ public class Brainrot : InventoryItem
         if (collected <= 0d)
             return 0d;
 
-        if (!TryAddCoins(collected))
+        bool playOfflineIncome = playAudio && _hasOfflineIncomePending;
+        if (!TryAddCoins(collected, playAudio && !playOfflineIncome))
             return 0d;
+        if (playOfflineIncome)
+            G.Sound?.Play(GameAudioId.SFX_OFFLINE_INCOME);
+        _hasOfflineIncomePending = false;
 
         _currentIncome = 0d;
         _lastIncomeTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -301,7 +307,7 @@ public class Brainrot : InventoryItem
             _floorListener.SaveData();
         if (_canvas != null)
             _canvas.UpdateIncome(_currentIncome);
-        if (playAudio && _audio)
+        if (playAudio && G.Sound == null && _audio)
             _audio.Play();
 
         TutorialSignals.Raise(
@@ -341,17 +347,17 @@ public class Brainrot : InventoryItem
         return _floorListener;
     }
 
-    private static bool TryAddCoins(double amount)
+    private static bool TryAddCoins(double amount, bool playAudio)
     {
         if (amount <= 0d)
             return false;
 
         if (G.Income != null)
-            return G.Income.TryAddCoins(amount);
+            return G.Income.TryAddCoins(amount, playAudio);
 
         if (G.Currency != null)
         {
-            G.Currency.AddCurrency(CurrencyType.Coins, amount);
+            G.Currency.AddCurrency(CurrencyType.Coins, amount, playAudio);
             return true;
         }
 

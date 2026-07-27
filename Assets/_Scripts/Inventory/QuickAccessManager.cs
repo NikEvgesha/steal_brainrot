@@ -96,6 +96,7 @@ public class QuickAccessManager : MonoBehaviour
         _currentActive.transform.localPosition = Vector3.zero;
         _currentActive.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         PlaceItem?.Invoke(_currentActive.Type);
+        G.Sound?.PlayAt(GameAudioId.SFX_ITEM_PLACE, dropPoint.position);
         G.Inventory.Remove(_currentActive);
         _dropping = false;
     }
@@ -126,6 +127,9 @@ public class QuickAccessManager : MonoBehaviour
                 break;
         }
         PlaceItem?.Invoke(_currentActive.Type);
+        G.Sound?.PlayAt(
+            placedType == Item.Egg ? GameAudioId.SFX_EGG_PLACE : GameAudioId.SFX_ANIMAL_PLACE,
+            field.transform.position);
         G.Inventory.Remove(_currentActive);
         _dropping = false;
 
@@ -146,6 +150,7 @@ public class QuickAccessManager : MonoBehaviour
     public void SwitchActive(InventoryItem item)
     {
         if (_currentActive == item) item = null;
+        bool hadActiveItem = _currentActive != null;
         
         if (_currentActive != null && !_dropping)
         {
@@ -159,10 +164,13 @@ public class QuickAccessManager : MonoBehaviour
             _currentActive.gameObject.SetActive(true);
             _inHand = _currentActive.Type;
             G.Player.SetItem(item);
+            G.Sound?.Play(GameAudioId.SFX_ITEM_EQUIP);
         } else
         {
             _inHand = Item.Free;
             G.Player.RemoveItem();
+            if (hadActiveItem)
+                G.Sound?.Play(GameAudioId.SFX_ITEM_UNEQUIP);
         }
 
         SwitchActiveItem?.Invoke(_currentActive);

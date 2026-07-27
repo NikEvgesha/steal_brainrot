@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -109,6 +110,7 @@ public class Field : MonoBehaviour
         if (_remoteMode) return;
         if (G.Currency.RemoveCurrency(CurrencyType.Coins, _price))
         {
+            StartCoroutine(PlayUnlockAudio());
             Unblock();
         }
     }
@@ -119,6 +121,15 @@ public class Field : MonoBehaviour
         G.Save.SaveFieldUnblockStatus(_id, true);
         if (!_remoteMode)
             TutorialSignals.Raise(TutorialSignalType.FieldUnlocked, this);
+    }
+
+    private IEnumerator PlayUnlockAudio()
+    {
+        G.Sound?.PlayAt(GameAudioId.SFX_HAMMER_SWING, transform.position);
+        yield return new WaitForSecondsRealtime(0.12f);
+        G.Sound?.PlayAt(GameAudioId.SFX_HAMMER_IMPACT, transform.position);
+        yield return new WaitForSecondsRealtime(0.06f);
+        G.Sound?.PlayAt(GameAudioId.SFX_TERRITORY_UNLOCK, transform.position);
     }
 
 

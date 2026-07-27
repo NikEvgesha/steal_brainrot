@@ -89,9 +89,13 @@ MonoBehaviour:
   groundedStick: -2
   maxFrameDeltaTime: 0.05
   cameraTransform: {fileID: 0}
+  footstepMinSpeed: 1.2
+  footstepProbeDistance: 1.5
+  footstepEventMinInterval: 0.075
   animator: {fileID: 2890640654912758897}
   speedDampTime: 0.08
   animatorSpeedMultiplier: 2
+  sprintAnimatorSpeedMultiplier: 3
   useHoldTriggerOnToggle: 1
   debugToggleHoldWithKey: 0
   debugHoldKey: 101

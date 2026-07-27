@@ -71,6 +71,7 @@ public class BigPetPoint : MonoBehaviour
     private bool _initializedLocal;
     private Coroutine _incomeRoutine;
     private bool _quickAccessBound;
+    private bool _hasOfflineIncomePending;
     private readonly List<Brainrot> _activePets = new List<Brainrot>();
 
     public double CurrentIncomePerSecond => _purchased ? _currentIncome : 0d;
@@ -238,6 +239,7 @@ public class BigPetPoint : MonoBehaviour
         if (!isFood) return;
 
         G.QuickAccess.DropCurrent(_foodPoint);
+        G.Sound?.PlayAt(GameAudioId.SFX_FEED_OFFER, _foodPoint != null ? _foodPoint.position : transform.position);
         _currentFood = food;
         _currentFood.transform.localScale = Vector3.one * _foodScaler;
         _feeding = true;
@@ -270,6 +272,11 @@ public class BigPetPoint : MonoBehaviour
             yield return new WaitForSeconds(1f);
             secondsRemains--;
             _currentXp += _currentFood.Data.XPPerSecond;
+            if (secondsRemains % 3 == 0)
+            {
+                G.Sound?.PlayAt(GameAudioId.SFX_CHEW_LOOP, transform.position);
+                G.Sound?.Play(GameAudioId.SFX_XP_PULSE);
+            }
             CheckLvl();
             G.Save.SaveBigPetXP(_currentXp);
 
@@ -300,7 +307,8 @@ public class BigPetPoint : MonoBehaviour
 
         if (_currentXp >= _xpForNextLvl)
         {
-           while (_currentXp >= _xpForNextLvl)
+            int previousMaxAvailablePetIdx = _maxAvailablePetIdx;
+            while (_currentXp >= _xpForNextLvl)
             {
                 _currentLvl++;
                 _currentXp -= _xpForNextLvl;
@@ -309,6 +317,8 @@ public class BigPetPoint : MonoBehaviour
             G.Save.SaveBigPetLvl(_currentLvl);
             LocalLevelChanged?.Invoke(_currentLvl);
             BaseDirtyTracker.MarkDirty();
+            if (_feeding)
+                G.Sound?.Play(GameAudioId.SFX_LEVEL_UP);
 
             var newMaxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
             if (newMaxAvailablePetIdx != _maxAvailablePetIdx)
@@ -320,6 +330,8 @@ public class BigPetPoint : MonoBehaviour
                 if (_petInfoUI != null)
                     _petInfoUI.SetInfo(_currentIncome);
                 SetPet(_maxAvailablePetIdx);
+                if (_feeding && _maxAvailablePetIdx > previousMaxAvailablePetIdx)
+                    G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
             }
 
             CheckScale();
@@ -479,6 +491,7 @@ public class BigPetPoint : MonoBehaviour
         if (_remoteMode) return;
         if (variantIndex < 0 || variantIndex > _maxAvailablePetIdx) return;
         SetPet(variantIndex);
+        G.Sound?.Play(GameAudioId.SFX_PET_SELECT);
     }
 
     private void GetIncome()
@@ -495,8 +508,12 @@ public class BigPetPoint : MonoBehaviour
         if (collected <= 0d)
             return 0d;
 
-        if (!TryAddCoins(collected))
+        bool playOfflineIncome = playAudio && _hasOfflineIncomePending;
+        if (!TryAddCoins(collected, playAudio && !playOfflineIncome))
             return 0d;
+        if (playOfflineIncome)
+            G.Sound?.Play(GameAudioId.SFX_OFFLINE_INCOME);
+        _hasOfflineIncomePending = false;
 
         _accumulatedIncome = 0;
         if (_petInfoUI != null)
@@ -505,23 +522,23 @@ public class BigPetPoint : MonoBehaviour
         var nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         _lastIncomeCollectTimestamp = DateTimeOffset.FromUnixTimeSeconds(nowTs).UtcDateTime;
         G.Save.SaveBigPetIncomeTime(nowTs.ToString(CultureInfo.InvariantCulture));
-        if (playAudio && _audio)
+        if (playAudio && G.Sound == null && _audio)
             _audio.Play();
 
         return collected;
     }
 
-    private static bool TryAddCoins(double amount)
+    private static bool TryAddCoins(double amount, bool playAudio)
     {
         if (amount <= 0d)
             return false;
 
         if (G.Income != null)
-            return G.Income.TryAddCoins(amount);
+            return G.Income.TryAddCoins(amount, playAudio);
 
         if (G.Currency != null)
         {
-            G.Currency.AddCurrency(CurrencyType.Coins, amount);
+            G.Currency.AddCurrency(CurrencyType.Coins, amount, playAudio);
             return true;
         }
 
@@ -697,6 +714,7 @@ public class BigPetPoint : MonoBehaviour
         LocalLevelChanged?.Invoke(CurrentLevel);
         BaseDirtyTracker.MarkDirty();
         TutorialSignals.Raise(TutorialSignalType.BigPetPurchased, this, value: _unlockPrice);
+        G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
 
         if (_playerInArea)
         {
@@ -862,6 +880,7 @@ public class BigPetPoint : MonoBehaviour
         incomeAccumulateTime = Math.Max(0L, nowTs - lastCollectTs);
 
         _accumulatedIncome = Math.Max(0d, incomeAccumulateTime * _currentIncome);
+        _hasOfflineIncomePending = incomeAccumulateTime >= 60L && _accumulatedIncome > 0d;
         if (_petInfoUI != null)
         {
             _petInfoUI.UpdateIncome(_accumulatedIncome);

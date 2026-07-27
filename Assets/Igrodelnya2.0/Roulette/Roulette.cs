@@ -140,6 +140,7 @@ public class Roulette : MonoBehaviour
     {
         //if (!(LoadingManager.Instance.CurrentLocation == Location.Lobby)) return;
         _isOpen = !_isOpen;
+        G.Sound?.Play(_isOpen ? GameAudioId.SFX_UI_OPEN : GameAudioId.SFX_UI_CLOSE);
         G.Control.CursorActive = _isOpen;
         if (!_isOpen)
         {
@@ -212,6 +213,7 @@ public class Roulette : MonoBehaviour
     {
         _adButton.interactable = false;
         _gemsButton.interactable = false;
+        G.Sound?.Play(GameAudioId.SFX_ROULETTE_START);
         
         _targetId = _rewards.IndexOf(GetRandomReward());
 
@@ -325,6 +327,7 @@ public class Roulette : MonoBehaviour
         float t;
         float speed;
         float zAngle;
+        var previousSector = -1;
 
         while (_spinning)
         {
@@ -341,11 +344,19 @@ public class Roulette : MonoBehaviour
 
             zAngle = Mathf.Lerp(0, _targetAngle, speed);
             _wheel.transform.rotation = Quaternion.Euler(new Vector3(0,0,zAngle));
+            var sector = Mathf.FloorToInt(zAngle / Mathf.Max(1f, _rotateAngle));
+            if (sector != previousSector)
+            {
+                if (previousSector >= 0)
+                    G.Sound?.Play(GameAudioId.SFX_ROULETTE_TICK);
+                previousSector = sector;
+            }
 
             yield return null;
         }
 
         _spinning = false;
+        G.Sound?.Play(GameAudioId.SFX_ROULETTE_STOP);
         GiveReward();
         _adButton.interactable = true;
         _gemsButton.interactable = true;
@@ -361,7 +372,7 @@ public class Roulette : MonoBehaviour
             G.Currency.AddCurrency(CurrencyType.Gems, reward.amount);
         } else
         {
-            // выдача предмета
+            // Grant an item reward.
             InventoryItem item = Instantiate(reward.item);
             G.Inventory.Add(item);
         }

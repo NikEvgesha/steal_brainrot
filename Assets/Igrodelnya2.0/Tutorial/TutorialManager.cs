@@ -291,6 +291,8 @@ public sealed class TutorialManager : MonoBehaviour
         {
             RunStartAction(definition.startAction);
             RefreshContext();
+            if (!resumed)
+                G.Sound?.Play(GameAudioId.SFX_TASK_START);
         }
         else
         {
@@ -392,6 +394,7 @@ public sealed class TutorialManager : MonoBehaviour
         _currentTaskState.objectiveAutoCompleted = autoCompleted;
         _currentTaskState.updatedUnix = UtcNowUnix();
         SaveState();
+        G.Sound?.Play(GameAudioId.SFX_TASK_COMPLETE);
         PresentClaimableCompletion();
     }
 
@@ -432,6 +435,10 @@ public sealed class TutorialManager : MonoBehaviour
             {
                 G.Currency?.AddCurrency(CurrencyType.Gems, reward);
                 rewardGrantedNow = true;
+            }
+            else
+            {
+                G.Sound?.Play(GameAudioId.SFX_REWARD_CLAIM);
             }
         }
 

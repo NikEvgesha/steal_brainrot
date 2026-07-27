@@ -18,6 +18,7 @@ public class FriendRequestInboxUI : MonoBehaviour
     private FriendsApi _api;
     private FriendsApi.FriendRequestItem _current;
     private bool _inFlight;
+    private string _lastNotifiedRequestId;
 
     private void Awake()
     {
@@ -70,6 +71,11 @@ public class FriendRequestInboxUI : MonoBehaviour
                 if (list != null && list.Count > 0)
                 {
                     var first = list[0];
+                    if (!string.Equals(_lastNotifiedRequestId, first.requestId, System.StringComparison.Ordinal))
+                    {
+                        _lastNotifiedRequestId = first.requestId;
+                        G.Sound?.Play(GameAudioId.SFX_SOCIAL_INBOX);
+                    }
                     if (!TryShowRequestInUniversalPopup(first))
                         ShowRequest(first);
                 }
@@ -137,7 +143,10 @@ public class FriendRequestInboxUI : MonoBehaviour
         _inFlight = false;
         Hide();
         if (ok)
+        {
+            G.Sound?.Play(GameAudioId.SFX_FRIEND_ACCEPT);
             FriendsPanelController.RequestLiveRefresh();
+        }
     }
 
     private IEnumerator DeclineFlow(string requestId)

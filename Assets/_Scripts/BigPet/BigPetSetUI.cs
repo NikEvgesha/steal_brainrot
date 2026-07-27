@@ -480,6 +480,8 @@ public class BigPetSetUI : MonoBehaviour
         {
             _selectedElement = FindBestUnlockedElement();
         }
+
+        G.Sound?.Play(GameAudioId.SFX_UI_TAB);
         RefreshFilterState();
         RefreshSlotVisibility();
         RebuildGrid();
@@ -491,11 +493,13 @@ public class BigPetSetUI : MonoBehaviour
     {
         if (!IsElementUnlocked(element))
         {
+            G.Sound?.Play(GameAudioId.SFX_UI_LOCKED);
             return;
         }
 
         _showUpgraded = element != ElementType.NoElement;
         _selectedElement = element;
+        G.Sound?.Play(GameAudioId.SFX_UI_TAB);
         RefreshFilterState();
         RefreshSlotVisibility();
         RebuildGrid();

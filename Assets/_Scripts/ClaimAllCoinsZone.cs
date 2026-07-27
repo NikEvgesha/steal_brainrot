@@ -172,6 +172,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
         _playerInside = true;
         StartStateRoutine();
+        if (HasCollectibleIncome())
+            G.Sound?.Play(GameAudioId.SFX_UI_READY);
         if (_permanentUnlocked)
         {
             StartAutoCollectRoutine();
@@ -453,6 +455,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
         {
             _permanentUnlocked = true;
             PersistPermanentUnlocked();
+            G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
             return true;
         }
 
@@ -464,6 +467,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
         _permanentUnlocked = true;
         PersistPermanentUnlocked();
+        G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
         if (debugLogs)
             Debug.Log("[ClaimAll] Permanent unlock purchased.");
         return true;
@@ -492,7 +496,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
             AddBonusCoins(bonus);
 
         var final = baseCollected + Math.Max(0d, bonus);
-        if (collectAudio != null)
+        bool played = G.Sound != null && G.Sound.Play(
+            safeMultiplier > 1d ? GameAudioId.SFX_CLAIM_ALL_X2 : GameAudioId.SFX_CLAIM_ALL);
+        if (G.Sound == null && !played && collectAudio != null)
             collectAudio.Play();
 
         if (debugLogs)
@@ -508,12 +514,12 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
         if (G.Income != null)
         {
-            G.Income.AddCoins(amount);
+            G.Income.TryAddCoins(amount, playAudio: false);
             return;
         }
 
         if (G.Currency != null)
-            G.Currency.AddCurrency(CurrencyType.Coins, amount);
+            G.Currency.AddCurrency(CurrencyType.Coins, amount, playAudio: false);
     }
 
     private double CollectAllIncomeRaw()

@@ -40,6 +40,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     private float _beltScrollOffset;
     private MaterialPropertyBlock _beltPropertyBlock;
     private readonly List<BeltRendererBinding> _beltRendererBindings = new List<BeltRendererBinding>();
+    private AudioSource _ambientLoop;
 
     public float IncomeMultiplier => _level != null ? _level.IncomeMultiplier : 1f;
     public IReadOnlyList<ConveyorLevel> Levels => _levels;
@@ -81,12 +82,16 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
     {
         EnsureEggStorage();
         if (_initialized)
+        {
             StartSpawnLoop();
+            StartAmbientLoop();
+        }
     }
 
     private void OnDisable()
     {
         StopSpawnLoop();
+        StopAmbientLoop();
     }
 
     private void EnsureLocalInit()
@@ -162,6 +167,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         ShowLocalUI();
         EnableInteractionListeners(true);
         StartSpawnLoop();
+        StartAmbientLoop();
     }
 
     private void FixedUpdate()
@@ -221,6 +227,8 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
                 egg.SetConveyorPurchaseMode(_remoteMode);
                 _eggs.Add(egg);
                 egg.EggPurchased.AddListener(OnEggPurchase);
+                if (!_remoteMode)
+                    G.Sound?.PlayAt(GameAudioId.SFX_EGG_BELT_DROP, egg.transform.position);
             }
 
             yield return new WaitForSeconds(_spawnInterval);
@@ -240,6 +248,21 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
         if (_spawnRoutine == null) return;
         StopCoroutine(_spawnRoutine);
         _spawnRoutine = null;
+    }
+
+    private void StartAmbientLoop()
+    {
+        if (_remoteMode || _ambientLoop != null || G.Sound == null)
+            return;
+        _ambientLoop = G.Sound.PlayLoop(GameAudioId.AMB_CONVEYOR_LOOP, transform);
+    }
+
+    private void StopAmbientLoop()
+    {
+        if (_ambientLoop == null)
+            return;
+        G.Sound?.StopLoop(_ambientLoop);
+        _ambientLoop = null;
     }
 
     private void OnEggPurchase(Egg egg)
@@ -517,6 +540,7 @@ public class Conveyor : MonoBehaviour, IConveyorPercentSource
 
         _remoteMode = remote;
         StopSpawnLoop();
+        StopAmbientLoop();
         ClearSpawnedEggs();
 
         if (_remoteMode)

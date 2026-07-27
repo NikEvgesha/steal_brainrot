@@ -372,6 +372,7 @@ public class RemoteFriendBoard : MonoBehaviour
         yield return LobbyClient.Instance.SendGift(targetPlayerId, itemType, payloadId, success => ok = success, targetFriendCode);
         if (ok)
         {
+            G.Sound?.Play(GameAudioId.SFX_GIFT_SEND);
             G.Inventory?.Remove(current);
             if (current != null && current.gameObject != null)
                 Destroy(current.gameObject);

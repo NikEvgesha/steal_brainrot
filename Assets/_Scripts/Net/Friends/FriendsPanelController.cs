@@ -322,6 +322,7 @@ public class FriendsPanelController : MonoBehaviour
         yield return api.AcceptFriendRequest(requestId, success => ok = success);
         if (ok)
         {
+            G.Sound?.Play(GameAudioId.SFX_FRIEND_ACCEPT);
             yield return RefreshRequests();
             yield return RefreshFriends();
         }

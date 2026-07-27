@@ -220,6 +220,7 @@ public class LobbyClient : MonoBehaviour
     private float _lastStateRecoverAt;
     private float _stateBackoffUntil;
     private float _lastHeartbeatSentAt;
+    private bool _networkAudioReady;
 
     private sealed class MemberParseCandidate
     {
@@ -946,8 +947,21 @@ public class LobbyClient : MonoBehaviour
         if (NetworkMode == mode)
             return;
 
+        var previousMode = NetworkMode;
         NetworkMode = mode;
         NetworkModeChanged?.Invoke(mode);
+
+        if (!_networkAudioReady)
+        {
+            if (mode == LobbyNetworkMode.Online)
+                _networkAudioReady = true;
+            return;
+        }
+
+        if (previousMode == LobbyNetworkMode.Online && mode != LobbyNetworkMode.Online)
+            G.Sound?.Play(GameAudioId.SFX_NETWORK_LOST);
+        else if (previousMode != LobbyNetworkMode.Online && mode == LobbyNetworkMode.Online)
+            G.Sound?.Play(GameAudioId.SFX_NETWORK_RESTORED);
     }
 
     private static bool ShouldSuppressReconnectTeleport(string reason)

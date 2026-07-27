@@ -22,6 +22,7 @@ public class AlbumProgressService : MonoBehaviour
 
     private bool _inventorySubscribed;
     private bool _quickAccessSubscribed;
+    private bool _hydratingInventory;
 
     private void Awake()
     {
@@ -197,12 +198,14 @@ public class AlbumProgressService : MonoBehaviour
         var resolvedElementType = ResolveElementTypeFallback(type, normalizedId, elementType);
 
         var changed = false;
+        var entityDiscovered = false;
         if (!IsDiscovered(type, normalizedId))
         {
             SaveFlag(BuildEntityKey("Discovered", type, normalizedId), true);
             SaveTimestampIfMissing(BuildEntityKey("FirstDiscoveredAt", type, normalizedId), DateTimeOffset.UtcNow);
             SaveFlag(BuildEntityKey("MentionCard", type, normalizedId), true);
             changed = true;
+            entityDiscovered = true;
             if (debugLogs)
                 Debug.Log($"[Album] Discovered {type}:{normalizedId}");
         }
@@ -212,6 +215,8 @@ public class AlbumProgressService : MonoBehaviour
 
         if (changed)
             Changed?.Invoke();
+        if (entityDiscovered && !_hydratingInventory)
+            G.Sound?.Play(GameAudioId.SFX_ALBUM_DISCOVERY);
 
         return changed;
     }
@@ -462,18 +467,26 @@ public class AlbumProgressService : MonoBehaviour
         if (G.Inventory == null || !G.Inventory.IsInitialized)
             return;
 
-        var eggs = G.Inventory.GetItems(Item.Egg);
-        if (eggs != null)
+        _hydratingInventory = true;
+        try
         {
-            for (var i = 0; i < eggs.Count; i++)
-                TryDiscoverFromInventoryItem(eggs[i]);
-        }
+            var eggs = G.Inventory.GetItems(Item.Egg);
+            if (eggs != null)
+            {
+                for (var i = 0; i < eggs.Count; i++)
+                    TryDiscoverFromInventoryItem(eggs[i]);
+            }
 
-        var animals = G.Inventory.GetItems(Item.Brainrot);
-        if (animals != null)
+            var animals = G.Inventory.GetItems(Item.Brainrot);
+            if (animals != null)
+            {
+                for (var i = 0; i < animals.Count; i++)
+                    TryDiscoverFromInventoryItem(animals[i]);
+            }
+        }
+        finally
         {
-            for (var i = 0; i < animals.Count; i++)
-                TryDiscoverFromInventoryItem(animals[i]);
+            _hydratingInventory = false;
         }
     }
 

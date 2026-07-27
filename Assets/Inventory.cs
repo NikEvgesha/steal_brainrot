@@ -119,7 +119,10 @@ public class Inventory : MonoBehaviour
         G.QuickAccess.Add(item);
         ItemAdded?.Invoke(item);
         if (forceSave)
+        {
+            G.Sound?.Play(GameAudioId.SFX_ITEM_PICKUP);
             TutorialSignals.Raise(TutorialSignalType.ItemAcquired, item, item.Name, item.Type);
+        }
     }
 
     public void Remove(InventoryItem item)

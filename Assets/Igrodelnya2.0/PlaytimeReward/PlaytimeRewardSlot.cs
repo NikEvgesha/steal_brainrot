@@ -19,6 +19,7 @@ public class PlaytimeRewardSlot : MonoBehaviour
     private int _secondsLeft;
     private TimeSpan _rewardTime;
     private bool _claimed = false;
+    private bool _initialized;
     private PlaytimeRewardPanel _panel;
 
     public void Init(PlaytimeReward reward, PlaytimeRewardPanel panel)
@@ -27,11 +28,23 @@ public class PlaytimeRewardSlot : MonoBehaviour
         _reward = reward;
         _amountText.text = "+" + _reward.amount;
         _rewardTime = MirraSDK.Time.CurrentDate.ToUniversalTime().TimeOfDay + TimeSpan.FromMinutes(_reward.playtimeMinutes);
+        _initialized = true;
         SwitchButtonElements(false);
+        if (isActiveAndEnabled)
+            StartRewardTimer();
     }
 
     private void OnEnable()
     {
+        if (!_initialized)
+            return;
+
+        StartRewardTimer();
+    }
+
+    private void StartRewardTimer()
+    {
+        StopAllCoroutines();
         _timeTillReward = _rewardTime - MirraSDK.Time.CurrentDate.ToUniversalTime().TimeOfDay;
         bool timerComplete = _timeTillReward <= TimeSpan.Zero;
         if (!timerComplete)
@@ -70,6 +83,7 @@ public class PlaytimeRewardSlot : MonoBehaviour
             yield return new WaitForSecondsRealtime(1);
         }
         SwitchButtonElements(true);
+        G.Sound?.Play(GameAudioId.SFX_REWARD_READY);
             
 
     }

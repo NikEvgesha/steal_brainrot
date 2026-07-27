@@ -251,6 +251,7 @@ public class SpecialShop : MonoBehaviour
         G.Input?.AOpenWindow?.Invoke(this);
         RefreshSlots();
         ScrollToSection(ShopCategory.Featured, false);
+        G.Sound?.Play(GameAudioId.SFX_UI_OPEN);
     }
 
     public void Close()
@@ -262,6 +263,7 @@ public class SpecialShop : MonoBehaviour
         _shopCanvas.SetActive(false);
         if (G.Control != null)
             G.Control.CursorActive = false;
+        G.Sound?.Play(GameAudioId.SFX_UI_CLOSE);
     }
 
     public void OnPurchaseRestore(string id)
@@ -327,6 +329,8 @@ public class SpecialShop : MonoBehaviour
     public bool TryUse(ShopPackData packData)
     {
         bool result = _effects != null && _effects.TryUseFirstConsumable(packData);
+        if (result)
+            G.Sound?.Play(GameAudioId.SFX_BOOST_ACTIVATE);
         RefreshSlots();
         return result;
     }
@@ -499,6 +503,7 @@ public class SpecialShop : MonoBehaviour
             if (!success)
                 return;
 
+            G.Sound?.Play(GameAudioId.SFX_AD_SUCCESS);
             G.Currency?.AddCurrency(CurrencyType.Gems, packData.RewardedAdGems);
             RefreshSlots();
         });
@@ -624,6 +629,10 @@ public class SpecialShop : MonoBehaviour
             }
         }
 
+        var majorPurchase =
+            packData.PriceCurrencyType == CurrencyType.Real ||
+            packData.Category == ShopCategory.Permanent;
+        G.Sound?.Play(majorPurchase ? GameAudioId.SFX_SHOP_PURCHASE_MAJOR : GameAudioId.SFX_SHOP_PURCHASE);
         RefreshSlots();
     }
 

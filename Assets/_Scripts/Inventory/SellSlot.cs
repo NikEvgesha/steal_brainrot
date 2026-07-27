@@ -28,6 +28,7 @@ public class SellSlot : MonoBehaviour
     public void _OnSellButtonClick()
     {
         if (!_item.SellAllowed) return;
+        G.Sound?.Play(GameAudioId.SFX_ITEM_SELL);
         G.Currency.AddCurrency(CurrencyType.Coins, _item.BaseSellPrice);
         G.Inventory.Remove(_item);
         Destroy(gameObject);

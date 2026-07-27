@@ -38,6 +38,8 @@ public class Teleporter : MonoBehaviour
         var target = ResolveDestination(destination);
         if (target == null) return;
 
+        if (G.Player != null)
+            G.Sound?.PlayAt(GameAudioId.SFX_TELEPORT, G.Player.transform.position);
         G.Player.Teleport(target);
     }
 
