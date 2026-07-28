@@ -19,8 +19,8 @@ public class CurrencyManager : MonoBehaviour
     [SerializeField] private AudioSource _audioSource;
     [Header("Coin collection audio")]
     [SerializeField, Min(0.1f)] private float _coinComboWindow = 1f;
-    [SerializeField, Range(0f, 0.2f)] private float _coinComboPitchStep = 0.055f;
-    [SerializeField, Min(0)] private int _coinComboMaxSteps = 8;
+    [SerializeField, Range(0f, 0.2f)] private float _coinComboPitchStep = 0.022f;
+    [SerializeField, Min(0)] private int _coinComboMaxSteps = 20;
     [SerializeField, Range(0f, 2f)] private float _coinGainVolumeScale = 1.15f;
 
     private float _lastCoinGainAudioAt = float.NegativeInfinity;
@@ -114,7 +114,7 @@ public class CurrencyManager : MonoBehaviour
             }
             else
             {
-                played = G.Sound != null && G.Sound.Play(GameAudioId.SFX_REWARD_CLAIM);
+                played = G.Sound != null && G.Sound.Play(GameAudioId.SFX_GEM_GAIN);
             }
 
             if (G.Sound == null && !played && _audioSource && _audioSell)

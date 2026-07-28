@@ -1190,3 +1190,10 @@
 - Extended BigPet unlocks from the 18 normal base animals into Gold, Diamond, Electric and Fire passes without changing the existing save field. Elemental variants tint URP materials, reuse the shared element VFX and apply the configured element income multiplier.
 - Redesigned the selector as a narrow blocky window with green header, farm-income badge, square close button, normal/upgraded tabs, locked element filters and a two-column scrolling card grid. Added RU/EN labels for the new controls.
 - Unity 6000.3.9f1 compiled without errors. Fresh Play Mode Bridge checks confirmed two showcase snapshots (`41/42` land, `15/16` pets, conveyor `6`, BigPet levels `110/140`), 90 BigPet variants, normal/Gold filtering, URP tint/VFX, exact pad-size collider and auto-close, preserved conveyor selection, and safe flight enable/disable. No new runtime exceptions were logged.
+
+### 2026-07-28 (second audio listening-pass revisions)
+- Selected `water_move_04` as the sole swimming movement cue, retaining a narrow runtime pitch variation to soften repetition.
+- Rebuilt `coin_gain` from a literal single-coin foley source and moved the former tonal coin cue to spending. Extended the collection combo from eight to twenty gradual pitch steps while keeping the one-second reset window.
+- Added a distinct magical `gem_gain` cue and routed gem collection to it instead of the generic reward sound. The listening pass selected the shorter `Button Arp Twinkle` source over the initial bright spell.
+- The generated collection now contains 88 Ogg/Vorbis clips at 2.27 MiB: 82 short clips use Compressed In Memory and six long ambience clips stream in the background.
+- The next listening choice replaced the single-coin gain with LordTomorrow's short CC0 `Coin Splash`. Its original audio, source page, author, license and checksum are retained under `Tools/audio/sources/CC0/OpenGameArt` for reproducible release builds.

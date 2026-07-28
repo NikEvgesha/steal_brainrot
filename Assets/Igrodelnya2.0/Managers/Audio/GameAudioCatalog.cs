@@ -77,11 +77,6 @@ public static class GameAudioCatalog
         "chew_01", "chew_02", "chew_03", "chew_04"
     };
 
-    private static readonly string[] WaterMove =
-    {
-        "water_move", "water_move_02", "water_move_03", "water_move_04"
-    };
-
     private static readonly IReadOnlyDictionary<GameAudioId, GameAudioCueDefinition> Cues =
         new Dictionary<GameAudioId, GameAudioCueDefinition>
         {
@@ -106,7 +101,7 @@ public static class GameAudioCatalog
             [GameAudioId.SFX_PLAYER_JUMP] = Spatial("jump", volume: 0.55f, pitchMin: 0.97f, pitchMax: 1.04f, minInterval: 0.12f),
             [GameAudioId.SFX_PLAYER_LAND] = Spatial("land", volume: 0.58f, pitchMin: 0.93f, pitchMax: 1.05f, minInterval: 0.12f),
             [GameAudioId.SFX_WATER_SPLASH] = Spatial("water_splash", volume: 0.7f, pitchMin: 0.94f, pitchMax: 1.04f, minInterval: 0.18f),
-            [GameAudioId.SFX_WATER_MOVE] = Pool(WaterMove, spatial: true, volume: 0.32f, pitchMin: 0.92f, pitchMax: 1.08f, minInterval: 0.3f),
+            [GameAudioId.SFX_WATER_MOVE] = Spatial("water_move_04", volume: 0.32f, pitchMin: 0.94f, pitchMax: 1.06f, minInterval: 0.3f),
             [GameAudioId.SFX_WATER_JUMP] = Spatial("water_splash", volume: 0.62f, pitchMin: 0.96f, pitchMax: 1.06f, minInterval: 0.2f),
             [GameAudioId.SFX_TELEPORT] = Spatial("teleport", volume: 0.75f, minInterval: 0.3f, maxDistance: 28f),
             [GameAudioId.SFX_ITEM_EQUIP] = Cue("equip", volume: 0.65f, pitchMin: 0.96f, pitchMax: 1.05f, minInterval: 0.07f),
@@ -120,6 +115,7 @@ public static class GameAudioCatalog
             [GameAudioId.SFX_COIN_GAIN] = Cue("coin_gain", volume: 0.82f, pitchMin: 0.98f, pitchMax: 1.02f, minInterval: 0.075f),
             [GameAudioId.SFX_COIN_GAIN_SOFT] = Cue("coin_spend", volume: 0.25f, pitchMin: 1.05f, pitchMax: 1.15f, minInterval: 0.35f),
             [GameAudioId.SFX_GEM_SPEND] = Cue("gem_spend", volume: 0.62f, minInterval: 0.1f),
+            [GameAudioId.SFX_GEM_GAIN] = Cue("gem_gain", volume: 0.7f, pitchMin: 0.98f, pitchMax: 1.04f, minInterval: 0.15f),
             [GameAudioId.SFX_CURRENCY_FAIL] = Layered(new[] { "ui_error", "ui_click" }, volume: 0.6f, minInterval: 0.18f),
             [GameAudioId.SFX_TIMER_START] = Layered(new[] { "clock_tick", "notification" }, spatial: true, volume: 0.45f, minInterval: 0.2f),
             [GameAudioId.SFX_EGG_READY] = Spatial("egg_ready", volume: 0.7f, minInterval: 0.35f, maxDistance: 26f),

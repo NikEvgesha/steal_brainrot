@@ -35,6 +35,7 @@ public enum GameAudioId
     SFX_COIN_GAIN,
     SFX_COIN_GAIN_SOFT,
     SFX_GEM_SPEND,
+    SFX_GEM_GAIN,
     SFX_CURRENCY_FAIL,
     SFX_TIMER_START,
     SFX_EGG_READY,

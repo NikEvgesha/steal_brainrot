@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build compact Unity-ready audio clips from the local Sonniss GDC 2026 bundle.
+"""Build compact Unity-ready audio clips from the Sonniss bundle and local CC0 sources.
 
-The source bundle is never modified. Output clips are resampled to 48 kHz,
+The source files are never modified. Output clips are resampled to 48 kHz,
 normalized conservatively, faded to avoid clicks, and encoded as Ogg/Vorbis.
 """
 
@@ -20,6 +20,7 @@ from scipy.signal import resample_poly
 
 DEFAULT_SOURCE = Path(r"D:\GameSound\GDC 2026\Sonniss.com-GDC2026-GameAudioBundle")
 DEFAULT_OUTPUT = Path("Assets/Resources/Audio/GDC2026")
+LOCAL_SOURCE_ROOT = Path(__file__).resolve().parent / "sources"
 TARGET_SAMPLE_RATE = 48_000
 
 
@@ -32,6 +33,7 @@ class ClipSpec:
     mono: bool = False
     target_db: float = -3.0
     fade_ms: float = 8.0
+    local: bool = False
 
 
 @dataclass(frozen=True)
@@ -215,19 +217,29 @@ CLIPS: dict[str, ClipSpec] = {
         target_db=-9.0,
     ),
     "coin_spend": ClipSpec(
-        "Cinematic Sound Design - Hybrid Game & UI Elements/Foley Coin Flip Single Fast.wav",
+        "Cinematic Sound Design - UI Interaction Elements/Ting Coins.wav",
+        duration=0.55,
         mono=True,
-        target_db=-8.0,
+        target_db=-10.0,
     ),
     "coin_gain": ClipSpec(
-        "Cinematic Sound Design - UI Interaction Elements/Ting Coins.wav",
-        target_db=-7.0,
+        "CC0/OpenGameArt/coinsplash.ogg",
+        mono=True,
+        target_db=-5.5,
+        fade_ms=4.0,
+        local=True,
     ),
     "gem_spend": ClipSpec(
         "Epic Stock Media - Elemental Mutation Whooshes and Impacts/"
         "GLASMvmt_Whoosh Glass Crystal Fragments Sharp Shards Dry 05_ESM_EMWI.wav",
         duration=0.85,
         target_db=-9.0,
+    ),
+    "gem_gain": ClipSpec(
+        "Cinematic Sound Design - User Interface/Button Arp Twinkle.wav",
+        duration=1.48,
+        target_db=-8.0,
+        fade_ms=5.0,
     ),
     "clock_tick": ClipSpec(
         "344 Audio - Antique Clocks/CLOCKTick_Crooked Antique Clock_344 Audio_Antique Clocks.wav",
@@ -549,7 +561,8 @@ def write_clip(path: Path, data: np.ndarray) -> None:
 def build_direct(source_root: Path, output_root: Path) -> list[tuple[str, str]]:
     manifest: list[tuple[str, str]] = []
     for output_name, spec in CLIPS.items():
-        source_path = source_root / Path(spec.source)
+        clip_source_root = LOCAL_SOURCE_ROOT if spec.local else source_root
+        source_path = clip_source_root / Path(spec.source)
         if not source_path.is_file():
             raise FileNotFoundError(source_path)
 
