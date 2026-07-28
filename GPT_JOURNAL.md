@@ -1197,3 +1197,8 @@
 - Added a distinct magical `gem_gain` cue and routed gem collection to it instead of the generic reward sound. The listening pass selected the shorter `Button Arp Twinkle` source over the initial bright spell.
 - The generated collection now contains 88 Ogg/Vorbis clips at 2.27 MiB: 82 short clips use Compressed In Memory and six long ambience clips stream in the background.
 - The next listening choice replaced the single-coin gain with LordTomorrow's short CC0 `Coin Splash`. Its original audio, source page, author, license and checksum are retained under `Tools/audio/sources/CC0/OpenGameArt` for reproducible release builds.
+
+### 2026-07-28 (mandatory online/offline fallback farms)
+- Reverted the dormant-empty-base experiment after product review: empty remote islands must remain part of the visible world even when the lobby contains no matching real players.
+- Removed the serialized `randomizeEmptyRemoteSlots` opt-out. `RemoteBasesApplier` now always builds and caches a deterministic randomized snapshot for every empty remote slot; a real lobby/location snapshot still takes priority and replaces it.
+- Live Bridge with one online player confirmed all five remote roots active with fallback populations `4 / 15 / 2 / 15 / 4` and `16–41` opened fields. With `LobbyClient` disabled and `ApplyOfflineLocalOnly()` forced, the same five islands remained active and populated after deferred destroys completed. Unity compilation succeeded without new errors and Play Mode was stopped.

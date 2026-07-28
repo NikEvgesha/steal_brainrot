@@ -68,7 +68,6 @@ public class RemoteBasesApplier : MonoBehaviour
     [SerializeField] private float syncDistanceHysteresisMeters = 2f;
     [SerializeField] private bool renderRemotePlayersOutsideBaseSyncRange = true;
     [Header("Fallback Remote Progress")]
-    [SerializeField] private bool randomizeEmptyRemoteSlots = true;
     [SerializeField] private int randomRemoteProgressSeed = 9173;
     [SerializeField] private int randomRemoteMinCells = 2;
     [SerializeField] private int randomRemoteMaxCells = 7;
@@ -894,7 +893,9 @@ public class RemoteBasesApplier : MonoBehaviour
     private bool TryGetFallbackRemoteSnapshot(int slotIndex, RemoteBaseSlot slot, out BaseSnapshotDto snapshot)
     {
         snapshot = null;
-        if (!randomizeEmptyRemoteSlots || slotIndex < 0 || slot == null || slot.root == null)
+        // Empty remote islands are part of the world presentation in both online
+        // and offline modes. Real player snapshots replace this cached fallback.
+        if (slotIndex < 0 || slot == null || slot.root == null)
             return false;
 
         EnsureSlotState();
