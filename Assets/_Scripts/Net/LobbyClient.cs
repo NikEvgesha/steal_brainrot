@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+#if UNITY_WEBGL && !UNITY_EDITOR
+using System.Runtime.InteropServices;
+#endif
 #if !UNITY_WEBGL || UNITY_EDITOR
 using System.IO;
 using System.Net.WebSockets;
@@ -146,6 +149,9 @@ public class LobbyClient : MonoBehaviour
     [Header("WebSocket (pilot)")]
     [SerializeField] private bool useWebSocketLobby = true;
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
+    [SerializeField, Min(0.1f)] private float webSocketUpdateIntervalSec = 0.2f;
+    [SerializeField, Min(0.1f)] private float webSocketPositionWindowSec = 0.35f;
+    [SerializeField, Range(4, 24)] private int webSocketPositionTargetSamples = 8;
     [SerializeField] private float webSocketPingIntervalSec = 10f;
     [SerializeField] private float webSocketSyncRequestIntervalSec = 8f;
     [SerializeField] private int maxWebSocketMessagesPerFrame = 2;
@@ -201,19 +207,17 @@ public class LobbyClient : MonoBehaviour
     private float _nextWsPingAt;
     private float _nextWsSyncRequestAt;
     private bool _wsSupportLogged;
+    private Coroutine _wsConnectLoop;
+    private readonly Queue<string> _wsInbox = new();
+    private readonly object _wsInboxLock = new();
+    private bool _wsConnected;
+    private bool _wsConnecting;
 #if !UNITY_WEBGL || UNITY_EDITOR
     private ClientWebSocket _ws;
     private CancellationTokenSource _wsCts;
     private Task _wsReceiveTask;
-    private Coroutine _wsConnectLoop;
-    private readonly Queue<string> _wsInbox = new();
-    private readonly object _wsInboxLock = new();
     private readonly SemaphoreSlim _wsSendLock = new(1, 1);
-    private bool _wsConnected;
-    private bool _wsConnecting;
     private int _wsGeneration;
-#else
-    private bool _wsConnected;
 #endif
     private int _state404Count;
     private bool _stateRecoverInProgress;
@@ -233,6 +237,10 @@ public class LobbyClient : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // Browser callbacks need a stable receiver name across scene loads.
+            gameObject.name = "LobbyClientWebSocket";
+#endif
             DontDestroyOnLoad(gameObject);
         }
         else
@@ -289,11 +297,7 @@ public class LobbyClient : MonoBehaviour
 
     private bool IsWebSocketRuntimeSupported()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return false;
-#else
         return true;
-#endif
     }
 
     private bool IsWebSocketDesired()
@@ -305,7 +309,7 @@ public class LobbyClient : MonoBehaviour
         {
             if (!_wsSupportLogged && webSocketDebugLogs)
             {
-                Debug.Log("[LobbyWS] Disabled: runtime platform does not support ClientWebSocket (WebGL build).");
+                Debug.Log("[LobbyWS] Disabled: runtime platform does not support WebSocket transport.");
                 _wsSupportLogged = true;
             }
 
@@ -325,15 +329,12 @@ public class LobbyClient : MonoBehaviour
         if (!IsOnline || !IsWebSocketDesired())
             return;
 
-#if !UNITY_WEBGL || UNITY_EDITOR
         if (_wsConnectLoop == null)
             _wsConnectLoop = StartCoroutine(WebSocketLoop());
-#endif
     }
 
     private void StopWebSocketTransport()
     {
-#if !UNITY_WEBGL || UNITY_EDITOR
         if (_wsConnectLoop != null)
         {
             StopCoroutine(_wsConnectLoop);
@@ -341,12 +342,10 @@ public class LobbyClient : MonoBehaviour
         }
 
         TeardownWebSocketClient();
-#endif
         _wsReady = false;
         _wsConnected = false;
     }
 
-#if !UNITY_WEBGL || UNITY_EDITOR
     private IEnumerator WebSocketLoop()
     {
         while (IsOnline && IsWebSocketDesired())
@@ -369,6 +368,7 @@ public class LobbyClient : MonoBehaviour
         _wsConnectLoop = null;
     }
 
+#if !UNITY_WEBGL || UNITY_EDITOR
     private IEnumerator ConnectWebSocket()
     {
         if (_wsConnecting || _wsConnected)
@@ -586,16 +586,177 @@ public class LobbyClient : MonoBehaviour
 #endif
 
 #if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")]
+    private static extern int ZooWebSocketConnect(string url, string receiverName);
+
+    [DllImport("__Internal")]
+    private static extern int ZooWebSocketSend(string message);
+
+    [DllImport("__Internal")]
+    private static extern void ZooWebSocketClose();
+
+    private bool TryBuildWebSocketUrl(out string wsUrl)
+    {
+        wsUrl = null;
+        var playerId = GetLocalPlayerId();
+        if (string.IsNullOrWhiteSpace(playerId))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(BaseUrl) || !Uri.TryCreate(BaseUrl, UriKind.Absolute, out var baseUri))
+            return false;
+
+        string scheme;
+        if (string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            scheme = "wss";
+        else if (string.Equals(baseUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+            scheme = "ws";
+        else
+            return false;
+
+        var builder = new UriBuilder(baseUri)
+        {
+            Scheme = scheme,
+            Port = baseUri.IsDefaultPort ? -1 : baseUri.Port
+        };
+
+        var path = (builder.Path ?? string.Empty).TrimEnd('/');
+        builder.Path = string.IsNullOrEmpty(path) ? "/ws/lobby" : $"{path}/ws/lobby";
+        builder.Query = $"playerId={UnityWebRequest.EscapeURL(playerId)}";
+        wsUrl = builder.Uri.ToString();
+        return true;
+    }
+
+    private IEnumerator ConnectWebSocket()
+    {
+        if (_wsConnecting || _wsConnected)
+            yield break;
+
+        if (!TryBuildWebSocketUrl(out var wsUrl))
+            yield break;
+
+        TeardownWebSocketClient();
+        _wsConnecting = true;
+        _wsReady = false;
+
+        var started = Time.realtimeSinceStartup;
+        var startedOk = false;
+        try
+        {
+            startedOk = ZooWebSocketConnect(wsUrl, gameObject.name) != 0;
+        }
+        catch (Exception ex)
+        {
+            if (webSocketDebugLogs)
+                Debug.LogWarning($"[LobbyWS] Browser connect setup failed: {ex.GetType().Name}");
+        }
+
+        if (!startedOk)
+        {
+            _wsConnecting = false;
+            yield break;
+        }
+
+        while (_wsConnecting && Time.realtimeSinceStartup - started < 10f)
+            yield return null;
+
+        if (_wsConnecting)
+        {
+            if (webSocketDebugLogs)
+                Debug.LogWarning("[LobbyWS] Browser connect timed out.");
+            TeardownWebSocketClient();
+        }
+    }
+
+    private void TeardownWebSocketClient()
+    {
+        _wsReady = false;
+        _wsConnected = false;
+        _wsConnecting = false;
+
+        try
+        {
+            ZooWebSocketClose();
+        }
+        catch
+        {
+        }
+
+        lock (_wsInboxLock)
+            _wsInbox.Clear();
+    }
+
     private IEnumerator SendWebSocketMessage(JObject message, Action<bool> onDone = null)
     {
-        onDone?.Invoke(false);
+        if (!_wsConnected)
+        {
+            onDone?.Invoke(false);
+            yield break;
+        }
+
+        var ok = false;
+        try
+        {
+            ok = ZooWebSocketSend(message.ToString(Formatting.None)) != 0;
+        }
+        catch
+        {
+            ok = false;
+        }
+
+        if (!ok)
+        {
+            _wsConnected = false;
+            _wsReady = false;
+        }
+
+        onDone?.Invoke(ok);
         yield break;
+    }
+
+    [UnityEngine.Scripting.Preserve]
+    public void OnWebSocketOpenedFromJs(string _)
+    {
+        _wsConnecting = false;
+        _wsConnected = true;
+        _wsReady = false;
+        _nextWsPingAt = Time.unscaledTime + Mathf.Max(3f, webSocketPingIntervalSec);
+        _nextWsSyncRequestAt = Time.unscaledTime + 1f;
+
+        if (webSocketDebugLogs)
+            Debug.Log("[LobbyWS] Browser WebSocket connected.");
+    }
+
+    [UnityEngine.Scripting.Preserve]
+    public void OnWebSocketMessageFromJs(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return;
+
+        lock (_wsInboxLock)
+            _wsInbox.Enqueue(message);
+    }
+
+    [UnityEngine.Scripting.Preserve]
+    public void OnWebSocketClosedFromJs(string reason)
+    {
+        _wsConnecting = false;
+        _wsConnected = false;
+        _wsReady = false;
+
+        if (webSocketDebugLogs)
+            Debug.Log($"[LobbyWS] Browser WebSocket closed: {reason}");
+    }
+
+    [UnityEngine.Scripting.Preserve]
+    public void OnWebSocketErrorFromJs(string reason)
+    {
+        if (webSocketDebugLogs)
+            Debug.LogWarning($"[LobbyWS] Browser WebSocket error: {reason}");
     }
 #endif
 
     private void ProcessWebSocketInbox()
     {
-#if !UNITY_WEBGL || UNITY_EDITOR
         var maxMessages = Mathf.Max(1, maxWebSocketMessagesPerFrame);
         for (var processed = 0; processed < maxMessages; processed++)
         {
@@ -611,7 +772,6 @@ public class LobbyClient : MonoBehaviour
 
             HandleWebSocketMessage(msg);
         }
-#endif
     }
 
     private void HandleWebSocketMessage(string msg)
@@ -842,11 +1002,15 @@ public class LobbyClient : MonoBehaviour
                 continue;
             }
 
-            if (IsWebSocketActive())
+            var useWebSocket = IsWebSocketActive();
+            if (useWebSocket)
                 yield return UpdateLobbyViaWebSocket();
             else
                 yield return UpdateLobby();
-            yield return new WaitForSeconds(updateIntervalSec);
+            var delay = useWebSocket
+                ? Mathf.Max(0.1f, webSocketUpdateIntervalSec)
+                : updateIntervalSec;
+            yield return new WaitForSeconds(delay);
         }
     }
 
@@ -1149,6 +1313,15 @@ public class LobbyClient : MonoBehaviour
 
     private List<LobbyPosSampleDto> BuildPositionSamplesForSend(float now, bool mirror)
     {
+        return BuildPositionSamplesForSend(now, mirror, positionSendWindowSec, positionTargetSamplesPerUpdate);
+    }
+
+    private List<LobbyPosSampleDto> BuildPositionSamplesForSend(
+        float now,
+        bool mirror,
+        float sendWindowSec,
+        int requestedTargetSamples)
+    {
         if (_positionHistory.Count == 0) return null;
 
         TrimPositionHistory(now);
@@ -1156,10 +1329,10 @@ public class LobbyClient : MonoBehaviour
 
         var last = _positionHistory[_positionHistory.Count - 1];
         var staleSec = now - last.t;
-        if (staleSec > positionSendWindowSec + 0.05f)
+        if (staleSec > sendWindowSec + 0.05f)
             return null;
 
-        var windowStart = now - Mathf.Max(positionSendWindowSec, updateIntervalSec);
+        var windowStart = now - Mathf.Max(sendWindowSec, 0.1f);
         var startIndex = 0;
         while (startIndex < _positionHistory.Count && _positionHistory[startIndex].t < windowStart)
             startIndex++;
@@ -1176,7 +1349,7 @@ public class LobbyClient : MonoBehaviour
         if (count <= 0) return null;
 
         var endIndex = _positionHistory.Count - 1;
-        var targetSamples = Mathf.Clamp(positionTargetSamplesPerUpdate, 4, 60);
+        var targetSamples = Mathf.Clamp(requestedTargetSamples, 4, 60);
         if (maxSamplesPerUpdate > 0)
             targetSamples = Mathf.Min(targetSamples, maxSamplesPerUpdate);
         targetSamples = Mathf.Min(targetSamples, count);
@@ -1848,7 +2021,11 @@ public class LobbyClient : MonoBehaviour
         onOk?.Invoke(req.result == UnityWebRequest.Result.Success);
     }
 
-    private JObject BuildLobbyUpdatePayload(out bool forceSnapshot, out bool sentBaseData, out int sampleCount)
+    private JObject BuildLobbyUpdatePayload(
+        out bool forceSnapshot,
+        out bool sentBaseData,
+        out int sampleCount,
+        bool webSocketTransport = false)
     {
         var payload = new JObject();
         forceSnapshot = _forceSnapshotUpload;
@@ -1870,9 +2047,17 @@ public class LobbyClient : MonoBehaviour
             payload["hand"] = hand != null ? JToken.FromObject(hand) : JValue.CreateNull();
 
         // No reason to stream positions while alone in lobby.
-        var samplesToSend = _lastMembers.Count > 1
-            ? BuildPositionSamplesForSend(Time.realtimeSinceStartup, mirror: false)
-            : null;
+        List<LobbyPosSampleDto> samplesToSend = null;
+        if (_lastMembers.Count > 1)
+        {
+            samplesToSend = webSocketTransport
+                ? BuildPositionSamplesForSend(
+                    Time.realtimeSinceStartup,
+                    mirror: false,
+                    Mathf.Max(0.1f, webSocketPositionWindowSec),
+                    webSocketPositionTargetSamples)
+                : BuildPositionSamplesForSend(Time.realtimeSinceStartup, mirror: false);
+        }
 
         if (samplesToSend != null)
         {
@@ -1885,7 +2070,11 @@ public class LobbyClient : MonoBehaviour
 
     private IEnumerator UpdateLobbyViaWebSocket()
     {
-        var payload = BuildLobbyUpdatePayload(out var forceSnapshot, out var sentBaseData, out var sampleCount);
+        var payload = BuildLobbyUpdatePayload(
+            out var forceSnapshot,
+            out var sentBaseData,
+            out var sampleCount,
+            webSocketTransport: true);
         if (payload.Count == 0)
             yield break;
 

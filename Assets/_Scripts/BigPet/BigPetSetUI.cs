@@ -66,6 +66,10 @@ public class BigPetSetUI : MonoBehaviour
 
     public bool IsOpen => _uiPanel != null && _uiPanel.activeSelf;
 
+    private PlayerManager _cachedPlayerOwner;
+    private CharacterController _cachedPlayerController;
+    private bool _wasPlayerInsideInteractionArea;
+
     private void Awake()
     {
         ConfigureWindowVisuals();
@@ -92,17 +96,49 @@ public class BigPetSetUI : MonoBehaviour
 
     private void Update()
     {
-        if (_remoteMode || !IsOpen || _interactionCollider == null || G.Player == null)
+        if (_remoteMode || _interactionCollider == null || G.Player == null)
             return;
         if (Time.unscaledTime < _nextDistanceCheckTime)
             return;
 
         _nextDistanceCheckTime = Time.unscaledTime + Mathf.Max(0.02f, _distanceCheckInterval);
+        bool playerInside = IsPlayerInsideInteractionArea();
+        bool playerEntered = playerInside && !_wasPlayerInsideInteractionArea;
+        _wasPlayerInsideInteractionArea = playerInside;
+
+        if (!IsOpen)
+        {
+            if (playerEntered)
+                OpenUI(true);
+            return;
+        }
+
+        if (playerInside)
+            return;
+
         Vector3 playerPosition = G.Player.transform.position;
         Vector3 closestPoint = _interactionCollider.ClosestPoint(playerPosition);
         float closeDistance = Mathf.Max(0.1f, _closeDistanceBuffer);
         if ((playerPosition - closestPoint).sqrMagnitude > closeDistance * closeDistance)
             OpenUI(false);
+    }
+
+    private bool IsPlayerInsideInteractionArea()
+    {
+        PlayerManager player = G.Player;
+        if (player == null || _interactionCollider == null)
+            return false;
+
+        if (_cachedPlayerOwner != player)
+        {
+            _cachedPlayerOwner = player;
+            _cachedPlayerController = player.GetComponent<CharacterController>();
+        }
+
+        if (_cachedPlayerController != null && _cachedPlayerController.enabled)
+            return _interactionCollider.bounds.Intersects(_cachedPlayerController.bounds);
+
+        return _interactionCollider.bounds.Contains(player.transform.position);
     }
 
     public void InitUI(IReadOnlyList<Brainrot> petList)
@@ -254,6 +290,7 @@ public class BigPetSetUI : MonoBehaviour
     public void ConfigureWorldInteraction(Collider interactionCollider, float openDistance)
     {
         _interactionCollider = interactionCollider;
+        _wasPlayerInsideInteractionArea = false;
     }
 
     public void ChangeActivePet(int variantIndex)
@@ -265,6 +302,7 @@ public class BigPetSetUI : MonoBehaviour
     public void SetRemoteMode(bool remote)
     {
         _remoteMode = remote;
+        _wasPlayerInsideInteractionArea = false;
         if (_remoteMode && _uiPanel != null)
             _uiPanel.SetActive(false);
     }

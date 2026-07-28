@@ -1198,7 +1198,28 @@
 - The generated collection now contains 88 Ogg/Vorbis clips at 2.27 MiB: 82 short clips use Compressed In Memory and six long ambience clips stream in the background.
 - The next listening choice replaced the single-coin gain with LordTomorrow's short CC0 `Coin Splash`. Its original audio, source page, author, license and checksum are retained under `Tools/audio/sources/CC0/OpenGameArt` for reproducible release builds.
 
+### 2026-07-28 (WebGL performance, build-size and network audit)
+- Profiled the live scene, historical build and production backend. The measured Editor frame baseline is `PlayerLoop` median `7.71 ms`, p90 `9.98 ms`; the main structural cost is six full remote `SceneAny` clones, while the production API itself remains lightly loaded and fast.
+- Enabled native browser WebSocket transport in `LobbyClient` through `Assets/Plugins/WebGL/ZooWebSocket.jslib`. WebGL now uses a `0.2 s` update cadence after `ws_ready`, retains HTTP until the socket is ready and automatically falls back after failure. Idle friend/gift inbox polling was reduced from 2 to 8 seconds.
+- Empty remote bases now stay dormant when no member snapshot is assigned. Randomized empty showcase farms were disabled in the production prefab.
+- Reduced the tutorial pointer WebGL import to 512px (`6,295,440 -> 263,716` packed bytes), moved Google Sheets code/credentials and Google API assemblies to editor-only scope, enabled unused post-process stripping, removed inactive Bloom and cleared unused Film Grain texture references.
+- The final WebGL audit build succeeded with zero errors and passed a Brotli-served browser visual smoke. Core files total `27,209,629` bytes. The new 88-clip audio collection adds `2,376,042` Ogg bytes after the previous public build; normalized for that asset drift, the comparable core is `110,621` bytes smaller and WASM is `97,736` bytes smaller.
+- Production logs confirmed that localhost `join_failed` was a missing Mirra player/profile payload (`400` in `1–2 ms`), not CORS. The deployed WebSocket endpoint returns `101`; a true two-client platform WebGL smoke remains.
+- Added a validated but not deployed nginx optimization in the backend repository: JSON gzip above 1 KiB, upstream keep-alive and a dedicated unbuffered WebSocket location. A real `11,234`-byte zoo snapshot compresses to `2,386` bytes (`-78.8%`); isolated `nginx -t` passed on the server.
+- Moved obsolete `PrototypeReferences`, `UIElementsReferences` and unused `DamagePopup` out of `Resources`, preserving the assets while removing their four build warnings from the next player build.
+- Full measurements and next priorities are documented in `Docs/WEBGL_OPTIMIZATION_AUDIT_2026-07-28.md`. The next highest-ROI task is replacing the six serialized remote bases with lazy lightweight proxies.
+
 ### 2026-07-28 (mandatory online/offline fallback farms)
 - Reverted the dormant-empty-base experiment after product review: empty remote islands must remain part of the visible world even when the lobby contains no matching real players.
 - Removed the serialized `randomizeEmptyRemoteSlots` opt-out. `RemoteBasesApplier` now always builds and caches a deterministic randomized snapshot for every empty remote slot; a real lobby/location snapshot still takes priority and replaces it.
 - Live Bridge with one online player confirmed all five remote roots active with fallback populations `4 / 15 / 2 / 15 / 4` and `16–41` opened fields. With `LobbyClient` disabled and `ApplyOfflineLocalOnly()` forced, the same five islands remained active and populated after deferred destroys completed. Unity compilation succeeded without new errors and Play Mode was stopped.
+
+### 2026-07-28 (BigPet change-pad entry regression)
+- Reproduced the selector failure at the exact center of `ChangePetArea`: the fitted collider occupied world Y `-0.80..0.06`, while the player's downward interaction ray started inside it at Y `0.01`; Unity therefore returned no ray hit and the menu stayed closed.
+- Kept the compact fitted interaction volume and moved automatic opening into `BigPetSetUI`, which detects the outside-to-inside transition between the pad bounds and the local player's `CharacterController.bounds`. The transition latch prevents a manually closed menu from reopening until the player leaves and enters again.
+- Unity compilation succeeded. Fresh Play Mode Bridge teleported the player to the pad center and returned `open=True / intersects=True`; moving three metres beyond the pad returned `open=False`. Play Mode was stopped after the smoke.
+
+### 2026-07-28 (regular animal placement grounding)
+- Runtime measurements showed that the islands and field-cell surfaces were consistent; the visible error came from animal-specific model pivots and post-init scaling. Before the fix, visual bottoms ranged from `-0.393` below to `+0.203` above the cell surface.
+- `FieldCell.AlignBrainrotToSurface` now uses only active Mesh/SkinnedMesh renderers, excluding UI and elemental VFX, and moves the actor root so the real visual bottom meets the cell surface. The alignment runs after hatch/manual placement, save loading and remote/fallback spawning.
+- Fresh Play Mode Bridge checked 37 active regular animals across local and remote farms: all 37 were aligned, with the largest animated-pose remainder at `0.0106` world units. BigPet grounding remained correct and separate.

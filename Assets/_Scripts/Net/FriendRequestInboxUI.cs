@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class FriendRequestInboxUI : MonoBehaviour
 {
     [SerializeField] private float pollIntervalSec = 2f;
+    [SerializeField] private float idlePollIntervalSec = 8f;
     [SerializeField] private bool useUniversalPopup = true;
 
     private Canvas _canvas;
@@ -48,6 +49,7 @@ public class FriendRequestInboxUI : MonoBehaviour
     {
         while (true)
         {
+            var nextPollDelay = Mathf.Max(pollIntervalSec, idlePollIntervalSec);
             if (_canvas == null && UnityEngine.EventSystems.EventSystem.current != null)
             {
                 CreateUI();
@@ -70,6 +72,7 @@ public class FriendRequestInboxUI : MonoBehaviour
 
                 if (list != null && list.Count > 0)
                 {
+                    nextPollDelay = pollIntervalSec;
                     var first = list[0];
                     if (!string.Equals(_lastNotifiedRequestId, first.requestId, System.StringComparison.Ordinal))
                     {
@@ -91,7 +94,7 @@ public class FriendRequestInboxUI : MonoBehaviour
                     Hide();
             }
 
-            yield return new WaitForSecondsRealtime(pollIntervalSec);
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.5f, nextPollDelay));
         }
     }
 

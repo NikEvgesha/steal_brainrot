@@ -2154,6 +2154,7 @@ public class RemoteBasesApplier : MonoBehaviour
         AttachActorToCell(pet.transform, cell, localRotation);
         pet.Init(dinamic, null, incomeLastTime);
         AttachActorToCell(pet.transform, cell, localRotation);
+        cell.AlignBrainrotToSurface(pet);
         var info = pet.GetComponentInChildren<BrainrotInfoUI>(true);
         if (info != null)
             info.SetRemoteView(true);

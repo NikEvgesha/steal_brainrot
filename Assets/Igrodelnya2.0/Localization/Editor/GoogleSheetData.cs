@@ -14,7 +14,7 @@ public class GoogleSheetData : ScriptableObject
 {
     [SerializeField] private string sheetId;
     [SerializeField] private string sheetName;
-    [SerializeField] private string credentialsPath = "Assets/Resources/credentials.json";
+    [SerializeField] private string credentialsPath = "Assets/Igrodelnya2.0/Localization/Editor/credentials.json";
     [SerializeField] private LocalizationData localizationData;
 
     private SheetsService GetSheetsService(bool readOnly)

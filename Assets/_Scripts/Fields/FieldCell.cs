@@ -177,6 +177,7 @@ public class FieldCell : MonoBehaviour
             case Item.Brainrot:
                 _currentEgg = null;
                 _currentPet = GetComponentInChildren<Brainrot>();
+                AlignBrainrotToSurface(_currentPet);
                 break;
             default:
                 _currentEgg = null;
@@ -339,6 +340,7 @@ public class FieldCell : MonoBehaviour
                 AttachLoadedActor(pet.transform, Quaternion.Euler(0f, 180f, 0f));
                 pet.Init(data.DinamicData, this, data.IncomeLastTime);
                 AttachLoadedActor(pet.transform, Quaternion.Euler(0f, 180f, 0f));
+                AlignBrainrotToSurface(pet);
                 _currentEgg = null;
                 _currentPet = pet;
                 break;
@@ -389,6 +391,44 @@ public class FieldCell : MonoBehaviour
         actor.SetParent(transform, false);
         actor.localPosition = Vector3.zero;
         actor.localRotation = localRotation;
+    }
+
+    public void AlignBrainrotToSurface(Brainrot pet)
+    {
+        if (pet == null || pet.Model == null)
+            return;
+
+        Renderer[] renderers = pet.Model.GetComponentsInChildren<Renderer>(true);
+        bool hasVisualBounds = false;
+        Bounds visualBounds = default;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null ||
+                !renderer.enabled ||
+                !renderer.gameObject.activeInHierarchy ||
+                (renderer is not MeshRenderer && renderer is not SkinnedMeshRenderer))
+            {
+                continue;
+            }
+
+            if (!hasVisualBounds)
+            {
+                visualBounds = renderer.bounds;
+                hasVisualBounds = true;
+            }
+            else
+            {
+                visualBounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasVisualBounds)
+            return;
+
+        float deltaY = transform.position.y - visualBounds.min.y;
+        if (Mathf.Abs(deltaY) > 0.001f)
+            pet.transform.position += Vector3.up * deltaY;
     }
 
     private void ClearSavedData()

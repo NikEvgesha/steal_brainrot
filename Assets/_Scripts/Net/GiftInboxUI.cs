@@ -8,6 +8,7 @@ using UnityEngine.UI;
 public class GiftInboxUI : MonoBehaviour
 {
     [SerializeField] private float pollIntervalSec = 2f;
+    [SerializeField] private float idlePollIntervalSec = 8f;
     [SerializeField] private bool useUniversalPopup = true;
 
     private Canvas _canvas;
@@ -49,6 +50,7 @@ public class GiftInboxUI : MonoBehaviour
     {
         while (true)
         {
+            var nextPollDelay = Mathf.Max(pollIntervalSec, idlePollIntervalSec);
             if (_canvas == null && UnityEngine.EventSystems.EventSystem.current != null)
             {
                 CreateUI();
@@ -71,6 +73,7 @@ public class GiftInboxUI : MonoBehaviour
 
                 if (list != null && list.Count > 0)
                 {
+                    nextPollDelay = pollIntervalSec;
                     var returnedGift = list.Find(g => g != null && g.isReturned);
                     if (returnedGift != null)
                     {
@@ -101,7 +104,7 @@ public class GiftInboxUI : MonoBehaviour
                     Hide();
             }
 
-            yield return new WaitForSeconds(pollIntervalSec);
+            yield return new WaitForSeconds(Mathf.Max(0.5f, nextPollDelay));
         }
     }
 
