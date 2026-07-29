@@ -1,9 +1,12 @@
 {
   "mcpServers": {
-    "unity-mcp": {
-      "command": "node",
-      "args": [ "E:/GitFork/steal_brainrot/unity-mcp/index.js" ],
-      "env": { "NODE_ENV": "production" }
+    "unity-steal-brainrot": {
+      "command": "C:/Users/loon1/.unity/relay/relay_win.exe",
+      "args": [
+        "--mcp",
+        "--project-path",
+        "E:/GitFork/steal_brainrot"
+      ]
     }
   }
 }

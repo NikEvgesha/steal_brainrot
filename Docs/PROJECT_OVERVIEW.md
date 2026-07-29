@@ -28,7 +28,7 @@
 - В проекте также есть провайдеры Yandex Games и локальные Dummy/Debug-провайдеры.
 - Основной UI: uGUI + TextMesh Pro.
 - Серверный проект: `E:/GitFork/zoogame-backend`.
-- Unity Bridge MCP расположен в `Tools/unity-bridge` и используется для Play Mode smoke, проверки иерархии и скриншотов.
+- Официальный Unity MCP установлен пакетом `com.unity.ai.assistant` и используется для Play Mode smoke, проверки иерархии, Console и снимков Scene/Game View.
 
 ## 3. Сцены и запуск
 
@@ -192,7 +192,7 @@
 
 1. Дождаться завершения Unity-компиляции без новых ошибок.
 2. Проверить `git diff --check` по измененным текстовым файлам.
-3. Запустить Play Mode через Unity Bridge.
+3. Запустить Play Mode через официальный Unity MCP.
 4. Пройти затронутый сценарий в Game View.
 5. Проверить Console, включая warnings.
 6. Проверить минимум `1280x720` и `800x600`; для мобильного UI также портретный и узкий viewport.
@@ -200,7 +200,7 @@
 8. Для сетевых изменений проверить online, simulated offline и reconnect.
 9. Остановить Play Mode перед завершением задачи.
 
-Инструкция по Bridge: `Tools/unity-bridge/CODEX_MCP_WORKFLOW.md`.
+Инструкция по MCP: `Docs/UNITY_MCP_WORKFLOW.md`.
 
 ## 8. Документы проекта
 

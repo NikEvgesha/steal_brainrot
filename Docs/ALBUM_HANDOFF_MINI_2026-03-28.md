@@ -1,5 +1,7 @@
 # Album + Unity Bridge MCP mini handoff (2026-03-28)
 
+> Архивный снимок состояния на 2026-03-28. Описанный ниже кастомный Unity Bridge удалён 2026-07-29 и заменён официальным Unity MCP; актуальная инструкция находится в `Docs/UNITY_MCP_WORKFLOW.md`.
+
 ## 1) Current branch state
 - Branch: `develop`
 - Remote tracking: `develop...origin/develop`
