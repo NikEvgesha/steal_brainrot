@@ -256,7 +256,8 @@ public class Egg : InventoryItem
                 _purchaseInProgress = false;
                 if (!success) return;
                 G.Sound?.Play(GameAudioId.SFX_AD_SUCCESS);
-                G.Inventory.Add(this);
+                using (GameAnalytics.BeginItemGrant("remote_conveyor_ad", Name))
+                    G.Inventory.Add(this);
                 EggPurchased.Invoke(this);
             });
             return;
@@ -264,7 +265,8 @@ public class Egg : InventoryItem
 
         if (G.Currency.RemoveCurrency(CurrencyType.Coins, EffectivePrice))
         {
-            G.Inventory.Add(this);
+            using (GameAnalytics.BeginItemGrant("conveyor", Name, "coins", EffectivePrice))
+                G.Inventory.Add(this);
             EggPurchased.Invoke(this);
         }
     }
@@ -322,6 +324,7 @@ public class Egg : InventoryItem
         if (G.Ad == null)
         {
             Debug.LogWarning("[Egg] Ads manager is missing, speed boost ad skipped.");
+            TrackSpeedupResult("rewarded_ad", "failed", "ads_manager_missing");
             return;
         }
 
@@ -330,7 +333,11 @@ public class Egg : InventoryItem
         {
             _speedBoostAdInProgress = false;
             if (!success || _status != EggStatus.Maturing)
+            {
+                TrackSpeedupResult("rewarded_ad", "failed",
+                    !success ? "ad_not_completed" : "egg_not_maturing");
                 return;
+            }
 
             CompleteMaturationSpeedup(wasFree: false);
         });
@@ -342,12 +349,25 @@ public class Egg : InventoryItem
             return;
 
         SpeedBoostInstant();
+        TrackSpeedupResult(wasFree ? "tutorial_free" : "rewarded_ad", "success", string.Empty);
         TutorialSignals.Raise(
             TutorialSignalType.EggSpeedupUsed,
             _currentCell,
             Name,
             Item.Egg,
             wasFree ? 1d : 0d);
+    }
+
+    private void TrackSpeedupResult(string source, string result, string failureReason)
+    {
+        GameAnalytics.Track(AnalyticsEventNames.EggSpeedupResult, GameAnalytics.Params(
+            "egg_id", Name,
+            "element_type", _data.DinamicData.ElementType.ToString().ToLowerInvariant(),
+            "remaining_sec", Math.Max(0d, (_endUtc - DateTimeOffset.UtcNow).TotalSeconds),
+            "total_duration_sec", _totalDurationSec,
+            "source", source,
+            "result", result,
+            "failure_reason", failureReason));
     }
 
     private void ApplySpeedBoostSeconds(int seconds)
@@ -548,6 +568,17 @@ public class Egg : InventoryItem
             _currentCell,
             brainrot.Name,
             Item.Brainrot);
+        var hatchParameters = GameAnalytics.Params(
+            "egg_id", Name,
+            "animal_id", brainrot.Name,
+            "rarity", brainrot.RareType.ToString().ToLowerInvariant(),
+            "element_type", brainrot.DinamicData.ElementType.ToString().ToLowerInvariant(),
+            "weight_multiplier", brainrot.DinamicData.WeightMultiplier,
+            "hatch_duration_sec", _totalDurationSec,
+            "result", "success",
+            "source", "field_hatch");
+        GameAnalytics.Track(AnalyticsEventNames.AnimalHatched, hatchParameters);
+        GameAnalytics.TrackOnce("first_animal_hatched", AnalyticsEventNames.FirstAnimalHatched, hatchParameters);
         Destroy(gameObject);
         _currentCell.LockCell(false);
     }

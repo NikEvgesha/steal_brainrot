@@ -181,6 +181,15 @@ public class SaveManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogWarning($"[SaveManager] Invalid tutorial state, starting from a safe default: {ex.Message}");
+            GameAnalytics.Track(AnalyticsEventNames.SaveError, GameAnalytics.Params(
+                "operation", "load_tutorial_state",
+                "save_provider", saveProvider != null ? saveProvider.GetType().Name : string.Empty,
+                "exception_type", ex.GetType().Name,
+                "source", "save_manager",
+                "result", "recovered",
+                "failure_reason", "invalid_serialized_state"),
+                AnalyticsPriority.Diagnostic,
+                "load_tutorial_state");
             TutorialSaveData fallback = TutorialSaveData.CreateNew();
             fallback.Normalize(saveProvider.GetTutorialProgress());
             return fallback;
@@ -314,6 +323,22 @@ public class SaveManager : MonoBehaviour
     public DateTime LoadRouletteDate()
     {
         return saveProvider.LoadRouletteDate();
+    }
+
+    public void SaveOfflineRewardLastSeenUnix(long unix)
+    {
+        if (saveProvider == null || !saveProvider.IsInitialized)
+            return;
+
+        saveProvider.SaveOfflineRewardLastSeenUnix(unix);
+        saveProvider.SaveProgress();
+    }
+
+    public long LoadOfflineRewardLastSeenUnix()
+    {
+        return saveProvider != null && saveProvider.IsInitialized
+            ? saveProvider.LoadOfflineRewardLastSeenUnix()
+            : 0L;
     }
 
     public void SaveBigPetStatus(bool purchased)

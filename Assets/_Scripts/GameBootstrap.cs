@@ -23,6 +23,7 @@ public class GameBootstrap : MonoBehaviour
 
     private void Start()
     {
+        _ = AnalyticsManager.Instance;
         Instantiate(_gameLoader);
         G.GameLoader.ShowLoadingScreen(true);
 
@@ -40,6 +41,7 @@ public class GameBootstrap : MonoBehaviour
         Instantiate(_storage);
         Instantiate(_backend);
         Instantiate(_lobby);
+        _ = OfflineRewardManager.Instance;
         new GameObject("AlbumProgressService").AddComponent<AlbumProgressService>();
 
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();

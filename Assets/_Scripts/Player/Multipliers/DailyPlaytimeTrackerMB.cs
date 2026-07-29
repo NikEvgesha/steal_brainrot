@@ -25,6 +25,7 @@ public sealed class DailyPlaytimeTrackerMB : MonoBehaviour
 
     private const string KeyDate = "daily_playtime_date";
     private const string KeySeconds = "daily_playtime_seconds";
+    private static readonly int[] AnalyticsMilestonesMinutes = { 10, 30, 60, 120 };
 
     private float _todaySeconds;
     private double _lastSaveTime;
@@ -59,6 +60,7 @@ public sealed class DailyPlaytimeTrackerMB : MonoBehaviour
         {
             _lastSaveTime = now;
             Save();
+            TrackMilestones();
             Changed?.Invoke();
         }
     }
@@ -155,6 +157,31 @@ public sealed class DailyPlaytimeTrackerMB : MonoBehaviour
         PlayerPrefs.SetString(KeyDate, _currentDate.ToString("yyyy-MM-dd"));
         PlayerPrefs.SetFloat(KeySeconds, _todaySeconds);
         PlayerPrefs.Save();
+    }
+
+    private void TrackMilestones()
+    {
+        string date = _currentDate.ToString("yyyy-MM-dd");
+        for (int i = 0; i < AnalyticsMilestonesMinutes.Length; i++)
+        {
+            int milestone = AnalyticsMilestonesMinutes[i];
+            if (TodayMinutes < milestone)
+                continue;
+
+            string key = "Analytics.DailyPlaytime." + date + "." + milestone;
+            if (PlayerPrefs.GetInt(key, 0) == 1)
+                continue;
+
+            PlayerPrefs.SetInt(key, 1);
+            PlayerPrefs.Save();
+            GameAnalytics.TrackCritical(AnalyticsEventNames.DailyPlaytimeMilestone, GameAnalytics.Params(
+                "milestone_minutes", milestone,
+                "today_playtime_minutes", Math.Round(TodayMinutes, 1),
+                "date", date,
+                "source", "daily_playtime_tracker",
+                "result", "reached"),
+                date + ":" + milestone);
+        }
     }
 
     private DateTime GetNow()

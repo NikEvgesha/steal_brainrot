@@ -27,6 +27,7 @@ public class SavedItems
 public class MirraSDKSaveProvider : SaveProvider
 {
     private const string TutorialStateKey = "Tutorial.State.V1";
+    private const string OfflineRewardLastSeenKey = "OfflineReward.LastSeenUnix";
     public override bool IsInitialized => isInitialize;
     private bool isInitialize;
     public override void Initialize()
@@ -384,6 +385,24 @@ public class MirraSDKSaveProvider : SaveProvider
         return DateTime.Today.AddDays(-1);
     }
 
+    public override void SaveOfflineRewardLastSeenUnix(long unix)
+    {
+        if (!isInitialize) return;
+        Changed = true;
+        MirraSDK.Data.SetString(
+            OfflineRewardLastSeenKey,
+            Math.Max(0L, unix).ToString(CultureInfo.InvariantCulture));
+    }
+
+    public override long LoadOfflineRewardLastSeenUnix()
+    {
+        if (!isInitialize) return 0L;
+        string raw = MirraSDK.Data.GetString(OfflineRewardLastSeenKey, "0");
+        return long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out long unix)
+            ? Math.Max(0L, unix)
+            : 0L;
+    }
+
 
 
 
@@ -545,6 +564,16 @@ public class MirraSDKSaveProvider : SaveProvider
         catch (Exception ex)
         {
             Debug.LogWarning($"[MirraSDKSaveProvider] Failed to load inventory '{type}': {ex.Message}");
+            GameAnalytics.Track(AnalyticsEventNames.SaveError, GameAnalytics.Params(
+                "operation", "load_inventory",
+                "item_type", type.ToString().ToLowerInvariant(),
+                "save_provider", "mirra_sdk",
+                "exception_type", ex.GetType().Name,
+                "source", "save_provider",
+                "result", "recovered",
+                "failure_reason", "invalid_serialized_inventory"),
+                AnalyticsPriority.Diagnostic,
+                "load_inventory:" + type);
             return new List<ItemSaveData>();
         }
     }

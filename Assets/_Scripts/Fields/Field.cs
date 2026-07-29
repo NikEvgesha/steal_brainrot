@@ -108,11 +108,20 @@ public class Field : MonoBehaviour
     public void _TryBuy()
     {
         if (_remoteMode) return;
-        if (G.Currency.RemoveCurrency(CurrencyType.Coins, _price))
+        bool success = G.Currency.RemoveCurrency(CurrencyType.Coins, _price);
+        if (success)
         {
             StartCoroutine(PlayUnlockAudio());
             Unblock();
         }
+
+        GameAnalytics.Track(AnalyticsEventNames.TerritoryUnlockResult, GameAnalytics.Params(
+            "field_id", _id,
+            "currency_type", "coins",
+            "price", _price,
+            "source", "field_buy_panel",
+            "result", success ? "success" : "failed",
+            "failure_reason", success ? string.Empty : "insufficient_currency"));
     }
 
     public void Unblock()

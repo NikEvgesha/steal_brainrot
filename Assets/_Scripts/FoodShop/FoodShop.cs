@@ -122,20 +122,48 @@ public class FoodShop : MonoBehaviour
 
     private void TryBuy(Food food, bool forGems)
     {
+        CurrencyType currency = forGems ? CurrencyType.Gems : CurrencyType.Coins;
+        double price = forGems ? food.Data.GemPrice : food.Data.MoneyPrice;
+        int stockBefore = _foodAmount.TryGetValue(food, out int stock) ? stock : 0;
         if (!_foodAmount.ContainsKey(food) || _foodAmount[food] == 0)
         {
             G.Sound?.Play(GameAudioId.SFX_UI_LOCKED);
+            TrackFoodPurchase(food, currency, price, stockBefore, stockBefore, "failed", "out_of_stock");
             return;
         }
 
-        if (G.Currency.RemoveCurrency(forGems ? CurrencyType.Gems : CurrencyType.Coins, forGems ? food.Data.GemPrice : food.Data.MoneyPrice))
+        if (G.Currency.RemoveCurrency(currency, price))
         {
             Food foodObj = Instantiate(food);
-            G.Inventory.Add(foodObj);
+            using (GameAnalytics.BeginItemGrant("food_shop", food.Name, currency.ToString().ToLowerInvariant(), price))
+                G.Inventory.Add(foodObj);
             _foodAmount[food]--;
             _ui.UpdateUI(_foodAmount);
             TutorialSignals.Raise(TutorialSignalType.FoodPurchased, foodObj, foodObj.Name, Item.Food, food.Data.MoneyPrice);
+            TrackFoodPurchase(food, currency, price, stockBefore, _foodAmount[food], "success", string.Empty);
         }
+        else
+            TrackFoodPurchase(food, currency, price, stockBefore, stockBefore, "failed", "insufficient_currency");
+    }
+
+    private static void TrackFoodPurchase(
+        Food food,
+        CurrencyType currency,
+        double price,
+        int stockBefore,
+        int stockAfter,
+        string result,
+        string failureReason)
+    {
+        GameAnalytics.Track(AnalyticsEventNames.FoodPurchaseResult, GameAnalytics.Params(
+            "food_id", food != null ? food.Name : string.Empty,
+            "currency_type", currency.ToString().ToLowerInvariant(),
+            "price", price,
+            "stock_before", stockBefore,
+            "stock_after", stockAfter,
+            "source", "food_shop",
+            "result", result,
+            "failure_reason", failureReason));
     }
 
     public Food GetFirstFood()

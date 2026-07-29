@@ -101,6 +101,13 @@ public sealed class TutorialManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_active && _currentDefinition != null)
+        {
+            Dictionary<string, object> abandoned = BuildStepParameters();
+            abandoned["abandon_reason"] = "tutorial_manager_destroyed";
+            LogEvent(AnalyticsEventNames.TutorialAbandoned, abandoned);
+        }
+
         TutorialSignals.Raised -= OnTutorialSignal;
         UnsubscribeLocalization();
         if (_view != null)
@@ -498,11 +505,12 @@ public sealed class TutorialManager : MonoBehaviour
         {
             _schedulerReady = false;
             G.Save.SaveTutorialProgress(true);
-            LogEvent("tutorial_completed", new Dictionary<string, object>
-            {
-                ["task_count"] = TutorialStepCatalog.Steps.Length,
-                ["reward_gems_total"] = 32,
-            });
+            GameAnalytics.TrackOnce("tutorial_completed", AnalyticsEventNames.TutorialCompleted,
+                new Dictionary<string, object>
+                {
+                    ["task_count"] = TutorialStepCatalog.Steps.Length,
+                    ["reward_gems_total"] = 32,
+                });
         }
     }
 
@@ -1755,8 +1763,7 @@ public sealed class TutorialManager : MonoBehaviour
 
     private static void LogEvent(string eventName, Dictionary<string, object> parameters)
     {
-        if (AnalyticsManager.Instance != null)
-            AnalyticsManager.Instance.LogEvent(eventName, parameters);
+        AnalyticsManager.Current?.LogEvent(eventName, parameters);
     }
 
     private void SubscribeLocalization()

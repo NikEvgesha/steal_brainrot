@@ -141,7 +141,7 @@ public class CurrencyManager : MonoBehaviour
         return 1f + _coinGainComboStep * Mathf.Max(0f, _coinComboPitchStep);
     }
 
-    public bool RemoveCurrency(CurrencyType type, double amount)
+    public bool RemoveCurrency(CurrencyType type, double amount, string source = "currency_purchase")
     {
         if (_balance[type] >= amount)
         {
@@ -158,8 +158,7 @@ public class CurrencyManager : MonoBehaviour
                 G.Save?.SaveGameCoin(_balance[type]);
             return true;
         }
-        if (type == CurrencyType.Gems)
-            NoGems.Invoke();
+        NotifyInsufficientCurrency(type, amount, source, true);
         G.Sound?.Play(GameAudioId.SFX_CURRENCY_FAIL);
         return false;
     }
@@ -169,23 +168,47 @@ public class CurrencyManager : MonoBehaviour
         return _balance[type];
     }
 
-    public bool CheckEnoughCurrency(CurrencyType type, double amount, bool showNoGemsShop = true)
+    public bool CheckEnoughCurrency(
+        CurrencyType type,
+        double amount,
+        bool showNoGemsShop = true,
+        string source = "currency_check")
     {
         if (amount <= _balance[type])
         {
             return true;
         }
 
-        if (type == CurrencyType.Gems)
-        {
-            if (showNoGemsShop)
-                NoGems?.Invoke();
-        } else if (type == CurrencyType.Coins)
-        {
-            NoCoins?.Invoke();
-        }
+        NotifyInsufficientCurrency(type, amount, source, showNoGemsShop);
         G.Sound?.Play(GameAudioId.SFX_CURRENCY_FAIL);
         return false;
+    }
+
+    private void NotifyInsufficientCurrency(
+        CurrencyType type,
+        double requestedAmount,
+        string source,
+        bool showGemsShop)
+    {
+        if (type == CurrencyType.Gems)
+        {
+            GameAnalytics.Track(AnalyticsEventNames.CurrencyShortageRedirect, GameAnalytics.Params(
+                "currency_type", "gems",
+                "required_amount", Math.Max(0d, requestedAmount),
+                "current_balance", Gems,
+                "missing_amount", Math.Max(0d, requestedAmount - Gems),
+                "shop_category", "currency",
+                "shop_open_requested", showGemsShop,
+                "source", string.IsNullOrWhiteSpace(source) ? "unknown" : source,
+                "result", showGemsShop ? "redirected" : "blocked"));
+
+            if (showGemsShop)
+                NoGems?.Invoke();
+            return;
+        }
+
+        if (type == CurrencyType.Coins)
+            NoCoins?.Invoke();
     }
 
 

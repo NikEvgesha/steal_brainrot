@@ -106,5 +106,12 @@ public class PlaytimeRewardSlot : MonoBehaviour
         _claimed = true;
         SwitchButtonElements(true);
         _panel.OnRewardCollect(_reward);
+        GameAnalytics.Track(AnalyticsEventNames.PlaytimeRewardClaimed, GameAnalytics.Params(
+            "reward_index", transform.GetSiblingIndex(),
+            "required_playtime_minutes", _reward.playtimeMinutes,
+            "currency_type", "gems",
+            "reward_amount", _reward.amount,
+            "source", "playtime_reward_panel",
+            "result", "success"));
     }
 }

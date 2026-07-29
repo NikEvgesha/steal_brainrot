@@ -4,28 +4,30 @@ using UnityEngine.Events;
 
 public class QuestInstance : MonoBehaviour
 {
-    [Header("Ссылка на данные квеста (ScriptableObject)")]
+    [Header("РЎСЃС‹Р»РєР° РЅР° РґР°РЅРЅС‹Рµ РєРІРµСЃС‚Р° (ScriptableObject)")]
     public QuestDefinition questDefinition;
 
-    // Состояние
-    private bool isCompleted = false;    // все условия выполнены, ждем ClaimReward
-    private bool isClaimed = false;    // награда уже забрана
+    // РЎРѕСЃС‚РѕСЏРЅРёРµ
+    private bool isCompleted = false;    // РІСЃРµ СѓСЃР»РѕРІРёСЏ РІС‹РїРѕР»РЅРµРЅС‹, Р¶РґРµРј ClaimReward
+    private bool isClaimed = false;    // РЅР°РіСЂР°РґР° СѓР¶Рµ Р·Р°Р±СЂР°РЅР°
+    private float _analyticsStartedAt;
 
-    // Все компоненты, реализующие IQuestCondition
+    // Р’СЃРµ РєРѕРјРїРѕРЅРµРЅС‚С‹, СЂРµР°Р»РёР·СѓСЋС‰РёРµ IQuestCondition
     private List<IQuestCondition> conditions = new List<IQuestCondition>();
 
-    // Когда все условия выполнены: UI должен показать кнопку «Забрать»
+    // РљРѕРіРґР° РІСЃРµ СѓСЃР»РѕРІРёСЏ РІС‹РїРѕР»РЅРµРЅС‹: UI РґРѕР»Р¶РµРЅ РїРѕРєР°Р·Р°С‚СЊ РєРЅРѕРїРєСѓ В«Р—Р°Р±СЂР°С‚СЊВ»
     public event System.Action OnReadyToClaim;
 
-    // Когда игрок нажал «Забрать»  QuestManager должен удалить сам QuestInstance
+    // РљРѕРіРґР° РёРіСЂРѕРє РЅР°Р¶Р°Р» В«Р—Р°Р±СЂР°С‚СЊВ»  QuestManager РґРѕР»Р¶РµРЅ СѓРґР°Р»РёС‚СЊ СЃР°Рј QuestInstance
     public event System.Action OnQuestClaimed;
 
-    // Когда QuestInstance уничтожен (например, вручную Destroy)
+    // РљРѕРіРґР° QuestInstance СѓРЅРёС‡С‚РѕР¶РµРЅ (РЅР°РїСЂРёРјРµСЂ, РІСЂСѓС‡РЅСѓСЋ Destroy)
     public event System.Action<QuestInstance> OnDestroyed;
 
     private void Awake()
     {
-        // Собираем все IQuestCondition в этом GameObject и его потомках
+        _analyticsStartedAt = Time.realtimeSinceStartup;
+        // РЎРѕР±РёСЂР°РµРј РІСЃРµ IQuestCondition РІ СЌС‚РѕРј GameObject Рё РµРіРѕ РїРѕС‚РѕРјРєР°С…
         var all = GetComponentsInChildren<MonoBehaviour>();
         foreach (var mb in all)
         {
@@ -36,18 +38,18 @@ public class QuestInstance : MonoBehaviour
             }
         }
 
-        // Сразу проверяем: может ли квест уже считаться выполненным?
-        // (если условия выполнялись до момента Spawn'а)
+        // РЎСЂР°Р·Сѓ РїСЂРѕРІРµСЂСЏРµРј: РјРѕР¶РµС‚ Р»Рё РєРІРµСЃС‚ СѓР¶Рµ СЃС‡РёС‚Р°С‚СЊСЃСЏ РІС‹РїРѕР»РЅРµРЅРЅС‹Рј?
+        // (РµСЃР»Рё СѓСЃР»РѕРІРёСЏ РІС‹РїРѕР»РЅСЏР»РёСЃСЊ РґРѕ РјРѕРјРµРЅС‚Р° Spawn'Р°)
         CheckImmediateCompletion();
     }
 
     private void Update()
     {
-        // Если уже выполнено или награда забрана — никаких проверок не делаем
+        // Р•СЃР»Рё СѓР¶Рµ РІС‹РїРѕР»РЅРµРЅРѕ РёР»Рё РЅР°РіСЂР°РґР° Р·Р°Р±СЂР°РЅР° вЂ” РЅРёРєР°РєРёС… РїСЂРѕРІРµСЂРѕРє РЅРµ РґРµР»Р°РµРј
         if (isCompleted || isClaimed)
             return;
 
-        // Проверяем каждое условие
+        // РџСЂРѕРІРµСЂСЏРµРј РєР°Р¶РґРѕРµ СѓСЃР»РѕРІРёРµ
         bool allTrue = true;
         foreach (var cond in conditions)
         {
@@ -61,24 +63,25 @@ public class QuestInstance : MonoBehaviour
         if (allTrue)
         {
             isCompleted = true;
-            // Отписываем все условия
+            // РћС‚РїРёСЃС‹РІР°РµРј РІСЃРµ СѓСЃР»РѕРІРёСЏ
             foreach (var cond in conditions)
                 cond.Dispose();
 
-            // Оповещаем UI: «квест готов к получению»
+            // РћРїРѕРІРµС‰Р°РµРј UI: В«РєРІРµСЃС‚ РіРѕС‚РѕРІ Рє РїРѕР»СѓС‡РµРЅРёСЋВ»
             OnReadyToClaim?.Invoke();
+            TrackQuestCompleted();
         }
         else
         {
-            // Если условия ещё не все выполнены, можно обновлять прогресс в UI
+            // Р•СЃР»Рё СѓСЃР»РѕРІРёСЏ РµС‰С‘ РЅРµ РІСЃРµ РІС‹РїРѕР»РЅРµРЅС‹, РјРѕР¶РЅРѕ РѕР±РЅРѕРІР»СЏС‚СЊ РїСЂРѕРіСЂРµСЃСЃ РІ UI
             float progress = CalculateNormalizedProgress();
             OnProgressChanged?.Invoke(progress);
         }
     }
 
     /// <summary>
-    /// Если все условия были выполнены до того, как этот объект появился,
-    /// сразу вызываем OnReadyToClaim().
+    /// Р•СЃР»Рё РІСЃРµ СѓСЃР»РѕРІРёСЏ Р±С‹Р»Рё РІС‹РїРѕР»РЅРµРЅС‹ РґРѕ С‚РѕРіРѕ, РєР°Рє СЌС‚РѕС‚ РѕР±СЉРµРєС‚ РїРѕСЏРІРёР»СЃСЏ,
+    /// СЃСЂР°Р·Сѓ РІС‹Р·С‹РІР°РµРј OnReadyToClaim().
     /// </summary>
     private void CheckImmediateCompletion()
     {
@@ -101,11 +104,12 @@ public class QuestInstance : MonoBehaviour
             foreach (var cond in conditions)
                 cond.Dispose();
             OnReadyToClaim?.Invoke();
+            TrackQuestCompleted();
         }
     }
 
     /// <summary>
-    /// Для UI: возвращаем текущий прогресс (0..1).
+    /// Р”Р»СЏ UI: РІРѕР·РІСЂР°С‰Р°РµРј С‚РµРєСѓС‰РёР№ РїСЂРѕРіСЂРµСЃСЃ (0..1).
     /// </summary>
     public float GetCurrentProgress()
     {
@@ -122,12 +126,12 @@ public class QuestInstance : MonoBehaviour
     }
 
     /// <summary>
-    /// Публичный геттер, чтобы QuestManager знал, выполнен ли квест до показа UI.
+    /// РџСѓР±Р»РёС‡РЅС‹Р№ РіРµС‚С‚РµСЂ, С‡С‚РѕР±С‹ QuestManager Р·РЅР°Р», РІС‹РїРѕР»РЅРµРЅ Р»Рё РєРІРµСЃС‚ РґРѕ РїРѕРєР°Р·Р° UI.
     /// </summary>
     public bool IsCompleted => isCompleted;
 
     /// <summary>
-    /// Вызывается, когда в UI нажали кнопку «Забрать награду».
+    /// Р’С‹Р·С‹РІР°РµС‚СЃСЏ, РєРѕРіРґР° РІ UI РЅР°Р¶Р°Р»Рё РєРЅРѕРїРєСѓ В«Р—Р°Р±СЂР°С‚СЊ РЅР°РіСЂР°РґСѓВ».
     /// </summary>
     public void ClaimReward()
     {
@@ -136,21 +140,44 @@ public class QuestInstance : MonoBehaviour
 
         isClaimed = true;
 
-        // Выдать награду
+        // Р’С‹РґР°С‚СЊ РЅР°РіСЂР°РґСѓ
         RewardManager.Instance.GiveReward(questDefinition.reward);
-        // UnityEvent для любых дополнительных действий (открыть дверь и т.п.)
+        // UnityEvent РґР»СЏ Р»СЋР±С‹С… РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹С… РґРµР№СЃС‚РІРёР№ (РѕС‚РєСЂС‹С‚СЊ РґРІРµСЂСЊ Рё С‚.Рї.)
         questDefinition.onQuestCompleted?.Invoke();
 
-        // Оповещаем менеджер: «квест окончательно забран»
+        // РћРїРѕРІРµС‰Р°РµРј РјРµРЅРµРґР¶РµСЂ: В«РєРІРµСЃС‚ РѕРєРѕРЅС‡Р°С‚РµР»СЊРЅРѕ Р·Р°Р±СЂР°РЅВ»
         OnQuestClaimed?.Invoke();
+        GameAnalytics.TrackCritical(AnalyticsEventNames.QuestRewardClaimed, GameAnalytics.Params(
+            "quest_id", QuestId,
+            "reward_coins", questDefinition != null && questDefinition.reward != null ? questDefinition.reward.coins : 0,
+            "reward_experience", questDefinition != null && questDefinition.reward != null ? questDefinition.reward.experience : 0,
+            "reward_item_id", questDefinition != null && questDefinition.reward != null ? questDefinition.reward.itemId : string.Empty,
+            "source", "quest_panel",
+            "result", "success"),
+            QuestId);
+    }
+
+    private string QuestId => questDefinition != null
+        ? questDefinition.questId.ToString().ToLowerInvariant()
+        : gameObject.name;
+
+    private void TrackQuestCompleted()
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.QuestCompleted, GameAnalytics.Params(
+            "quest_id", QuestId,
+            "completion_time_sec", Mathf.Max(0f, Time.realtimeSinceStartup - _analyticsStartedAt),
+            "condition_count", conditions.Count,
+            "source", "quest_conditions",
+            "result", "success"),
+            QuestId);
     }
 
     private void OnDestroy()
     {
-        // Уведомляем, что QuestInstance удалён
+        // РЈРІРµРґРѕРјР»СЏРµРј, С‡С‚Рѕ QuestInstance СѓРґР°Р»С‘РЅ
         OnDestroyed?.Invoke(this);
     }
 
-    // Событие, чтобы UI обновлялся при каждом изменении прогресса
+    // РЎРѕР±С‹С‚РёРµ, С‡С‚РѕР±С‹ UI РѕР±РЅРѕРІР»СЏР»СЃСЏ РїСЂРё РєР°Р¶РґРѕРј РёР·РјРµРЅРµРЅРёРё РїСЂРѕРіСЂРµСЃСЃР°
     public event System.Action<float> OnProgressChanged;
 }

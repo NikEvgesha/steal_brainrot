@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using MirraGames.SDK;
 using UnityEngine;
 
 public class GameEntryPoint : MonoBehaviour
@@ -134,6 +133,7 @@ public class GameEntryPoint : MonoBehaviour
 
         _loadingHidden = true;
         G.GameLoader.ShowLoadingScreen(false);
-        MirraSDK.WaitForProviders(static () => MirraSDK.Analytics.GameIsReady());
+        AnalyticsManager.Instance.MarkGameReady();
+        AnalyticsManager.Instance.MarkGameplayStarted("game_entry");
     }
 }

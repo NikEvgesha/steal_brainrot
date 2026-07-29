@@ -128,6 +128,14 @@ public class FriendsPanelController : MonoBehaviour
         {
             _openFlow = StartCoroutine(OpenFlow());
             G.Input.AOpenWindow?.Invoke(this);
+            GameAnalytics.Track(AnalyticsEventNames.FriendsPanelOpened, GameAnalytics.Params(
+                "online_mode", LobbyClient.Instance != null
+                    ? LobbyClient.Instance.NetworkMode.ToString().ToLowerInvariant()
+                    : "unknown",
+                "source", "friends_button",
+                "result", "success"),
+                AnalyticsPriority.Normal,
+                "friends_panel_open");
         }
 
     }
@@ -297,6 +305,7 @@ public class FriendsPanelController : MonoBehaviour
 
         bool ok = false;
         yield return api.AddFriend(code, success => ok = success);
+        TrackFriendRequest("send", code, ok, ok ? string.Empty : "request_failed");
 
         if (!ok)
         {
@@ -313,6 +322,11 @@ public class FriendsPanelController : MonoBehaviour
     {
         bool ok = false;
         yield return api.RemoveFriend(friendCode, success => ok = success);
+        GameAnalytics.TrackCritical(AnalyticsEventNames.FriendRemoved, GameAnalytics.Params(
+            "target_id_hash", GameAnalytics.HashId(friendCode),
+            "source", "friends_panel",
+            "result", ok ? "success" : "failed",
+            "failure_reason", ok ? string.Empty : "request_failed"));
         if (ok) yield return RefreshFriends();
     }
 
@@ -320,6 +334,7 @@ public class FriendsPanelController : MonoBehaviour
     {
         bool ok = false;
         yield return api.AcceptFriendRequest(requestId, success => ok = success);
+        TrackFriendRequest("accept", requestId, ok, ok ? string.Empty : "request_failed");
         if (ok)
         {
             G.Sound?.Play(GameAudioId.SFX_FRIEND_ACCEPT);
@@ -332,10 +347,21 @@ public class FriendsPanelController : MonoBehaviour
     {
         bool ok = false;
         yield return api.DeclineFriendRequest(requestId, success => ok = success);
+        TrackFriendRequest("decline", requestId, ok, ok ? string.Empty : "request_failed");
         if (ok)
         {
             yield return RefreshRequests();
         }
+    }
+
+    private static void TrackFriendRequest(string action, string targetId, bool success, string failureReason)
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.FriendRequestResult, GameAnalytics.Params(
+            "action", action,
+            "target_id_hash", GameAnalytics.HashId(targetId),
+            "source", "friends_panel",
+            "result", success ? "success" : "failed",
+            "failure_reason", failureReason ?? string.Empty));
     }
 
     IEnumerator RenameFlow()

@@ -216,7 +216,16 @@ public class AlbumProgressService : MonoBehaviour
         if (changed)
             Changed?.Invoke();
         if (entityDiscovered && !_hydratingInventory)
+        {
             G.Sound?.Play(GameAudioId.SFX_ALBUM_DISCOVERY);
+            GameAnalytics.Track(AnalyticsEventNames.AlbumDiscovery, GameAnalytics.Params(
+                "discovery_kind", "entity",
+                "entity_type", type.ToString().ToLowerInvariant(),
+                "entity_id", normalizedId,
+                "element_type", resolvedElementType.ToString().ToLowerInvariant(),
+                "source", "gameplay_discovery",
+                "result", "success"));
+        }
 
         return changed;
     }
@@ -259,6 +268,17 @@ public class AlbumProgressService : MonoBehaviour
 
         if (changed)
             Changed?.Invoke();
+
+        if (changed && !_hydratingInventory)
+        {
+            GameAnalytics.Track(AnalyticsEventNames.AlbumDiscovery, GameAnalytics.Params(
+                "discovery_kind", "element",
+                "entity_type", type.ToString().ToLowerInvariant(),
+                "entity_id", normalizedId,
+                "element_type", elementType.ToString().ToLowerInvariant(),
+                "source", "gameplay_discovery",
+                "result", "success"));
+        }
 
         return changed;
     }

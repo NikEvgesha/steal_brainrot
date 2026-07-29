@@ -133,6 +133,19 @@ public class QuickAccessManager : MonoBehaviour
         G.Inventory.Remove(_currentActive);
         _dropping = false;
 
+        Field ownerField = field.GetComponentInParent<Field>();
+        var placementParameters = GameAnalytics.Params(
+            "item_type", placedType.ToString().ToLowerInvariant(),
+            "item_id", placedId,
+            "destination_type", "field_cell",
+            "field_id", ownerField != null ? ownerField.ID : -1,
+            "cell_id", field.name,
+            "source", "quick_access",
+            "result", "success");
+        GameAnalytics.Track(AnalyticsEventNames.ItemPlaced, placementParameters);
+        if (placedType == Item.Egg)
+            GameAnalytics.TrackOnce("first_egg_placed", AnalyticsEventNames.FirstEggPlaced, placementParameters);
+
         TutorialSignals.Raise(
             placedType == Item.Egg ? TutorialSignalType.EggPlaced : TutorialSignalType.AnimalPlaced,
             field,

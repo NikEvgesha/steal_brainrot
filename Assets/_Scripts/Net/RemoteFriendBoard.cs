@@ -326,6 +326,12 @@ public class RemoteFriendBoard : MonoBehaviour
 
         bool ok = false;
         yield return api.SendFriendRequest(friendCode, success => ok = success);
+        GameAnalytics.TrackCritical(AnalyticsEventNames.FriendRequestResult, GameAnalytics.Params(
+            "action", "send",
+            "target_id_hash", GameAnalytics.HashId(friendCode),
+            "source", "remote_friend_board",
+            "result", ok ? "success" : "failed",
+            "failure_reason", ok ? string.Empty : "request_failed"));
         if (ok)
         {
             if (statusText != null) statusText.text = L("UI/Friends/RequestSent", sentLabel);
@@ -370,6 +376,13 @@ public class RemoteFriendBoard : MonoBehaviour
 
         var payloadId = BuildGiftItemPayload(current, itemType);
         yield return LobbyClient.Instance.SendGift(targetPlayerId, itemType, payloadId, success => ok = success, targetFriendCode);
+        GameAnalytics.TrackCritical(AnalyticsEventNames.GiftSendResult, GameAnalytics.Params(
+            "target_id_hash", GameAnalytics.HashId(targetPlayerId ?? targetFriendCode),
+            "item_type", itemType,
+            "item_id_hash", GameAnalytics.HashId(current.Name),
+            "source", "remote_friend_board",
+            "result", ok ? "success" : "failed",
+            "failure_reason", ok ? string.Empty : "request_failed"));
         if (ok)
         {
             G.Sound?.Play(GameAudioId.SFX_GIFT_SEND);

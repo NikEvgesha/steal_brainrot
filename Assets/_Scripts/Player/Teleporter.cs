@@ -41,6 +41,11 @@ public class Teleporter : MonoBehaviour
         if (G.Player != null)
             G.Sound?.PlayAt(GameAudioId.SFX_TELEPORT, G.Player.transform.position);
         G.Player.Teleport(target);
+        GameAnalytics.Track(AnalyticsEventNames.TeleportUsed, GameAnalytics.Params(
+            "destination", destination.ToString().ToLowerInvariant(),
+            "destination_object", target.name,
+            "source", "teleport_button",
+            "result", "success"));
     }
 
     private Transform ResolveDestination(ScenePoint destination)

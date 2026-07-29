@@ -93,9 +93,20 @@ public class PurchasesManager : MonoBehaviour
     // Вызов покупки
     public void BuyPurchase(string purchaseId, Action<bool> onComplete)
     {
+        string requestId = Guid.NewGuid().ToString("N");
+        float requestedAt = Time.realtimeSinceStartup;
+        GameAnalytics.TrackCritical(AnalyticsEventNames.PurchaseStarted, GameAnalytics.Params(
+            "request_id", requestId,
+            "product_id", purchaseId ?? string.Empty,
+            "provider", provider != null ? provider.GetType().Name : string.Empty,
+            "source", "platform_purchase",
+            "result", "started"),
+            requestId);
+
         if (string.IsNullOrWhiteSpace(purchaseId))
         {
             Debug.LogError("[PurchasesManager] Cannot buy purchase: purchase id is empty.");
+            TrackPurchaseResult(requestId, purchaseId, requestedAt, false, "empty_product_id");
             onComplete?.Invoke(false);
             return;
         }
@@ -103,6 +114,7 @@ public class PurchasesManager : MonoBehaviour
         if (provider == null)
         {
             Debug.LogError("Purchases provider not initialized!");
+            TrackPurchaseResult(requestId, purchaseId, requestedAt, false, "provider_missing");
             onComplete?.Invoke(false);
             return;
         }
@@ -110,11 +122,36 @@ public class PurchasesManager : MonoBehaviour
         if (!provider.IsInitialized)
         {
             Debug.LogWarning("[PurchasesManager] Cannot buy purchase: provider is not ready yet.");
+            TrackPurchaseResult(requestId, purchaseId, requestedAt, false, "provider_not_ready");
             onComplete?.Invoke(false);
             return;
         }
 
-        provider.BuyPurchase(purchaseId, onComplete);
+        provider.BuyPurchase(purchaseId, success =>
+        {
+            TrackPurchaseResult(requestId, purchaseId, requestedAt, success,
+                success ? string.Empty : "cancelled_or_failed");
+            onComplete?.Invoke(success);
+        });
+    }
+
+    private void TrackPurchaseResult(
+        string requestId,
+        string purchaseId,
+        float requestedAt,
+        bool success,
+        string failureReason)
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.PurchaseResult, GameAnalytics.Params(
+            "request_id", requestId,
+            "product_id", purchaseId ?? string.Empty,
+            "provider", provider != null ? provider.GetType().Name : string.Empty,
+            "latency_ms", Math.Round(Math.Max(0f, Time.realtimeSinceStartup - requestedAt) * 1000d),
+            "is_restore", false,
+            "source", "platform_purchase",
+            "result", success ? "success" : "failed",
+            "failure_reason", failureReason ?? string.Empty),
+            requestId);
     }
 
     // Получение данных о покупке

@@ -865,6 +865,7 @@ public class LobbyClient : MonoBehaviour
 
     public IEnumerator JoinLobbyFlow()
     {
+        float analyticsJoinStartedAt = Time.realtimeSinceStartup;
         if (debugSimulateOffline)
             yield break;
 
@@ -884,6 +885,7 @@ public class LobbyClient : MonoBehaviour
         if (backend == null)
         {
             DisableOnline("backend_missing");
+            TrackLobbyJoin("auto", LobbyJoinResult.Failed, analyticsJoinStartedAt, "backend_missing");
             yield break;
         }
 
@@ -894,6 +896,8 @@ public class LobbyClient : MonoBehaviour
 
         var joinResult = LobbyJoinResult.Failed;
         yield return JoinLobby(result => joinResult = result);
+        TrackLobbyJoin("auto", joinResult, analyticsJoinStartedAt,
+            joinResult == LobbyJoinResult.Success ? string.Empty : joinResult.ToString().ToLowerInvariant());
         if (joinResult != LobbyJoinResult.Success)
         {
             DisableOnline(joinResult == LobbyJoinResult.CapacityDegraded
@@ -927,6 +931,7 @@ public class LobbyClient : MonoBehaviour
 
     public IEnumerator JoinWithFriend(string friendCode, Action<bool> onDone = null)
     {
+        float analyticsJoinStartedAt = Time.realtimeSinceStartup;
         if (debugSimulateOffline)
         {
             onDone?.Invoke(false);
@@ -948,6 +953,7 @@ public class LobbyClient : MonoBehaviour
         if (backend == null)
         {
             DisableOnline("backend_missing");
+            TrackLobbyJoin("friend_code", LobbyJoinResult.Failed, analyticsJoinStartedAt, "backend_missing", friendCode);
             onDone?.Invoke(false);
             yield break;
         }
@@ -959,6 +965,9 @@ public class LobbyClient : MonoBehaviour
 
         var joinResult = LobbyJoinResult.Failed;
         yield return JoinLobbyWith(friendCode, result => joinResult = result);
+        TrackLobbyJoin("friend_code", joinResult, analyticsJoinStartedAt,
+            joinResult == LobbyJoinResult.Success ? string.Empty : joinResult.ToString().ToLowerInvariant(),
+            friendCode);
         if (joinResult != LobbyJoinResult.Success)
         {
             if (joinResult == LobbyJoinResult.CapacityDegraded)
@@ -1114,6 +1123,13 @@ public class LobbyClient : MonoBehaviour
         var previousMode = NetworkMode;
         NetworkMode = mode;
         NetworkModeChanged?.Invoke(mode);
+        GameAnalytics.TrackCritical(AnalyticsEventNames.OnlineModeChanged, GameAnalytics.Params(
+            "mode_before", previousMode.ToString().ToLowerInvariant(),
+            "mode_after", mode.ToString().ToLowerInvariant(),
+            "lobby_id_hash", GameAnalytics.HashId(LobbyId),
+            "source", "lobby_client",
+            "result", "changed"),
+            previousMode + ":" + mode);
 
         if (!_networkAudioReady)
         {
@@ -2214,6 +2230,7 @@ public class LobbyClient : MonoBehaviour
 
     private IEnumerator RecoverAfterStateNotFound()
     {
+        float analyticsRecoveryStartedAt = Time.realtimeSinceStartup;
         _stateRecoverInProgress = true;
         var joinResult = LobbyJoinResult.Failed;
         yield return JoinLobby(result => joinResult = result);
@@ -2234,7 +2251,34 @@ public class LobbyClient : MonoBehaviour
             RegisterError("state_recover_join_failed");
         }
 
+        GameAnalytics.TrackCritical(AnalyticsEventNames.LobbyRecoveryResult, GameAnalytics.Params(
+            "recovery_type", "state_404_rejoin",
+            "attempt_count", _state404Count,
+            "latency_ms", Math.Round(Math.Max(0f, Time.realtimeSinceStartup - analyticsRecoveryStartedAt) * 1000d),
+            "source", "lobby_state",
+            "result", joinResult == LobbyJoinResult.Success ? "success" : "failed",
+            "failure_reason", joinResult == LobbyJoinResult.Success
+                ? string.Empty
+                : joinResult.ToString().ToLowerInvariant()),
+            "state_404_rejoin");
+
         _stateRecoverInProgress = false;
+    }
+
+    private static void TrackLobbyJoin(
+        string joinType,
+        LobbyJoinResult joinResult,
+        float startedAt,
+        string failureReason,
+        string targetCode = null)
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.LobbyJoinResult, GameAnalytics.Params(
+            "join_type", joinType,
+            "target_id_hash", GameAnalytics.HashId(targetCode),
+            "latency_ms", Math.Round(Math.Max(0f, Time.realtimeSinceStartup - startedAt) * 1000d),
+            "source", "lobby_client",
+            "result", joinResult == LobbyJoinResult.Success ? "success" : "failed",
+            "failure_reason", failureReason ?? string.Empty));
     }
 
     private void HandleWsNotInLobby()

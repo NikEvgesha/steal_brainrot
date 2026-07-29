@@ -244,7 +244,17 @@ public class ConveyorUI : MonoBehaviour
         if (_currentLevelInfo == null)
             return;
 
+        bool wasActive = _currentLevelInfo.IsActive;
         LevelActivated?.Invoke(_currentLevelInfo);
+        if (_currentLevelInfo.IsPurchased && !wasActive)
+        {
+            GameAnalytics.Track(AnalyticsEventNames.ConveyorLevelActivated, GameAnalytics.Params(
+                "conveyor_level_id", _currentLevelInfo.Name,
+                "rarity", _currentLevelInfo.RareType.ToString().ToLowerInvariant(),
+                "income_multiplier", _currentLevelInfo.IncomeMultiplier,
+                "source", "conveyor_level_ui",
+                "result", "success"));
+        }
         G.Sound?.PlayAt(GameAudioId.SFX_CONVEYOR_ACTIVATE, _conveyor != null ? _conveyor.transform.position : transform.position);
         SetButtons();
     }

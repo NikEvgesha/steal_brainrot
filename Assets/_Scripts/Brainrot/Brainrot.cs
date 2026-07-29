@@ -55,6 +55,8 @@ public class Brainrot : InventoryItem
 
     public GameObject Model => _modelPoint.gameObject;
     public double CurrentIncome => _currentIncome;
+    public double MaxAccumulatedIncome =>
+        Math.Max(0d, _dinamicData.ResultIncome * OfflineRewardRules.MaxAccrualSeconds);
     public long LastIncomeCollectTime => _lastIncomeTime;
     public bool HasCollectibleIncome => IsCollectibleLocal() && _currentIncome > 0d;
 
@@ -170,7 +172,7 @@ public class Brainrot : InventoryItem
             effectiveLastIncomeTs = nowTs;
 
         _lastIncomeTime = effectiveLastIncomeTs;
-        var incomeAccumulationTime = Math.Max(0L, nowTs - effectiveLastIncomeTs);
+        var incomeAccumulationTime = OfflineRewardRules.ClampAccrualSeconds(nowTs - effectiveLastIncomeTs);
         _currentIncome = Math.Max(0d, Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome));
         _hasOfflineIncomePending = incomeAccumulationTime >= 60L && _currentIncome > 0d;
         _incomeReadySignaled = _currentIncome > 0d;
@@ -293,7 +295,8 @@ public class Brainrot : InventoryItem
         if (collected <= 0d)
             return 0d;
 
-        bool playOfflineIncome = playAudio && _hasOfflineIncomePending;
+        bool hadOfflineIncome = _hasOfflineIncomePending;
+        bool playOfflineIncome = playAudio && hadOfflineIncome;
         if (!TryAddCoins(collected, playAudio && !playOfflineIncome))
             return 0d;
         if (playOfflineIncome)
@@ -317,7 +320,44 @@ public class Brainrot : InventoryItem
             Item.Brainrot,
             collected);
 
+        var incomeParameters = GameAnalytics.Params(
+            "source_type", "brainrot",
+            "source_id", Name,
+            "amount", collected,
+            "collection_mode", AnalyticsContext.IsIncomeBatch ? AnalyticsContext.IncomeBatchMode : "manual",
+            "offline_income", hadOfflineIncome,
+            "currency_type", "coins",
+            "result", "success");
+        GameAnalytics.TrackOnce("first_income_collected", AnalyticsEventNames.FirstIncomeCollected, incomeParameters);
+        if (!AnalyticsContext.IsIncomeBatch)
+            GameAnalytics.Track(AnalyticsEventNames.IncomeCollected, incomeParameters);
+
         return collected;
+    }
+
+    public void RefreshAccumulatedIncomeFromClock()
+    {
+        if (!IsCollectibleLocal())
+            return;
+
+        long nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (_lastIncomeTime <= 0L || _lastIncomeTime > nowTs)
+            _lastIncomeTime = nowTs;
+
+        long elapsed = OfflineRewardRules.ClampAccrualSeconds(nowTs - _lastIncomeTime);
+        _currentIncome = Math.Max(0d, Math.Round(elapsed * _dinamicData.ResultIncome));
+        _currentIncome = double.IsInfinity(_currentIncome)
+            ? float.MaxValue
+            : Math.Min(_currentIncome, MaxAccumulatedIncome);
+        _hasOfflineIncomePending = elapsed >= 60L && _currentIncome > 0d;
+        _incomeReadySignaled = _currentIncome > 0d;
+
+        if (_canvas != null)
+        {
+            _canvas.UpdateIncome(_currentIncome);
+            if (elapsed > 0L)
+                _canvas.UpdateOfflineIncome(_currentIncome);
+        }
     }
 
     private bool IsCollectibleLocal()
@@ -374,7 +414,9 @@ public class Brainrot : InventoryItem
                 continue;
 
             _currentIncome += _dinamicData.ResultIncome; //2 is the magic number
-            _currentIncome = (double.IsInfinity(_currentIncome)) ? float.MaxValue : _currentIncome;
+            _currentIncome = double.IsInfinity(_currentIncome)
+                ? float.MaxValue
+                : Math.Min(_currentIncome, MaxAccumulatedIncome);
             _currentIncome = Math.Round(_currentIncome);
             if (!_incomeReadySignaled && _currentIncome > 0d)
             {

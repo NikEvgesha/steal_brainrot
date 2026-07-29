@@ -28,9 +28,21 @@ public class SellSlot : MonoBehaviour
     public void _OnSellButtonClick()
     {
         if (!_item.SellAllowed) return;
+        string itemId = _item.Name;
+        string itemType = _item.Type.ToString().ToLowerInvariant();
+        string rarity = _item.RareType.ToString().ToLowerInvariant();
+        double price = _item.BaseSellPrice;
         G.Sound?.Play(GameAudioId.SFX_ITEM_SELL);
-        G.Currency.AddCurrency(CurrencyType.Coins, _item.BaseSellPrice);
+        G.Currency.AddCurrency(CurrencyType.Coins, price);
         G.Inventory.Remove(_item);
+        GameAnalytics.Track(AnalyticsEventNames.ItemSold, GameAnalytics.Params(
+            "item_type", itemType,
+            "item_id", itemId,
+            "rarity", rarity,
+            "currency_type", "coins",
+            "price", price,
+            "source", "sell_point",
+            "result", "success"));
         Destroy(gameObject);
     }
 }

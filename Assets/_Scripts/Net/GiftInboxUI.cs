@@ -111,6 +111,7 @@ public class GiftInboxUI : MonoBehaviour
     private void ShowGift(GiftItemDto gift)
     {
         _current = gift;
+        TrackGiftPresented(gift, "legacy_panel");
         if (_panel != null) _panel.SetActive(true);
         if (_text != null)
         {
@@ -148,8 +149,10 @@ public class GiftInboxUI : MonoBehaviour
         if (resp != null && resp.ok)
         {
             G.Sound?.Play(GameAudioId.SFX_GIFT_OPEN);
-            SpawnGiftItem(resp.itemType, resp.itemId);
+            using (GameAnalytics.BeginItemGrant("gift", gift.giftId))
+                SpawnGiftItem(resp.itemType, resp.itemId);
         }
+        TrackGiftAction(gift, "accept", resp != null && resp.ok);
         Hide();
     }
 
@@ -159,6 +162,7 @@ public class GiftInboxUI : MonoBehaviour
         yield return LobbyClient.Instance.DeclineGift(gift.giftId, v => ok = v);
         if (ok)
             G.Sound?.Play(GameAudioId.SFX_GIFT_RETURN);
+        TrackGiftAction(gift, "decline", ok);
         Hide();
     }
 
@@ -173,8 +177,10 @@ public class GiftInboxUI : MonoBehaviour
         if (resp != null && resp.ok)
         {
             G.Sound?.Play(GameAudioId.SFX_GIFT_RETURN);
-            SpawnGiftItem(resp.itemType, resp.itemId);
+            using (GameAnalytics.BeginItemGrant("returned_gift", gift.giftId))
+                SpawnGiftItem(resp.itemType, resp.itemId);
         }
+        TrackGiftAction(gift, "auto_accept_returned", resp != null && resp.ok);
 
         _autoAcceptInFlight = false;
         Hide();
@@ -206,9 +212,39 @@ public class GiftInboxUI : MonoBehaviour
         });
 
         if (shown)
+        {
             _current = gift;
+            TrackGiftPresented(gift, "universal_popup");
+        }
 
         return shown;
+    }
+
+    private static void TrackGiftPresented(GiftItemDto gift, string presentation)
+    {
+        if (gift == null)
+            return;
+        GameAnalytics.Track(AnalyticsEventNames.GiftPresented, GameAnalytics.Params(
+            "gift_id_hash", GameAnalytics.HashId(gift.giftId),
+            "target_id_hash", GameAnalytics.HashId(gift.fromPlayerId),
+            "item_type", gift.itemType,
+            "item_id_hash", GameAnalytics.HashId(gift.itemId),
+            "presentation", presentation,
+            "is_returned", gift.isReturned,
+            "source", "gift_inbox",
+            "result", "presented"),
+            AnalyticsPriority.Normal,
+            GameAnalytics.HashId(gift.giftId));
+    }
+
+    private static void TrackGiftAction(GiftItemDto gift, string action, bool success)
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.GiftActionResult, GameAnalytics.Params(
+            "gift_id_hash", GameAnalytics.HashId(gift != null ? gift.giftId : null),
+            "action", action,
+            "source", "gift_inbox",
+            "result", success ? "success" : "failed",
+            "failure_reason", success ? string.Empty : "backend_request_failed"));
     }
 
     private void SpawnGiftItem(string itemType, string itemId)

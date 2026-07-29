@@ -1,73 +1,116 @@
+using System;
 using System.Collections.Generic;
+using MirraGames.SDK;
 using UnityEngine;
-using MirraGames.SDK;  // Пространство имён MirraSDK
 
-//#if MIRRA_SDK_ENABLED
-public class MirraSDKAnalyticsProvider : AnalyticsProvider
+public sealed class MirraSDKAnalyticsProvider : AnalyticsProvider
 {
-    /// <summary>
-    /// Ждём, пока EventsReporter инициализируется,
-    /// чтобы не потерять первые события.
-    /// </summary>
+    public override bool IsReady
+    {
+        get
+        {
+            try
+            {
+                return MirraSDK.Analytics.IsEventsReporterInitialized;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
     public override void Initialize()
     {
-        MirraSDK.WaitForProviders(() =>
-        {
-            //Debug.Log("MirraSDKAnalyticsProvider: Events reporter initialized");
-        });  // :contentReference[oaicite:0]{index=0}
+        MirraSDK.WaitForProviders(() => { });
     }
 
-    /// <summary>
-    /// Отправка простого события без параметров.
-    /// </summary>
     public override void SendEvent(string eventName)
     {
-        if (MirraSDK.Analytics.IsEventsReporterInitialized)
-        {
-            MirraSDK.Analytics.Report(eventName);
-            Debug.Log($"MirraSDKAnalyticsProvider: Event sent: {eventName}");
-        }
-        else
-        {
-            Debug.LogWarning($"MirraSDKAnalyticsProvider: Reporter not ready, skipped event '{eventName}'");
-        }
+        TrySendEvent(eventName, null);
     }
 
-    /// <summary>
-    /// Отправка события с произвольными параметрами (object).
-    /// </summary>
     public override void SendEvent(string eventName, Dictionary<string, object> parameters)
     {
-        if (MirraSDK.Analytics.IsEventsReporterInitialized)
+        TrySendEvent(eventName, parameters);
+    }
+
+    public override void SendEvent(string eventName, Dictionary<string, string> parameters)
+    {
+        var converted = new Dictionary<string, object>();
+        if (parameters != null)
         {
-            MirraSDK.Analytics.Report(eventName, parameters);
-            Debug.Log($"MirraSDKAnalyticsProvider: Event sent: {eventName} with parameters");
+            foreach (KeyValuePair<string, string> pair in parameters)
+                converted[pair.Key] = pair.Value;
         }
-        else
+        TrySendEvent(eventName, converted);
+    }
+
+    public override bool TrySendEvent(string eventName, Dictionary<string, object> parameters = null)
+    {
+        if (!IsReady)
+            return false;
+
+        try
         {
-            Debug.LogWarning($"MirraSDKAnalyticsProvider: Reporter not ready, skipped event '{eventName}'");
+            if (parameters == null || parameters.Count == 0)
+                MirraSDK.Analytics.Report(eventName);
+            else
+                MirraSDK.Analytics.Report(eventName, parameters);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"Mirra analytics rejected '{eventName}': {exception.GetType().Name}");
+            return false;
         }
     }
 
-    /// <summary>
-    /// Отправка события с параметрами-строками.
-    /// Просто конвертируем их в object-словарь.
-    /// </summary>
-    public override void SendEvent(string eventName, Dictionary<string, string> parameters)
+    public bool TryGameIsReady()
     {
-        if (MirraSDK.Analytics.IsEventsReporterInitialized)
+        if (!IsReady)
+            return false;
+        try
         {
-            var objParams = new Dictionary<string, object>(parameters.Count);
-            foreach (var kv in parameters)
-                objParams[kv.Key] = kv.Value;
-
-            MirraSDK.Analytics.Report(eventName, objParams);
-            Debug.Log($"MirraSDKAnalyticsProvider: Event sent: {eventName} with string parameters");
+            MirraSDK.Analytics.GameIsReady();
+            return true;
         }
-        else
+        catch (Exception exception)
         {
-            Debug.LogWarning($"MirraSDKAnalyticsProvider: Reporter not ready, skipped event '{eventName}'");
+            Debug.LogWarning($"Mirra native GameIsReady failed: {exception.GetType().Name}");
+            return false;
+        }
+    }
+
+    public bool TryGameplayStart()
+    {
+        if (!IsReady)
+            return false;
+        try
+        {
+            MirraSDK.Analytics.GameplayStart();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"Mirra native GameplayStart failed: {exception.GetType().Name}");
+            return false;
+        }
+    }
+
+    public bool TryGameplayStop()
+    {
+        if (!IsReady)
+            return false;
+        try
+        {
+            MirraSDK.Analytics.GameplayStop();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"Mirra native GameplayStop failed: {exception.GetType().Name}");
+            return false;
         }
     }
 }
-//#endif

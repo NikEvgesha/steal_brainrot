@@ -75,6 +75,9 @@ public class BigPetPoint : MonoBehaviour
     private readonly List<Brainrot> _activePets = new List<Brainrot>();
 
     public double CurrentIncomePerSecond => _purchased ? _currentIncome : 0d;
+    public double AccumulatedIncome => _remoteMode ? 0d : Math.Max(0d, _accumulatedIncome);
+    public double MaxAccumulatedIncome =>
+        Math.Max(0d, CurrentIncomePerSecond * OfflineRewardRules.MaxAccrualSeconds);
     public double UnlockPrice => Math.Max(0d, _unlockPrice);
     public bool IsPurchased => _purchased;
     public int CurrentLevel => Mathf.Max(1, _currentLvl);
@@ -252,6 +255,9 @@ public class BigPetPoint : MonoBehaviour
     private IEnumerator FeedProcess()
     {
         if (_remoteMode) yield break;
+        string analyticsFoodId = _currentFood != null ? _currentFood.Name : string.Empty;
+        int analyticsLevelBefore = _currentLvl;
+        int analyticsXpBefore = _currentXp;
         if (_foodTimeBar != null)
             _foodTimeBar.gameObject.SetActive(true);
 
@@ -299,6 +305,16 @@ public class BigPetPoint : MonoBehaviour
         CheckPlayer(G.QuickAccess != null ? G.QuickAccess.CurrentActive : null);
         if (_foodTimeBar != null)
             _foodTimeBar.gameObject.SetActive(false);
+
+        GameAnalytics.Track(AnalyticsEventNames.BigPetFed, GameAnalytics.Params(
+            "big_pet_id", gameObject.name,
+            "food_id", analyticsFoodId,
+            "level_before", analyticsLevelBefore,
+            "level_after", _currentLvl,
+            "xp_before", analyticsXpBefore,
+            "xp_after", _currentXp,
+            "source", "big_pet_feed",
+            "result", "success"));
     }
 
     private void CheckLvl()
@@ -307,6 +323,7 @@ public class BigPetPoint : MonoBehaviour
 
         if (_currentXp >= _xpForNextLvl)
         {
+            int levelBefore = _currentLvl;
             int previousMaxAvailablePetIdx = _maxAvailablePetIdx;
             while (_currentXp >= _xpForNextLvl)
             {
@@ -335,6 +352,14 @@ public class BigPetPoint : MonoBehaviour
             }
 
             CheckScale();
+            GameAnalytics.Track(AnalyticsEventNames.BigPetLevelUp, GameAnalytics.Params(
+                "big_pet_id", gameObject.name,
+                "level_before", levelBefore,
+                "level_after", _currentLvl,
+                "variant_unlocked", _maxAvailablePetIdx > previousMaxAvailablePetIdx,
+                "active_variant_index", _currentPetIdx,
+                "source", "feeding",
+                "result", "success"));
         }
 
         if (_xpProgressBar != null)
@@ -490,8 +515,18 @@ public class BigPetPoint : MonoBehaviour
     {
         if (_remoteMode) return;
         if (variantIndex < 0 || variantIndex > _maxAvailablePetIdx) return;
+        int previousVariant = _currentPetIdx;
+        if (previousVariant == variantIndex)
+            return;
         SetPet(variantIndex);
         G.Sound?.Play(GameAudioId.SFX_PET_SELECT);
+        GameAnalytics.Track(AnalyticsEventNames.BigPetVariantSelected, GameAnalytics.Params(
+            "big_pet_id", gameObject.name,
+            "variant_before", previousVariant,
+            "variant_after", variantIndex,
+            "big_pet_level", _currentLvl,
+            "source", "big_pet_variant_ui",
+            "result", "success"));
     }
 
     private void GetIncome()
@@ -508,7 +543,8 @@ public class BigPetPoint : MonoBehaviour
         if (collected <= 0d)
             return 0d;
 
-        bool playOfflineIncome = playAudio && _hasOfflineIncomePending;
+        bool hadOfflineIncome = _hasOfflineIncomePending;
+        bool playOfflineIncome = playAudio && hadOfflineIncome;
         if (!TryAddCoins(collected, playAudio && !playOfflineIncome))
             return 0d;
         if (playOfflineIncome)
@@ -525,7 +561,46 @@ public class BigPetPoint : MonoBehaviour
         if (playAudio && G.Sound == null && _audio)
             _audio.Play();
 
+        var incomeParameters = GameAnalytics.Params(
+            "source_type", "big_pet",
+            "source_id", gameObject.name,
+            "amount", collected,
+            "collection_mode", AnalyticsContext.IsIncomeBatch ? AnalyticsContext.IncomeBatchMode : "manual",
+            "offline_income", hadOfflineIncome,
+            "currency_type", "coins",
+            "result", "success");
+        GameAnalytics.TrackOnce("first_income_collected", AnalyticsEventNames.FirstIncomeCollected, incomeParameters);
+        if (!AnalyticsContext.IsIncomeBatch)
+            GameAnalytics.Track(AnalyticsEventNames.IncomeCollected, incomeParameters);
+
         return collected;
+    }
+
+    public void RefreshAccumulatedIncomeFromClock()
+    {
+        if (_remoteMode || !_purchased)
+            return;
+
+        long nowTs = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long lastTs = _lastIncomeCollectTimestamp == default
+            ? nowTs
+            : new DateTimeOffset(_lastIncomeCollectTimestamp).ToUnixTimeSeconds();
+        if (lastTs <= 0L || lastTs > nowTs)
+            lastTs = nowTs;
+
+        long elapsed = OfflineRewardRules.ClampAccrualSeconds(nowTs - lastTs);
+        _accumulatedIncome = Math.Max(0d, Math.Round(elapsed * _currentIncome));
+        _accumulatedIncome = double.IsInfinity(_accumulatedIncome)
+            ? float.MaxValue
+            : Math.Min(_accumulatedIncome, MaxAccumulatedIncome);
+        _hasOfflineIncomePending = elapsed >= 60L && _accumulatedIncome > 0d;
+
+        if (_petInfoUI != null)
+        {
+            _petInfoUI.UpdateIncome(_accumulatedIncome);
+            if (elapsed > 0L)
+                _petInfoUI.UpdateOfflineIncome(_accumulatedIncome);
+        }
     }
 
     private static bool TryAddCoins(double amount, bool playAudio)
@@ -557,7 +632,9 @@ public class BigPetPoint : MonoBehaviour
                 continue;
 
             _accumulatedIncome += _currentIncome;
-            _accumulatedIncome = double.IsInfinity(_accumulatedIncome) ? float.MaxValue : _accumulatedIncome;
+            _accumulatedIncome = double.IsInfinity(_accumulatedIncome)
+                ? float.MaxValue
+                : Math.Min(_accumulatedIncome, MaxAccumulatedIncome);
             _accumulatedIncome = Math.Round(_accumulatedIncome);
             if (_petInfoUI != null)
                 _petInfoUI.UpdateIncome(_accumulatedIncome);
@@ -705,8 +782,12 @@ public class BigPetPoint : MonoBehaviour
         if (_remoteMode || _purchased)
             return;
 
-        if (!G.Currency.RemoveCurrency(CurrencyType.Coins, _unlockPrice))
+        bool success = G.Currency.RemoveCurrency(CurrencyType.Coins, _unlockPrice);
+        if (!success)
+        {
+            TrackPurchaseResult(false);
             return;
+        }
 
         _purchased = true;
         G.Save.SaveBigPetStatus(true);
@@ -715,12 +796,24 @@ public class BigPetPoint : MonoBehaviour
         BaseDirtyTracker.MarkDirty();
         TutorialSignals.Raise(TutorialSignalType.BigPetPurchased, this, value: _unlockPrice);
         G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
+        TrackPurchaseResult(true);
 
         if (_playerInArea)
         {
             SetQuickAccessBinding(true);
             CheckPlayer(G.QuickAccess != null ? G.QuickAccess.CurrentActive : null);
         }
+    }
+
+    private void TrackPurchaseResult(bool success)
+    {
+        GameAnalytics.Track(AnalyticsEventNames.BigPetPurchaseResult, GameAnalytics.Params(
+            "big_pet_id", gameObject.name,
+            "currency_type", "coins",
+            "price", _unlockPrice,
+            "source", "big_pet_buy_panel",
+            "result", success ? "success" : "failed",
+            "failure_reason", success ? string.Empty : "insufficient_currency"));
     }
 
     private void CacheSceneRefs()
@@ -877,7 +970,7 @@ public class BigPetPoint : MonoBehaviour
             lastCollectTs = nowTs;
 
         _lastIncomeCollectTimestamp = DateTimeOffset.FromUnixTimeSeconds(lastCollectTs).UtcDateTime;
-        incomeAccumulateTime = Math.Max(0L, nowTs - lastCollectTs);
+        incomeAccumulateTime = OfflineRewardRules.ClampAccrualSeconds(nowTs - lastCollectTs);
 
         _accumulatedIncome = Math.Max(0d, incomeAccumulateTime * _currentIncome);
         _hasOfflineIncomePending = incomeAccumulateTime >= 60L && _accumulatedIncome > 0d;

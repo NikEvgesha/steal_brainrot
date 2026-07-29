@@ -456,6 +456,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
             _permanentUnlocked = true;
             PersistPermanentUnlocked();
             G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
+            TrackPermanentUnlock("free", 0d);
             return true;
         }
 
@@ -468,9 +469,22 @@ public class ClaimAllCoinsZone : MonoBehaviour
         _permanentUnlocked = true;
         PersistPermanentUnlocked();
         G.Sound?.Play(GameAudioId.SFX_UNLOCK_MAJOR);
+        TrackPermanentUnlock(unlockPriceCurrency.ToString().ToLowerInvariant(), unlockPrice);
         if (debugLogs)
             Debug.Log("[ClaimAll] Permanent unlock purchased.");
         return true;
+    }
+
+    private void TrackPermanentUnlock(string currencyType, double price)
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.NoAdsUnlocked, GameAnalytics.Params(
+            "unlock_type", "claim_all_forever",
+            "zone_id", zoneId,
+            "source", "claim_all",
+            "currency_type", currencyType,
+            "price", price,
+            "result", "success"),
+            "claim_all_unlock:" + zoneId);
     }
 
     private void TryCollectWithoutAd(string source)
@@ -486,9 +500,14 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private double CollectAllIncomeWithBonus(double multiplier, string source)
     {
-        var baseCollected = CollectAllIncomeRaw();
+        var baseCollected = CollectAllIncomeRaw(out int sourceCount, source);
         if (baseCollected <= 0d)
+        {
+            if (!string.Equals(source, "auto", StringComparison.Ordinal))
+                AnalyticsManager.Instance.RecordClaimAll(
+                    zoneId, source, 0d, multiplier, 0, "failed", "no_collectible_income");
             return 0d;
+        }
 
         var safeMultiplier = Math.Max(1d, multiplier);
         var bonus = baseCollected * (safeMultiplier - 1d);
@@ -504,6 +523,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
         if (debugLogs)
             Debug.Log($"[ClaimAll] source={source} collected={final.ToString("0", CultureInfo.InvariantCulture)}");
 
+        AnalyticsManager.Instance.RecordClaimAll(
+            zoneId, source, final, safeMultiplier, sourceCount);
         return final;
     }
 
@@ -522,28 +543,38 @@ public class ClaimAllCoinsZone : MonoBehaviour
             G.Currency.AddCurrency(CurrencyType.Coins, amount, playAudio: false);
     }
 
-    private double CollectAllIncomeRaw()
+    private double CollectAllIncomeRaw(out int sourceCount, string collectionMode)
     {
         EnsureIncomeSourcesCache();
         double total = 0d;
+        sourceCount = 0;
 
-        for (var i = 0; i < _cachedIncomeCells.Count; i++)
+        using (GameAnalytics.BeginIncomeBatch(collectionMode))
         {
-            var cell = _cachedIncomeCells[i];
-            var brainrot = cell != null ? cell.CurrentBrainrot : null;
-            if (brainrot == null)
-                continue;
-            total += brainrot.CollectIncome(playAudio: false);
-        }
-
-        if (includeBigPetIncome)
-        {
-            for (var i = 0; i < _cachedBigPetPoints.Count; i++)
+            for (var i = 0; i < _cachedIncomeCells.Count; i++)
             {
-                var bigPet = _cachedBigPetPoints[i];
-                if (bigPet == null)
+                var cell = _cachedIncomeCells[i];
+                var brainrot = cell != null ? cell.CurrentBrainrot : null;
+                if (brainrot == null)
                     continue;
-                total += bigPet.CollectIncome(playAudio: false);
+                double collected = brainrot.CollectIncome(playAudio: false);
+                if (collected > 0d)
+                    sourceCount++;
+                total += collected;
+            }
+
+            if (includeBigPetIncome)
+            {
+                for (var i = 0; i < _cachedBigPetPoints.Count; i++)
+                {
+                    var bigPet = _cachedBigPetPoints[i];
+                    if (bigPet == null)
+                        continue;
+                    double collected = bigPet.CollectIncome(playAudio: false);
+                    if (collected > 0d)
+                        sourceCount++;
+                    total += collected;
+                }
             }
         }
 

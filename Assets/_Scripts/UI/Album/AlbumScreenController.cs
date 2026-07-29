@@ -379,6 +379,15 @@ public class AlbumScreenController : MonoBehaviour
         {
             Refresh();
             TutorialSignals.Raise(TutorialSignalType.AlbumOpened, this);
+            if (!wasOpen)
+            {
+                GameAnalytics.Track(AnalyticsEventNames.AlbumOpened, GameAnalytics.Params(
+                    "selected_entity_type", _currentTab.ToString().ToLowerInvariant(),
+                    "source", "album_button",
+                    "result", "success"),
+                    AnalyticsPriority.Normal,
+                    "album_open");
+            }
 
             if (G.Input != null)
                 G.Input.AOpenWindow?.Invoke(this);
@@ -1443,6 +1452,16 @@ public class AlbumScreenController : MonoBehaviour
             G.Currency.AddCurrency(CurrencyType.Gems, rewardAmount);
         else
             G.Sound?.Play(GameAudioId.SFX_REWARD_CLAIM);
+
+        GameAnalytics.TrackCritical(AnalyticsEventNames.AlbumRewardClaimed, GameAnalytics.Params(
+            "entity_type", entry.type.ToString().ToLowerInvariant(),
+            "entity_id", entry.id,
+            "element_type", selectedElementType.ToString().ToLowerInvariant(),
+            "currency_type", "gems",
+            "reward_amount", rewardAmount,
+            "source", "album_card",
+            "result", "success"),
+            entry.type + ":" + entry.id + ":" + selectedElementType);
 
         TutorialSignals.Raise(
             TutorialSignalType.AlbumRewardClaimed,

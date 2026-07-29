@@ -122,6 +122,22 @@ public class Inventory : MonoBehaviour
         {
             G.Sound?.Play(GameAudioId.SFX_ITEM_PICKUP);
             TutorialSignals.Raise(TutorialSignalType.ItemAcquired, item, item.Name, item.Type);
+
+            AnalyticsItemGrantContext grant = AnalyticsContext.ItemGrant;
+            var parameters = GameAnalytics.Params(
+                "item_type", item.Type.ToString().ToLowerInvariant(),
+                "item_id", item.Name,
+                "rarity", item.RareType.ToString().ToLowerInvariant(),
+                "source", grant != null ? grant.Source : "gameplay",
+                "source_id", grant != null ? grant.SourceId : string.Empty,
+                "currency_type", grant != null ? grant.CurrencyType : string.Empty,
+                "price", grant != null ? grant.Price : 0d,
+                "request_id", grant != null ? grant.RequestId : string.Empty,
+                "inventory_count", GetItems(item.Type)?.Count ?? 0);
+            GameAnalytics.Track(AnalyticsEventNames.ItemAcquired, parameters);
+
+            if (item.Type == Item.Egg)
+                GameAnalytics.TrackOnce("first_egg_acquired", AnalyticsEventNames.FirstEggAcquired, parameters);
         }
     }
 

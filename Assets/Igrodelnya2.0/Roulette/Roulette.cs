@@ -59,6 +59,10 @@ public class Roulette : MonoBehaviour
     private IEnumerator _spinCoroutine;
     private IEnumerator _timerCoroutine;
     private bool _inputBound;
+    private string _spinSource = string.Empty;
+    private string _spinCurrency = string.Empty;
+    private double _spinPrice;
+    private string _spinRequestId = string.Empty;
 
 
     private void Awake()
@@ -147,6 +151,7 @@ public class Roulette : MonoBehaviour
             if (_spinning)
             {
                 StopCoroutine(_spinCoroutine);
+                TrackSpinResult(false, default, "spin_cancelled");
                 _adButton.interactable = true;
                 _gemsButton.interactable = true;
                 _freeAvailable = true;
@@ -159,6 +164,14 @@ public class Roulette : MonoBehaviour
             _ui.SetActive(_isOpen);
             G.Input.AOpenWindow?.Invoke(this);
             SwitchFreePlayButton(_freeAvailable);
+            GameAnalytics.Track(AnalyticsEventNames.RouletteOpened, GameAnalytics.Params(
+                "free_spin_available", _freeAvailable,
+                "gems_price", _gemsPrice,
+                "reward_count", _rewards.Count,
+                "source", "roulette_toggle",
+                "result", "success"),
+                AnalyticsPriority.Normal,
+                "roulette_open");
         }
         
     }
@@ -177,7 +190,7 @@ public class Roulette : MonoBehaviour
     {
         if (_freeAvailable)
         {
-            StartSpin();
+            StartSpin("free", string.Empty, 0d);
             SwitchFreePlayButton(false);
             _lastSpinTime = MirraSDK.Time.CurrentDate.ToUniversalTime();
             G.Save.SaveRouletteDate(_lastSpinTime);
@@ -194,7 +207,9 @@ public class Roulette : MonoBehaviour
                 (success) =>
                 {
                     if (success)
-                        StartSpin();
+                        StartSpin("rewarded_ad", string.Empty, 0d);
+                    else
+                        TrackSpinFailure("rewarded_ad", string.Empty, 0d, "ad_not_completed");
             });
         }
     }
@@ -203,14 +218,19 @@ public class Roulette : MonoBehaviour
     {
         if (G.Currency.RemoveCurrency(CurrencyType.Gems, _gemsPrice))
         {
-            //G.Currency.RemoveCurrency(CurrencyType.Gems, _gemsPrice);
-            StartSpin();
+            StartSpin("gems", "gems", _gemsPrice);
         }
+        else
+            TrackSpinFailure("gems", "gems", _gemsPrice, "insufficient_currency");
     }
 
 
-    private void StartSpin()
+    private void StartSpin(string source, string currencyType, double price)
     {
+        _spinSource = source;
+        _spinCurrency = currencyType;
+        _spinPrice = price;
+        _spinRequestId = Guid.NewGuid().ToString("N");
         _adButton.interactable = false;
         _gemsButton.interactable = false;
         G.Sound?.Play(GameAudioId.SFX_ROULETTE_START);
@@ -374,9 +394,37 @@ public class Roulette : MonoBehaviour
         {
             // Grant an item reward.
             InventoryItem item = Instantiate(reward.item);
-            G.Inventory.Add(item);
+            using (GameAnalytics.BeginItemGrant("roulette", _spinSource, _spinCurrency, _spinPrice, _spinRequestId))
+                G.Inventory.Add(item);
         }
 
-            Debug.Log("Roulette reward");
+        TrackSpinResult(true, reward, string.Empty);
+        Debug.Log("Roulette reward");
+    }
+
+    private void TrackSpinFailure(string source, string currencyType, double price, string failureReason)
+    {
+        _spinSource = source;
+        _spinCurrency = currencyType;
+        _spinPrice = price;
+        _spinRequestId = Guid.NewGuid().ToString("N");
+        TrackSpinResult(false, default, failureReason);
+    }
+
+    private void TrackSpinResult(bool success, RouletteReward reward, string failureReason)
+    {
+        GameAnalytics.Track(AnalyticsEventNames.RouletteSpinResult, GameAnalytics.Params(
+            "request_id", _spinRequestId,
+            "spin_source", _spinSource,
+            "currency_type", _spinCurrency,
+            "price", _spinPrice,
+            "reward_type", success ? reward.rewardType.ToString().ToLowerInvariant() : string.Empty,
+            "reward_amount", success ? reward.amount : 0,
+            "reward_item_id", success && reward.item != null ? reward.item.Name : string.Empty,
+            "source", "roulette",
+            "result", success ? "success" : "failed",
+            "failure_reason", failureReason),
+            AnalyticsPriority.Normal,
+            _spinRequestId);
     }
 }

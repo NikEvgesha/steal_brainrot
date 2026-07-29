@@ -185,6 +185,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/auth/guest", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             yield break;
         }
@@ -228,6 +229,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/zoo/me:get", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             onDone?.Invoke(null);
             yield break;
@@ -254,6 +256,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/zoo/me:put", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             onOk?.Invoke(false);
             yield break;
@@ -321,6 +324,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/zoo/locations", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             CompleteInitialLocationsLoad(_lastLocations);
             yield break;
@@ -352,6 +356,7 @@ public class ZooBackendClient : MonoBehaviour
         }
         catch
         {
+            AnalyticsManager.Instance.RecordBackendFailure("/zoo/locations", 500, "parse_error");
             onErr?.Invoke(500, "Failed to parse locations response");
             CompleteInitialLocationsLoad(_lastLocations);
             yield break;
@@ -388,6 +393,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/friends/by-code/base", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             yield break;
         }
@@ -416,6 +422,7 @@ public class ZooBackendClient : MonoBehaviour
         }
         catch
         {
+            AnalyticsManager.Instance.RecordBackendFailure("/friends/by-code/base", 500, "parse_error");
             onErr?.Invoke(500, "Failed to parse friend base response");
         }
     }
@@ -434,6 +441,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/chest:get", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             yield break;
         }
@@ -474,6 +482,7 @@ public class ZooBackendClient : MonoBehaviour
         }
         catch
         {
+            AnalyticsManager.Instance.RecordBackendFailure("/chest:get", 500, "parse_error");
             onErr?.Invoke(500, "Failed to parse chest response");
         }
     }
@@ -501,6 +510,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/chest/deposit", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             onOk?.Invoke(false);
             yield break;
@@ -530,6 +540,7 @@ public class ZooBackendClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            RecordRequestFailure("/chest/claim", req);
             onErr?.Invoke(req.responseCode, req.downloadHandler.text);
             yield break;
         }
@@ -556,7 +567,16 @@ public class ZooBackendClient : MonoBehaviour
         }
         catch
         {
+            AnalyticsManager.Instance.RecordBackendFailure("/chest/claim", 500, "parse_error");
             onErr?.Invoke(500, "Failed to parse chest claim response");
         }
+    }
+
+    private static void RecordRequestFailure(string endpoint, UnityWebRequest request)
+    {
+        AnalyticsManager.Instance.RecordBackendFailure(
+            endpoint,
+            request != null ? request.responseCode : 0,
+            request != null ? request.result.ToString().ToLowerInvariant() : "request_missing");
     }
 }

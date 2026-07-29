@@ -29,7 +29,7 @@ public class LoadingManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("LoadingManager уже существует! Удаляем дубликат.");
+            Debug.LogWarning("LoadingManager СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚! РЈРґР°Р»СЏРµРј РґСѓР±Р»РёРєР°С‚.");
             Destroy(gameObject);
         }
     }
@@ -38,8 +38,8 @@ public class LoadingManager : MonoBehaviour
         G.GameLoader.OnSceneLoaded += OnSceneLoaded;
         MirraSDK.WaitForProviders(static () => {
             LoadingManager.Instance.StartGame();
-            // Методы SDK не должны вызывать вылет или NullReferenceException,
-            // делегат будет вызван только когда все провайдеры имеют статус IsInitialized.
+            // РњРµС‚РѕРґС‹ SDK РЅРµ РґРѕР»Р¶РЅС‹ РІС‹Р·С‹РІР°С‚СЊ РІС‹Р»РµС‚ РёР»Рё NullReferenceException,
+            // РґРµР»РµРіР°С‚ Р±СѓРґРµС‚ РІС‹Р·РІР°РЅ С‚РѕР»СЊРєРѕ РєРѕРіРґР° РІСЃРµ РїСЂРѕРІР°Р№РґРµСЂС‹ РёРјРµСЋС‚ СЃС‚Р°С‚СѓСЃ IsInitialized.
         });
 
     }
@@ -75,15 +75,13 @@ public class LoadingManager : MonoBehaviour
     {
         CurrentLocation = _location;
         LocationChanged?.Invoke(CurrentLocation);
-        MirraSDK.Analytics.GameplayStart();
-        //Debug.Log("GameplayStart");
+        AnalyticsManager.Instance.MarkGameplayStarted("scene_loaded");
         
     }
 
     public void LoadLocation(Location location, string sceneName = null, bool withAds = true)
     {
-        MirraSDK.Analytics.GameplayStop();
-        //Debug.Log("GameplayStop");
+        AnalyticsManager.Instance.MarkGameplayStopped("scene_transition");
         if (location == Location.Game)
         {
             G.GameLoader.LoadNextScene(sceneName != null ? sceneName : _gameScene, true);

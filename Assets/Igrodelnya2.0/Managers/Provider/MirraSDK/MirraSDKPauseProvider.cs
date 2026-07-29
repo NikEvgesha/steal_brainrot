@@ -1,5 +1,5 @@
 using UnityEngine;
-using MirraGames.SDK;  // пространство имён MirraSDK
+using MirraGames.SDK;  // РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ РёРјС‘РЅ MirraSDK
 
 //#if MIRRA_SDK_ENABLED
 public class MirraSDKPauseProvider : PauseProvider
@@ -10,12 +10,7 @@ public class MirraSDKPauseProvider : PauseProvider
 
     public override void Initialize()
     {
-        MirraSDK.WaitForProviders(() =>
-        {
-            MirraSDK.Analytics.GameIsReady();
-            // В SDK нет глобальных событий паузы, поэтому инициализация здесь пустая
-            //Debug.Log("MirraSDKPauseProvider initialized");
-        });  
+        MirraSDK.WaitForProviders(() => { });
     }
     public override void SetPause(bool paused, bool controlAudio = true)
     {
@@ -23,27 +18,21 @@ public class MirraSDKPauseProvider : PauseProvider
 
         _isPaused = paused;
 
-        // Управляем временем через MirraSDK.Time.Scale
+        // РЈРїСЂР°РІР»СЏРµРј РІСЂРµРјРµРЅРµРј С‡РµСЂРµР· MirraSDK.Time.Scale
         MirraSDK.Time.Scale = paused ? 0f : 1f;  // :contentReference[oaicite:0]{index=0}
 
         if (controlAudio)
         {
-            // Управляем звуком через MirraSDK.Audio.Pause
+            // РЈРїСЂР°РІР»СЏРµРј Р·РІСѓРєРѕРј С‡РµСЂРµР· MirraSDK.Audio.Pause
             MirraSDK.Audio.Pause = paused;         // :contentReference[oaicite:1]{index=1}
         }
 
-        // Оповещаем подписчиков об изменении паузы
+        // РћРїРѕРІРµС‰Р°РµРј РїРѕРґРїРёСЃС‡РёРєРѕРІ РѕР± РёР·РјРµРЅРµРЅРёРё РїР°СѓР·С‹
         RaisePauseChanged(_isPaused);
         if (_isPaused)
-        {
-            MirraSDK.Analytics.GameplayStop();
-            //Debug.Log("GameplayStop");
-        }
+            AnalyticsManager.Instance.MarkGameplayStopped("game_pause");
         else 
-        { 
-            MirraSDK.Analytics.GameplayStart();
-            //Debug.Log("GameplayStart");
-        }
+            AnalyticsManager.Instance.MarkGameplayStarted("game_pause");
 
 
         Debug.Log($"MirraSDKPauseProvider: pause set to {_isPaused}");

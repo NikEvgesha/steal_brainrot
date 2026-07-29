@@ -4,6 +4,8 @@ using UnityEngine;
 
 public abstract class SaveProvider : MonoBehaviour
 {
+    private const string OfflineRewardLastSeenKey = "OfflineReward.LastSeenUnix";
+
     public bool Changed;
     public abstract bool IsInitialized { get; }
     public abstract void Initialize();
@@ -74,6 +76,19 @@ public abstract class SaveProvider : MonoBehaviour
     public abstract int LoadLevelId();
     public abstract void SaveRouletteDate(DateTime date);
     public abstract DateTime LoadRouletteDate();
+
+    public virtual void SaveOfflineRewardLastSeenUnix(long unix)
+    {
+        PlayerPrefs.SetString(OfflineRewardLastSeenKey, Math.Max(0L, unix).ToString());
+        PlayerPrefs.Save();
+    }
+
+    public virtual long LoadOfflineRewardLastSeenUnix()
+    {
+        return long.TryParse(PlayerPrefs.GetString(OfflineRewardLastSeenKey, "0"), out long unix)
+            ? Math.Max(0L, unix)
+            : 0L;
+    }
 
     public abstract void SaveBigPetXP(int xp);
     public abstract void SaveBigPetLvl(int lvl);

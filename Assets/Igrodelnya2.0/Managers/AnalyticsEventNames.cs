@@ -1,0 +1,79 @@
+public static class AnalyticsEventNames
+{
+    public const string GameLoaded = "game_loaded";
+    public const string SessionStarted = "session_started";
+    public const string SessionEnded = "session_ended";
+    public const string AppPause = "app_pause";
+    public const string AppResume = "app_resume";
+    public const string OnlineModeChanged = "online_mode_changed";
+    public const string LobbyJoinResult = "lobby_join_result";
+    public const string LobbyRecoveryResult = "lobby_recovery_result";
+    public const string TutorialStarted = "tutorial_started";
+    public const string TutorialResumed = "tutorial_resumed";
+    public const string TutorialStepStarted = "tutorial_step_started";
+    public const string TutorialStepCompleted = "tutorial_step_completed";
+    public const string TutorialCompleted = "tutorial_completed";
+    public const string TutorialAbandoned = "tutorial_abandoned";
+    public const string FirstEggAcquired = "first_egg_acquired";
+    public const string FirstEggPlaced = "first_egg_placed";
+    public const string FirstAnimalHatched = "first_animal_hatched";
+    public const string FirstIncomeCollected = "first_income_collected";
+    public const string FirstUpgradePurchased = "first_upgrade_purchased";
+    public const string ItemAcquired = "item_acquired";
+    public const string ItemPlaced = "item_placed";
+    public const string EggSpeedupResult = "egg_speedup_result";
+    public const string AnimalHatched = "animal_hatched";
+    public const string IncomeCollected = "income_collected";
+    public const string ClaimAllResult = "claim_all_result";
+    public const string ItemSold = "item_sold";
+    public const string FoodPurchaseResult = "food_purchase_result";
+    public const string TerritoryUnlockResult = "territory_unlock_result";
+    public const string ConveyorUpgradeResult = "conveyor_upgrade_result";
+    public const string ConveyorLevelActivated = "conveyor_level_activated";
+    public const string BigPetPurchaseResult = "big_pet_purchase_result";
+    public const string BigPetFed = "big_pet_fed";
+    public const string BigPetLevelUp = "big_pet_level_up";
+    public const string BigPetVariantSelected = "big_pet_variant_selected";
+    public const string AlbumOpened = "album_opened";
+    public const string AlbumDiscovery = "album_discovery";
+    public const string AlbumRewardClaimed = "album_reward_claimed";
+    public const string InventoryOpened = "inventory_opened";
+    public const string TeleportUsed = "teleport_used";
+    public const string RouletteOpened = "roulette_opened";
+    public const string RouletteSpinResult = "roulette_spin_result";
+    public const string PlaytimeRewardClaimed = "playtime_reward_claimed";
+    public const string DailyPlaytimeMilestone = "daily_playtime_milestone";
+    public const string OfflineRewardPresented = "offline_reward_presented";
+    public const string OfflineRewardClaimResult = "offline_reward_claim_result";
+    public const string CurrencyShortageRedirect = "currency_shortage_redirect";
+    public const string QuestCompleted = "quest_completed";
+    public const string QuestRewardClaimed = "quest_reward_claimed";
+    public const string ShopOpened = "shop_opened";
+    public const string ShopOfferSelected = "shop_offer_selected";
+    public const string PurchaseStarted = "purchase_started";
+    public const string PurchaseResult = "purchase_result";
+    public const string AdRequested = "ad_requested";
+    public const string AdResult = "ad_result";
+    public const string TimedInterstitialRewardGranted = "timed_interstitial_reward_granted";
+    public const string NoAdsUnlocked = "no_ads_unlocked";
+    public const string FriendsPanelOpened = "friends_panel_opened";
+    public const string FriendRequestResult = "friend_request_result";
+    public const string FriendRemoved = "friend_removed";
+    public const string RemoteProfileOpened = "remote_profile_opened";
+    public const string LikeResult = "like_result";
+    public const string GiftSendResult = "gift_send_result";
+    public const string GiftPresented = "gift_presented";
+    public const string GiftActionResult = "gift_action_result";
+    public const string SettingsChanged = "settings_changed";
+    public const string SaveError = "save_error";
+    public const string AnalyticsDeliveryError = "analytics_delivery_error";
+    public const string SessionQualitySummary = "session_quality_summary";
+    public const string BackendFailureSummary = "backend_failure_summary";
+}
+
+public enum AnalyticsPriority
+{
+    Critical = 0,
+    Normal = 1,
+    Diagnostic = 2
+}

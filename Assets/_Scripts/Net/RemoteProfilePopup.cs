@@ -155,6 +155,13 @@ public sealed class RemoteProfilePopup : MonoBehaviour
 
         if (_panel != null)
             _panel.SetActive(true);
+
+        GameAnalytics.Track(AnalyticsEventNames.RemoteProfileOpened, GameAnalytics.Params(
+            "target_id_hash", GameAnalytics.HashId(_targetPlayerId ?? _targetFriendCode),
+            "has_public_stats", stats != null,
+            "likes_count", _likesCount,
+            "source", "remote_profile",
+            "result", "success"));
     }
 
     private void MountOnGameCanvas()
@@ -825,6 +832,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             Debug.LogWarning($"[RemoteProfilePopup] Like request failed: {errCode} {errText}");
             ShowNotice(L("UI/Profile/LikeUnavailable", "Like is temporarily unavailable"), ExtraLikeNoticeSeconds);
             UpdateLikeUi();
+            TrackLikeResult(false, errCode != 0 ? "backend_error_" + errCode : "empty_response");
             yield break;
         }
 
@@ -833,9 +841,25 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         UpdateLikeUi();
 
         if (response.ok)
+        {
             G.Sound?.Play(GameAudioId.SFX_LIKE);
+            TrackLikeResult(true, string.Empty);
+        }
         else
+        {
             ShowNotice(BuildAlreadyLikedText(response.nextLikeAtUtc), ExtraLikeNoticeSeconds);
+            TrackLikeResult(false, "already_liked_or_limited");
+        }
+    }
+
+    private void TrackLikeResult(bool success, string failureReason)
+    {
+        GameAnalytics.TrackCritical(AnalyticsEventNames.LikeResult, GameAnalytics.Params(
+            "target_id_hash", GameAnalytics.HashId(_targetPlayerId ?? _targetFriendCode),
+            "likes_count", _likesCount,
+            "source", "remote_profile",
+            "result", success ? "success" : "failed",
+            "failure_reason", failureReason ?? string.Empty));
     }
 
     private void UpdateLikeUi()

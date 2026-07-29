@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,8 +13,27 @@ public class SettingUI : MonoBehaviour
     [SerializeField] private GameObject _lobbyButtons;
 
     private bool _isOpen;
+    private readonly Dictionary<string, PendingSetting> _pendingSettings = new();
+
+    private void Update()
+    {
+        if (_pendingSettings.Count == 0)
+            return;
+
+        float now = Time.unscaledTime;
+        var ready = new List<string>();
+        foreach (KeyValuePair<string, PendingSetting> pair in _pendingSettings)
+        {
+            if (now - pair.Value.ChangedAt >= 1f)
+                ready.Add(pair.Key);
+        }
+        for (int i = 0; i < ready.Count; i++)
+            FlushSetting(ready[i]);
+    }
+
     public void ToggleOpen()
     {
+        bool wasOpen = _isOpen;
         _isOpen = !_isOpen;
         //_lobbyButtons.SetActive(G.Game);
         if (!G.Control.UseTouchControl)
@@ -27,6 +47,8 @@ public class SettingUI : MonoBehaviour
 
         if (_isOpen)
             G.Input.AOpenWindow?.Invoke(this);
+        else if (wasOpen)
+            FlushAllSettings();
         
     }
     private void Start()
@@ -87,22 +109,85 @@ public class SettingUI : MonoBehaviour
 
     public void OnMusicVolumeChange(float value)
     {
+        float before = G.Sound != null ? G.Sound.MusicVolume : value;
         G.Settings.MusicVolume(value);
+        if (_isOpen)
+            MarkSettingChanged("music_volume", before, value);
     }
 
     public void OnSoundVolumeChange(float value)
     {
+        float before = G.Sound != null ? G.Sound.SoundVolume : value;
         G.Settings.SoundVolume(value);
+        if (_isOpen)
+            MarkSettingChanged("sound_volume", before, value);
     }
 
     public void OnSensivityChange(float value)
     {
+        float before = G.Settings != null ? G.Settings.Sensivity : value;
         G.Settings.Sensitivity(value);
+        if (_isOpen)
+            MarkSettingChanged("sensitivity", before, value);
     }
 
     public void OnAnimationsToggleChange(bool isEnabled)
     {
+        bool before = G.Settings != null && G.Settings.AnimalsAnimationsEnabled;
         G.Settings.SetAnimalsAnimationsEnabled(isEnabled);
+        if (_isOpen && before != isEnabled)
+        {
+            MarkSettingChanged("animal_animations", before, isEnabled);
+            FlushSetting("animal_animations");
+        }
+    }
+
+    private void MarkSettingChanged(string name, object before, object after)
+    {
+        if (_pendingSettings.TryGetValue(name, out PendingSetting pending))
+        {
+            pending.After = after;
+            pending.ChangedAt = Time.unscaledTime;
+            return;
+        }
+
+        _pendingSettings[name] = new PendingSetting
+        {
+            Before = before,
+            After = after,
+            ChangedAt = Time.unscaledTime
+        };
+    }
+
+    private void FlushAllSettings()
+    {
+        if (_pendingSettings.Count == 0)
+            return;
+        var names = new List<string>(_pendingSettings.Keys);
+        for (int i = 0; i < names.Count; i++)
+            FlushSetting(names[i]);
+    }
+
+    private void FlushSetting(string name)
+    {
+        if (!_pendingSettings.TryGetValue(name, out PendingSetting pending))
+            return;
+        _pendingSettings.Remove(name);
+        GameAnalytics.Track(AnalyticsEventNames.SettingsChanged, GameAnalytics.Params(
+            "setting_name", name,
+            "value_before", pending.Before,
+            "value_after", pending.After,
+            "source", "settings_panel",
+            "result", "changed"),
+            AnalyticsPriority.Normal,
+            name);
+    }
+
+    private sealed class PendingSetting
+    {
+        public object Before;
+        public object After;
+        public float ChangedAt;
     }
 
     private void ResolveAnimationsToggle()

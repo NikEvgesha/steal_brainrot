@@ -79,12 +79,26 @@ public class ConveyorLevel : MonoBehaviour
     {
         if (_purchased) return;
 
-
-        if (G.Currency.RemoveCurrency(forGems ? CurrencyType.Gems : CurrencyType.Coins, forGems ? _priceGems : _priceCoin))
+        CurrencyType currency = forGems ? CurrencyType.Gems : CurrencyType.Coins;
+        double price = forGems ? _priceGems : _priceCoin;
+        bool success = G.Currency.RemoveCurrency(currency, price);
+        if (success)
         {
             SetPurchased(true);
             LevelPurchased?.Invoke(this);
         }
+
+        var parameters = GameAnalytics.Params(
+            "conveyor_level_id", _name,
+            "rarity", _rarity.ToString().ToLowerInvariant(),
+            "currency_type", currency.ToString().ToLowerInvariant(),
+            "price", price,
+            "source", "conveyor_upgrade_ui",
+            "result", success ? "success" : "failed",
+            "failure_reason", success ? string.Empty : "insufficient_currency");
+        GameAnalytics.Track(AnalyticsEventNames.ConveyorUpgradeResult, parameters);
+        if (success)
+            GameAnalytics.TrackOnce("first_upgrade_purchased", AnalyticsEventNames.FirstUpgradePurchased, parameters);
     }
 
     public void SetPurchased(bool purchased)

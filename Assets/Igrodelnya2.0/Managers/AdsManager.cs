@@ -138,9 +138,14 @@ public class AdsManager : MonoBehaviour
 
     public void ShowRewardedAd(string rewardId, Action<bool> onComplete)
     {
+        string requestId = Guid.NewGuid().ToString("N");
+        float requestedAt = Time.realtimeSinceStartup;
+        TrackAdRequested("rewarded", rewardId, requestId);
+
         if (_rewardedInProgress)
         {
             Debug.LogWarning("Rewarded ad is already in progress.");
+            TrackAdResult("rewarded", rewardId, requestId, null, requestedAt, false, "already_in_progress");
             onComplete?.Invoke(false);
             return;
         }
@@ -148,19 +153,20 @@ public class AdsManager : MonoBehaviour
         AdsProvider provider = FindReadyRewardedProvider();
         if (provider != null)
         {
-            ShowRewardedAd(provider, rewardId, onComplete);
+            ShowRewardedAd(provider, rewardId, requestId, requestedAt, onComplete);
             return;
         }
 
         if (!waitForRewardedProvider)
         {
             Debug.LogWarning("No rewarded ads available.");
+            TrackAdResult("rewarded", rewardId, requestId, null, requestedAt, false, "provider_unavailable");
             onComplete?.Invoke(false);
             return;
         }
 
         _rewardedInProgress = true;
-        StartCoroutine(WaitAndShowRewardedAd(rewardId, onComplete));
+        StartCoroutine(WaitAndShowRewardedAd(rewardId, requestId, requestedAt, onComplete));
     }
 
     public void ShowInterstitialAd()
@@ -175,14 +181,20 @@ public class AdsManager : MonoBehaviour
 
     private bool TryShowInterstitialAd(Action<bool> onComplete)
     {
+        string requestId = Guid.NewGuid().ToString("N");
+        float requestedAt = Time.realtimeSinceStartup;
+        TrackAdRequested("interstitial", "interstitial", requestId);
+
         if (IsInterstitialTemporarilySuppressed)
         {
+            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "tutorial_suppressed");
             onComplete?.Invoke(false);
             return false;
         }
 
         if (AreInterstitialAdsDisabled)
         {
+            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "no_ads_unlocked");
             onComplete?.Invoke(false);
             return false;
         }
@@ -190,6 +202,7 @@ public class AdsManager : MonoBehaviour
         if (_interstitialInProgress)
         {
             Debug.LogWarning("Interstitial ad is already in progress.");
+            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "already_in_progress");
             onComplete?.Invoke(false);
             return false;
         }
@@ -198,6 +211,7 @@ public class AdsManager : MonoBehaviour
         if (provider == null)
         {
             Debug.LogWarning("No interstitial ads available.");
+            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "provider_unavailable");
             onComplete?.Invoke(false);
             return false;
         }
@@ -208,6 +222,8 @@ public class AdsManager : MonoBehaviour
         {
             _interstitialInProgress = false;
             RegisterAdWatched(success);
+            TrackAdResult("interstitial", "interstitial", requestId, provider, requestedAt, success,
+                success ? string.Empty : "provider_failed");
             onComplete?.Invoke(success);
         });
 
@@ -216,18 +232,24 @@ public class AdsManager : MonoBehaviour
 
     public void DisableInterstitialAdsForDays(int days)
     {
+        bool wasDisabled = AreInterstitialAdsDisabled;
         int safeDays = Mathf.Max(1, days);
         long nowUnix = GetCurrentUtcUnixSeconds();
         long currentUntilUnix = Math.Max(GetNoAdsUntilUnix(), nowUnix);
         long until = DateTimeOffset.FromUnixTimeSeconds(currentUntilUnix).AddDays(safeDays).ToUnixTimeSeconds();
         PlayerPrefs.SetString(NoAdsUntilUnixKey, until.ToString(CultureInfo.InvariantCulture));
         PlayerPrefs.Save();
+        if (!wasDisabled)
+            TrackNoAdsUnlocked("days", safeDays);
     }
 
     public void DisableInterstitialAdsForever()
     {
+        bool wasDisabled = AreInterstitialAdsDisabled;
         PlayerPrefs.SetInt(NoAdsForeverKey, 1);
         PlayerPrefs.Save();
+        if (!wasDisabled)
+            TrackNoAdsUnlocked("forever", 0);
     }
 
     public bool IsInterstitialTemporarilySuppressed =>
@@ -289,7 +311,12 @@ public class AdsManager : MonoBehaviour
         return null;
     }
 
-    private void ShowRewardedAd(AdsProvider provider, string rewardId, Action<bool> onComplete)
+    private void ShowRewardedAd(
+        AdsProvider provider,
+        string rewardId,
+        string requestId,
+        float requestedAt,
+        Action<bool> onComplete)
     {
         _rewardedInProgress = true;
         ResetTimedInterstitialTimer();
@@ -297,11 +324,17 @@ public class AdsManager : MonoBehaviour
         {
             _rewardedInProgress = false;
             RegisterAdWatched(success);
+            TrackAdResult("rewarded", rewardId, requestId, provider, requestedAt, success,
+                success ? string.Empty : "provider_failed");
             onComplete?.Invoke(success);
         });
     }
 
-    private IEnumerator WaitAndShowRewardedAd(string rewardId, Action<bool> onComplete)
+    private IEnumerator WaitAndShowRewardedAd(
+        string rewardId,
+        string requestId,
+        float requestedAt,
+        Action<bool> onComplete)
     {
         float timeout = Mathf.Max(0f, rewardedReadyTimeoutSeconds);
         WaitForSecondsRealtime poll = new WaitForSecondsRealtime(Mathf.Max(0.02f, rewardedReadyPollSeconds));
@@ -321,6 +354,7 @@ public class AdsManager : MonoBehaviour
         {
             Debug.LogWarning("No rewarded ads available after wait.");
             _rewardedInProgress = false;
+            TrackAdResult("rewarded", rewardId, requestId, null, requestedAt, false, "ready_timeout");
             onComplete?.Invoke(false);
             yield break;
         }
@@ -330,6 +364,8 @@ public class AdsManager : MonoBehaviour
         {
             _rewardedInProgress = false;
             RegisterAdWatched(success);
+            TrackAdResult("rewarded", rewardId, requestId, provider, requestedAt, success,
+                success ? string.Empty : "provider_failed");
             onComplete?.Invoke(success);
         });
     }
@@ -420,8 +456,10 @@ public class AdsManager : MonoBehaviour
         HideCountdown();
 
         bool done = false;
+        bool adSuccess = false;
         bool adStarted = TryShowInterstitialAd(success =>
         {
+            adSuccess = success;
             done = true;
         });
 
@@ -434,7 +472,8 @@ public class AdsManager : MonoBehaviour
         while (!done)
             yield return null;
 
-        GiveTimedInterstitialReward(baseReward);
+        if (adSuccess)
+            GiveTimedInterstitialReward(baseReward);
 
         _timedInterstitialFlowInProgress = false;
     }
@@ -482,8 +521,63 @@ public class AdsManager : MonoBehaviour
         }
 
         G.Currency.AddCurrency(CurrencyType.Coins, finalReward);
+        GameAnalytics.Track(AnalyticsEventNames.TimedInterstitialRewardGranted, GameAnalytics.Params(
+            "placement", "timed_interstitial",
+            "currency_type", "coins",
+            "reward_amount", finalReward,
+            "base_reward_amount", baseReward,
+            "multiplier", interstitialIncomeRewardMultiplier,
+            "source", "timed_interstitial",
+            "result", "success"));
 
         ShowRewardPopup(finalReward);
+    }
+
+    private static void TrackAdRequested(string adType, string placement, string requestId)
+    {
+        GameAnalytics.Track(AnalyticsEventNames.AdRequested, GameAnalytics.Params(
+            "ad_type", adType,
+            "placement", placement ?? string.Empty,
+            "request_id", requestId,
+            "source", placement ?? string.Empty,
+            "result", "requested"));
+    }
+
+    private static void TrackAdResult(
+        string adType,
+        string placement,
+        string requestId,
+        AdsProvider provider,
+        float requestedAt,
+        bool success,
+        string failureReason)
+    {
+        GameAnalytics.Track(AnalyticsEventNames.AdResult, GameAnalytics.Params(
+            "ad_type", adType,
+            "placement", placement ?? string.Empty,
+            "request_id", requestId,
+            "provider", provider != null ? provider.GetType().Name : string.Empty,
+            "latency_ms", Math.Round(Math.Max(0f, Time.realtimeSinceStartup - requestedAt) * 1000d),
+            "reward_granted", success && string.Equals(adType, "rewarded", StringComparison.Ordinal),
+            "source", placement ?? string.Empty,
+            "result", success ? "success" : "failed",
+            "failure_reason", failureReason ?? string.Empty),
+            AnalyticsPriority.Normal,
+            requestId);
+    }
+
+    private static void TrackNoAdsUnlocked(string unlockType, int days)
+    {
+        AnalyticsItemGrantContext context = AnalyticsContext.ItemGrant;
+        GameAnalytics.TrackCritical(AnalyticsEventNames.NoAdsUnlocked, GameAnalytics.Params(
+            "unlock_type", unlockType,
+            "duration_days", days,
+            "source", context != null ? context.Source : "shop",
+            "source_id", context != null ? context.SourceId : string.Empty,
+            "currency_type", context != null ? context.CurrencyType : string.Empty,
+            "price", context != null ? context.Price : 0d,
+            "result", "success"),
+            "no_ads:" + unlockType);
     }
 
     private double CalculateTimedInterstitialBaseReward()

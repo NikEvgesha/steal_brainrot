@@ -8,6 +8,8 @@ using UnityEngine.UI;
 
 public class SpecialShop : MonoBehaviour
 {
+    public event Action Closed;
+
     [SerializeField] private List<ShopPackData> _packs;
     [SerializeField] private LocalizationData _localizationData;
     [SerializeField] private GameObject _shopCanvas;
@@ -111,8 +113,8 @@ public class SpecialShop : MonoBehaviour
             _effects.Changed += RefreshSlots;
         if (G.Currency != null)
         {
-            G.Currency.NoGems.RemoveListener(Open);
-            G.Currency.NoGems.AddListener(Open);
+            G.Currency.NoGems.RemoveListener(OpenCurrency);
+            G.Currency.NoGems.AddListener(OpenCurrency);
         }
     }
 
@@ -125,7 +127,7 @@ public class SpecialShop : MonoBehaviour
         if (_effects != null)
             _effects.Changed -= RefreshSlots;
         if (G.Currency != null)
-            G.Currency.NoGems.RemoveListener(Open);
+            G.Currency.NoGems.RemoveListener(OpenCurrency);
     }
 
     private void OnDestroy()
@@ -237,9 +239,20 @@ public class SpecialShop : MonoBehaviour
 
     public void Open()
     {
+        OpenAtCategory(_defaultCategory, "shop_button");
+    }
+
+    public void OpenCurrency()
+    {
+        OpenAtCategory(ShopCategory.Currency, "insufficient_currency");
+    }
+
+    private void OpenAtCategory(ShopCategory category, string source)
+    {
         if (_shopCanvas == null)
             return;
 
+        bool wasOpen = _isOpen;
         _isOpen = true;
         _shopCanvas.SetActive(true);
         bool purchasesAvailable = PurchasesAvailable();
@@ -250,8 +263,20 @@ public class SpecialShop : MonoBehaviour
         G.Currency?.ShowGems?.Invoke(true);
         G.Input?.AOpenWindow?.Invoke(this);
         RefreshSlots();
-        ScrollToSection(ShopCategory.Featured, false);
+        ScrollToSection(category, false);
         G.Sound?.Play(GameAudioId.SFX_UI_OPEN);
+        if (!wasOpen)
+        {
+            GameAnalytics.Track(AnalyticsEventNames.ShopOpened, GameAnalytics.Params(
+                "shop_id", "special_shop",
+                "category", category.ToString().ToLowerInvariant(),
+                "pack_count", _packs != null ? _packs.Count : 0,
+                "purchases_available", purchasesAvailable,
+                "source", source,
+                "result", "success"),
+                AnalyticsPriority.Normal,
+                "special_shop_open");
+        }
     }
 
     public void Close()
@@ -259,11 +284,14 @@ public class SpecialShop : MonoBehaviour
         if (_shopCanvas == null)
             return;
 
+        bool wasOpen = _isOpen;
         _isOpen = false;
         _shopCanvas.SetActive(false);
         if (G.Control != null)
             G.Control.CursorActive = false;
         G.Sound?.Play(GameAudioId.SFX_UI_CLOSE);
+        if (wasOpen)
+            Closed?.Invoke();
     }
 
     public void OnPurchaseRestore(string id)
@@ -276,12 +304,29 @@ public class SpecialShop : MonoBehaviour
         }
 
         GiveReward(id);
+        GameAnalytics.TrackCritical(AnalyticsEventNames.PurchaseResult, GameAnalytics.Params(
+            "product_id", id,
+            "pack_id", id,
+            "is_restore", true,
+            "source", "purchase_restore",
+            "result", "success"),
+            "restore:" + id);
     }
 
     public void TryBuy(PurchaseData purchaseData, ShopPackData packData)
     {
         if (packData == null)
             return;
+
+        GameAnalytics.Track(AnalyticsEventNames.ShopOfferSelected, GameAnalytics.Params(
+            "shop_id", "special_shop",
+            "pack_id", packData.Id,
+            "category", packData.Category.ToString().ToLowerInvariant(),
+            "currency_type", packData.PriceCurrencyType.ToString().ToLowerInvariant(),
+            "price", packData.Price,
+            "rewarded_ad_fallback", IsRewardedAdFallback(packData),
+            "source", "shop_pack",
+            "result", "selected"));
 
         if (packData.PriceCurrencyType == CurrencyType.Real && IsInAppPreviewActive())
         {
@@ -603,29 +648,36 @@ public class SpecialShop : MonoBehaviour
         if (packData == null || packData.Rewards == null)
             return;
 
-        for (int rewardIndex = 0; rewardIndex < packData.Rewards.Count; rewardIndex++)
+        using (GameAnalytics.BeginItemGrant(
+                   "special_shop",
+                   packData.Id,
+                   packData.PriceCurrencyType.ToString().ToLowerInvariant(),
+                   packData.Price))
         {
-            var reward = packData.Rewards[rewardIndex];
-            switch (reward.Type)
+            for (int rewardIndex = 0; rewardIndex < packData.Rewards.Count; rewardIndex++)
             {
-                case ShopRewardType.Item:
-                    if (reward.Item == null || G.Inventory == null)
+                var reward = packData.Rewards[rewardIndex];
+                switch (reward.Type)
+                {
+                    case ShopRewardType.Item:
+                        if (reward.Item == null || G.Inventory == null)
+                            break;
+                        for (int i = 0; i < Mathf.Max(1, reward.Amount); i++)
+                            G.Inventory.Add(Instantiate(reward.Item));
                         break;
-                    for (int i = 0; i < Mathf.Max(1, reward.Amount); i++)
-                        G.Inventory.Add(Instantiate(reward.Item));
-                    break;
-                case ShopRewardType.Currency:
-                    G.Currency?.AddCurrency(reward.RewardCurrencyType, reward.Amount);
-                    break;
-                case ShopRewardType.NoAdsMonth:
-                    G.Ad?.DisableInterstitialAdsForDays(reward.Amount > 0 ? reward.Amount : 30);
-                    break;
-                case ShopRewardType.NoAdsForever:
-                    G.Ad?.DisableInterstitialAdsForever();
-                    break;
-                default:
-                    _effects?.GrantReward(packData.Id, reward);
-                    break;
+                    case ShopRewardType.Currency:
+                        G.Currency?.AddCurrency(reward.RewardCurrencyType, reward.Amount);
+                        break;
+                    case ShopRewardType.NoAdsMonth:
+                        G.Ad?.DisableInterstitialAdsForDays(reward.Amount > 0 ? reward.Amount : 30);
+                        break;
+                    case ShopRewardType.NoAdsForever:
+                        G.Ad?.DisableInterstitialAdsForever();
+                        break;
+                    default:
+                        _effects?.GrantReward(packData.Id, reward);
+                        break;
+                }
             }
         }
 

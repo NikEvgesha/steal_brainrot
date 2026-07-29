@@ -67,7 +67,16 @@ public class InventoryUI : MonoBehaviour
         _selectedTab = Item.Brainrot;
         UpdateItems(G.Inventory.GetItems(Item.Brainrot));
         if (_isOpen)
+        {
             ApplyBlockyStyle();
+            GameAnalytics.Track(AnalyticsEventNames.InventoryOpened, GameAnalytics.Params(
+                "selected_tab", _selectedTab.ToString().ToLowerInvariant(),
+                "item_count", G.Inventory.GetItems(_selectedTab)?.Count ?? 0,
+                "source", "inventory_toggle",
+                "result", "success"),
+                AnalyticsPriority.Normal,
+                "inventory_open");
+        }
     }
 
     public void _ShowBrainrots()
