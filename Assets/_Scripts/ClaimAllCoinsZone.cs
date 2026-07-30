@@ -57,7 +57,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     [Header("Permanent Unlock")]
     [SerializeField] private CurrencyType unlockPriceCurrency = CurrencyType.Gems;
-    [SerializeField] private double unlockPrice = 49d;
+    [SerializeField] private double unlockPrice = 499d;
     [SerializeField] private bool autoCollectWhenUnlocked = true;
     [SerializeField] private bool collectImmediatelyOnEnterAfterUnlock = true;
     [SerializeField] private float autoCollectIntervalSec = 1f;
@@ -66,27 +66,29 @@ public class ClaimAllCoinsZone : MonoBehaviour
     [SerializeField] private string interactionLocalizationKey = "UI/ClaimAll/OpenPopup";
     [SerializeField] private string interactionText = "Claim all";
     [SerializeField] private string popupTitleLocalizationKey = "UI/ClaimAll/PopupTitle";
-    [SerializeField] private string popupTitleText = "Collect all income";
+    [SerializeField] private string popupTitleText = "Collect income";
     [SerializeField] private string popupDescriptionLocalizationKey = "UI/ClaimAll/PopupDescription";
-    [SerializeField] private string popupDescriptionText = "Choose how to collect income.";
+    [SerializeField] private string popupDescriptionText = "Collect income from every pet at once.";
     [SerializeField] private string popupCollectX2LocalizationKey = "UI/ClaimAll/PopupCollectX2Ad";
-    [SerializeField] private string popupCollectX2Text = "Take x2 (AD)";
+    [SerializeField] private string popupCollectX2Text = "Collect x2";
     [SerializeField] private string popupBuyForeverLocalizationKey = "UI/ClaimAll/PopupBuyForever";
-    [SerializeField] private string popupBuyForeverText = "Buy forever";
+    [SerializeField] private string popupBuyForeverText = "Auto-collect forever";
 
     [Header("Popup Presentation")]
     [SerializeField] private bool applyClaimPopupPresentation = true;
-    [SerializeField] private Vector2 claimPopupAnchorMin = new Vector2(0.14f, 0.18f);
-    [SerializeField] private Vector2 claimPopupAnchorMax = new Vector2(0.86f, 0.72f);
-    [SerializeField] private Vector2 claimPopupPosition = new Vector2(0f, -22f);
-    [SerializeField] private Vector2 claimPopupPadding = new Vector2(42f, 34f);
-    [SerializeField] private Color claimPopupPanelColor = new Color(0.20f, 0.02f, 0.09f, 0.96f);
-    [SerializeField] private Color claimPopupConfirmColor = new Color(0.08f, 0.46f, 0.29f, 1f);
-    [SerializeField] private Color claimPopupCancelColor = new Color(0.50f, 0.13f, 0.34f, 1f);
+    [SerializeField] private Vector2 claimPopupAnchorMin = new Vector2(0.24f, 0.21f);
+    [SerializeField] private Vector2 claimPopupAnchorMax = new Vector2(0.76f, 0.77f);
+    [SerializeField] private Vector2 claimPopupPosition = Vector2.zero;
+    [SerializeField] private Vector2 claimPopupPadding = new Vector2(28f, 24f);
+    [SerializeField] private Color claimPopupPanelColor = new Color(0.35f, 0.18f, 0.07f, 0.98f);
+    [SerializeField] private Color claimPopupConfirmColor = new Color(0.05f, 0.45f, 0.92f, 1f);
+    [SerializeField] private Color claimPopupCancelColor = new Color(0.18f, 0.82f, 0.08f, 1f);
     [SerializeField] private Color claimPopupTextColor = Color.white;
-    [SerializeField] private float claimPopupTitleFontSize = 44f;
+    [SerializeField] private Sprite claimPopupTextureSprite;
+    [SerializeField] private Sprite claimPopupGradientSprite;
+    [SerializeField] private float claimPopupTitleFontSize = 40f;
     [SerializeField] private float claimPopupDescriptionFontSize = 25f;
-    [SerializeField] private float claimPopupButtonFontSize = 28f;
+    [SerializeField] private float claimPopupButtonFontSize = 25f;
 
     [Header("Debug")]
     [SerializeField] private bool debugLogs;
@@ -362,7 +364,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
                 popupDescriptionLocalizationKey,
                 popupDescriptionText),
             confirm = new UniversalDecisionPopup.LocalizedTextPayload(popupCollectX2LocalizationKey, popupCollectX2Text),
-            cancel = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, BuildBuyForeverButtonText()),
+            cancel = new UniversalDecisionPopup.LocalizedTextPayload(
+                popupBuyForeverLocalizationKey,
+                popupBuyForeverText),
             onConfirm = () =>
             {
                 _activePopup = null;
@@ -931,6 +935,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
             return;
 
         var popupTransform = popup.transform;
+        EnsureDimBackdrop(popupTransform);
+
         var container = popupTransform.Find("container") as RectTransform;
         if (container != null)
         {
@@ -956,22 +962,52 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
             var panelImage = panel.GetComponent<Image>();
             if (panelImage != null)
-                panelImage.color = claimPopupPanelColor;
+                ApplyClaimPopupSurface(panelImage, claimPopupPanelColor, true);
+
+            EnsureOutline(panel.gameObject, new Vector2(5f, -5f), BlockyUITheme.BlackStroke);
+            EnsureShadow(panel.gameObject, new Vector2(0f, -6f), new Color(0f, 0f, 0f, 0.45f));
+            var headerSurface = EnsureSurface(
+                panel,
+                "ClaimAllHeader",
+                new Vector2(0f, 0.78f),
+                Vector2.one,
+                BlockyUITheme.GreenHeader,
+                studs: true,
+                siblingIndex: 0);
+            EnsureGradient(headerSurface);
+            EnsureSurface(
+                panel,
+                "ClaimAllBody",
+                new Vector2(0.035f, 0.045f),
+                new Vector2(0.965f, 0.735f),
+                BlockyUITheme.DarkBrownPanel,
+                studs: true,
+                siblingIndex: 1);
         }
 
         var elements = popupTransform.Find("container/panel/Elements") as RectTransform;
         if (elements != null)
+        {
             Stretch(elements, claimPopupPadding, -claimPopupPadding);
+            elements.SetAsLastSibling();
+        }
 
         var title = popupTransform.Find("container/panel/Elements/Title") as RectTransform;
         if (title != null)
-            SetTopBand(title, 0f, 80f);
+        {
+            title.anchorMin = new Vector2(0.02f, 0.79f);
+            title.anchorMax = new Vector2(0.88f, 1f);
+            title.pivot = new Vector2(0.5f, 0.5f);
+            title.anchoredPosition = Vector2.zero;
+            title.sizeDelta = Vector2.zero;
+            title.localScale = Vector3.one;
+        }
 
         var description = popupTransform.Find("container/panel/Elements/Discription") as RectTransform;
         if (description != null)
         {
-            description.anchorMin = new Vector2(0.04f, 0.34f);
-            description.anchorMax = new Vector2(0.96f, 0.72f);
+            description.anchorMin = new Vector2(0.055f, 0.37f);
+            description.anchorMax = new Vector2(0.945f, 0.72f);
             description.pivot = new Vector2(0.5f, 0.5f);
             description.anchoredPosition = Vector2.zero;
             description.sizeDelta = Vector2.zero;
@@ -981,8 +1017,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
         var buttons = popupTransform.Find("container/panel/Elements/Buttons") as RectTransform;
         if (buttons != null)
         {
-            buttons.anchorMin = new Vector2(0.06f, 0.06f);
-            buttons.anchorMax = new Vector2(0.94f, 0.28f);
+            buttons.anchorMin = new Vector2(0.045f, 0.075f);
+            buttons.anchorMax = new Vector2(0.955f, 0.315f);
             buttons.pivot = new Vector2(0.5f, 0.5f);
             buttons.anchoredPosition = Vector2.zero;
             buttons.sizeDelta = Vector2.zero;
@@ -993,14 +1029,29 @@ public class ClaimAllCoinsZone : MonoBehaviour
         if (confirm != null)
         {
             SetSplitButton(confirm, 0f, 0.48f);
-            SetImageColor(confirm, claimPopupConfirmColor);
+            var button = confirm.GetComponent<Button>();
+            if (button != null)
+            {
+                BlockyUITheme.ApplyButton(button, claimPopupConfirmColor);
+                ApplyClaimPopupSurface(button.targetGraphic as Image, claimPopupConfirmColor, true);
+                EnsureGradient(confirm);
+                AdButtonIconDecorator.SetAdIcon(button, true);
+            }
+            ConfigureAdButton(confirm);
         }
 
         var cancel = popupTransform.Find("container/panel/Elements/Buttons/Cancel") as RectTransform;
         if (cancel != null)
         {
             SetSplitButton(cancel, 0.52f, 1f);
-            SetImageColor(cancel, claimPopupCancelColor);
+            var button = cancel.GetComponent<Button>();
+            if (button != null)
+            {
+                BlockyUITheme.ApplyButton(button, claimPopupCancelColor);
+                ApplyClaimPopupSurface(button.targetGraphic as Image, claimPopupCancelColor, true);
+                EnsureGradient(cancel);
+            }
+            ConfigurePermanentButton(cancel);
         }
 
         var close = popupTransform.Find("container/panel/Button (Legacy)") as RectTransform;
@@ -1009,15 +1060,308 @@ public class ClaimAllCoinsZone : MonoBehaviour
             close.anchorMin = new Vector2(1f, 1f);
             close.anchorMax = new Vector2(1f, 1f);
             close.pivot = new Vector2(1f, 1f);
-            close.anchoredPosition = new Vector2(-10f, -10f);
-            close.sizeDelta = new Vector2(58f, 58f);
+            close.anchoredPosition = new Vector2(-8f, -8f);
+            close.sizeDelta = new Vector2(62f, 62f);
             close.localScale = Vector3.one;
+            ConfigureCloseButton(close);
         }
 
         ConfigureText(popupTransform.Find("container/panel/Elements/Title/Text (TMP)"), claimPopupTitleFontSize);
         ConfigureText(popupTransform.Find("container/panel/Elements/Discription/Text (TMP) (1)"), claimPopupDescriptionFontSize);
         ConfigureText(popupTransform.Find("container/panel/Elements/Buttons/Ok/Text (TMP)"), claimPopupButtonFontSize);
         ConfigureText(popupTransform.Find("container/panel/Elements/Buttons/Cancel/Text (TMP)"), claimPopupButtonFontSize);
+    }
+
+    private static void EnsureDimBackdrop(Transform popupTransform)
+    {
+        if (popupTransform == null)
+            return;
+
+        var backdrop = popupTransform.Find("ClaimAllDimBackdrop") as RectTransform;
+        if (backdrop == null)
+        {
+            var backdropObject = new GameObject(
+                "ClaimAllDimBackdrop",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            backdropObject.transform.SetParent(popupTransform, false);
+            backdrop = backdropObject.transform as RectTransform;
+        }
+
+        Stretch(backdrop, Vector2.zero, Vector2.zero);
+        var image = backdrop.GetComponent<Image>();
+        image.sprite = null;
+        image.type = Image.Type.Simple;
+        image.color = new Color(0.025f, 0.012f, 0.02f, 0.62f);
+        image.raycastTarget = true;
+        backdrop.SetAsFirstSibling();
+    }
+
+    private RectTransform EnsureSurface(
+        Transform parent,
+        string objectName,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Color color,
+        bool studs,
+        int siblingIndex)
+    {
+        if (parent == null)
+            return null;
+
+        var rect = parent.Find(objectName) as RectTransform;
+        if (rect == null)
+        {
+            var surfaceObject = new GameObject(
+                objectName,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            surfaceObject.transform.SetParent(parent, false);
+            rect = surfaceObject.transform as RectTransform;
+        }
+
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
+        rect.localScale = Vector3.one;
+        rect.SetSiblingIndex(Mathf.Clamp(siblingIndex, 0, parent.childCount - 1));
+
+        var image = rect.GetComponent<Image>();
+        ApplyClaimPopupSurface(image, color, false);
+        image.raycastTarget = false;
+        EnsureOutline(rect.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+        return rect;
+    }
+
+    private void ApplyClaimPopupSurface(Image image, Color color, bool raycastTarget)
+    {
+        if (image == null)
+            return;
+
+        if (claimPopupTextureSprite == null)
+        {
+            BlockyUITheme.ApplyPanel(image, color, studs: true);
+        }
+        else
+        {
+            image.sprite = claimPopupTextureSprite;
+            image.type = Image.Type.Tiled;
+            image.pixelsPerUnitMultiplier = 1f;
+            image.color = color;
+        }
+
+        image.raycastTarget = raycastTarget;
+    }
+
+    private void EnsureGradient(Transform parent)
+    {
+        if (parent == null || claimPopupGradientSprite == null)
+            return;
+
+        var gradient = parent.Find("ClaimAllGradient") as RectTransform;
+        if (gradient == null)
+        {
+            var gradientObject = new GameObject(
+                "ClaimAllGradient",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            gradientObject.transform.SetParent(parent, false);
+            gradient = gradientObject.transform as RectTransform;
+        }
+
+        Stretch(gradient, Vector2.zero, Vector2.zero);
+        var image = gradient.GetComponent<Image>();
+        image.sprite = claimPopupGradientSprite;
+        image.type = Image.Type.Simple;
+        image.color = new Color(1f, 1f, 1f, 0.34f);
+        image.raycastTarget = false;
+        gradient.SetAsFirstSibling();
+    }
+
+    private static void ConfigureAdButton(RectTransform buttonRect)
+    {
+        if (buttonRect == null)
+            return;
+
+        var label = buttonRect.Find("Text (TMP)") as RectTransform;
+        if (label != null)
+        {
+            label.anchorMin = Vector2.zero;
+            label.anchorMax = Vector2.one;
+            label.offsetMin = new Vector2(18f, 5f);
+            label.offsetMax = new Vector2(-62f, -5f);
+        }
+
+        var icon = buttonRect.Find("AdIconBadge") as RectTransform;
+        if (icon == null)
+            return;
+
+        icon.anchorMin = new Vector2(1f, 0.5f);
+        icon.anchorMax = new Vector2(1f, 0.5f);
+        icon.pivot = new Vector2(1f, 0.5f);
+        icon.anchoredPosition = new Vector2(-12f, 0f);
+        icon.sizeDelta = new Vector2(48f, 48f);
+        icon.localScale = Vector3.one;
+    }
+
+    private void ConfigurePermanentButton(RectTransform buttonRect)
+    {
+        if (buttonRect == null)
+            return;
+
+        var label = buttonRect.Find("Text (TMP)") as RectTransform;
+        if (label != null)
+        {
+            label.anchorMin = Vector2.zero;
+            label.anchorMax = new Vector2(0.62f, 1f);
+            label.offsetMin = new Vector2(14f, 4f);
+            label.offsetMax = new Vector2(-4f, -4f);
+        }
+
+        var priceRoot = buttonRect.Find("ClaimAllPrice") as RectTransform;
+        if (priceRoot == null)
+        {
+            var priceObject = new GameObject("ClaimAllPrice", typeof(RectTransform));
+            priceObject.transform.SetParent(buttonRect, false);
+            priceRoot = priceObject.transform as RectTransform;
+        }
+
+        priceRoot.anchorMin = new Vector2(0.62f, 0f);
+        priceRoot.anchorMax = Vector2.one;
+        priceRoot.pivot = new Vector2(0.5f, 0.5f);
+        priceRoot.anchoredPosition = Vector2.zero;
+        priceRoot.sizeDelta = Vector2.zero;
+        priceRoot.localScale = Vector3.one;
+        priceRoot.gameObject.SetActive(unlockPrice > 0d);
+
+        var icon = priceRoot.Find("CurrencyIcon") as RectTransform;
+        if (icon == null)
+        {
+            var iconObject = new GameObject(
+                "CurrencyIcon",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            iconObject.transform.SetParent(priceRoot, false);
+            icon = iconObject.transform as RectTransform;
+        }
+
+        icon.anchorMin = new Vector2(0.02f, 0.5f);
+        icon.anchorMax = new Vector2(0.02f, 0.5f);
+        icon.pivot = new Vector2(0f, 0.5f);
+        icon.anchoredPosition = Vector2.zero;
+        icon.sizeDelta = new Vector2(42f, 42f);
+        var iconImage = icon.GetComponent<Image>();
+        iconImage.sprite = G.Currency != null ? G.Currency.GetCurrencyIcon(unlockPriceCurrency) : null;
+        iconImage.preserveAspect = true;
+        iconImage.raycastTarget = false;
+
+        var priceText = priceRoot.Find("PriceText")?.GetComponent<TextMeshProUGUI>();
+        if (priceText == null)
+        {
+            var textObject = new GameObject(
+                "PriceText",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(priceRoot, false);
+            priceText = textObject.GetComponent<TextMeshProUGUI>();
+        }
+
+        var priceRect = priceText.rectTransform;
+        priceRect.anchorMin = new Vector2(0.42f, 0f);
+        priceRect.anchorMax = Vector2.one;
+        priceRect.offsetMin = Vector2.zero;
+        priceRect.offsetMax = new Vector2(-8f, 0f);
+        priceText.text = G.Currency != null
+            ? G.Currency.ToString(unlockPrice)
+            : Math.Round(unlockPrice).ToString("0", CultureInfo.InvariantCulture);
+        priceText.alignment = TextAlignmentOptions.Center;
+        priceText.enableAutoSizing = true;
+        priceText.fontSizeMin = 20f;
+        priceText.fontSizeMax = 31f;
+        priceText.color = Color.white;
+        priceText.raycastTarget = false;
+        BlockyUITheme.ApplyText(priceText, Color.white, 22);
+        priceText.textWrappingMode = TextWrappingModes.NoWrap;
+        priceText.overflowMode = TextOverflowModes.Overflow;
+    }
+
+    private void ConfigureCloseButton(RectTransform closeRect)
+    {
+        if (closeRect == null)
+            return;
+
+        var button = closeRect.GetComponent<Button>();
+        if (button != null)
+        {
+            BlockyUITheme.ApplyButton(button, BlockyUITheme.RedHeader);
+            ApplyClaimPopupSurface(button.targetGraphic as Image, BlockyUITheme.RedHeader, true);
+            EnsureGradient(closeRect);
+        }
+
+        var glyph = closeRect.Find("ClaimAllCloseGlyph")?.GetComponent<TextMeshProUGUI>();
+        if (glyph == null)
+        {
+            var glyphObject = new GameObject(
+                "ClaimAllCloseGlyph",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            glyphObject.transform.SetParent(closeRect, false);
+            glyph = glyphObject.GetComponent<TextMeshProUGUI>();
+        }
+
+        Stretch(glyph.rectTransform, new Vector2(4f, 2f), new Vector2(-4f, -2f));
+        glyph.text = "X";
+        glyph.alignment = TextAlignmentOptions.Center;
+        glyph.enableAutoSizing = true;
+        glyph.fontSizeMin = 30f;
+        glyph.fontSizeMax = 46f;
+        glyph.color = Color.white;
+        glyph.raycastTarget = false;
+        BlockyUITheme.ApplyText(glyph, Color.white, 34);
+    }
+
+    private static void EnsureOutline(GameObject target, Vector2 distance, Color color)
+    {
+        if (target == null)
+            return;
+
+        var outline = target.GetComponent<Outline>();
+        if (outline == null)
+            outline = target.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = distance;
+        outline.useGraphicAlpha = true;
+    }
+
+    private static void EnsureShadow(GameObject target, Vector2 distance, Color color)
+    {
+        if (target == null)
+            return;
+
+        Shadow shadow = null;
+        var shadows = target.GetComponents<Shadow>();
+        for (var i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] != null && !(shadows[i] is Outline))
+            {
+                shadow = shadows[i];
+                break;
+            }
+        }
+
+        if (shadow == null)
+            shadow = target.AddComponent<Shadow>();
+        shadow.effectColor = color;
+        shadow.effectDistance = distance;
+        shadow.useGraphicAlpha = true;
     }
 
     private static void Stretch(RectTransform rect, Vector2 offsetMin, Vector2 offsetMax)
@@ -1030,16 +1374,6 @@ public class ClaimAllCoinsZone : MonoBehaviour
         rect.localScale = Vector3.one;
     }
 
-    private static void SetTopBand(RectTransform rect, float topOffset, float height)
-    {
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -topOffset);
-        rect.sizeDelta = new Vector2(0f, height);
-        rect.localScale = Vector3.one;
-    }
-
     private static void SetSplitButton(RectTransform rect, float anchorMinX, float anchorMaxX)
     {
         rect.anchorMin = new Vector2(anchorMinX, 0f);
@@ -1048,13 +1382,6 @@ public class ClaimAllCoinsZone : MonoBehaviour
         rect.anchoredPosition = Vector2.zero;
         rect.sizeDelta = Vector2.zero;
         rect.localScale = Vector3.one;
-    }
-
-    private static void SetImageColor(Component component, Color color)
-    {
-        var image = component != null ? component.GetComponent<Image>() : null;
-        if (image != null)
-            image.color = color;
     }
 
     private void ConfigureText(Transform textTransform, float fontSize)
@@ -1070,25 +1397,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
         text.fontSizeMax = fontSize;
         text.alignment = TextAlignmentOptions.Center;
         text.overflowMode = TextOverflowModes.Ellipsis;
-    }
-
-    private string BuildBuyForeverButtonText()
-    {
-        var label = LocalizationUtils.T(popupBuyForeverLocalizationKey, popupBuyForeverText);
-        if (unlockPrice <= 0d)
-            return label;
-
-        var priceText = G.Currency != null
-            ? G.Currency.ToString(unlockPrice)
-            : Math.Round(unlockPrice).ToString("0", CultureInfo.InvariantCulture);
-
-        if (unlockPriceCurrency == CurrencyType.Coins)
-            return $"{label} ({priceText})";
-
-        var currencyName = LocalizationUtils.T(
-            "UI/Currency/" + unlockPriceCurrency,
-            unlockPriceCurrency.ToString());
-        return $"{label} ({priceText} {currencyName})";
+        BlockyUITheme.ApplyText(text, claimPopupTextColor, Mathf.RoundToInt(fontSize * 0.65f));
     }
 
     private string ResolveUnlockSaveKey()

@@ -10,9 +10,11 @@ public sealed class OfflineRewardWindow : MonoBehaviour
 {
     private static readonly Vector2 WindowSize = new(930f, 760f);
     private const float SafeMargin = 30f;
+    private const double ExpandedMoneyLimit = 1_000_000_000_000d;
 
     private OfflineRewardManager _owner;
     private OfflineRewardSnapshot _snapshot;
+    // Used only by the one-time legacy-to-prefab migration helpers below.
     private TMP_FontAsset _font;
     private Sprite _panelSprite;
     private Sprite _headerSprite;
@@ -24,32 +26,43 @@ public sealed class OfflineRewardWindow : MonoBehaviour
     private Sprite _gemSprite;
     private Sprite _adSprite;
 
-    private RectTransform _panel;
-    private TMP_Text _title;
-    private TMP_Text _info;
-    private TMP_Text _elapsedText;
-    private TMP_Text _maxText;
-    private TMP_Text _amountTitle;
-    private TMP_Text _amountBefore;
-    private TMP_Text _amountArrow;
-    private TMP_Text _amountAfter;
-    private TMP_Text _multiplyPrompt;
-    private TMP_Text _activeStatus;
-    private TMP_Text _activeClaimText;
-    private TMP_Text _adLabel;
-    private TMP_Text _monthlyBoostMainLabel;
-    private TMP_Text _monthlyBoostDurationLabel;
-    private UIImage _progressFill;
-    private UIButton _closeButton;
-    private UIButton _adButton;
-    private UIButton _gemButton;
-    private UIButton _activeClaimButton;
-    private UIButton _monthlyBoostButton;
-    private RectTransform _choiceRoot;
-    private RectTransform _activeRoot;
-    private CanvasGroup _canvasGroup;
+    [Header("Prefab Layout")]
+    [SerializeField] private RectTransform _shadow;
+    [SerializeField] private RectTransform _panel;
+    [SerializeField] private TMP_Text _title;
+    [SerializeField] private TMP_Text _info;
+    [SerializeField] private TMP_Text _elapsedText;
+    [SerializeField] private TMP_Text _maxText;
+    [SerializeField] private TMP_Text _amountTitle;
+    [SerializeField] private TMP_Text _amountBefore;
+    [SerializeField] private TMP_Text _amountArrow;
+    [SerializeField] private TMP_Text _amountAfter;
+    [SerializeField] private TMP_Text _multiplyPrompt;
+    [SerializeField] private TMP_Text _activeStatus;
+    [SerializeField] private TMP_Text _activeClaimText;
+    [SerializeField] private TMP_Text _adLabel;
+    [SerializeField] private TMP_Text _adMultiplierText;
+    [SerializeField] private TMP_Text _adRewardAmount;
+    [SerializeField] private TMP_Text _gemMultiplierText;
+    [SerializeField] private TMP_Text _gemRewardAmount;
+    [SerializeField] private TMP_Text _gemPriceText;
+    [SerializeField] private TMP_Text _monthlyBoostMainLabel;
+    [SerializeField] private TMP_Text _monthlyBoostMultiplierText;
+    [SerializeField] private TMP_Text _monthlyBoostDurationLabel;
+    [SerializeField] private TMP_Text _monthlyBoostPriceText;
+    [SerializeField] private UIImage _progressFill;
+    [SerializeField] private UIImage _adIcon;
+    [SerializeField] private UIButton _closeButton;
+    [SerializeField] private UIButton _adButton;
+    [SerializeField] private UIButton _gemButton;
+    [SerializeField] private UIButton _activeClaimButton;
+    [SerializeField] private UIButton _monthlyBoostButton;
+    [SerializeField] private RectTransform _choiceRoot;
+    [SerializeField] private RectTransform _activeRoot;
+    [SerializeField] private CanvasGroup _canvasGroup;
     private float _nextRefreshAt;
     private bool _renderedMonthlyState;
+    private bool _multiplyPromptEnabledByLayout;
     private LocalizationManager _subscribedLocalizationManager;
 
     public bool IsVisible => gameObject.activeInHierarchy &&
@@ -58,9 +71,16 @@ public sealed class OfflineRewardWindow : MonoBehaviour
     public void Initialize(OfflineRewardManager owner, OfflineRewardSnapshot snapshot)
     {
         _owner = owner;
-        CaptureStyleSources();
-        DisableLegacyLayout();
-        BuildModernLayout();
+        ResolvePrefabReferences();
+        if (_panel == null)
+        {
+            Debug.LogError(
+                "[OfflineReward] OfflineRewardWindow.prefab is missing its ModernOfflinePanel hierarchy.");
+            return;
+        }
+
+        _multiplyPromptEnabledByLayout =
+            _multiplyPrompt != null && _multiplyPrompt.gameObject.activeSelf;
         BindButtons();
         Refresh(snapshot);
         SetVisible(true);
@@ -130,11 +150,18 @@ public sealed class OfflineRewardWindow : MonoBehaviour
 
         if (_progressFill != null)
         {
+            _progressFill.type = UIImage.Type.Filled;
+            _progressFill.fillMethod = UIImage.FillMethod.Horizontal;
+            _progressFill.fillOrigin = 0;
             _progressFill.fillAmount = Mathf.Clamp01(
                 snapshot.CappedElapsedSeconds / (float)OfflineRewardRules.MaxAccrualSeconds);
         }
 
         string normalReward = FormatMoney(snapshot.DisplayedReward);
+        string adReward = FormatMoney(
+            snapshot.GetReward(OfflineRewardRules.AdMultiplier));
+        string gemReward = FormatMoney(
+            snapshot.GetReward(OfflineRewardRules.BoostMultiplier));
         string monthlyReward = FormatMoney(
             snapshot.GetReward(OfflineRewardRules.MonthlyBoostMultiplier));
         if (_amountTitle != null)
@@ -146,7 +173,7 @@ public sealed class OfflineRewardWindow : MonoBehaviour
 
         if (_amountBefore != null)
         {
-            _amountBefore.text = "$" + normalReward;
+            _amountBefore.text = CurrencyText.Coins(normalReward);
             RectTransform beforeRect = _amountBefore.rectTransform;
             beforeRect.anchoredPosition = monthlyActive
                 ? new Vector2(-205f, -4f)
@@ -160,13 +187,13 @@ public sealed class OfflineRewardWindow : MonoBehaviour
         if (_amountArrow != null)
         {
             _amountArrow.gameObject.SetActive(monthlyActive);
-            _amountArrow.text = "x20  →";
+            _amountArrow.text = "x20  \u2192";
         }
 
         if (_amountAfter != null)
         {
             _amountAfter.gameObject.SetActive(monthlyActive);
-            _amountAfter.text = "$" + monthlyReward;
+            _amountAfter.text = CurrencyText.Coins(monthlyReward);
         }
 
         if (_choiceRoot != null)
@@ -178,25 +205,43 @@ public sealed class OfflineRewardWindow : MonoBehaviour
 
         if (_multiplyPrompt != null)
         {
-            _multiplyPrompt.gameObject.SetActive(!monthlyActive);
+            _multiplyPrompt.gameObject.SetActive(
+                !monthlyActive && _multiplyPromptEnabledByLayout);
             _multiplyPrompt.text = LocalizationUtils.T(
                 "UI/OfflineReward/MultiplyPrompt",
                 "MULTIPLY YOUR REWARD");
         }
 
+        if (_adMultiplierText != null)
+            _adMultiplierText.text = "x" + OfflineRewardRules.AdMultiplier;
+        if (_adRewardAmount != null)
+            _adRewardAmount.text = CurrencyText.Coins(adReward);
+
+        if (_gemMultiplierText != null)
+            _gemMultiplierText.text = "x" + OfflineRewardRules.BoostMultiplier;
+        if (_gemRewardAmount != null)
+            _gemRewardAmount.text = CurrencyText.Coins(gemReward);
+        if (_gemPriceText != null)
+            _gemPriceText.text = OfflineRewardRules.BoostPriceGems.ToString();
+
         if (_adLabel != null)
         {
             string free = LocalizationUtils.T("UI/OfflineReward/Free", "FREE");
-            _adLabel.text = _adSprite != null ? free : "▶  " + free;
+            _adLabel.text = _adIcon != null && _adIcon.gameObject.activeSelf
+                ? free
+                : "\u25B6  " + free;
         }
 
         if (_monthlyBoostMainLabel != null)
         {
-            _monthlyBoostMainLabel.text = LocalizationUtils.Format(
-                "UI/OfflineReward/MonthlyOffer",
-                "BOOST OFFLINE INCOME x{0}",
-                OfflineRewardRules.MonthlyBoostMultiplier);
+            _monthlyBoostMainLabel.text = LocalizationUtils.T(
+                "UI/OfflineReward/MonthlyIncome",
+                "OFFLINE INCOME");
         }
+
+        if (_monthlyBoostMultiplierText != null)
+            _monthlyBoostMultiplierText.text =
+                "x" + OfflineRewardRules.MonthlyBoostMultiplier;
 
         if (_monthlyBoostDurationLabel != null)
         {
@@ -206,6 +251,10 @@ public sealed class OfflineRewardWindow : MonoBehaviour
                 OfflineRewardRules.MonthlyBoostDurationDays);
         }
 
+        if (_monthlyBoostPriceText != null)
+            _monthlyBoostPriceText.text =
+                OfflineRewardRules.MonthlyBoostPriceGems.ToString();
+
         if (monthlyActive)
         {
             long remaining = _owner != null ? _owner.GetMonthlyBoostRemainingSeconds() : 0L;
@@ -213,7 +262,7 @@ public sealed class OfflineRewardWindow : MonoBehaviour
             {
                 _activeStatus.text = LocalizationUtils.Format(
                     "UI/OfflineReward/ActiveStatus",
-                    "x{0} ACTIVE  •  {1} LEFT",
+                    "x{0} ACTIVE  \u2022  {1} LEFT",
                     OfflineRewardRules.MonthlyBoostMultiplier,
                     FormatBoostDuration(remaining));
             }
@@ -222,7 +271,7 @@ public sealed class OfflineRewardWindow : MonoBehaviour
             {
                 _activeClaimText.text = LocalizationUtils.Format(
                     "UI/OfflineReward/Collect",
-                    "COLLECT  ${0}",
+                    "COLLECT  " + CurrencyText.CoinIcon + "{0}",
                     monthlyReward);
             }
         }
@@ -760,10 +809,100 @@ public sealed class OfflineRewardWindow : MonoBehaviour
             Mathf.Min(
                 Mathf.Max(1f, size.x - SafeMargin * 2f) / WindowSize.x,
                 Mathf.Max(1f, size.y - SafeMargin * 2f) / WindowSize.y));
-        Transform shadow = transform.Find("ModernOfflineShadow");
-        if (shadow != null)
-            shadow.localScale = new Vector3(scale, scale, 1f);
+        if (_shadow != null)
+            _shadow.localScale = new Vector3(scale, scale, 1f);
         _panel.localScale = new Vector3(scale, scale, 1f);
+        if (_monthlyBoostButton != null &&
+            !_monthlyBoostButton.transform.IsChildOf(_panel))
+        {
+            _monthlyBoostButton.transform.localScale =
+                new Vector3(scale, scale, 1f);
+        }
+    }
+
+    private void OnValidate()
+    {
+        ResolvePrefabReferences();
+    }
+
+    private void ResolvePrefabReferences()
+    {
+        _shadow ??= FindRect("ModernOfflineShadow");
+        _panel ??= FindRect("ModernOfflinePanel");
+        _canvasGroup ??= GetComponent<CanvasGroup>();
+
+        _title ??= FindComponent<TMP_Text>("ModernOfflinePanel/Header/Title");
+        _closeButton ??= FindComponent<UIButton>("ModernOfflinePanel/Header/CloseButton");
+        _info ??= FindComponent<TMP_Text>("ModernOfflinePanel/Content/Info");
+        _elapsedText ??= FindComponent<TMP_Text>("ModernOfflinePanel/Content/TimeChip/Elapsed");
+        _progressFill ??= FindComponent<UIImage>(
+            "ModernOfflinePanel/Content/ProgressBackground/ProgressFill");
+        _maxText ??= FindComponent<TMP_Text>("ModernOfflinePanel/Content/Maximum");
+        _amountTitle ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/AmountCard/AmountTitle");
+        _amountBefore ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/AmountCard/BeforeAmount");
+        _amountArrow ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/AmountCard/Arrow");
+        _amountAfter ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/AmountCard/AfterAmount");
+        _multiplyPrompt ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/MultiplyPrompt");
+
+        _choiceRoot ??= FindRect("ModernOfflinePanel/Content/ChoiceButtons");
+        _adButton ??= FindComponent<UIButton>(
+            "ModernOfflinePanel/Content/ChoiceButtons/AdButton");
+        _adIcon ??= FindComponent<UIImage>(
+            "ModernOfflinePanel/Content/ChoiceButtons/AdButton/AdIcon");
+        _adLabel ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ChoiceButtons/AdButton/AdLabel");
+        _adMultiplierText ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ChoiceButtons/AdButton/Multiplier");
+        _adRewardAmount ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ChoiceButtons/AdButton/BeforeAmount (1)");
+        _gemButton ??= FindComponent<UIButton>(
+            "ModernOfflinePanel/Content/ChoiceButtons/GemButton");
+        _gemMultiplierText ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ChoiceButtons/GemButton/Multiplier");
+        _gemRewardAmount ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ChoiceButtons/GemButton/BeforeAmount (2)");
+        _gemPriceText ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ChoiceButtons/GemButton/GemPrice");
+
+        _monthlyBoostButton ??= FindComponent<UIButton>("MonthlyBoostButton");
+        _monthlyBoostButton ??= FindComponent<UIButton>(
+            "ModernOfflinePanel/Content/MonthlyBoostButton");
+        _monthlyBoostMainLabel ??= FindComponent<TMP_Text>(
+            "MonthlyBoostButton/MainLabel");
+        _monthlyBoostMainLabel ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/MonthlyBoostButton/MainLabel");
+        _monthlyBoostMultiplierText ??= FindComponent<TMP_Text>(
+            "MonthlyBoostButton/X20");
+        _monthlyBoostDurationLabel ??= FindComponent<TMP_Text>(
+            "MonthlyBoostButton/Duration");
+        _monthlyBoostDurationLabel ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/MonthlyBoostButton/Duration");
+        _monthlyBoostPriceText ??= FindComponent<TMP_Text>(
+            "MonthlyBoostButton/Price");
+
+        _activeRoot ??= FindRect("ModernOfflinePanel/Content/ActiveBoostState");
+        _activeStatus ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ActiveBoostState/Status");
+        _activeClaimButton ??= FindComponent<UIButton>(
+            "ModernOfflinePanel/Content/ActiveBoostState/CollectButton");
+        _activeClaimText ??= FindComponent<TMP_Text>(
+            "ModernOfflinePanel/Content/ActiveBoostState/CollectButton/Label");
+    }
+
+    private RectTransform FindRect(string path)
+    {
+        return transform.Find(path) as RectTransform;
+    }
+
+    private T FindComponent<T>(string path) where T : Component
+    {
+        Transform target = transform.Find(path);
+        return target != null ? target.GetComponent<T>() : null;
     }
 
     private RectTransform CreateRect(
@@ -915,9 +1054,17 @@ public sealed class OfflineRewardWindow : MonoBehaviour
 
     private static string FormatMoney(double amount)
     {
+        double safeAmount = Math.Max(0d, amount);
+        if (safeAmount < ExpandedMoneyLimit)
+        {
+            return Math.Round(safeAmount, MidpointRounding.AwayFromZero)
+                .ToString("0");
+        }
+
         if (G.Currency != null)
-            return G.Currency.ToString(Math.Max(0d, amount));
-        return Math.Round(Math.Max(0d, amount)).ToString("0");
+            return G.Currency.ToString(safeAmount);
+        return Math.Round(safeAmount, MidpointRounding.AwayFromZero)
+            .ToString("0");
     }
 
     private static string FormatBoostDuration(long seconds)

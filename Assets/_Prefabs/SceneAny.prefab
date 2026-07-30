@@ -389,33 +389,35 @@ MonoBehaviour:
   openPopupOnEnter: 1
   hidePopupOnExit: 1
   unlockPriceCurrency: 1
-  unlockPrice: 49
+  unlockPrice: 499
   autoCollectWhenUnlocked: 1
   collectImmediatelyOnEnterAfterUnlock: 1
   autoCollectIntervalSec: 5
   interactionLocalizationKey: UI/ClaimAll/OpenPopup
   interactionText: Claim all
   popupTitleLocalizationKey: UI/ClaimAll/PopupTitle
-  popupTitleText: Collect all income
+  popupTitleText: Collect income
   popupDescriptionLocalizationKey: UI/ClaimAll/PopupDescription
-  popupDescriptionText: Choose how to collect income.
+  popupDescriptionText: Collect income from every pet at once.
   popupCollectX2LocalizationKey: UI/ClaimAll/PopupCollectX2Ad
-  popupCollectX2Text: Take x2 (AD)
+  popupCollectX2Text: Collect x2
   popupBuyForeverLocalizationKey: UI/ClaimAll/PopupBuyForever
-  popupBuyForeverText: Buy forever
+  popupBuyForeverText: Auto-collect forever
   applyClaimPopupPresentation: 1
-  claimPopupAnchorMin: {x: 0.14, y: 0.18}
-  claimPopupAnchorMax: {x: 0.86, y: 0.72}
-  claimPopupPosition: {x: 0, y: -22}
-  claimPopupPadding: {x: 42, y: 34}
-  claimPopupPanelColor: {r: 0.2, g: 0.02, b: 0.09, a: 0.96}
-  claimPopupConfirmColor: {r: 0.08, g: 0.46, b: 0.29, a: 1}
-  claimPopupCancelColor: {r: 0.5, g: 0.13, b: 0.34, a: 1}
+  claimPopupAnchorMin: {x: 0.24, y: 0.21}
+  claimPopupAnchorMax: {x: 0.76, y: 0.77}
+  claimPopupPosition: {x: 0, y: 0}
+  claimPopupPadding: {x: 28, y: 24}
+  claimPopupPanelColor: {r: 0.35, g: 0.18, b: 0.07, a: 0.98}
+  claimPopupConfirmColor: {r: 0.05, g: 0.45, b: 0.92, a: 1}
+  claimPopupCancelColor: {r: 0.18, g: 0.82, b: 0.08, a: 1}
   claimPopupTextColor: {r: 1, g: 1, b: 1, a: 1}
-  claimPopupTitleFontSize: 44
+  claimPopupTextureSprite: {fileID: 21300000, guid: 763bb9e19e7a60a4d89e8d61868188d5, type: 3}
+  claimPopupGradientSprite: {fileID: 21300000, guid: b0ca618c1cb5fc044b595b7b3abcad55, type: 3}
+  claimPopupTitleFontSize: 40
   claimPopupDescriptionFontSize: 25
-  claimPopupButtonFontSize: 28
-  debugLogs: 1
+  claimPopupButtonFontSize: 25
+  debugLogs: 0
 --- !u!65 &270612846172312293
 BoxCollider:
   m_ObjectHideFlags: 0

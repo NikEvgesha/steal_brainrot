@@ -20,7 +20,7 @@ public sealed class DailyPlaytimeTrackerMB : MonoBehaviour
     [SerializeField] private float _saveEverySeconds = 10f;
 
     [Header("Testing")]
-    [SerializeField] private bool _isTest = true;
+    [SerializeField] private bool _isTest;
     [SerializeField] private bool _disableAutoTickInTest = false;
 
     private const string KeyDate = "daily_playtime_date";

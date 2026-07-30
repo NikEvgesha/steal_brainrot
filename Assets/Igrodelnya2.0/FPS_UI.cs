@@ -22,6 +22,9 @@ public class FPS_UI : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
+#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
+        return;
+#else
         if (FindAnyObjectByType<FPS_UI>() != null)
             return;
 
@@ -67,6 +70,7 @@ public class FPS_UI : MonoBehaviour
         text.outlineColor = new Color(0f, 0f, 0f, 0.95f);
         text.outlineWidth = 0.14f;
         text.enabled = false;
+#endif
     }
 
     private void Awake()

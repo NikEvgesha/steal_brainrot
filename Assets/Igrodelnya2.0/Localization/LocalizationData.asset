@@ -1360,8 +1360,8 @@ MonoBehaviour:
     - 'Reward: +{0}'
   - Key: UI/Brainrot/OfflineIncome
     Translations:
-    - "\u041E\u0444\u043B\u0430\u0439\u043D \u0434\u043E\u0445\u043E\u0434 = ${0}"
-    - Offline income = ${0}
+    - "\u041E\u0444\u043B\u0430\u0439\u043D \u0434\u043E\u0445\u043E\u0434 = <sprite=\"Coin\" index=0>{0}"
+    - Offline income = <sprite="Coin" index=0>{0}
   - Key: UI/Gifts/InboxLine
     Translations:
     - "\u041F\u043E\u0434\u0430\u0440\u043E\u043A \u043E\u0442 {0}: {1} ({2})"
@@ -1538,21 +1538,22 @@ MonoBehaviour:
     - Claim all
   - Key: UI/ClaimAll/PopupTitle
     Translations:
-    - "\u0421\u043E\u0431\u0440\u0430\u0442\u044C \u0432\u0435\u0441\u044C \u0434\u043E\u0445\u043E\u0434"
-    - Collect all income
+    - "\u0421\u043E\u0431\u0440\u0430\u0442\u044C \u0434\u043E\u0445\u043E\u0434"
+    - Collect income
   - Key: UI/ClaimAll/PopupDescription
     Translations:
-    - "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043F\u043E\u0441\u043E\u0431
-      \u0441\u0431\u043E\u0440\u0430 \u0434\u043E\u0445\u043E\u0434\u0430."
-    - Choose how to collect income.
+    - "\u0421\u043E\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u043E\u0445\u043E\u0434
+      \u0441\u043E \u0432\u0441\u0435\u0445 \u043F\u0438\u0442\u043E\u043C\u0446\u0435\u0432
+      \u0441\u0440\u0430\u0437\u0443."
+    - Collect income from every pet at once.
   - Key: UI/ClaimAll/PopupCollectX2Ad
     Translations:
-    - "\u0417\u0430\u0431\u0440\u0430\u0442\u044C x2 \u0437\u0430 \u0440\u0435\u043A\u043B\u0430\u043C\u0443"
-    - Take x2 (AD)
+    - "\u0417\u0430\u0431\u0440\u0430\u0442\u044C x2"
+    - Collect x2
   - Key: UI/ClaimAll/PopupBuyForever
     Translations:
-    - "\u041A\u0443\u043F\u0438\u0442\u044C \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
-    - Buy forever
+    - "\u0410\u0432\u0442\u043E\u0441\u0431\u043E\u0440 \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430"
+    - Auto-collect forever
   - Key: UI/Conveyor/ChancesBase
     Translations:
     - "\u0411\u0435\u0437 \u0431\u043E\u043D\u0443\u0441\u0430 \u0443\u0434\u0430\u0447\u0438"
@@ -2720,6 +2721,10 @@ MonoBehaviour:
     Translations:
     - "УСКОРИТЬ ОФЛАЙН-ДОХОД x{0}"
     - "BOOST OFFLINE INCOME x{0}"
+  - Key: UI/OfflineReward/MonthlyIncome
+    Translations:
+    - "ОФЛАЙН-ДОХОД"
+    - "OFFLINE INCOME"
   - Key: UI/OfflineReward/MonthlyDuration
     Translations:
     - "НА {0} ДНЕЙ"
@@ -2730,8 +2735,8 @@ MonoBehaviour:
     - "x{0} ACTIVE  •  {1} LEFT"
   - Key: UI/OfflineReward/Collect
     Translations:
-    - "ЗАБРАТЬ  ${0}"
-    - "COLLECT  ${0}"
+    - "ЗАБРАТЬ  <sprite=\"Coin\" index=0>{0}"
+    - "COLLECT  <sprite=\"Coin\" index=0>{0}"
   - Key: UI/TimeBonus/Off
     Translations:
     - "ВЫКЛ"

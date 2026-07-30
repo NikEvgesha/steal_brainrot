@@ -324,7 +324,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         {
             _priceText.gameObject.SetActive(price != null);
             if (price != null)
-                _priceText.text = "$" + price;
+                _priceText.text = CurrencyText.Coins(price);
         }
     }
 

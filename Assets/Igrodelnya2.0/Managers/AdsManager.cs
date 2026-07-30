@@ -38,6 +38,9 @@ public class AdsManager : MonoBehaviour
     private Coroutine _timedInterstitialRoutine;
     private Coroutine _adButtonIconRoutine;
     private Coroutine _rewardPopupRoutine;
+#if UNITY_EDITOR
+    private Coroutine _editorCountdownPreviewRoutine;
+#endif
     private float _lastSuccessfulAdRealtime;
     private bool _timedInterstitialFlowInProgress;
     private bool _tutorialInterstitialSuppressed;
@@ -657,6 +660,7 @@ public class AdsManager : MonoBehaviour
 
         AdsOverlayView view = Instantiate(adOverlayPrefab);
         view.name = "AdsOverlayCanvas";
+        view.transform.localScale = Vector3.one;
         DontDestroyOnLoad(view.gameObject);
 
         _adOverlayCanvas = view.Canvas;
@@ -683,6 +687,8 @@ public class AdsManager : MonoBehaviour
             return false;
         }
 
+        _adOverlayCanvas.overrideSorting = true;
+        _adOverlayCanvas.sortingOrder = short.MaxValue;
         _countdownPanel.gameObject.SetActive(false);
         _rewardText.gameObject.SetActive(false);
         view.gameObject.SetActive(false);
@@ -765,6 +771,7 @@ public class AdsManager : MonoBehaviour
     {
         EnsureAdOverlay();
         _adOverlayCanvas.gameObject.SetActive(true);
+        _adOverlayCanvas.transform.localScale = Vector3.one;
         _countdownPanel.gameObject.SetActive(true);
         var countdownFormat = LocalizationUtils.T(timedInterstitialCountdownLocalizationKey, timedInterstitialCountdownText);
         _countdownText.text = string.Format(CultureInfo.InvariantCulture, countdownFormat, seconds);
@@ -776,6 +783,37 @@ public class AdsManager : MonoBehaviour
             _countdownRewardText.gameObject.SetActive(true);
         }
     }
+
+#if UNITY_EDITOR
+    [ContextMenu("Ads/Preview 3-2-1 Countdown")]
+    public void PreviewTimedInterstitialCountdownForEditor()
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("[AdsManager] Enter Play Mode to preview the ad countdown.");
+            return;
+        }
+
+        if (_editorCountdownPreviewRoutine != null)
+            StopCoroutine(_editorCountdownPreviewRoutine);
+
+        _editorCountdownPreviewRoutine = StartCoroutine(EditorCountdownPreviewRoutine());
+    }
+
+    private IEnumerator EditorCountdownPreviewRoutine()
+    {
+        double baseReward = CalculateTimedInterstitialBaseReward();
+        int countdown = Mathf.Max(1, interstitialCountdownSeconds);
+        for (int i = countdown; i > 0; i--)
+        {
+            ShowCountdown(i, baseReward);
+            yield return new WaitForSecondsRealtime(1f);
+        }
+
+        HideCountdown();
+        _editorCountdownPreviewRoutine = null;
+    }
+#endif
 
     private void HideCountdown()
     {

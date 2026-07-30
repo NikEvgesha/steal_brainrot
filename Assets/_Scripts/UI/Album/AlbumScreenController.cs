@@ -2094,10 +2094,12 @@ public class AlbumScreenController : MonoBehaviour
             : Math.Round(value).ToString("N0", CultureInfo.InvariantCulture);
 
         if (string.IsNullOrWhiteSpace(text))
-            return "$0";
+            return CurrencyText.Coins("0");
 
         text = text.Trim();
-        return text.StartsWith("$", StringComparison.Ordinal) ? text : "$" + text;
+        return text.StartsWith(CurrencyText.CoinIcon, StringComparison.Ordinal)
+            ? text
+            : CurrencyText.Coins(text);
     }
 
     private void AutoSetupReferences()

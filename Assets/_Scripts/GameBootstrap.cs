@@ -46,7 +46,6 @@ public class GameBootstrap : MonoBehaviour
 
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
         TryCreateRuntimeUi("FriendRequestInboxUI", "FriendRequestInboxUI");
-        LobbyDebugPanel.EnsureExists();
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
     }

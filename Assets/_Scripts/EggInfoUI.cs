@@ -45,7 +45,7 @@ public class EggInfoUI : MonoBehaviour
         if (_luck != null)
             _luck.text = FormatAmount(egg.Data.Luck) + "X";
         if (_price != null)
-            _price.text = "$" + FormatAmount(egg.EffectivePrice);
+            _price.text = CurrencyText.Coins(FormatAmount(egg.EffectivePrice));
     }
 
     private void OnLanguageChanged(string _)

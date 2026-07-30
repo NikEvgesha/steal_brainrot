@@ -22,31 +22,29 @@ public class BrainrotInfoUI : MonoBehaviour
     {
         //_name.text = data.Name;
         if (_accumulationIncome != null)
-            _accumulationIncome.text = "$0";
+            _accumulationIncome.text = CurrencyText.Coins("0");
         if (_income != null)
-            _income.text = string.Format("${0}/s", FormatAmount(dinamicData.ResultIncome));
+            _income.text = CurrencyText.Coins(FormatAmount(dinamicData.ResultIncome)) + "/s";
     }
     public void SetInfo(double income)
     {
         //_name.text = data.Name;
         if (_accumulationIncome != null)
-            _accumulationIncome.text = "$0";
+            _accumulationIncome.text = CurrencyText.Coins("0");
         if (_income != null)
-            _income.text = string.Format("${0}/s", FormatAmount(income));
+            _income.text = CurrencyText.Coins(FormatAmount(income)) + "/s";
     }
 
 
     public void UpdateIncome(double income)
     {
         if (_accumulationIncome != null)
-            _accumulationIncome.text = "$" + FormatAmount(income);
+            _accumulationIncome.text = CurrencyText.Coins(FormatAmount(income));
     }
     public void UpdateOfflineIncome(double income)
     {
-        if (_remoteView) return;
-        if (_offlineIncome == null) return;
-        _offlineIncome.gameObject.SetActive(true);
-        _offlineIncome.text = LocalizationUtils.Format("UI/Brainrot/OfflineIncome", "Offline income = ${0}", FormatAmount(income));
+        if (_offlineIncome != null)
+            _offlineIncome.gameObject.SetActive(false);
     }
 
     public void SetRemoteView(bool remote)

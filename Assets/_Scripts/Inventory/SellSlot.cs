@@ -17,7 +17,7 @@ public class SellSlot : MonoBehaviour
     {
         _item = item;
         _icon.sprite = _item.Icon;
-        _price.text = "$" + G.Currency.ToString(_item.BaseSellPrice); // TODO: use multipliers
+        _price.text = CurrencyText.Coins(G.Currency.ToString(_item.BaseSellPrice)); // TODO: use multipliers
         _sellButton.enabled = _item.SellAllowed;
         _lockSellIndicator.SetActive(!_item.SellAllowed);
 

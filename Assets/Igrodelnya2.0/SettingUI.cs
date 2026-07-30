@@ -39,7 +39,6 @@ public class SettingUI : MonoBehaviour
         if (!G.Control.UseTouchControl)
             G.Control.CursorActive = _isOpen;
         _panel.SetActive(_isOpen);
-        LobbyDebugPanel.EnsureExists().SetMenuOpen(_isOpen);
         //_exitButton.SetActive(_isOpen);
         //PauseManager.Instance.SetPause(_isOpen, false);
         G.IsPaused = _isOpen;
@@ -54,9 +53,6 @@ public class SettingUI : MonoBehaviour
     private void Start()
     {
         G.Input.APause += ToggleOpen;
-        var lobbyDebugPanel = LobbyDebugPanel.EnsureExists();
-        lobbyDebugPanel.BindToMenu(_panel != null ? _panel.transform : transform);
-        lobbyDebugPanel.SetMenuOpen(false);
         ResolveAnimationsToggle();
         if (_animationsToggle != null)
         {

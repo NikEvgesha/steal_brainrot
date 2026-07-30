@@ -6,7 +6,7 @@ public static class OfflineRewardRules
     public const long MaxAccrualSeconds = 8L * 60L * 60L;
     public const int AdMultiplier = 5;
     public const int BoostMultiplier = 10;
-    public const int BoostPriceGems = 10;
+    public const int BoostPriceGems = 15;
     public const int MonthlyBoostMultiplier = 20;
     public const int MonthlyBoostDurationDays = 30;
     public const int MonthlyBoostPriceGems = 499;

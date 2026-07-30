@@ -10,8 +10,11 @@ public sealed class OfflineRewardManager : MonoBehaviour
 {
     private const float DependencyTimeoutSeconds = 20f;
     private const float HeartbeatIntervalSeconds = 30f;
-    private const string WindowResourcePath = "OfflineReward";
+    private const string WindowResourcePath = "OfflineRewardWindow";
     private const string MonthlyBoostUntilKey = "OfflineReward.MonthlyBoostUntilUnix";
+#if UNITY_EDITOR
+    private const long EditorPreviewAwaySeconds = (3L * 60L + 24L) * 60L;
+#endif
 
     private static OfflineRewardManager _instance;
 
@@ -20,6 +23,7 @@ public sealed class OfflineRewardManager : MonoBehaviour
     private bool _initialized;
     private bool _claimPending;
     private bool _isBackgrounded;
+    private bool _isQuitting;
     private long _pausedAtUnix;
     private long _evaluatedAwaySeconds;
     private string _evaluationSource = "session_start";
@@ -58,6 +62,12 @@ public sealed class OfflineRewardManager : MonoBehaviour
 
     private IEnumerator Start()
     {
+#if UNITY_EDITOR
+        yield return WaitForEditorPreviewScene();
+        _initialized = true;
+        ShowEditorPreview();
+        yield break;
+#else
         yield return WaitForSaveAndCurrency();
 
         long now = TrustedUtcNowUnix();
@@ -73,7 +83,33 @@ public sealed class OfflineRewardManager : MonoBehaviour
         long elapsed = Math.Max(0L, now - previous);
         yield return WaitForPlayableScene();
         EvaluateAndShow(elapsed, "session_start");
+#endif
     }
+
+#if UNITY_EDITOR
+    private static IEnumerator WaitForEditorPreviewScene()
+    {
+        while (string.Equals(
+                   SceneManager.GetActiveScene().name,
+                   "LoadingScene",
+                   StringComparison.OrdinalIgnoreCase))
+        {
+            yield return null;
+        }
+
+        yield return null;
+        yield return null;
+    }
+
+    private void ShowEditorPreview()
+    {
+        RefreshIncomeFromClock();
+        OfflineRewardSnapshot snapshot = BuildSnapshot(EditorPreviewAwaySeconds);
+        _evaluatedAwaySeconds = EditorPreviewAwaySeconds;
+        _evaluationSource = "editor_play_mode";
+        ShowWindow(snapshot);
+    }
+#endif
 
     private void OnApplicationPause(bool paused)
     {
@@ -111,7 +147,9 @@ public sealed class OfflineRewardManager : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        PersistLastSeen(TrustedUtcNowUnix());
+        _isQuitting = true;
+        if (_initialized)
+            PersistLastSeen(TrustedUtcNowUnix());
     }
 
     private void OnDestroy()
@@ -119,7 +157,7 @@ public sealed class OfflineRewardManager : MonoBehaviour
         if (_instance != this)
             return;
 
-        if (_initialized)
+        if (_initialized && !_isQuitting && Application.isPlaying)
             PersistLastSeen(TrustedUtcNowUnix());
         UnsubscribeFromShop();
         _instance = null;

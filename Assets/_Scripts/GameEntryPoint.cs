@@ -38,7 +38,6 @@ public class GameEntryPoint : MonoBehaviour
 
         if (G.Backend == null && _backend != null)
             Instantiate(_backend);
-        LobbyDebugPanel.EnsureExists();
 
         G.Initialized?.Invoke();
         TutorialManager.EnsureExists();
