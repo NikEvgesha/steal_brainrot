@@ -36,6 +36,12 @@ public static class LocalizationUtils
         if (string.IsNullOrWhiteSpace(language) && data.Languages.Count > 0)
             language = data.Languages[0];
 
+        if (data.TryGetTranslation(key, language, out var exactTranslation) &&
+            !string.IsNullOrWhiteSpace(exactTranslation))
+        {
+            return exactTranslation;
+        }
+
         var translated = data.GetTranslation(key, language);
         if (!string.IsNullOrWhiteSpace(translated) && translated != key)
             return translated;

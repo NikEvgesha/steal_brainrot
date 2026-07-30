@@ -256,7 +256,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
         var canInteract = _playerInside && _hasTarget;
         interactionPanel.gameObject.SetActive(canInteract);
         if (canInteract)
-            interactionPanel.SetInfo(L(interactionLocalizationKey, interactionTextFallback));
+            interactionPanel.SetInfoLocalized(interactionLocalizationKey, interactionTextFallback);
     }
 
     private void HideInteraction()

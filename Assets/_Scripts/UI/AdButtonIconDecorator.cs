@@ -126,6 +126,12 @@ public static class AdButtonIconDecorator
 
     public static Sprite GetIconSprite()
     {
+        Sprite configuredIcon = G.SpecialShop != null
+            ? G.SpecialShop.RewardedAdIcon
+            : null;
+        if (configuredIcon != null)
+            return configuredIcon;
+
         if (_iconSprite != null)
             return _iconSprite;
 

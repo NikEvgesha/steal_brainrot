@@ -4,8 +4,12 @@ public static class OfflineRewardRules
 {
     public const long MinimumAwaySeconds = 20L * 60L;
     public const long MaxAccrualSeconds = 8L * 60L * 60L;
+    public const int AdMultiplier = 5;
     public const int BoostMultiplier = 10;
     public const int BoostPriceGems = 10;
+    public const int MonthlyBoostMultiplier = 20;
+    public const int MonthlyBoostDurationDays = 30;
+    public const int MonthlyBoostPriceGems = 499;
 
     public static long ClampAccrualSeconds(long elapsedSeconds)
     {
@@ -22,7 +26,13 @@ public static class OfflineRewardRules
         seconds = Math.Max(0L, seconds);
         long hours = seconds / 3600L;
         long minutes = seconds % 3600L / 60L;
-        return hours > 0L ? $"{hours}ч {minutes:00}м" : $"{minutes}м";
+        return hours > 0L
+            ? LocalizationUtils.Format(
+                "UI/Duration/HoursMinutesShort",
+                "{0}h {1:00}m",
+                hours,
+                minutes)
+            : LocalizationUtils.Format("UI/Duration/MinutesShort", "{0}m", minutes);
     }
 }
 
@@ -47,4 +57,6 @@ public readonly struct OfflineRewardSnapshot
     public double DisplayedReward { get; }
     public int SourceCount { get; }
     public double BoostedReward => DisplayedReward * OfflineRewardRules.BoostMultiplier;
+    public double GetReward(int multiplier) =>
+        DisplayedReward * Math.Max(1, multiplier);
 }

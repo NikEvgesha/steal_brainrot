@@ -95,7 +95,7 @@ public class EggDropCatalogInteractionPoint : MonoBehaviour
         var show = _playerInside && (!hideInteractionWhileCatalogOpen || !catalogIsOpen);
         interactionPanel.gameObject.SetActive(show);
         if (show)
-            interactionPanel.SetInfo(L(interactionLocalizationKey, interactionTextFallback));
+            interactionPanel.SetInfoLocalized(interactionLocalizationKey, interactionTextFallback);
     }
 
     private void HideInteraction()

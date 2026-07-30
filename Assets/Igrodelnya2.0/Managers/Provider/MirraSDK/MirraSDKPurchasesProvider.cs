@@ -70,10 +70,7 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
 
                 restoreData.RestoreProduct(id, onProductRestore: () => {
 
-                    if (G.SpecialShop != null)
-                        G.SpecialShop.OnPurchaseRestore(id);
-                    else
-                        Debug.LogWarning($"MirraSDK: Purchase '{id}' restored before SpecialShop was ready.");
+                    SpecialShop.DeliverOrQueueRestoredPurchase(id);
 
                     Debug.Log($"Товар '{id}' восстановлен");
 

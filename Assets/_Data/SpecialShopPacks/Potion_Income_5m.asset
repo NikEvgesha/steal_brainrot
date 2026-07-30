@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d5817389edd4a84195c68d90f4f0d7a, type: 3}
+  m_Name: Potion_Income_5m
+  m_EditorClassIdentifier: Assembly-CSharp::ShopPackData
+  _id: potion_income_5m
+  _name: "\u0417\u0435\u043B\u044C\u0435 \u043C\u043E\u043D\u0435\u0442"
+  price: 25
+  _priceCurrencyType: 1
+  _slotType: 0
+  _category: 1
+  _descriptionKey: 
+  _descriptionFallback: "+100% \u043C\u043E\u043D\u0435\u0442 \u043D\u0430 5 \u043C\u0438\u043D\u0443\u0442."
+  _icon: {fileID: 21300000, guid: d27ac6cfdb67049f79c092866ed0a916, type: 3}
+  _accentColor: {r: 0.48, g: 0.2, b: 0.88, a: 1}
+  _sortOrder: 41
+  _featured: 0
+  _offerStyle: 9
+  _itemsPerRow: 2
+  _badgeFallback: "\u0417\u0415\u041B\u042C\u0415"
+  _originalPrice: 0
+  _groupId: Potion
+  _trackSteps: []
+  _rewardedAdFallback: 0
+  _rewardedAdGems: 5
+  _rewards:
+  - Type: 6
+    RewardCurrencyType: 0
+    Amount: 1
+    Icon: {fileID: 21300000, guid: d27ac6cfdb67049f79c092866ed0a916, type: 3}
+    Item: {fileID: 0}
+    EffectValue: 2
+    DurationMinutes: 5
+    DurationDays: 0

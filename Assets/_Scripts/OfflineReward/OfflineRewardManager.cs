@@ -11,6 +11,7 @@ public sealed class OfflineRewardManager : MonoBehaviour
     private const float DependencyTimeoutSeconds = 20f;
     private const float HeartbeatIntervalSeconds = 30f;
     private const string WindowResourcePath = "OfflineReward";
+    private const string MonthlyBoostUntilKey = "OfflineReward.MonthlyBoostUntilUnix";
 
     private static OfflineRewardManager _instance;
 
@@ -38,6 +39,10 @@ public sealed class OfflineRewardManager : MonoBehaviour
     }
 
     public bool IsWindowOpen => _window != null && _window.IsVisible;
+    public bool IsMonthlyBoostActive => GetMonthlyBoostRemainingSeconds() > 0L;
+    public int CurrentClaimMultiplier => IsMonthlyBoostActive
+        ? OfflineRewardRules.MonthlyBoostMultiplier
+        : 1;
 
     private void Awake()
     {
@@ -122,12 +127,135 @@ public sealed class OfflineRewardManager : MonoBehaviour
 
     public void ClaimNormal(string source)
     {
-        Claim(false, source);
+        int multiplier = CurrentClaimMultiplier;
+        Claim(
+            multiplier,
+            0,
+            source,
+            multiplier == OfflineRewardRules.MonthlyBoostMultiplier
+                ? "x20_monthly"
+                : source == "close_button" ? "close_as_normal" : "normal");
     }
 
     public void ClaimBoosted()
     {
-        Claim(true, "x10_button");
+        ClaimWithGems();
+    }
+
+    public void ClaimWithAd()
+    {
+        if (_claimPending || _window == null)
+            return;
+
+        if (IsMonthlyBoostActive)
+        {
+            ClaimNormal("monthly_collect");
+            return;
+        }
+
+        RefreshIncomeFromClock();
+        OfflineRewardSnapshot preview = BuildSnapshot(_evaluatedAwaySeconds);
+        if (G.Ad == null)
+        {
+            TrackClaim(
+                false,
+                OfflineRewardRules.AdMultiplier,
+                0,
+                "x5_ad_button",
+                "x5_ad",
+                preview,
+                0d,
+                "ads_unavailable");
+            G.Sound?.Play(GameAudioId.SFX_CURRENCY_FAIL);
+            return;
+        }
+
+        _claimPending = true;
+        _window.SetActionsInteractable(false);
+        G.Ad.ShowRewardedAd("OfflineRewardX5", success =>
+        {
+            _claimPending = false;
+            if (!success)
+            {
+                _window?.SetActionsInteractable(true);
+                TrackClaim(
+                    false,
+                    OfflineRewardRules.AdMultiplier,
+                    0,
+                    "x5_ad_button",
+                    "x5_ad",
+                    preview,
+                    0d,
+                    "ad_failed_or_closed");
+                return;
+            }
+
+            Claim(
+                OfflineRewardRules.AdMultiplier,
+                0,
+                "x5_ad_button",
+                "x5_ad");
+        });
+    }
+
+    public void ClaimWithGems()
+    {
+        if (IsMonthlyBoostActive)
+        {
+            ClaimNormal("monthly_collect");
+            return;
+        }
+
+        Claim(
+            OfflineRewardRules.BoostMultiplier,
+            OfflineRewardRules.BoostPriceGems,
+            "x10_button",
+            "x10_gems");
+    }
+
+    public void PurchaseMonthlyBoost()
+    {
+        if (_claimPending || _window == null)
+            return;
+
+        if (IsMonthlyBoostActive)
+        {
+            _window.Refresh(BuildSnapshot(_evaluatedAwaySeconds));
+            return;
+        }
+
+        if (G.Currency == null ||
+            !G.Currency.RemoveCurrency(
+                CurrencyType.Gems,
+                OfflineRewardRules.MonthlyBoostPriceGems,
+                "offline_reward_x20_monthly"))
+        {
+            OpenCurrencyShopAndReturn();
+            return;
+        }
+
+        long now = TrustedUtcNowUnix();
+        long currentUntil = LoadMonthlyBoostUntil();
+        long until = Math.Max(now, currentUntil) +
+                     OfflineRewardRules.MonthlyBoostDurationDays * 86400L;
+        PlayerPrefs.SetString(
+            MonthlyBoostUntilKey,
+            until.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        PlayerPrefs.Save();
+
+        G.Sound?.Play(GameAudioId.SFX_SHOP_PURCHASE_MAJOR);
+        _window.Refresh(BuildSnapshot(_evaluatedAwaySeconds));
+        GameAnalytics.TrackCritical(
+            AnalyticsEventNames.PurchaseResult,
+            GameAnalytics.Params(
+                "product_id", "offline_x20_30d",
+                "source", "offline_reward_window",
+                "currency_type", "gems",
+                "price", OfflineRewardRules.MonthlyBoostPriceGems,
+                "duration_days", OfflineRewardRules.MonthlyBoostDurationDays,
+                "multiplier", OfflineRewardRules.MonthlyBoostMultiplier,
+                "result", "success"),
+            "offline_x20_30d:" + until);
     }
 
     private IEnumerator WaitForSaveAndCurrency()
@@ -215,8 +343,12 @@ public sealed class OfflineRewardManager : MonoBehaviour
             "base_income", snapshot.BaseIncome,
             "displayed_reward", snapshot.DisplayedReward,
             "income_source_count", snapshot.SourceCount,
-            "boost_multiplier", OfflineRewardRules.BoostMultiplier,
+            "ad_multiplier", OfflineRewardRules.AdMultiplier,
+            "gems_multiplier", OfflineRewardRules.BoostMultiplier,
             "boost_price_gems", OfflineRewardRules.BoostPriceGems,
+            "monthly_boost_active", IsMonthlyBoostActive,
+            "monthly_boost_multiplier", OfflineRewardRules.MonthlyBoostMultiplier,
+            "monthly_boost_remaining_sec", GetMonthlyBoostRemainingSeconds(),
             "source", _evaluationSource,
             "result", "success"),
             AnalyticsPriority.Normal,
@@ -270,47 +402,79 @@ public sealed class OfflineRewardManager : MonoBehaviour
         G.Sound?.Play(GameAudioId.SFX_REWARD_READY);
     }
 
-    private void Claim(bool boosted, string source)
+    private void Claim(
+        int multiplier,
+        int gemsPrice,
+        string source,
+        string claimMode)
     {
         if (_claimPending || _window == null)
             return;
 
+        multiplier = Math.Max(1, multiplier);
+        gemsPrice = Math.Max(0, gemsPrice);
         RefreshIncomeFromClock();
         OfflineRewardSnapshot preview = BuildSnapshot(_evaluatedAwaySeconds);
         if (preview.BaseIncome <= 0d)
         {
-            TrackClaim(false, boosted, source, preview, 0d, "nothing_to_collect");
+            TrackClaim(
+                false,
+                multiplier,
+                0,
+                source,
+                claimMode,
+                preview,
+                0d,
+                "nothing_to_collect");
             CloseWindow();
             return;
         }
 
-        if (boosted &&
+        if (gemsPrice > 0 &&
             (G.Currency == null ||
              !G.Currency.RemoveCurrency(
                  CurrencyType.Gems,
-                 OfflineRewardRules.BoostPriceGems,
+                 gemsPrice,
                  "offline_reward_x10")))
         {
-            TrackClaim(false, true, source, preview, 0d, "insufficient_gems");
+            TrackClaim(
+                false,
+                multiplier,
+                0,
+                source,
+                claimMode,
+                preview,
+                0d,
+                "insufficient_gems");
             OpenCurrencyShopAndReturn();
             return;
         }
 
         _claimPending = true;
         double collectedBase = CollectAllLocalIncome(out int sourceCount);
-        if (boosted && collectedBase > 0d)
-            AddBonusIncome(collectedBase * (OfflineRewardRules.BoostMultiplier - 1));
+        if (multiplier > 1 && collectedBase > 0d)
+            AddBonusIncome(collectedBase * (multiplier - 1));
 
-        double granted = ApplyIncomeModifiers(collectedBase) *
-                         (boosted ? OfflineRewardRules.BoostMultiplier : 1);
+        double granted = ApplyIncomeModifiers(collectedBase) * multiplier;
         var resultSnapshot = new OfflineRewardSnapshot(
             _evaluatedAwaySeconds,
             collectedBase,
             ApplyIncomeModifiers(collectedBase),
             sourceCount);
 
-        G.Sound?.Play(boosted ? GameAudioId.SFX_REWARD_CLAIM_MAJOR : GameAudioId.SFX_OFFLINE_INCOME);
-        TrackClaim(true, boosted, source, resultSnapshot, granted, string.Empty);
+        G.Sound?.Play(
+            multiplier > 1
+                ? GameAudioId.SFX_REWARD_CLAIM_MAJOR
+                : GameAudioId.SFX_OFFLINE_INCOME);
+        TrackClaim(
+            true,
+            multiplier,
+            gemsPrice,
+            source,
+            claimMode,
+            resultSnapshot,
+            granted,
+            string.Empty);
         CloseWindow();
         _claimPending = false;
     }
@@ -463,27 +627,29 @@ public sealed class OfflineRewardManager : MonoBehaviour
 
     private void TrackClaim(
         bool success,
-        bool boosted,
+        int multiplier,
+        int gemsSpent,
         string source,
+        string claimMode,
         OfflineRewardSnapshot snapshot,
         double granted,
         string failureReason)
     {
         GameAnalytics.TrackCritical(AnalyticsEventNames.OfflineRewardClaimResult, GameAnalytics.Params(
-            "claim_mode", boosted ? "x10_gems" : source == "close_button" ? "close_as_normal" : "normal",
+            "claim_mode", claimMode,
             "away_duration_sec", snapshot.ElapsedSeconds,
             "credited_duration_sec", snapshot.CappedElapsedSeconds,
             "max_accrual_sec", OfflineRewardRules.MaxAccrualSeconds,
             "base_income", snapshot.BaseIncome,
             "granted_amount", granted,
             "income_source_count", snapshot.SourceCount,
-            "multiplier", boosted ? OfflineRewardRules.BoostMultiplier : 1,
-            "gems_spent", success && boosted ? OfflineRewardRules.BoostPriceGems : 0,
+            "multiplier", Math.Max(1, multiplier),
+            "gems_spent", success ? Math.Max(0, gemsSpent) : 0,
             "currency_type", "coins",
             "source", string.IsNullOrWhiteSpace(source) ? "offline_reward_window" : source,
             "result", success ? "success" : "failed",
             "failure_reason", failureReason ?? string.Empty),
-            "offline_claim:" + (boosted ? "x10" : "normal") + ":" + (source ?? string.Empty));
+            "offline_claim:" + claimMode + ":" + (source ?? string.Empty));
     }
 
     private void CloseWindow()
@@ -497,6 +663,36 @@ public sealed class OfflineRewardManager : MonoBehaviour
 
         if (G.Control != null)
             G.Control.CursorActive = false;
+    }
+
+    public long GetMonthlyBoostRemainingSeconds()
+    {
+        long now = TrustedUtcNowUnix();
+        long until = LoadMonthlyBoostUntil();
+        if (until <= now)
+        {
+            if (until > 0L)
+            {
+                PlayerPrefs.DeleteKey(MonthlyBoostUntilKey);
+                PlayerPrefs.Save();
+            }
+
+            return 0L;
+        }
+
+        return until - now;
+    }
+
+    private static long LoadMonthlyBoostUntil()
+    {
+        string raw = PlayerPrefs.GetString(MonthlyBoostUntilKey, "0");
+        return long.TryParse(
+            raw,
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out long until)
+            ? Math.Max(0L, until)
+            : 0L;
     }
 
     private static void PersistLastSeen(long unix)

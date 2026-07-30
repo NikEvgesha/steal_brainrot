@@ -220,7 +220,7 @@ public class BigPetPoint : MonoBehaviour
         {
             InteractionPanel feedPanel = _feedButton.GetComponent<InteractionPanel>();
             if (feedPanel != null)
-                feedPanel.SetInfo(LocalizationUtils.T("Feed", "Кормить"));
+                feedPanel.SetInfoLocalized("Feed", "Feed");
 
             if (_buyPanel != null)
                 _buyPanel.gameObject.SetActive(false);
@@ -589,7 +589,8 @@ public class BigPetPoint : MonoBehaviour
             lastTs = nowTs;
 
         long elapsed = OfflineRewardRules.ClampAccrualSeconds(nowTs - lastTs);
-        _accumulatedIncome = Math.Max(0d, Math.Round(elapsed * _currentIncome));
+        _accumulatedIncome = Math.Max(0d, Math.Round(ApplyOfflineShopMultiplier(
+            elapsed * _currentIncome)));
         _accumulatedIncome = double.IsInfinity(_accumulatedIncome)
             ? float.MaxValue
             : Math.Min(_accumulatedIncome, MaxAccumulatedIncome);
@@ -619,6 +620,11 @@ public class BigPetPoint : MonoBehaviour
 
         Debug.LogWarning("[BigPetPoint] Cannot collect income: income and currency managers are not initialized.");
         return false;
+    }
+
+    private static double ApplyOfflineShopMultiplier(double amount)
+    {
+        return G.ShopEffects != null ? G.ShopEffects.ApplyOfflineIncome(amount) : amount;
     }
 
     private IEnumerator ProduceIncome()
@@ -972,7 +978,8 @@ public class BigPetPoint : MonoBehaviour
         _lastIncomeCollectTimestamp = DateTimeOffset.FromUnixTimeSeconds(lastCollectTs).UtcDateTime;
         incomeAccumulateTime = OfflineRewardRules.ClampAccrualSeconds(nowTs - lastCollectTs);
 
-        _accumulatedIncome = Math.Max(0d, incomeAccumulateTime * _currentIncome);
+        _accumulatedIncome = Math.Max(0d, ApplyOfflineShopMultiplier(
+            incomeAccumulateTime * _currentIncome));
         _hasOfflineIncomePending = incomeAccumulateTime >= 60L && _accumulatedIncome > 0d;
         if (_petInfoUI != null)
         {
@@ -1188,7 +1195,7 @@ public class BigPetPoint : MonoBehaviour
 
         if (_buyPanel != null)
         {
-            _buyPanel.SetInfo(LocalizationUtils.T("Buy", "Купить"), Math.Round(_unlockPrice).ToString("0", CultureInfo.InvariantCulture));
+            _buyPanel.SetInfoLocalized("Buy", "Buy", Math.Round(_unlockPrice).ToString("0", CultureInfo.InvariantCulture));
             _buyPanel.gameObject.SetActive(showBuyPanel);
         }
     }

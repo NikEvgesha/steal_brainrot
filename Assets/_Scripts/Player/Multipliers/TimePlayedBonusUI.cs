@@ -19,6 +19,7 @@ public sealed class TimePlayedBonusUI : MonoBehaviour, IPointerEnterHandler, IPo
     private TMP_Text _tooltipText;
     private string _tooltipValue = "";
     private static Sprite _panelSprite;
+    private LocalizationManager _subscribedLocalizationManager;
 
     private void Awake()
     {
@@ -33,6 +34,20 @@ public sealed class TimePlayedBonusUI : MonoBehaviour, IPointerEnterHandler, IPo
         UpdateView();
     }
 
+    private void OnEnable()
+    {
+        LocalizationManager.OnInstanceReady += HandleLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged += HandleLanguageChanged;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
+    }
+
+    private void OnDisable()
+    {
+        LocalizationManager.OnInstanceReady -= HandleLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= HandleLanguageChanged;
+        UnsubscribeFromLocalizationManager();
+    }
+
     private void OnDestroy()
     {
         if (_modifier != null)
@@ -45,14 +60,24 @@ public sealed class TimePlayedBonusUI : MonoBehaviour, IPointerEnterHandler, IPo
 
         if (_modifier == null || !_modifier.IsActive)
         {
-            _text.text = string.Format(_format, "OFF");
-            _tooltipValue = "Бонус дохода: выключен\nРаботает в тестовом режиме или по выходным. Даёт прибавку за время в игре.";
+            _text.text = string.Format(
+                _format,
+                LocalizationUtils.T("UI/TimeBonus/Off", "OFF"));
+            _tooltipValue = LocalizationUtils.T(
+                "UI/TimeBonus/DisabledTooltip",
+                "Income bonus: off\nAvailable in test mode or on weekends. Increases with time played.");
             UpdateTooltipText();
             return;
         }
 
         _text.text = string.Format(_format, _modifier.DisplayValue);
-        _tooltipValue = $"Бонус дохода: {_modifier.DisplayValue}\n{_modifier.Description}";
+        _tooltipValue = LocalizationUtils.Format(
+            "UI/TimeBonus/ActiveTooltip",
+            "Income bonus: {0}\n{1}",
+            _modifier.DisplayValue,
+            LocalizationUtils.T(
+                "UI/TimeBonus/Description",
+                "Available in test mode or on weekends. +1% per minute today, up to +50%."));
         UpdateTooltipText();
     }
 
@@ -226,5 +251,35 @@ public sealed class TimePlayedBonusUI : MonoBehaviour, IPointerEnterHandler, IPo
         int dx = x - cx;
         int dy = y - cy;
         return dx * dx + dy * dy <= radius * radius;
+    }
+
+    private void HandleLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+        UpdateView();
+    }
+
+    private void HandleLanguageChanged(string _)
+    {
+        UpdateView();
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || manager == _subscribedLocalizationManager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _subscribedLocalizationManager = manager;
+        _subscribedLocalizationManager.OnLanguageChanged += HandleLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_subscribedLocalizationManager == null)
+            return;
+
+        _subscribedLocalizationManager.OnLanguageChanged -= HandleLanguageChanged;
+        _subscribedLocalizationManager = null;
     }
 }

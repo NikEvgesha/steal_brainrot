@@ -358,7 +358,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
         var request = new UniversalDecisionPopup.Request
         {
             title = new UniversalDecisionPopup.LocalizedTextPayload(popupTitleLocalizationKey, popupTitleText),
-            description = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, BuildPopupDescription()),
+            description = new UniversalDecisionPopup.LocalizedTextPayload(
+                popupDescriptionLocalizationKey,
+                popupDescriptionText),
             confirm = new UniversalDecisionPopup.LocalizedTextPayload(popupCollectX2LocalizationKey, popupCollectX2Text),
             cancel = new UniversalDecisionPopup.LocalizedTextPayload(string.Empty, BuildBuyForeverButtonText()),
             onConfirm = () =>
@@ -687,7 +689,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
         {
             interactionPanel.gameObject.SetActive(showInteraction);
             if (showInteraction)
-                interactionPanel.SetInfo(L(interactionLocalizationKey, interactionText));
+                interactionPanel.SetInfoLocalized(interactionLocalizationKey, interactionText);
         }
 
         if (readyIndicator != null)
@@ -923,12 +925,6 @@ public class ClaimAllCoinsZone : MonoBehaviour
         return _runtimePopupCanvas.transform;
     }
 
-    private string BuildPopupDescription()
-    {
-        var baseText = L(popupDescriptionLocalizationKey, popupDescriptionText);
-        return $"{baseText}\n{BuildBuyForeverButtonText()}";
-    }
-
     private void ApplyPopupPresentation(UniversalDecisionPopup popup)
     {
         if (!applyClaimPopupPresentation || popup == null)
@@ -1078,7 +1074,7 @@ public class ClaimAllCoinsZone : MonoBehaviour
 
     private string BuildBuyForeverButtonText()
     {
-        var label = L(popupBuyForeverLocalizationKey, popupBuyForeverText);
+        var label = LocalizationUtils.T(popupBuyForeverLocalizationKey, popupBuyForeverText);
         if (unlockPrice <= 0d)
             return label;
 
@@ -1089,7 +1085,10 @@ public class ClaimAllCoinsZone : MonoBehaviour
         if (unlockPriceCurrency == CurrencyType.Coins)
             return $"{label} ({priceText})";
 
-        return $"{label} ({priceText} {unlockPriceCurrency})";
+        var currencyName = LocalizationUtils.T(
+            "UI/Currency/" + unlockPriceCurrency,
+            unlockPriceCurrency.ToString());
+        return $"{label} ({priceText} {currencyName})";
     }
 
     private string ResolveUnlockSaveKey()

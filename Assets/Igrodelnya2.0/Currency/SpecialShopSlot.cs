@@ -32,6 +32,10 @@ public class SpecialShopSlot : MonoBehaviour
     private ShopPackData _shopPackData;
     private PurchaseData _productData;
     private float _nextTimerRefresh;
+    private Image _badgeBackground;
+    private TextMeshProUGUI _badgeText;
+    private TextMeshProUGUI _originalPriceText;
+    private SpecialShopEternalTrackView _eternalTrack;
 
     private void Awake()
     {
@@ -50,17 +54,26 @@ public class SpecialShopSlot : MonoBehaviour
             return;
         }
 
+        ApplyCardLayout(pack.OfferStyle);
+        ConfigureOfferDecorations(pack);
+
         if (_name != null)
-            _name.text = LocalizationUtils.T(pack.Name, pack.Name);
+            _name.text = _shop != null
+                ? _shop.BuildPackTitle(pack)
+                : LocalizationUtils.T(pack.Name, pack.Name);
         if (_description != null)
         {
-            _description.text = LocalizationUtils.T(pack.DescriptionKey, pack.DescriptionFallback);
-            _description.gameObject.SetActive(false);
+            _description.text = _shop != null
+                ? _shop.BuildPackDescription(pack)
+                : LocalizationUtils.T(pack.DescriptionKey, pack.DescriptionFallback);
+            _description.gameObject.SetActive(ShouldShowDescription(pack));
         }
+
+        bool eternalPack = pack.OfferStyle == ShopOfferStyle.EternalPack;
         bool hasMultipleRewards = pack.Rewards != null && pack.Rewards.Count > 1;
         if (_effectText != null)
         {
-            _effectText.gameObject.SetActive(!hasMultipleRewards);
+            _effectText.gameObject.SetActive(!eternalPack && !hasMultipleRewards);
             _effectText.text = _shop != null ? _shop.BuildRewardSummary(pack) : string.Empty;
         }
 
@@ -68,26 +81,36 @@ public class SpecialShopSlot : MonoBehaviour
         if (_productIcon != null)
         {
             _productIcon.sprite = icon;
-            _productIcon.enabled = icon != null;
+            _productIcon.enabled = !eternalPack && icon != null;
+            _productIcon.gameObject.SetActive(!eternalPack);
             _productIcon.preserveAspect = true;
         }
 
         if (_cardBackground != null)
             _cardBackground.color = Color.Lerp(pack.AccentColor, Color.white, 0.18f);
 
-        BuildRewardIcons(pack);
-        ConfigureActionLayout(pack.HasConsumableReward);
+        if (_rewardParent != null)
+            _rewardParent.gameObject.SetActive(!eternalPack);
+
+        if (eternalPack)
+            ConfigureEternalTrack(pack);
+        else
+            BuildRewardIcons(pack);
+
+        ConfigureActionLayout(pack.HasConsumableReward, pack.OfferStyle);
         RefreshPrice();
         RefreshState();
     }
 
     private void Update()
     {
-        if (_shopPackData == null || !_shopPackData.HasConsumableReward || Time.unscaledTime < _nextTimerRefresh)
+        if (_shopPackData == null || Time.unscaledTime < _nextTimerRefresh)
             return;
 
         _nextTimerRefresh = Time.unscaledTime + 0.5f;
         RefreshState();
+        if (_shopPackData.OfferStyle == ShopOfferStyle.SoftCurrency && _effectText != null)
+            _effectText.text = _shop != null ? _shop.BuildRewardSummary(_shopPackData) : string.Empty;
     }
 
     public void RefreshState()
@@ -95,14 +118,20 @@ public class SpecialShopSlot : MonoBehaviour
         if (_shopPackData == null)
             return;
 
+        if (_shopPackData.OfferStyle == ShopOfferStyle.EternalPack)
+        {
+            _eternalTrack?.Refresh();
+            return;
+        }
+
         var effects = _shop != null ? _shop.Effects : null;
         bool permanentOwned = effects != null && effects.IsPermanentPackOwned(_shopPackData);
         int owned = effects != null ? effects.GetOwnedCount(_shopPackData) : 0;
 
         if (_buyButton != null)
-            _buyButton.interactable = !permanentOwned;
+            _buyButton.interactable = !permanentOwned && (_shop == null || _shop.CanPurchasePack(_shopPackData));
         if (_price != null && permanentOwned)
-            _price.text = LocalizationUtils.T("UI/Shop/Owned", "Owned");
+            _price.text = LocalizationUtils.T("UI/Shop/Owned", "Куплено");
         else
             RefreshPrice();
 
@@ -113,14 +142,15 @@ public class SpecialShopSlot : MonoBehaviour
         }
 
         if (_useButtonText != null)
-            _useButtonText.text = LocalizationUtils.T("UI/Shop/Use", "Use");
+            _useButtonText.text = LocalizationUtils.T("UI/Shop/Use", "Применить");
         if (_ownedText != null)
         {
             _ownedText.gameObject.SetActive(_shopPackData.HasConsumableReward);
-            _ownedText.text = LocalizationUtils.Format("UI/Shop/OwnedCount", "Owned: {0}", owned);
+            _ownedText.text = LocalizationUtils.Format("UI/Shop/OwnedCount", "В наличии: {0}", owned);
         }
 
         RefreshActiveTimer(effects);
+        RefreshAvailabilityBadge();
     }
 
     public void OnClick()
@@ -182,7 +212,12 @@ public class SpecialShopSlot : MonoBehaviour
             for (int i = 0; i < _shopPackData.Rewards.Count; i++)
             {
                 var type = _shopPackData.Rewards[i].Type;
-                if (type == ShopRewardType.ConsumableIncomeBoost || type == ShopRewardType.ConsumableElementLuckBoost)
+                if (type == ShopRewardType.ConsumableIncomeBoost ||
+                    type == ShopRewardType.TimedIncomeBoost ||
+                    type == ShopRewardType.ConsumableElementLuckBoost ||
+                    type == ShopRewardType.TimedElementLuckBoost ||
+                    type == ShopRewardType.ConsumableHatchSpeedBoost ||
+                    type == ShopRewardType.ConsumableOmniBoost)
                 {
                     seconds = effects.GetRemainingSeconds(type);
                     break;
@@ -192,7 +227,13 @@ public class SpecialShopSlot : MonoBehaviour
 
         _activeTimerText.gameObject.SetActive(seconds > 0);
         if (seconds > 0)
-            _activeTimerText.text = LocalizationUtils.Format("UI/Shop/ActiveTimer", "Active: {0}", TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss"));
+        {
+            TimeSpan remaining = TimeSpan.FromSeconds(seconds);
+            string timer = seconds >= 3600
+                ? remaining.ToString(@"hh\:mm\:ss")
+                : remaining.ToString(@"mm\:ss");
+            _activeTimerText.text = LocalizationUtils.Format("UI/Shop/ActiveTimer", "Активно: {0}", timer);
+        }
     }
 
     private void BuildRewardIcons(ShopPackData pack)
@@ -249,46 +290,302 @@ public class SpecialShopSlot : MonoBehaviour
 
     private static Sprite ResolveRewardIcon(ShopReward reward)
     {
+        if (reward.Icon != null)
+            return reward.Icon;
         if (reward.Type == ShopRewardType.Item && reward.Item != null)
             return reward.Item.Icon;
-        return reward.Icon;
+        return null;
     }
 
     [ContextMenu("Apply shop card layout")]
     public void ApplyCardLayout()
     {
+        ApplyCardLayout(ShopOfferStyle.Standard);
+    }
+
+    private void ApplyCardLayout(ShopOfferStyle style)
+    {
         var layout = GetComponent<LayoutElement>();
         if (layout == null)
             layout = gameObject.AddComponent<LayoutElement>();
-        layout.minHeight = 250f;
-        layout.preferredHeight = 250f;
+        float height = GetPreferredHeight(style);
+        layout.minHeight = height;
+        layout.preferredHeight = height;
 
-        ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0f, 0.78f), Vector2.one, new Vector2(12f, 4f), new Vector2(-12f, -6f));
-        ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.03f, 0.25f), new Vector2(0.34f, 0.75f), new Vector2(10f, 8f), new Vector2(-10f, -8f));
-        ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.36f, 0.48f), new Vector2(0.97f, 0.74f), new Vector2(6f, 2f), new Vector2(-6f, -2f));
-        ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.36f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
-        ConfigureRect(_rewardParent as RectTransform, new Vector2(0.35f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
-        ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.36f, 0.04f), new Vector2(0.97f, 0.24f), Vector2.zero, Vector2.zero);
-        ConfigureRect(_useButton != null ? _useButton.transform as RectTransform : null, new Vector2(0.03f, 0.04f), new Vector2(0.47f, 0.24f), Vector2.zero, Vector2.zero);
-        ConfigureRect(_ownedText != null ? _ownedText.rectTransform : null, new Vector2(0.03f, 0.24f), new Vector2(0.47f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
-        ConfigureRect(_activeTimerText != null ? _activeTimerText.rectTransform : null, new Vector2(0.52f, 0.24f), new Vector2(0.97f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+        bool strip = style == ShopOfferStyle.TimedIncome || style == ShopOfferStyle.TimedLuck;
+        bool eternal = style == ShopOfferStyle.EternalPack;
+        if (strip)
+        {
+            ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0.02f, 0.72f), new Vector2(0.72f, 0.98f), new Vector2(12f, 2f), new Vector2(-8f, -2f));
+            ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.02f, 0.12f), new Vector2(0.24f, 0.72f), new Vector2(8f, 6f), new Vector2(-8f, -6f));
+            ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.25f, 0.47f), new Vector2(0.72f, 0.71f), new Vector2(4f, 2f), new Vector2(-4f, -2f));
+            ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.25f, 0.17f), new Vector2(0.72f, 0.69f), new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            ConfigureRect(_rewardParent as RectTransform, new Vector2(0.25f, 0.17f), new Vector2(0.72f, 0.69f), new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            ConfigureRect(_ownedText != null ? _ownedText.rectTransform : null, new Vector2(0.73f, 0.60f), new Vector2(0.98f, 0.72f), new Vector2(2f, 0f), new Vector2(-2f, 0f));
+            ConfigureRect(_activeTimerText != null ? _activeTimerText.rectTransform : null, new Vector2(0.73f, 0.48f), new Vector2(0.98f, 0.60f), new Vector2(2f, 0f), new Vector2(-2f, 0f));
+            ConfigureRect(_useButton != null ? _useButton.transform as RectTransform : null, new Vector2(0.73f, 0.26f), new Vector2(0.98f, 0.47f), Vector2.zero, Vector2.zero);
+            ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.73f, 0.04f), new Vector2(0.98f, 0.24f), Vector2.zero, Vector2.zero);
+        }
+        else if (eternal)
+        {
+            ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0.02f, 0.79f), new Vector2(0.72f, 0.98f), new Vector2(12f, 2f), new Vector2(-8f, -2f));
+            ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.02f, 0.72f), new Vector2(0.72f, 0.83f), new Vector2(12f, 0f), new Vector2(-8f, 0f));
+        }
+        else
+        {
+            ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0f, 0.78f), Vector2.one, new Vector2(12f, 4f), new Vector2(-12f, -6f));
+            ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.03f, 0.25f), new Vector2(0.34f, 0.75f), new Vector2(10f, 8f), new Vector2(-10f, -8f));
+            ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.36f, 0.48f), new Vector2(0.97f, 0.74f), new Vector2(6f, 2f), new Vector2(-6f, -2f));
+            ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.36f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
+            ConfigureRect(_rewardParent as RectTransform, new Vector2(0.35f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
+            ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.36f, 0.04f), new Vector2(0.97f, 0.24f), Vector2.zero, Vector2.zero);
+            ConfigureRect(_useButton != null ? _useButton.transform as RectTransform : null, new Vector2(0.03f, 0.04f), new Vector2(0.47f, 0.24f), Vector2.zero, Vector2.zero);
+            ConfigureRect(_ownedText != null ? _ownedText.rectTransform : null, new Vector2(0.03f, 0.24f), new Vector2(0.47f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+            ConfigureRect(_activeTimerText != null ? _activeTimerText.rectTransform : null, new Vector2(0.52f, 0.24f), new Vector2(0.97f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+        }
 
-        ConfigureText(_name, 20f, 32f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
-        ConfigureText(_effectText, 17f, 27f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        bool compactTitle =
+            style == ShopOfferStyle.LimitedEgg ||
+            style == ShopOfferStyle.MonthlyPass ||
+            style == ShopOfferStyle.Permanent ||
+            style == ShopOfferStyle.Potion ||
+            style == ShopOfferStyle.PremiumCurrency ||
+            style == ShopOfferStyle.SoftCurrency;
+        float nameMin = compactTitle ? 12f : strip ? 22f : 18f;
+        float nameMax = compactTitle ? 28f : strip ? 36f : 32f;
+        ConfigureText(_name, nameMin, nameMax, strip ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_description, 14f, 22f, strip ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_effectText, 17f, strip ? 31f : 27f, strip ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
         ConfigureText(_ownedText, 13f, 19f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
         ConfigureText(_activeTimerText, 13f, 19f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_useButtonText, 10f, 24f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
+        ConfigureText(_price, 18f, 34f, TextAlignmentOptions.Center, TextOverflowModes.Ellipsis);
 
         if (_productIcon != null)
             _productIcon.preserveAspect = true;
     }
 
-    private void ConfigureActionLayout(bool hasConsumableReward)
+    private void ConfigureActionLayout(bool hasConsumableReward, ShopOfferStyle style)
     {
         if (_buyButton == null)
             return;
 
+        if (style == ShopOfferStyle.EternalPack)
+        {
+            _buyButton.gameObject.SetActive(false);
+            if (_useButton != null)
+                _useButton.gameObject.SetActive(false);
+            if (_ownedText != null)
+                _ownedText.gameObject.SetActive(false);
+            if (_activeTimerText != null)
+                _activeTimerText.gameObject.SetActive(false);
+            return;
+        }
+
+        _buyButton.gameObject.SetActive(true);
+        if (style == ShopOfferStyle.TimedIncome || style == ShopOfferStyle.TimedLuck)
+        {
+            if (!hasConsumableReward)
+                ConfigureRect(
+                    _buyButton.transform as RectTransform,
+                    new Vector2(0.73f, 0.06f),
+                    new Vector2(0.98f, 0.34f),
+                    Vector2.zero,
+                    Vector2.zero);
+            return;
+        }
+
         Vector2 min = hasConsumableReward ? new Vector2(0.52f, 0.04f) : new Vector2(0.36f, 0.04f);
         ConfigureRect(_buyButton.transform as RectTransform, min, new Vector2(0.97f, 0.24f), Vector2.zero, Vector2.zero);
+    }
+
+    private void ConfigureOfferDecorations(ShopPackData pack)
+    {
+        EnsureDecorations();
+        string localizedBadge = _shop != null
+            ? _shop.BuildPackBadge(pack)
+            : LocalizationUtils.T(pack.BadgeFallback, pack.BadgeFallback);
+        bool showBadge = !string.IsNullOrWhiteSpace(localizedBadge);
+        if (_badgeBackground.transform is RectTransform badgeRect)
+        {
+            badgeRect.anchorMin = new Vector2(0.69f, 0.84f);
+            badgeRect.anchorMax = new Vector2(0.98f, 0.98f);
+        }
+
+        bool strip = pack.OfferStyle == ShopOfferStyle.TimedIncome ||
+                     pack.OfferStyle == ShopOfferStyle.TimedLuck;
+        bool eternal = pack.OfferStyle == ShopOfferStyle.EternalPack;
+        if (_name != null && showBadge && !strip && !eternal)
+        {
+            ConfigureRect(
+                _name.rectTransform,
+                new Vector2(0.01f, 0.78f),
+                new Vector2(0.68f, 0.99f),
+                new Vector2(8f, 2f),
+                new Vector2(-3f, -3f));
+            _name.alignment = TextAlignmentOptions.Center;
+        }
+
+        _badgeBackground.gameObject.SetActive(showBadge);
+        if (showBadge)
+            _badgeText.text = localizedBadge;
+
+        bool showOriginalPrice = pack.OriginalPrice > pack.Price;
+        _originalPriceText.gameObject.SetActive(showOriginalPrice);
+        if (showOriginalPrice)
+            _originalPriceText.text = "<s>" + pack.OriginalPrice + "</s>";
+    }
+
+    private void RefreshAvailabilityBadge()
+    {
+        if (_badgeText == null || _shop == null || _shopPackData == null)
+            return;
+
+        long seconds = _shop.GetOfferRemainingSeconds(_shopPackData);
+        if (seconds < 0L)
+            return;
+
+        if (seconds == 0L)
+        {
+            _badgeText.text = LocalizationUtils.T("UI/Shop/Expired", "АКЦИЯ ЗАВЕРШЕНА");
+            return;
+        }
+
+        long days = Math.Max(1L, (seconds + 86399L) / 86400L);
+        _badgeText.text = LocalizationUtils.Format(
+            "UI/Shop/DaysRemaining",
+            "ОСТАЛОСЬ {0} Д.",
+            days);
+    }
+
+    private void EnsureDecorations()
+    {
+        if (_badgeBackground == null)
+        {
+            var badge = new GameObject(
+                "OfferBadge",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            badge.transform.SetParent(transform, false);
+            var rect = badge.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.72f, 0.83f);
+            rect.anchorMax = new Vector2(0.98f, 0.98f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            _badgeBackground = badge.GetComponent<Image>();
+            _badgeBackground.sprite = _buyButton != null ? (_buyButton.targetGraphic as Image)?.sprite : null;
+            _badgeBackground.type = _badgeBackground.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            _badgeBackground.color = new Color(1f, 0.18f, 0.12f, 1f);
+            _badgeBackground.raycastTarget = false;
+
+            _badgeText = CreateRuntimeText(
+                badge.transform,
+                "Text",
+                Vector2.zero,
+                Vector2.one,
+                18f,
+                TextAlignmentOptions.Center,
+                Color.white);
+        }
+
+        if (_originalPriceText == null)
+        {
+            _originalPriceText = CreateRuntimeText(
+                transform,
+                "OriginalPrice",
+                new Vector2(0.70f, 0.23f),
+                new Vector2(0.96f, 0.34f),
+                20f,
+                TextAlignmentOptions.Center,
+                new Color(1f, 0.18f, 0.14f, 1f));
+        }
+    }
+
+    private TextMeshProUGUI CreateRuntimeText(
+        Transform parent,
+        string objectName,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        float maxSize,
+        TextAlignmentOptions alignment,
+        Color color)
+    {
+        var textObject = new GameObject(
+            objectName,
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(TextMeshProUGUI),
+            typeof(Outline));
+        textObject.transform.SetParent(parent, false);
+        var rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = new Vector2(3f, 2f);
+        rect.offsetMax = new Vector2(-3f, -2f);
+
+        var text = textObject.GetComponent<TextMeshProUGUI>();
+        text.font = _name != null ? _name.font : null;
+        text.fontStyle = FontStyles.Bold;
+        text.color = color;
+        text.alignment = alignment;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 12f;
+        text.fontSizeMax = maxSize;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.raycastTarget = false;
+
+        var outline = textObject.GetComponent<Outline>();
+        outline.effectColor = new Color(0.02f, 0.01f, 0.01f, 0.96f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        return text;
+    }
+
+    private void ConfigureEternalTrack(ShopPackData pack)
+    {
+        if (_eternalTrack == null)
+        {
+            var trackObject = new GameObject("EternalTrack", typeof(RectTransform));
+            trackObject.transform.SetParent(transform, false);
+            _eternalTrack = trackObject.AddComponent<SpecialShopEternalTrackView>();
+        }
+
+        _eternalTrack.gameObject.SetActive(true);
+        _eternalTrack.Initialize(
+            _shop,
+            pack,
+            _cardBackground != null ? _cardBackground.sprite : null,
+            _name != null ? _name.font : null);
+    }
+
+    private static bool ShouldShowDescription(ShopPackData pack)
+    {
+        return pack != null &&
+               pack.OfferStyle == ShopOfferStyle.MonthlyPass;
+    }
+
+    private static float GetPreferredHeight(ShopOfferStyle style)
+    {
+        switch (style)
+        {
+            case ShopOfferStyle.LimitedEgg:
+            case ShopOfferStyle.MonthlyPass:
+                return 280f;
+            case ShopOfferStyle.EternalPack:
+                return 300f;
+            case ShopOfferStyle.TimedIncome:
+            case ShopOfferStyle.TimedLuck:
+                return 220f;
+            case ShopOfferStyle.PremiumCurrency:
+            case ShopOfferStyle.SoftCurrency:
+                return 230f;
+            case ShopOfferStyle.Potion:
+            case ShopOfferStyle.Permanent:
+                return 255f;
+            default:
+                return 250f;
+        }
     }
 
     private static void ConfigureRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)

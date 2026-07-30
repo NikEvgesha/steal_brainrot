@@ -173,7 +173,8 @@ public class Brainrot : InventoryItem
 
         _lastIncomeTime = effectiveLastIncomeTs;
         var incomeAccumulationTime = OfflineRewardRules.ClampAccrualSeconds(nowTs - effectiveLastIncomeTs);
-        _currentIncome = Math.Max(0d, Math.Round(incomeAccumulationTime * _dinamicData.ResultIncome));
+        _currentIncome = Math.Max(0d, Math.Round(ApplyOfflineShopMultiplier(
+            incomeAccumulationTime * _dinamicData.ResultIncome)));
         _hasOfflineIncomePending = incomeAccumulationTime >= 60L && _currentIncome > 0d;
         _incomeReadySignaled = _currentIncome > 0d;
         if (floor != null)
@@ -345,7 +346,8 @@ public class Brainrot : InventoryItem
             _lastIncomeTime = nowTs;
 
         long elapsed = OfflineRewardRules.ClampAccrualSeconds(nowTs - _lastIncomeTime);
-        _currentIncome = Math.Max(0d, Math.Round(elapsed * _dinamicData.ResultIncome));
+        _currentIncome = Math.Max(0d, Math.Round(ApplyOfflineShopMultiplier(
+            elapsed * _dinamicData.ResultIncome)));
         _currentIncome = double.IsInfinity(_currentIncome)
             ? float.MaxValue
             : Math.Min(_currentIncome, MaxAccumulatedIncome);
@@ -403,6 +405,11 @@ public class Brainrot : InventoryItem
 
         Debug.LogWarning("[Brainrot] Cannot collect income: income and currency managers are not initialized.");
         return false;
+    }
+
+    private static double ApplyOfflineShopMultiplier(double amount)
+    {
+        return G.ShopEffects != null ? G.ShopEffects.ApplyOfflineIncome(amount) : amount;
     }
 
     private IEnumerator ProduceIncome()

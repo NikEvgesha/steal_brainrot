@@ -13,10 +13,18 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
 
     public float PermanentIncomeBonus01 { get; private set; }
     public float PermanentElementLuckBonus01 { get; private set; }
+    public float PermanentElementChanceMultiplier { get; private set; } = 1f;
+    public float PermanentOfflineIncomeMultiplier { get; private set; } = 1f;
+    public float PermanentHatchSpeedBonus01 { get; private set; }
     public float TimedIncomeMultiplier { get; private set; } = 1f;
     public float TimedElementLuckBonus01 { get; private set; }
+    public float TimedHatchSpeedBonus01 { get; private set; }
     public long TimedIncomeUntilUnix { get; private set; }
     public long TimedLuckUntilUnix { get; private set; }
+    public long TimedHatchUntilUnix { get; private set; }
+    public long DailyGemsPassUntilUnix { get; private set; }
+    public int DailyGemsPerDay { get; private set; }
+    public double TimedHatchProgressSeconds { get; private set; }
 
     private ShopPermanentIncomeModifier _permanentIncomeModifier;
     private ShopTimedIncomeModifier _timedIncomeModifier;
@@ -24,6 +32,7 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
     private bool _registeredIncome;
     private bool _registeredLuck;
     private float _nextTimerRefresh;
+    private long _timedHatchProgressUpdatedUnix;
 
     public static ShopEffectsService EnsureExists()
     {
@@ -62,12 +71,17 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
     {
         TryRegisterRuntimeSources();
         FlushPendingPermanentSaves();
+        TryGrantDailyPassReward();
 
         if (Time.unscaledTime < _nextTimerRefresh)
             return;
 
         _nextTimerRefresh = Time.unscaledTime + TimerRefreshInterval;
-        if (ExpireFinishedEffects())
+        bool hatchProgressChanged = IntegrateTimedHatchProgress(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        bool expired = ExpireFinishedEffects();
+        if (hatchProgressChanged && !expired)
+            SaveTimedEffects();
+        if (expired)
             NotifyChanged();
     }
 
@@ -86,10 +100,30 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
             G.ShopEffects = null;
     }
 
+    private void OnApplicationPause(bool paused)
+    {
+        if (!paused)
+            return;
+
+        IntegrateTimedHatchProgress(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        SaveTimedEffects();
+        SaveDailyPass();
+    }
+
+    private void OnApplicationQuit()
+    {
+        IntegrateTimedHatchProgress(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        SaveTimedEffects();
+        SaveDailyPass();
+    }
+
     public void RestoreOwnedPermanentEffects(IReadOnlyList<ShopPackData> packs)
     {
         PermanentIncomeBonus01 = 0f;
         PermanentElementLuckBonus01 = 0f;
+        PermanentElementChanceMultiplier = 1f;
+        PermanentOfflineIncomeMultiplier = 1f;
+        PermanentHatchSpeedBonus01 = 0f;
 
         if (packs != null)
         {
@@ -117,12 +151,32 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
         {
             case ShopRewardType.PermanentIncomePercent:
             case ShopRewardType.PermanentElementLuckPercent:
+            case ShopRewardType.PermanentElementChanceMultiplier:
+            case ShopRewardType.PermanentOfflineIncomeMultiplier:
+            case ShopRewardType.PermanentHatchSpeedPercent:
                 return GrantPermanentReward(packId, reward);
 
             case ShopRewardType.ConsumableIncomeBoost:
             case ShopRewardType.ConsumableElementLuckBoost:
             case ShopRewardType.ConsumableHatchSkip:
+            case ShopRewardType.ConsumableHatchSpeedBoost:
+            case ShopRewardType.ConsumableOmniBoost:
+            case ShopRewardType.InstantHatchAll:
                 AddConsumable(reward.Type, Mathf.Max(1, reward.Amount));
+                return true;
+
+            case ShopRewardType.TimedIncomeBoost:
+                ApplyTimedIncome(reward);
+                NotifyChanged();
+                return true;
+
+            case ShopRewardType.TimedElementLuckBoost:
+                ApplyTimedLuck(reward);
+                NotifyChanged();
+                return true;
+
+            case ShopRewardType.DailyGemsPass:
+                GrantDailyGemsPass(reward);
                 return true;
 
             default:
@@ -191,12 +245,50 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
 
     public bool IsTimedIncomeActive => TimedIncomeUntilUnix > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     public bool IsTimedLuckActive => TimedLuckUntilUnix > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    public bool IsTimedHatchSpeedActive => TimedHatchUntilUnix > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    public bool IsDailyGemsPassActive => DailyGemsPassUntilUnix > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
     public int GetRemainingSeconds(ShopRewardType type)
     {
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        long until = type == ShopRewardType.ConsumableIncomeBoost ? TimedIncomeUntilUnix : TimedLuckUntilUnix;
+        long until;
+        switch (type)
+        {
+            case ShopRewardType.ConsumableIncomeBoost:
+            case ShopRewardType.TimedIncomeBoost:
+                until = TimedIncomeUntilUnix;
+                break;
+            case ShopRewardType.ConsumableElementLuckBoost:
+            case ShopRewardType.TimedElementLuckBoost:
+                until = TimedLuckUntilUnix;
+                break;
+            case ShopRewardType.ConsumableHatchSpeedBoost:
+                until = TimedHatchUntilUnix;
+                break;
+            case ShopRewardType.ConsumableOmniBoost:
+                until = Math.Max(TimedIncomeUntilUnix, Math.Max(TimedLuckUntilUnix, TimedHatchUntilUnix));
+                break;
+            default:
+                until = 0L;
+                break;
+        }
         return (int)Math.Min(int.MaxValue, Math.Max(0L, until - now));
+    }
+
+    public double ApplyOfflineIncome(double amount)
+    {
+        return Math.Max(0d, amount) * Math.Max(1f, PermanentOfflineIncomeMultiplier);
+    }
+
+    public float GetHatchDurationMultiplier()
+    {
+        return 1f / Mathf.Max(1f, 1f + PermanentHatchSpeedBonus01);
+    }
+
+    public double GetTimedHatchProgressSeconds()
+    {
+        IntegrateTimedHatchProgress(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        return Math.Max(0d, TimedHatchProgressSeconds);
     }
 
     private bool GrantPermanentReward(string packId, ShopReward reward)
@@ -209,6 +301,8 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
 
         SetPermanentRewardOwned(packId, reward.Type);
         AddPermanentValue(reward);
+        if (reward.Type == ShopRewardType.PermanentHatchSpeedPercent)
+            ApplyHatchSpeedToExistingEggs(Mathf.Max(0f, reward.EffectValue) / 100f);
         NotifyChanged();
         return true;
     }
@@ -220,6 +314,16 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
             PermanentIncomeBonus01 += value01;
         else if (reward.Type == ShopRewardType.PermanentElementLuckPercent)
             PermanentElementLuckBonus01 += value01;
+        else if (reward.Type == ShopRewardType.PermanentElementChanceMultiplier)
+            PermanentElementChanceMultiplier = Mathf.Max(
+                PermanentElementChanceMultiplier,
+                Mathf.Max(1f, reward.EffectValue));
+        else if (reward.Type == ShopRewardType.PermanentOfflineIncomeMultiplier)
+            PermanentOfflineIncomeMultiplier = Mathf.Max(
+                PermanentOfflineIncomeMultiplier,
+                Mathf.Max(1f, reward.EffectValue));
+        else if (reward.Type == ShopRewardType.PermanentHatchSpeedPercent)
+            PermanentHatchSpeedBonus01 += value01;
     }
 
     private bool TryUse(ShopReward reward)
@@ -242,6 +346,17 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
             case ShopRewardType.ConsumableHatchSkip:
                 applied = ApplyHatchSkip(reward);
                 break;
+            case ShopRewardType.ConsumableHatchSpeedBoost:
+                ApplyTimedHatchSpeed(reward);
+                applied = true;
+                break;
+            case ShopRewardType.ConsumableOmniBoost:
+                ApplyOmniBoost(reward);
+                applied = true;
+                break;
+            case ShopRewardType.InstantHatchAll:
+                applied = ApplyInstantHatchAll();
+                break;
             default:
                 return false;
         }
@@ -256,18 +371,53 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
 
     private void ApplyTimedIncome(ShopReward reward)
     {
+        bool wasActive = IsTimedIncomeActive;
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         TimedIncomeUntilUnix = Math.Max(now, TimedIncomeUntilUnix) + Mathf.Max(1, reward.DurationMinutes) * 60L;
-        TimedIncomeMultiplier = Mathf.Max(TimedIncomeMultiplier, Mathf.Max(1f, reward.EffectValue));
+        float newMultiplier = Mathf.Max(1f, reward.EffectValue);
+        TimedIncomeMultiplier = wasActive ? Mathf.Max(TimedIncomeMultiplier, newMultiplier) : newMultiplier;
         SaveTimedEffects();
     }
 
     private void ApplyTimedLuck(ShopReward reward)
     {
+        bool wasActive = IsTimedLuckActive;
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         TimedLuckUntilUnix = Math.Max(now, TimedLuckUntilUnix) + Mathf.Max(1, reward.DurationMinutes) * 60L;
-        TimedElementLuckBonus01 = Mathf.Max(TimedElementLuckBonus01, Mathf.Max(0f, reward.EffectValue) / 100f);
+        float newBonus = Mathf.Max(0f, reward.EffectValue) / 100f;
+        TimedElementLuckBonus01 = wasActive ? Mathf.Max(TimedElementLuckBonus01, newBonus) : newBonus;
         SaveTimedEffects();
+    }
+
+    private void ApplyTimedHatchSpeed(ShopReward reward)
+    {
+        bool wasActive = IsTimedHatchSpeedActive;
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        IntegrateTimedHatchProgress(now);
+        TimedHatchUntilUnix = Math.Max(now, TimedHatchUntilUnix) + Mathf.Max(1, reward.DurationMinutes) * 60L;
+        float newBonus = Mathf.Max(0f, reward.EffectValue) / 100f;
+        TimedHatchSpeedBonus01 = wasActive ? Mathf.Max(TimedHatchSpeedBonus01, newBonus) : newBonus;
+        _timedHatchProgressUpdatedUnix = now;
+        SaveTimedEffects();
+    }
+
+    private void ApplyOmniBoost(ShopReward reward)
+    {
+        var duration = Mathf.Max(1, reward.DurationMinutes);
+        var income = reward;
+        income.EffectValue = reward.EffectValue > 1f ? reward.EffectValue : 2f;
+        income.DurationMinutes = duration;
+        ApplyTimedIncome(income);
+
+        var luck = reward;
+        luck.EffectValue = 100f;
+        luck.DurationMinutes = duration;
+        ApplyTimedLuck(luck);
+
+        var hatch = reward;
+        hatch.EffectValue = 25f;
+        hatch.DurationMinutes = duration;
+        ApplyTimedHatchSpeed(hatch);
     }
 
     private static bool ApplyHatchSkip(ShopReward reward)
@@ -282,6 +432,58 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
         }
 
         return changed;
+    }
+
+    private static bool ApplyInstantHatchAll()
+    {
+        bool changed = false;
+        var eggs = FindObjectsByType<Egg>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < eggs.Length; i++)
+        {
+            if (eggs[i] != null && eggs[i].TryReduceHatchingTime(int.MaxValue))
+                changed = true;
+        }
+
+        return changed;
+    }
+
+    private static void ApplyHatchSpeedToExistingEggs(float bonus01)
+    {
+        if (bonus01 <= 0f)
+            return;
+
+        var eggs = FindObjectsByType<Egg>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < eggs.Length; i++)
+            eggs[i]?.ApplyHatchSpeedBonus(bonus01);
+    }
+
+    private void GrantDailyGemsPass(ShopReward reward)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        int days = Mathf.Max(1, reward.DurationDays);
+        bool wasActive = IsDailyGemsPassActive;
+        DailyGemsPassUntilUnix = Math.Max(now, DailyGemsPassUntilUnix) + days * 86400L;
+        int newDailyAmount = Mathf.Max(1, reward.Amount);
+        DailyGemsPerDay = wasActive ? Mathf.Max(DailyGemsPerDay, newDailyAmount) : newDailyAmount;
+        SaveDailyPass();
+        TryGrantDailyPassReward();
+        NotifyChanged();
+    }
+
+    private void TryGrantDailyPassReward()
+    {
+        if (!IsDailyGemsPassActive || DailyGemsPerDay <= 0 || G.Currency == null)
+            return;
+
+        string today = DateTimeOffset.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        string key = BuildKey("Pass", "LastClaimDate");
+        if (string.Equals(PlayerPrefs.GetString(key, string.Empty), today, StringComparison.Ordinal))
+            return;
+
+        G.Currency.AddCurrency(CurrencyType.Gems, DailyGemsPerDay);
+        PlayerPrefs.SetString(key, today);
+        PlayerPrefs.Save();
+        NotifyChanged();
     }
 
     private void AddConsumable(ShopRewardType type, int amount)
@@ -333,8 +535,18 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
     {
         TimedIncomeUntilUnix = LoadLong("IncomeUntil");
         TimedLuckUntilUnix = LoadLong("LuckUntil");
+        TimedHatchUntilUnix = LoadLong("HatchUntil");
         TimedIncomeMultiplier = PlayerPrefs.GetFloat(BuildKey("Timed", "IncomeValue"), 1f);
         TimedElementLuckBonus01 = PlayerPrefs.GetFloat(BuildKey("Timed", "LuckValue"), 0f);
+        TimedHatchSpeedBonus01 = PlayerPrefs.GetFloat(BuildKey("Timed", "HatchValue"), 0f);
+        TimedHatchProgressSeconds = LoadDouble("HatchProgressSeconds");
+        _timedHatchProgressUpdatedUnix = LoadLong("HatchProgressUpdated");
+        DailyGemsPassUntilUnix = LoadLongFromGroup("Pass", "Until");
+        DailyGemsPerDay = Mathf.Max(0, PlayerPrefs.GetInt(BuildKey("Pass", "DailyGems"), 0));
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (_timedHatchProgressUpdatedUnix <= 0)
+            _timedHatchProgressUpdatedUnix = now;
+        IntegrateTimedHatchProgress(now);
         ExpireFinishedEffects();
     }
 
@@ -342,8 +554,23 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
     {
         SaveLong("IncomeUntil", TimedIncomeUntilUnix);
         SaveLong("LuckUntil", TimedLuckUntilUnix);
+        SaveLong("HatchUntil", TimedHatchUntilUnix);
         PlayerPrefs.SetFloat(BuildKey("Timed", "IncomeValue"), TimedIncomeMultiplier);
         PlayerPrefs.SetFloat(BuildKey("Timed", "LuckValue"), TimedElementLuckBonus01);
+        PlayerPrefs.SetFloat(BuildKey("Timed", "HatchValue"), TimedHatchSpeedBonus01);
+        PlayerPrefs.SetString(
+            BuildKey("Timed", "HatchProgressSeconds"),
+            TimedHatchProgressSeconds.ToString("R", CultureInfo.InvariantCulture));
+        SaveLong("HatchProgressUpdated", _timedHatchProgressUpdatedUnix);
+        PlayerPrefs.Save();
+    }
+
+    private void SaveDailyPass()
+    {
+        PlayerPrefs.SetString(
+            BuildKey("Pass", "Until"),
+            DailyGemsPassUntilUnix.ToString(CultureInfo.InvariantCulture));
+        PlayerPrefs.SetInt(BuildKey("Pass", "DailyGems"), Mathf.Max(0, DailyGemsPerDay));
         PlayerPrefs.Save();
     }
 
@@ -366,10 +593,38 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
             changed = true;
         }
 
+        if (TimedHatchUntilUnix > 0 && TimedHatchUntilUnix <= now)
+        {
+            TimedHatchUntilUnix = 0;
+            TimedHatchSpeedBonus01 = 0f;
+            changed = true;
+        }
+
         if (changed)
             SaveTimedEffects();
 
         return changed;
+    }
+
+    private bool IntegrateTimedHatchProgress(long now)
+    {
+        if (_timedHatchProgressUpdatedUnix <= 0)
+        {
+            _timedHatchProgressUpdatedUnix = now;
+            return false;
+        }
+
+        if (now <= _timedHatchProgressUpdatedUnix)
+            return false;
+
+        long activeUntil = Math.Min(now, TimedHatchUntilUnix);
+        long activeSeconds = Math.Max(0L, activeUntil - _timedHatchProgressUpdatedUnix);
+        _timedHatchProgressUpdatedUnix = now;
+        if (activeSeconds <= 0 || TimedHatchSpeedBonus01 <= 0f)
+            return false;
+
+        TimedHatchProgressSeconds += activeSeconds * (double)TimedHatchSpeedBonus01;
+        return true;
     }
 
     private void TryRegisterRuntimeSources()
@@ -415,6 +670,20 @@ public sealed class ShopEffectsService : MonoBehaviour, IElementLuckBonusSource
     {
         string raw = PlayerPrefs.GetString(BuildKey("Timed", id), "0");
         return long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0L;
+    }
+
+    private static long LoadLongFromGroup(string group, string id)
+    {
+        string raw = PlayerPrefs.GetString(BuildKey(group, id), "0");
+        return long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0L;
+    }
+
+    private static double LoadDouble(string id)
+    {
+        string raw = PlayerPrefs.GetString(BuildKey("Timed", id), "0");
+        return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? Math.Max(0d, value)
+            : 0d;
     }
 }
 

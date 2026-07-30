@@ -91,22 +91,41 @@ public class ElementTypeMultiplaer : MonoBehaviour
     public ElementType GetRandomWeighted()
     {
         float elementChanceBonus = G.Luck != null ? G.Luck.ElementChanceBonus01 : 0f;
-        if (elementChanceBonus > 0f)
-            return GetRandomWeighted(elementChanceBonus);
-
-        return GetRandomWeightedWithoutLuck();
+        return GetRandomWeightedInternal(elementChanceBonus, 0f);
     }
 
     public ElementType GetRandomWeighted(float elementChanceBonus01)
     {
+        return GetRandomWeightedInternal(elementChanceBonus01, 0f);
+    }
+
+    public ElementType GetRandomWeightedWithMinimumChance(float minimumElementChance01)
+    {
+        float elementChanceBonus = G.Luck != null ? G.Luck.ElementChanceBonus01 : 0f;
+        return GetRandomWeightedInternal(
+            elementChanceBonus,
+            Mathf.Clamp01(minimumElementChance01));
+    }
+
+    private ElementType GetRandomWeightedInternal(
+        float elementChanceBonus01,
+        float minimumElementChance01)
+    {
         if (_cdf.Count == 0) // нет данных
             return default;
 
-        if (elementChanceBonus01 <= 0f || _noElementWeight <= 0f || _elementOnlyWeight <= 0f)
+        float permanentMultiplier = G.ShopEffects != null
+            ? Mathf.Max(1f, G.ShopEffects.PermanentElementChanceMultiplier)
+            : 1f;
+        if (_noElementWeight <= 0f || _elementOnlyWeight <= 0f)
+        {
             return GetRandomWeightedWithoutLuck();
+        }
 
         float baseElementChance = _elementOnlyWeight / _totalWeight;
-        float boostedElementChance = Mathf.Clamp01(baseElementChance + elementChanceBonus01);
+        float boostedElementChance = Mathf.Max(
+            minimumElementChance01,
+            Mathf.Clamp01(baseElementChance * permanentMultiplier + elementChanceBonus01));
 
         if (UnityEngine.Random.value > boostedElementChance)
             return ElementType.NoElement;

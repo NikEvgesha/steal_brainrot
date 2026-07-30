@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
@@ -74,6 +75,11 @@ public class Egg : InventoryItem
     private int _totalDurationSec;      // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
     private DateTimeOffset _endUtc;           // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… (UTC)
     private Coroutine _ticker;
+    private string ShopHatchProgressKey => $"shop_hatch_progress_{_currentCell.Id}";
+    private double _lastShopHatchProgressSeconds;
+    private bool _shopHatchCheckpointInitialized;
+    private bool _shopHatchDeadlineNeedsSave;
+    private float _nextShopHatchCheckpointSaveAt;
     private string SaveKey => $"egg_endUtc_{_currentCell.Id}";//РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… id РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…/РїС—Р…РїС—Р…РїС—Р…РїС—Р…)
 
     public long HatchingTime => _hatchingTimectamp;
@@ -204,6 +210,19 @@ public class Egg : InventoryItem
     public void SetTutorialFreePurchase(bool free)
     {
         _tutorialFreePurchase = free;
+        ApplyBuyPanelAdBadge();
+        _infoUI?.SetInfo(this);
+    }
+
+    public void SetRandomData(float minimumElementChance01)
+    {
+        if (!_initialized)
+            Init();
+
+        _data.DinamicData.ElementType = G.Elements != null
+            ? G.Elements.GetRandomWeightedWithMinimumChance(minimumElementChance01)
+            : ElementType.NoElement;
+        SetTypeVisual();
         _infoUI?.SetInfo(this);
     }
     private void SetTypeVisual()
@@ -277,7 +296,9 @@ public class Egg : InventoryItem
         _infoUI?.SetStatus(_status);
         _currentCell = field;
         _totalDurationSec = Mathf.RoundToInt(
-            _data.SecondsToHatching * GetElementMultiplier()
+            _data.SecondsToHatching *
+            GetElementMultiplier() *
+            (G.ShopEffects != null ? G.ShopEffects.GetHatchDurationMultiplier() : 1f)
         );
         // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
 
@@ -301,6 +322,7 @@ public class Egg : InventoryItem
        */
         _endUtc = DateTimeOffset.UtcNow.AddSeconds(_totalDurationSec); // РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+        InitializeShopHatchProgressCheckpoint(restoreSaved: false);
 
         G.Sound?.PlayAt(GameAudioId.SFX_TIMER_START, transform.position);
 
@@ -390,6 +412,22 @@ public class Egg : InventoryItem
         ApplySpeedBoostSeconds(seconds);
         return true;
     }
+
+    public bool ApplyHatchSpeedBonus(float bonus01)
+    {
+        if (bonus01 <= 0f ||
+            _status != EggStatus.Maturing ||
+            _currentCell == null ||
+            _currentCell.IsRemoteMode)
+        {
+            return false;
+        }
+
+        double remainingSeconds = Math.Max(0d, (_endUtc - DateTimeOffset.UtcNow).TotalSeconds);
+        int reductionSeconds = Mathf.RoundToInt(
+            (float)(remainingSeconds * bonus01 / Mathf.Max(1f, 1f + bonus01)));
+        return reductionSeconds > 0 && TryReduceHatchingTime(reductionSeconds);
+    }
     /// <summary>
     /// РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…: РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р….
     /// </summary>
@@ -421,6 +459,8 @@ public class Egg : InventoryItem
         DateTimeOffset now = DateTimeOffset.UtcNow;
         _endUtc = endTime.ToUnixTimeSeconds() > 0 ? endTime : now.AddSeconds(_totalDurationSec);
         _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+        InitializeShopHatchProgressCheckpoint(restoreSaved: true);
+        ApplyShopTimedHatchProgress(allowFieldSave: false);
         StartTicker();
     }
 
@@ -432,6 +472,78 @@ public class Egg : InventoryItem
     private static float GetElementMultiplier(ElementType elementType)
     {
         return G.Elements != null ? G.Elements.GetMultiplaer(elementType) : 1f;
+    }
+
+    private void InitializeShopHatchProgressCheckpoint(bool restoreSaved)
+    {
+        if (_currentCell == null || G.ShopEffects == null)
+            return;
+
+        double currentProgress = G.ShopEffects.GetTimedHatchProgressSeconds();
+        _lastShopHatchProgressSeconds = currentProgress;
+        if (restoreSaved &&
+            PlayerPrefs.HasKey(ShopHatchProgressKey) &&
+            double.TryParse(
+                PlayerPrefs.GetString(ShopHatchProgressKey, "0"),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out double savedProgress))
+        {
+            _lastShopHatchProgressSeconds = Math.Min(
+                currentProgress,
+                Math.Max(0d, savedProgress));
+        }
+
+        _shopHatchCheckpointInitialized = true;
+        SaveShopHatchProgressCheckpoint();
+    }
+
+    private void ApplyShopTimedHatchProgress(bool allowFieldSave = true)
+    {
+        if (_currentCell == null || _currentCell.IsRemoteMode || G.ShopEffects == null)
+            return;
+
+        if (!_shopHatchCheckpointInitialized)
+            InitializeShopHatchProgressCheckpoint(restoreSaved: true);
+        if (!_shopHatchCheckpointInitialized)
+            return;
+
+        double currentProgress = G.ShopEffects.GetTimedHatchProgressSeconds();
+        double extraProgress = Math.Max(0d, currentProgress - _lastShopHatchProgressSeconds);
+        if (extraProgress > 0d)
+        {
+            _endUtc = _endUtc.AddSeconds(-extraProgress);
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (_endUtc < now)
+                _endUtc = now;
+
+            _hatchingTimectamp = _endUtc.ToUnixTimeSeconds();
+            _lastShopHatchProgressSeconds = currentProgress;
+            _shopHatchDeadlineNeedsSave = true;
+            SaveShopHatchProgressCheckpoint();
+        }
+
+        if (!allowFieldSave ||
+            !_shopHatchDeadlineNeedsSave ||
+            Time.unscaledTime < _nextShopHatchCheckpointSaveAt)
+        {
+            return;
+        }
+
+        _nextShopHatchCheckpointSaveAt = Time.unscaledTime + 2f;
+        _shopHatchDeadlineNeedsSave = false;
+        _currentCell.SaveData();
+        PlayerPrefs.Save();
+    }
+
+    private void SaveShopHatchProgressCheckpoint()
+    {
+        if (_currentCell == null || !_shopHatchCheckpointInitialized)
+            return;
+
+        PlayerPrefs.SetString(
+            ShopHatchProgressKey,
+            _lastShopHatchProgressSeconds.ToString("R", CultureInfo.InvariantCulture));
     }
 
     private void StartTicker()
@@ -459,6 +571,7 @@ public class Egg : InventoryItem
 
         while (true)
         {
+            ApplyShopTimedHatchProgress();
             double remainingSec = (_endUtc - DateTime.UtcNow).TotalSeconds;
 
             if (remainingSec <= 0)
@@ -483,6 +596,8 @@ public class Egg : InventoryItem
     {
         if (_currentCell == null) return;
         PlayerPrefs.SetString(SaveKey, _endUtc.Ticks.ToString());
+        SaveShopHatchProgressCheckpoint();
+        _currentCell.SaveData();
         PlayerPrefs.Save();
     }
 
@@ -654,8 +769,20 @@ public class Egg : InventoryItem
 
     private void ApplyBuyPanelAdBadge()
     {
-        if (_buyPanel != null)
-            _buyPanel.SetRewardedAdBadgeVisible(_remoteConveyorPurchase);
+        if (_buyPanel == null)
+            return;
+
+        if (_remoteConveyorPurchase)
+        {
+            Sprite adIcon = G.SpecialShop != null ? G.SpecialShop.RewardedAdIcon : null;
+            _buyPanel.SetInfoLocalized("UI/Interaction/BuyWithAd", "Buy with ad");
+            _buyPanel.ConfigureRewardedAdBadge(true, adIcon, string.Empty);
+            return;
+        }
+
+        string price = Math.Round(EffectivePrice).ToString("0", CultureInfo.InvariantCulture);
+        _buyPanel.SetInfoLocalized("Buy", "Buy", price);
+        _buyPanel.SetRewardedAdBadgeVisible(false);
     }
 
 

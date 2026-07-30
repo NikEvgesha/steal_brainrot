@@ -12,6 +12,16 @@ public struct ShopReward
     public InventoryItem Item;
     [Min(0f)] public float EffectValue;
     [Min(0)] public int DurationMinutes;
+    [Min(0)] public int DurationDays;
+}
+
+[Serializable]
+public struct ShopTrackStep
+{
+    public bool Free;
+    [Min(0)] public int Price;
+    public CurrencyType PriceCurrencyType;
+    public ShopReward Reward;
 }
 
 [CreateAssetMenu(fileName = "CurrencyPack", menuName = "Scriptable/CurrencyPackData")]
@@ -29,8 +39,15 @@ public class ShopPackData : ScriptableObject
     [SerializeField] private Color _accentColor = new Color(0.08f, 0.48f, 0.94f, 1f);
     [SerializeField] private int _sortOrder;
     [SerializeField] private bool _featured;
+    [SerializeField] private ShopOfferStyle _offerStyle;
+    [SerializeField, Range(1, 3)] private int _itemsPerRow = 2;
+    [SerializeField] private string _badgeFallback;
+    [SerializeField, Min(0)] private int _originalPrice;
+    [SerializeField] private string _groupId;
+    [SerializeField] private List<ShopTrackStep> _trackSteps;
     [SerializeField] private bool _rewardedAdFallback;
     [SerializeField, Min(1)] private int _rewardedAdGems = 5;
+    [SerializeField, Min(0)] private int _availabilityDays;
     [SerializeField] private List<ShopReward> _rewards;
 
     public string Id => _id;
@@ -46,8 +63,15 @@ public class ShopPackData : ScriptableObject
     public Color AccentColor => _accentColor;
     public int SortOrder => _sortOrder;
     public bool Featured => _featured;
+    public ShopOfferStyle OfferStyle => _offerStyle;
+    public int ItemsPerRow => Mathf.Clamp(_slotType == ShopSlotType.Big ? 1 : _itemsPerRow, 1, 3);
+    public string BadgeFallback => _badgeFallback;
+    public int OriginalPrice => Mathf.Max(0, _originalPrice);
+    public string GroupId => _groupId;
+    public IReadOnlyList<ShopTrackStep> TrackSteps => _trackSteps;
     public bool RewardedAdFallback => _rewardedAdFallback;
     public int RewardedAdGems => Mathf.Max(1, _rewardedAdGems);
+    public int AvailabilityDays => Mathf.Max(0, _availabilityDays);
 
     public bool HasConsumableReward
     {
@@ -65,6 +89,23 @@ public class ShopPackData : ScriptableObject
             return false;
         }
     }
+
+    public bool HasTimedReward
+    {
+        get
+        {
+            if (_rewards == null)
+                return false;
+
+            for (int i = 0; i < _rewards.Count; i++)
+            {
+                if (ShopRewardUtility.IsTimed(_rewards[i].Type))
+                    return true;
+            }
+
+            return false;
+        }
+    }
 }
 
 public static class ShopRewardUtility
@@ -73,12 +114,28 @@ public static class ShopRewardUtility
     {
         return type == ShopRewardType.ConsumableIncomeBoost ||
                type == ShopRewardType.ConsumableElementLuckBoost ||
-               type == ShopRewardType.ConsumableHatchSkip;
+               type == ShopRewardType.ConsumableHatchSkip ||
+               type == ShopRewardType.ConsumableHatchSpeedBoost ||
+               type == ShopRewardType.ConsumableOmniBoost ||
+               type == ShopRewardType.InstantHatchAll;
     }
 
     public static bool IsPermanent(ShopRewardType type)
     {
         return type == ShopRewardType.PermanentIncomePercent ||
-               type == ShopRewardType.PermanentElementLuckPercent;
+               type == ShopRewardType.PermanentElementLuckPercent ||
+               type == ShopRewardType.PermanentOfflineIncomeMultiplier ||
+               type == ShopRewardType.PermanentHatchSpeedPercent ||
+               type == ShopRewardType.PermanentElementChanceMultiplier;
+    }
+
+    public static bool IsTimed(ShopRewardType type)
+    {
+        return type == ShopRewardType.TimedIncomeBoost ||
+               type == ShopRewardType.TimedElementLuckBoost ||
+               type == ShopRewardType.ConsumableIncomeBoost ||
+               type == ShopRewardType.ConsumableElementLuckBoost ||
+               type == ShopRewardType.ConsumableHatchSpeedBoost ||
+               type == ShopRewardType.ConsumableOmniBoost;
     }
 }

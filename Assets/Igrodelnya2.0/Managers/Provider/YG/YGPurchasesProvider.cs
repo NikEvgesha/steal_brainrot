@@ -66,12 +66,7 @@ public class YGPurchasesProvider : PurchasesProvider
     {
         Debug.Log($"YG Purchase successful: {id}");
         if (currentCallback == null)
-        {
-            if (G.SpecialShop != null)
-                G.SpecialShop.OnPurchaseRestore(id);
-            else
-                Debug.LogWarning($"YG Purchase '{id}' restored before SpecialShop was ready.");
-        }
+            SpecialShop.DeliverOrQueueRestoredPurchase(id);
 
         currentCallback?.Invoke(true);
         currentCallback = null;

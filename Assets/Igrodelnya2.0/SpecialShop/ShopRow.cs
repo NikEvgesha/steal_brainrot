@@ -18,6 +18,23 @@ public class ShopRow : MonoBehaviour
         _maxItems = amount;
     }
 
+    public void RefreshHeight()
+    {
+        float contentHeight = 250f;
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            var childLayout = transform.GetChild(i).GetComponent<LayoutElement>();
+            if (childLayout != null)
+                contentHeight = Mathf.Max(contentHeight, childLayout.preferredHeight);
+        }
+
+        var layout = GetComponent<LayoutElement>();
+        if (layout == null)
+            layout = gameObject.AddComponent<LayoutElement>();
+        layout.minHeight = contentHeight + 14f;
+        layout.preferredHeight = contentHeight + 14f;
+    }
+
     [ContextMenu("Apply shop row layout")]
     public void ApplyLayout()
     {
@@ -38,5 +55,7 @@ public class ShopRow : MonoBehaviour
             horizontal.childForceExpandWidth = true;
             horizontal.childForceExpandHeight = false;
         }
+
+        RefreshHeight();
     }
 }

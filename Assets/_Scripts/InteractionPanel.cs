@@ -39,6 +39,9 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private bool _pointerHold;
     private LocalizedText _actionLocalizedText;
     private LocalizedText _priceLocalizedText;
+    private LocalizationManager _localizationManager;
+    private string _actionLocalizationKey;
+    private string _actionLocalizationFallback;
     private bool _hasResumeProgress;
     private float _resumeProgress;
     private float _resumeUntilUnscaledTime;
@@ -62,7 +65,11 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         {
             _actionLocalizedText = _actionText.GetComponent<LocalizedText>();
             if (_actionLocalizedText != null)
+            {
+                _actionLocalizationKey = _actionLocalizedText.SelectedKey;
+                _actionLocalizationFallback = _actionText.text;
                 _actionLocalizedText.enabled = false;
+            }
         }
 
         if (_priceText != null)
@@ -86,6 +93,10 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void OnEnable()
     {
+        LocalizationManager.OnInstanceReady += HandleLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged += HandleLanguageChanged;
+        SubscribeToLocalizationManager(LocalizationManager.Instance);
+        RefreshLocalizedAction();
         ApplyRewardedAdBadgeState();
 
         if (_hasResumeProgress &&
@@ -110,6 +121,10 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void OnDisable()
     {
+        LocalizationManager.OnInstanceReady -= HandleLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= HandleLanguageChanged;
+        UnsubscribeFromLocalizationManager();
+
         bool wasInterrupted = _interactionInProgress && _progress > 0f && _progress < _nearCompleteThreshold;
         var canResumeAfterDisable =
             _interactionInProgress &&
@@ -281,17 +296,85 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         if (_priceLocalizedText != null && _priceLocalizedText.enabled)
             _priceLocalizedText.enabled = false;
 
-        if (_actionText != null)
-            _actionText.text = actionText;
+        _actionLocalizationKey = ResolveLocalizationKey(actionText);
+        _actionLocalizationFallback = actionText;
+        RefreshLocalizedAction();
 
+        ApplyPrice(price);
+        ApplyRewardedAdBadgeState();
+    }
+
+    public void SetInfoLocalized(string localizationKey, string fallback, string price = null)
+    {
+        if (_actionLocalizedText != null && _actionLocalizedText.enabled)
+            _actionLocalizedText.enabled = false;
+        if (_priceLocalizedText != null && _priceLocalizedText.enabled)
+            _priceLocalizedText.enabled = false;
+
+        _actionLocalizationKey = localizationKey;
+        _actionLocalizationFallback = fallback;
+        RefreshLocalizedAction();
+        ApplyPrice(price);
+        ApplyRewardedAdBadgeState();
+    }
+
+    private void ApplyPrice(string price)
+    {
         if (_priceText != null)
         {
             _priceText.gameObject.SetActive(price != null);
             if (price != null)
                 _priceText.text = "$" + price;
         }
+    }
 
-        ApplyRewardedAdBadgeState();
+    private void HandleLocalizationManagerReady(LocalizationManager manager)
+    {
+        SubscribeToLocalizationManager(manager);
+        RefreshLocalizedAction();
+    }
+
+    private void HandleLanguageChanged(string _)
+    {
+        RefreshLocalizedAction();
+    }
+
+    private void SubscribeToLocalizationManager(LocalizationManager manager)
+    {
+        if (manager == null || _localizationManager == manager)
+            return;
+
+        UnsubscribeFromLocalizationManager();
+        _localizationManager = manager;
+        _localizationManager.OnLanguageChanged += HandleLanguageChanged;
+    }
+
+    private void UnsubscribeFromLocalizationManager()
+    {
+        if (_localizationManager == null)
+            return;
+
+        _localizationManager.OnLanguageChanged -= HandleLanguageChanged;
+        _localizationManager = null;
+    }
+
+    private void RefreshLocalizedAction()
+    {
+        if (_actionText == null)
+            return;
+
+        _actionText.text = string.IsNullOrWhiteSpace(_actionLocalizationKey)
+            ? _actionLocalizationFallback ?? string.Empty
+            : LocalizationUtils.T(_actionLocalizationKey, _actionLocalizationFallback);
+    }
+
+    private static string ResolveLocalizationKey(string actionText)
+    {
+        var manager = LocalizationManager.Instance;
+        var data = manager != null ? manager.LocalizationData : null;
+        return data != null && data.TryFindKeyByTranslation(actionText, out string key)
+            ? key
+            : string.Empty;
     }
 
     public void SetRewardedAdBadgeVisible(bool visible)

@@ -120,6 +120,7 @@ public class FieldCell : MonoBehaviour
                 switch (_currentEgg.Status)
                 {
                     case EggStatus.Maturing:
+                        SetPanelLocalizedAction(_addSpeedButton, "UI/Interaction/SpeedUp", "Speed up");
                         _addSpeedButton.SetActive(true);
                         SetPanelRewardedAdBadge(
                             _addSpeedButton,
@@ -131,6 +132,7 @@ public class FieldCell : MonoBehaviour
                             _speedBoostAdBadgeOffset);
                         break;
                     case EggStatus.ReadyToHatch:
+                        SetPanelLocalizedAction(_hatchButton, "UI/Interaction/Hatch", "Hatch");
                         _hatchButton.SetActive(true);
                         break;
                     default:
@@ -141,6 +143,7 @@ public class FieldCell : MonoBehaviour
             case Item.Brainrot:
                 if (G.QuickAccess.CheckHand() == Item.Hamer)
                 {
+                    SetPanelLocalizedAction(_takeButton, "UI/Interaction/Take", "Take");
                     _takeButton.SetActive(true);
                 }
                 break;
@@ -155,10 +158,12 @@ public class FieldCell : MonoBehaviour
         {
             case Item.Egg:
                 _triggerIndicator.SetActive(true);
+                SetPanelLocalizedAction(_dropButton, "UI/Interaction/Place", "Place");
                 _dropButton.SetActive(true);
                 break;
             case Item.Brainrot:
                 _triggerIndicator.SetActive(true);
+                SetPanelLocalizedAction(_dropButton, "UI/Interaction/Place", "Place");
                 _dropButton.SetActive(true);
                 break;
             default:
@@ -467,5 +472,20 @@ public class FieldCell : MonoBehaviour
 
         if (panel != null)
             panel.ConfigureRewardedAdBadge(visible, sprite, label, badgeParent, size, offset);
+    }
+
+    private static void SetPanelLocalizedAction(
+        GameObject buttonRoot,
+        string localizationKey,
+        string fallback)
+    {
+        if (buttonRoot == null)
+            return;
+
+        var panel = buttonRoot.GetComponent<InteractionPanel>();
+        if (panel == null)
+            panel = buttonRoot.GetComponentInChildren<InteractionPanel>(true);
+
+        panel?.SetInfoLocalized(localizationKey, fallback);
     }
 }

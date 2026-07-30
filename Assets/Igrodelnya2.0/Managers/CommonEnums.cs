@@ -319,7 +319,31 @@ public enum ShopRewardType
     PermanentElementLuckPercent,
     ConsumableIncomeBoost,
     ConsumableElementLuckBoost,
-    ConsumableHatchSkip
+    ConsumableHatchSkip,
+    DailyGemsPass,
+    SoftCurrencyHours,
+    PermanentOfflineIncomeMultiplier,
+    PermanentHatchSpeedPercent,
+    ConsumableHatchSpeedBoost,
+    ConsumableOmniBoost,
+    InstantHatchAll,
+    PermanentElementChanceMultiplier,
+    TimedIncomeBoost,
+    TimedElementLuckBoost
+}
+
+public enum ShopOfferStyle
+{
+    Standard,
+    LimitedEgg,
+    MonthlyPass,
+    TimedIncome,
+    TimedLuck,
+    EternalPack,
+    Permanent,
+    PremiumCurrency,
+    SoftCurrency,
+    Potion
 }
 
 public enum RaycastType
