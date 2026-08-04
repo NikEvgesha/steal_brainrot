@@ -6,6 +6,8 @@ using UnityEngine.Networking;
 
 public class FriendsApi : MonoBehaviour
 {
+    public static event Action<string> LocalDisplayNameChanged;
+
     [SerializeField] private string baseUrl = "https://api.igrodelnya-zoogame.ru";
     private SaveManager saveManager;
 
@@ -311,6 +313,7 @@ public class FriendsApi : MonoBehaviour
 
         // success -> сохраняем
         saveManager.SaveBackendProfile(p.playerId, p.friendCode, body.displayName);
+        LocalDisplayNameChanged?.Invoke(body.displayName);
         onOk?.Invoke(true);
     }
     public IEnumerator RenameMePaid(string newName, Action<bool> onOk = null, Action<string> onFail = null)
@@ -337,6 +340,7 @@ public class FriendsApi : MonoBehaviour
         }
 
         saveManager.SaveBackendProfile(p.playerId, p.friendCode, body.displayName);
+        LocalDisplayNameChanged?.Invoke(body.displayName);
         onOk?.Invoke(true);
     }
 

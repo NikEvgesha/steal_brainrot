@@ -108,6 +108,8 @@ public class ClaimAllCoinsZone : MonoBehaviour
     private UniversalDecisionPopup _activePopup;
     private bool _popupOpenedByZone;
     private Canvas _runtimePopupCanvas;
+    private Collider _trackedPlayerCollider;
+    private float _nextPresenceRefreshAt;
 
     private void Awake()
     {
@@ -144,13 +146,21 @@ public class ClaimAllCoinsZone : MonoBehaviour
     private void OnDisable()
     {
         UnsubscribeEvents();
-        StopStateRoutine();
-        StopAutoCollectRoutine();
-        HideInteraction();
+        ExitZone(forceHidePopup: true);
     }
 
     private void Update()
     {
+        if (_playerInside && Time.unscaledTime >= _nextPresenceRefreshAt)
+        {
+            _nextPresenceRefreshAt = Time.unscaledTime + Mathf.Max(0.1f, stateRefreshSec);
+            if (!IsTrackedPlayerStillInside())
+            {
+                ExitZone(forceHidePopup: true);
+                return;
+            }
+        }
+
         if (!onlyForLocalSlot)
             return;
 
@@ -172,7 +182,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
         if (!RefreshSlotAvailability())
             return;
 
+        _trackedPlayerCollider = ResolvePlayerCollider(other);
         _playerInside = true;
+        _nextPresenceRefreshAt = Time.unscaledTime + Mathf.Max(0.1f, stateRefreshSec);
         StartStateRoutine();
         if (HasCollectibleIncome())
             G.Sound?.Play(GameAudioId.SFX_UI_READY);
@@ -194,12 +206,41 @@ public class ClaimAllCoinsZone : MonoBehaviour
         if (!other.CompareTag("Player"))
             return;
 
+        ExitZone(forceHidePopup: false);
+    }
+
+    private void ExitZone(bool forceHidePopup)
+    {
         _playerInside = false;
+        _trackedPlayerCollider = null;
         StopStateRoutine();
         StopAutoCollectRoutine();
-        HidePopupIfOpenedByZone();
+        HidePopupIfOpenedByZone(forceHidePopup);
         HideInteraction();
         RefreshVisualState();
+    }
+
+    private static Collider ResolvePlayerCollider(Collider source)
+    {
+        if (source == null)
+            return null;
+
+        var controller = source.GetComponentInParent<CharacterController>();
+        return controller != null ? controller : source;
+    }
+
+    private bool IsTrackedPlayerStillInside()
+    {
+        if (triggerCollider == null || !triggerCollider.enabled || !triggerCollider.gameObject.activeInHierarchy)
+            return false;
+
+        if (_trackedPlayerCollider == null || !_trackedPlayerCollider.enabled ||
+            !_trackedPlayerCollider.gameObject.activeInHierarchy)
+            return false;
+
+        Bounds zoneBounds = triggerCollider.bounds;
+        zoneBounds.Expand(0.1f);
+        return zoneBounds.Intersects(_trackedPlayerCollider.bounds);
     }
 
     private void SubscribeEvents()
@@ -711,9 +752,9 @@ public class ClaimAllCoinsZone : MonoBehaviour
             interactionPanel.gameObject.SetActive(false);
     }
 
-    private void HidePopupIfOpenedByZone()
+    private void HidePopupIfOpenedByZone(bool forceHidePopup = false)
     {
-        if (!hidePopupOnExit || !_popupOpenedByZone)
+        if ((!hidePopupOnExit && !forceHidePopup) || !_popupOpenedByZone)
             return;
 
         if (_activePopup != null && _activePopup.IsOpen)
@@ -779,8 +820,10 @@ public class ClaimAllCoinsZone : MonoBehaviour
             return;
 
         _playerInside = false;
+        _trackedPlayerCollider = null;
         StopStateRoutine();
         StopAutoCollectRoutine();
+        HidePopupIfOpenedByZone(forceHidePopup: true);
         HideInteraction();
 
         if (readyIndicator != null)

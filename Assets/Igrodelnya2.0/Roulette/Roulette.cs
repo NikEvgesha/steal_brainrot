@@ -63,6 +63,7 @@ public class Roulette : MonoBehaviour
     private string _spinCurrency = string.Empty;
     private double _spinPrice;
     private string _spinRequestId = string.Empty;
+    private bool _saveStateReady;
 
 
     private void Awake()
@@ -72,9 +73,10 @@ public class Roulette : MonoBehaviour
         _priceText.text = _gemsPrice.ToString();
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
         BindInput();
+        SetSpinButtonsInteractable(false);
         //LoadingManager.Instance.LocationChanged += ToggleButtonVisibility;
         for (int i = 0; i < _slots.Count; i++)
         {
@@ -82,8 +84,17 @@ public class Roulette : MonoBehaviour
             _slots[i].transform.RotateAround(_wheel.transform.position, Vector3.forward, -i * _rotateAngle);
 
         }
+
+        // Mirra data is initialized asynchronously. Reading before it is ready
+        // returns the provider fallback (yesterday), which incorrectly grants a
+        // second daily spin after every relaunch.
+        while (G.Save == null || !G.Save.IsReady)
+            yield return null;
+
         _lastSpinTime = G.Save.LoadRouletteDate();
+        _saveStateReady = true;
         CheckFreeSpinAvailable();
+        SetSpinButtonsInteractable(true);
         if (!_freeAvailable)
         {
             SetTime();
@@ -128,10 +139,9 @@ public class Roulette : MonoBehaviour
 
     private IEnumerator Timer()
     {
-        UpdateTime();
-        while (_tillNextDay.TotalSeconds > 0)
+        while (_lastSpinTime.Date == MirraSDK.Time.CurrentDate.ToUniversalTime().Date)
         {
-            _tillNextDay -= TimeSpan.FromSeconds(1);
+            SetTime();
             if (_isOpen)
                 UpdateTime();
             yield return new WaitForSecondsRealtime(1);
@@ -151,12 +161,11 @@ public class Roulette : MonoBehaviour
             if (_spinning)
             {
                 StopCoroutine(_spinCoroutine);
+                _spinCoroutine = null;
+                _spinning = false;
                 TrackSpinResult(false, default, "spin_cancelled");
-                _adButton.interactable = true;
-                _gemsButton.interactable = true;
-                _freeAvailable = true;
-                SwitchFreePlayButton(true);
-                
+                SetSpinButtonsInteractable(_saveStateReady);
+                CheckFreeSpinAvailable();
             }
             _ui.SetActive(_isOpen);
 
@@ -188,17 +197,20 @@ public class Roulette : MonoBehaviour
 
     public void OnPlayButtonClick()
     {
+        if (!_saveStateReady || _spinning)
+            return;
+
         if (_freeAvailable)
         {
-            StartSpin("free", string.Empty, 0d);
-            SwitchFreePlayButton(false);
             _lastSpinTime = MirraSDK.Time.CurrentDate.ToUniversalTime();
             G.Save.SaveRouletteDate(_lastSpinTime);
             SetTime();
+            SwitchFreePlayButton(false);
+            StartSpin("free", string.Empty, 0d);
             if (_timerCoroutine == null)
             {
                 _timerCoroutine = Timer();
-                StartCoroutine(Timer());
+                StartCoroutine(_timerCoroutine);
             }
         } else
         {
@@ -216,6 +228,9 @@ public class Roulette : MonoBehaviour
 
     public void OnGemsButtonClick()
     {
+        if (!_saveStateReady || _spinning)
+            return;
+
         if (G.Currency.RemoveCurrency(CurrencyType.Gems, _gemsPrice))
         {
             StartSpin("gems", "gems", _gemsPrice);
@@ -279,8 +294,19 @@ public class Roulette : MonoBehaviour
 
     private void CheckFreeSpinAvailable()
     {
+        if (!_saveStateReady)
+            return;
+
         _freeAvailable = _lastSpinTime.Date != MirraSDK.Time.CurrentDate.ToUniversalTime().Date;
         SwitchFreePlayButton(_freeAvailable);
+    }
+
+    private void SetSpinButtonsInteractable(bool interactable)
+    {
+        if (_adButton != null)
+            _adButton.interactable = interactable;
+        if (_gemsButton != null)
+            _gemsButton.interactable = interactable;
     }
 
     private void SwitchFreePlayButton(bool free)

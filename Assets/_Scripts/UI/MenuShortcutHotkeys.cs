@@ -79,7 +79,7 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
         TryInvoke(inventoryKey, inventoryButton);
         TryInvoke(shopKey, shopButton);
-        TryInvoke(albumKey, albumButton);
+        TryToggleAlbumHotkey();
     }
 
     private void ResolveButtons()
@@ -201,7 +201,30 @@ public class MenuShortcutHotkeys : MonoBehaviour
             return;
         }
 
-        album.Toggle();
+        // The sidebar entry is an "open album" action. Keeping it idempotent is
+        // important because the album panel may have been closed by another UI
+        // (or disabled together with a parent canvas) between pointer events.
+        // In that case a state-based Toggle could immediately close it again.
+        album.Open();
+    }
+
+    private void TryToggleAlbumHotkey()
+    {
+        if (albumKey == KeyCode.None || albumButton == null || !albumButton.interactable ||
+            !albumButton.gameObject.activeInHierarchy || !Input.GetKeyDown(albumKey))
+            return;
+
+        var album = ResolveAlbumScreen();
+        if (album == null)
+        {
+            Debug.LogWarning("[MenuShortcutHotkeys] AlbumScreenController was not found.");
+            return;
+        }
+
+        if (album.IsOpen)
+            album.Close();
+        else
+            album.Open();
     }
 
     private void RegisterAlbumButton()

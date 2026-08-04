@@ -8,6 +8,7 @@ public static class RemoteProfilePopupEditorTools
     private const string TexturePath = "Assets/_Sprites/texture.png";
     private const string GradientPath = "Assets/_Sprites/Gradient2.png";
     private const string FontPath = "Assets/Igrodelnya2.0/Fonts/RussoOne-Regular SDF.asset";
+    private const string EditIconPath = "Assets/_Sprites/GUI-CasualFantasy/ResourcesData/Sprites/Components/IconMisc/Icon_Pencil.Png";
 
     [MenuItem("Tools/UI/Restyle Remote Profile Popup")]
     public static void RestylePrefab()
@@ -22,13 +23,14 @@ public static class RemoteProfilePopupEditorTools
             Sprite texture = AssetDatabase.LoadAssetAtPath<Sprite>(TexturePath);
             Sprite gradient = AssetDatabase.LoadAssetAtPath<Sprite>(GradientPath);
             TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-            if (texture == null || gradient == null || font == null)
+            Sprite editIcon = AssetDatabase.LoadAssetAtPath<Sprite>(EditIconPath);
+            if (texture == null || gradient == null || font == null || editIcon == null)
             {
                 throw new MissingReferenceException(
-                    $"Remote profile theme assets are missing: texture={TexturePath}, gradient={GradientPath}, font={FontPath}.");
+                    $"Remote profile theme assets are missing: texture={TexturePath}, gradient={GradientPath}, font={FontPath}, editIcon={EditIconPath}.");
             }
 
-            popup.ConfigureVisualAssets(texture, gradient, font);
+            popup.ConfigureVisualAssets(texture, gradient, font, editIcon);
             popup.ApplyVisualStyle();
 
             foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true))

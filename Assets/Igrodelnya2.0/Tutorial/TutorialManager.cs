@@ -959,7 +959,7 @@ public sealed class TutorialManager : MonoBehaviour
             {
                 message = FormatLocalized(
                     "UI/Tutorial/Context/SaveFood",
-                    "Save {0} coins for the first fruit ({1}/{0}). Every big-animal level adds 10% farm income.",
+                    "Save {0} coins for the first fruit ({1}/{0}). Then buy it and feed the big animal.",
                     FormatCoins(price),
                     FormatCoins(G.Currency?.Coins ?? 0d));
                 primary = FindIncomeTeachingTarget();
@@ -969,14 +969,14 @@ public sealed class TutorialManager : MonoBehaviour
 
             if (shop != null && !shop.IsPlayerInside)
             {
-                message = L("UI/Tutorial/Context/TravelFoodShop", "Go to the food shop. You can use the FOOD teleport button.");
+                message = L("UI/Tutorial/Context/TravelFoodShop", "Go to the food shop — you can use the FOOD teleport. Buy a fruit, then feed it to the big animal.");
                 primary = shop.TeleportPoint != null ? shop.TeleportPoint : shop.transform;
                 secondary = FindTeleportButton(ScenePoint.FOOD);
                 highlight = shop.transform;
                 return;
             }
 
-            message = FormatLocalized("UI/Tutorial/Context/BuyFoodAction", "Buy the first fruit for {0} coins.", FormatCoins(price));
+            message = FormatLocalized("UI/Tutorial/Context/BuyFoodAction", "Buy the first fruit for {0} coins, then bring it to the big animal.", FormatCoins(price));
             FoodShopSlot slot = shop?.Ui?.FindSlot(firstFood);
             primary = slot != null ? slot.CoinButtonTarget : shop?.transform;
             return;
@@ -988,13 +988,13 @@ public sealed class TutorialManager : MonoBehaviour
                 ownedFood,
                 Item.Food,
                 "UI/Tutorial/Context/OpenInventoryFood",
-                "Open the inventory to find the fruit.",
+                "Open the inventory and take the fruit to feed the big animal.",
                 "UI/Tutorial/Context/ChooseFoodTab",
-                "Choose the Food tab.",
+                "Choose the Food tab and select a fruit for feeding.",
                 "UI/Tutorial/Context/AddFoodQuick",
-                "Tap the fruit to add it to quick access.",
+                "Tap the fruit to add it to quick access for feeding.",
                 "UI/Tutorial/Context/EquipFood",
-                "Select the fruit in quick access.",
+                "Select the fruit in quick access and bring it to the big animal.",
                 out message,
                 out primary);
             return;
@@ -1012,12 +1012,12 @@ public sealed class TutorialManager : MonoBehaviour
         highlight = bigPet != null ? bigPet.transform : null;
         if (bigPet != null && bigPet.IsPlayerInArea)
         {
-            message = L("UI/Tutorial/Context/FeedAction", "Feed the fruit to the big animal. Each level adds 10% to all farm income.");
+            message = L("UI/Tutorial/Context/FeedAction", "Feed the fruit to the big animal. The task completes after feeding. Late levels give an especially large income bonus.");
             primary = bigPet.FeedActionTarget;
         }
         else
         {
-            message = L("UI/Tutorial/Context/ApproachBigPetWithFood", "Bring the fruit to the big animal.");
+            message = L("UI/Tutorial/Context/ApproachBigPetWithFood", "Bring the fruit to the big animal and feed it.");
             primary = bigPet != null ? bigPet.transform : null;
         }
     }
@@ -1769,6 +1769,7 @@ public sealed class TutorialManager : MonoBehaviour
     private void SubscribeLocalization()
     {
         LocalizationManager.OnInstanceReady += OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
         if (LocalizationManager.Instance != null)
             LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
     }
@@ -1776,6 +1777,7 @@ public sealed class TutorialManager : MonoBehaviour
     private void UnsubscribeLocalization()
     {
         LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
+        LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
         if (LocalizationManager.Instance != null)
             LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
     }

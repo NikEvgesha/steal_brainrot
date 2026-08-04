@@ -1118,7 +1118,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   _foodList:
   - {fileID: 2146794906140059914, guid: 814d1ff97ec2f694f9e8b67c1bfd41b0, type: 3}
+  - {fileID: 1239945925751999923, guid: df1a1e59d1ee2cd4899339e39e77f4b7, type: 3}
+  - {fileID: 4567384955224325575, guid: 3c70601856f2b674591460e5239beba9, type: 3}
+  - {fileID: 4085178201428273123, guid: 451fe58704e049149a8638a51e182c0c, type: 3}
+  - {fileID: 4085925248033432425, guid: 0cb42d0520aede34388ec9e64d5ff8ba, type: 3}
+  - {fileID: 3334293854521306143, guid: a6fb3347c21c0914eac226b8b9a9d8f6, type: 3}
   - {fileID: 6026022890723195221, guid: ff5e3a2fb5bdc074ba5dbff8e68feff4, type: 3}
+  - {fileID: 4880000207753454644, guid: c343eeb270727774ca9a8b7ceaa31274, type: 3}
+  - {fileID: 1598040444779314214, guid: 4d708a08b896a454982ee527db1de3d6, type: 3}
+  - {fileID: 5968687439643818366, guid: 9682f3de90f76384d88e6450e05becf3, type: 3}
+  - {fileID: 2087430259405915763, guid: bae8723b88aa6124cb68f58268154f01, type: 3}
+  - {fileID: 7885686350197289455, guid: fd9b9b53add6726448e7d07ca239fac2, type: 3}
   _ui: {fileID: 7215267699306820273}
   _resupplyTime: 120
   _priceResupply: 10
@@ -1575,7 +1585,7 @@ Transform:
   m_GameObject: {fileID: 6469532903820938669}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0.55, y: 0.04, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1601,8 +1611,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2.84, y: 0.18697846, z: 2.97}
-  m_Center: {x: 0, y: -0.079889774, z: 0}
+  m_Size: {x: 3, y: 0.24, z: 3}
+  m_Center: {x: 0, y: 0.02, z: 0}
 --- !u!114 &1623283717904358345
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1880,14 +1890,14 @@ Canvas:
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
-  m_OverrideSorting: 0
+  m_OverrideSorting: 1
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 2000
   m_TargetDisplay: 0
 --- !u!114 &3455371399474879599
 MonoBehaviour:

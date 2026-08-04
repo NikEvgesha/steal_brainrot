@@ -1223,3 +1223,50 @@
 - Runtime measurements showed that the islands and field-cell surfaces were consistent; the visible error came from animal-specific model pivots and post-init scaling. Before the fix, visual bottoms ranged from `-0.393` below to `+0.203` above the cell surface.
 - `FieldCell.AlignBrainrotToSurface` now uses only active Mesh/SkinnedMesh renderers, excluding UI and elemental VFX, and moves the actor root so the real visual bottom meets the cell surface. The alignment runs after hatch/manual placement, save loading and remote/fallback spawning.
 - Fresh Play Mode Bridge checked 37 active regular animals across local and remote farms: all 37 were aligned, with the largest animated-pose remainder at `0.0106` world units. BigPet grounding remained correct and separate.
+
+### 2026-08-04 (friends ID clipboard repair)
+- Replaced the WebGL-only use of `GUIUtility.systemCopyBuffer` with a browser plugin. It first copies through a temporary selected textarea for compatibility with cross-origin platform iframes, then falls back to the modern Clipboard API when available; Editor and standalone builds retain Unity's native clipboard.
+- Centralized the copy-feedback state in `FriendsPanelController`. The ID and copy icon are restored and the localized `Copied` label is hidden whenever the friends window closes, opens, the controller enables or disables; failed copy attempts also restore the normal state.
+- Bound the existing prefab objects explicitly, kept the existing RU/EN localization, passed JavaScript syntax and Unity YAML/diff validation. A platform WebGL click/paste smoke is still required because the active Unity bridge is attached to another project.
+
+### 2026-08-04 (pending friend requests and real friend-lobby visits)
+- Traced automatic friendship to the friends panel still calling the legacy `/friends/add` endpoint. The form now calls `/friends/request`, displays the existing localized `Request sent` status and does not add the target to the sender's friend list before acceptance.
+- Made `FriendRequestInboxUI` a direct bootstrap dependency instead of a reflection-only type name, ensuring IL2CPP/WebGL stripping cannot remove the explicit Accept/Decline flow. The backend already keeps these requests pending and creates the mutual relationship only in `/friends/requests/accept`, so no server change was required.
+- Replaced the old `ViewFriendBaseStub`, which only copied a saved snapshot into a local display slot, with `LobbyClient.JoinWithFriend`. After the server applies the documented free-slot/pair-relocation rules, the client resolves the friend's returned server slot, closes the friends window and teleports to that base. Added localized RU/EN failure feedback and a short state-resolution timeout.
+- Static checks confirmed the correct request/join endpoints, prefab references and localization cardinality. A live two-client test remains because the available Unity bridge is connected to `RobloxBasicProject`, not this project.
+
+### 2026-08-04 (album reopen and claim-all popup cleanup)
+- Changed the persistent sidebar album action from state-dependent `Toggle` to idempotent `Open`. `AlbumScreenController` now ignores already-applied visual states, avoiding duplicate cursor-window accounting, and clears an EventSystem selection that belongs to the hidden album when the window closes.
+- Centralized `ClaimAllCoinsZone` exit handling. Its interaction, coroutines, active decision popup and generated dim backdrop are now cleared on trigger exit, component disable and loss of local-slot ownership.
+- Added a low-frequency overlap check between the zone collider and the player's `CharacterController`. This also closes the popup after teleports or collider disable paths where Unity may not deliver a normal `OnTriggerExit`.
+- Focused Roslyn compilation against the current Unity assemblies completed with no errors. A visual Play Mode regression remains because the available Unity bridge is attached to `RobloxBasicProject` while this project is open in a separate editor.
+
+### 2026-08-04 (roulette daily-spin persistence)
+- Found that `Roulette.Start` loaded `RouletteLastDate` before the asynchronous Mirra save provider became ready. The provider deliberately returned yesterday in that state, making the daily free spin available again after a relaunch.
+- Roulette initialization now waits for `SaveManager.IsReady` and keeps both spin buttons disabled until the persisted date has been loaded. The free-spin timestamp is recorded before animation starts.
+- `SaveManager.SaveRouletteDate` now marks progress and immediately flushes the provider, so an immediate WebGL page close does not miss the one-second background save window.
+- Fixed two adjacent exploits: cancelling a running spin no longer restores the daily free attempt, and the countdown now derives from trusted UTC every second instead of decrementing session-local state. Also corrected the stored timer enumerator so only the tracked coroutine is started.
+- Focused roulette compilation passed without errors. Remaining acceptance is a same-day spin -> restart -> reopen smoke in Editor and on a platform WebGL build.
+
+### 2026-08-04 (local profile-board rename and code copy)
+- Added owner-only actions to `RemoteProfilePopup`: the existing Friends pencil asset enables inline nickname editing in the green header, and a separate copy icon copies the local friend code. Both controls are hidden for foreign boards, where the existing like flow remains unchanged.
+- Nickname submission reuses the same paid-rename endpoint as the Friends UI, keeps the 3–16 character contract, shows localized loading/success/failure feedback and immediately updates the saved backend profile, popup title/avatar and local board target.
+- Added `FriendsApi.LocalDisplayNameChanged` and made local slot resolution prefer the saved local name, preventing a stale lobby/base snapshot from restoring the old nickname on the next target refresh.
+- Centralized Editor/standalone/WebGL clipboard handling in `ZooClipboard`; the Friends panel and profile board now share the selected-textarea browser fallback already used for cross-origin platform iframes.
+- Focused Roslyn checks passed for the popup/clipboard and Friends panel paths. The project-generated IDE build remains stale and omits several already-existing runtime files; final Play Mode owner-button layout, rename request and paste smoke are still required in the `steal_brainrot` Unity editor.
+
+### 2026-08-04 (feed-tutorial wording and startup localization)
+- Rewrote tutorial step 8 and every dynamic food context so the visible objective remains explicit: buy/take a fruit, bring it to the big animal and feed it; the final prompt now states that feeding completes the task.
+- Replaced the untranslated `FOOD` token in the Russian travel hint with the localized visible label `«Еда»`. Updated the runtime fallbacks, localization asset and editor repair/validation source together so a later tutorial rebuild cannot restore the old wording.
+- Moved `LocalizationManager` instantiation ahead of `GameLoader`, ensuring the platform language is resolved before loading-screen `LocalizedText` components enable. Tutorial refresh now also listens for fallback-language changes.
+- Shifted the food-shop `InteractionArea` 0.55 local units toward the counter and 0.04 units upward. Its raycast collider now matches the full 3-unit visual diameter and sits safely above the floor instead of exposing only a small hittable segment.
+
+### 2026-08-04 (player visual grounding)
+- Confirmed that both player prefabs already place the physical `CharacterController` and fallback capsule bottom at local Y zero; changing their collision geometry or skin width would affect steps and movement stability rather than fix the visible gap.
+- Lowered the shared `SadovnicOBJ` visual by `0.08` local units in both `Player` and `RemotePlayer`. The local and replicated characters therefore keep identical feet-to-ground alignment on normal terrain and the BigPet platform while their physical movement and collision remain unchanged.
+- Prefab YAML and focused diff validation passed. A visual Play Mode pass in the `steal_brainrot` editor remains because the available bridge is attached to a different Unity project.
+
+### 2026-08-04 (server-online lobby member visibility)
+- Found that the server already computes authoritative lobby presence and returns `isOnline`, but `LobbyClient` repeated the decision locally by comparing the server `updatedAt` value with the device clock. Clock skew or an older activity timestamp could therefore turn a server-online participant into a client-offline participant and make `RemoteBasesApplier` hide that player.
+- Removed the redundant client-side stale override and its serialized timeout. The client still uses `updatedAt` to choose the newest duplicate member record, while visibility now follows the server `isOnline` contract.
+- Live Play Mode joined a lobby containing two real members, including a participant already present on the server. Both were online; the corresponding `RemotePlayer_0` was active with all 15 child renderers enabled. Unity recompilation and focused diff checks passed without errors.

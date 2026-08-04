@@ -782,10 +782,11 @@ MonoBehaviour:
   _ui: {fileID: 7557199385917524029}
   yenOrNotPopup: {fileID: 0}
   remoteBases: {fileID: 0}
-  remoteSlotIndex: 0
   myNameText: {fileID: 3031845416014856653}
   myCodeText: {fileID: 2273551822611991913}
   copyCodeButton: {fileID: 7404464457475124688}
+  copyCodeIcon: {fileID: 5683646596970290425}
+  copiedCodeText: {fileID: 3221965198026117217}
   renameInput: {fileID: 8515948470177267983}
   renameButton: {fileID: 4908713712885667832}
   renameStatusText: {fileID: 8655672890478768465}
@@ -4016,43 +4017,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 4528145470395818424}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 882069242718448659}
-        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
-        m_MethodName: SetActive
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument:
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 5683646596970290425}
-        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
-        m_MethodName: SetActive
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument:
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 3221965198026117217}
-        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
-        m_MethodName: SetActive
-        m_Mode: 6
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument:
-          m_BoolArgument: 1
-        m_CallState: 2
+      m_Calls: []
 --- !u!1 &5683646596970290425
 GameObject:
   m_ObjectHideFlags: 0

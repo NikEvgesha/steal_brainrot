@@ -42,6 +42,8 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     private Sprite _buttonGradientSprite;
     [SerializeField]
     private TMP_FontAsset _sharedFont;
+    [SerializeField]
+    private Sprite _editIconSprite;
 
     private Coroutine _noticeRoutine;
     private Coroutine _likeStateRoutine;
@@ -55,6 +57,16 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     private string _displayName;
     private PlayerPublicStatsDto _stats;
     private LocalizationManager _subscribedLocalizationManager;
+    private Button _editNameButton;
+    private Button _copyCodeButton;
+    private Image _editNameIcon;
+    private TMP_Text _editConfirmLabel;
+    private TMP_InputField _nameInput;
+    private Coroutine _renameRoutine;
+    private bool _isLocalOwner;
+    private bool _nameEditing;
+    private bool _renameInFlight;
+    private int _profileViewVersion;
 
     public static RemoteProfilePopup Instance
     {
@@ -113,9 +125,20 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             _closeButton.onClick.RemoveListener(Hide);
         if (_likeButton != null)
             _likeButton.onClick.RemoveListener(OnLikePressed);
+        if (_editNameButton != null)
+            _editNameButton.onClick.RemoveListener(OnEditNamePressed);
+        if (_copyCodeButton != null)
+            _copyCodeButton.onClick.RemoveListener(OnCopyCodePressed);
+        if (_nameInput != null)
+            _nameInput.onSubmit.RemoveListener(OnNameSubmitted);
     }
 
-    public void Show(string displayName, PlayerPublicStatsDto stats, string targetPlayerId = null, string targetFriendCode = null)
+    public void Show(
+        string displayName,
+        PlayerPublicStatsDto stats,
+        string targetPlayerId = null,
+        string targetFriendCode = null,
+        bool isLocalOwner = false)
     {
         if (_panel == null)
             BuildUI();
@@ -124,9 +147,12 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         _stats = stats ?? new PlayerPublicStatsDto();
         _targetPlayerId = string.IsNullOrWhiteSpace(targetPlayerId) ? null : targetPlayerId;
         _targetFriendCode = string.IsNullOrWhiteSpace(targetFriendCode) ? null : targetFriendCode;
+        _isLocalOwner = isLocalOwner || IsTargetLocalPlayer();
+        _profileViewVersion++;
         _likedToday = false;
         _likesCount = 0;
         _likeRequestInFlight = false;
+        SetNameEditMode(false);
 
         MountOnGameCanvas();
 
@@ -236,6 +262,8 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         if (_notice != null)
             _notice.gameObject.SetActive(false);
 
+        SetNameEditMode(false);
+
         if (_panel != null)
             _panel.SetActive(false);
     }
@@ -243,7 +271,10 @@ public sealed class RemoteProfilePopup : MonoBehaviour
     private void BuildUI()
     {
         if (TryBindPrefabUI())
+        {
+            EnsureProfileActions();
             return;
+        }
 
         var canvasGo = new GameObject("Canvas");
         canvasGo.transform.SetParent(transform, false);
@@ -298,6 +329,7 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         _likeButtonLabel = _likeButton.GetComponentInChildren<TMP_Text>(true);
 
         _closeButton = CreateButton("CloseButton", header.transform, "X", new Vector2(0.88f, 0.16f), new Vector2(0.97f, 0.86f), BlockyUITheme.RedHeader);
+        EnsureProfileActions();
     }
 
     private static RemoteProfilePopup FindLoadedInstance()
@@ -356,6 +388,24 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             _likeButton.onClick.RemoveListener(OnLikePressed);
             _likeButton.onClick.AddListener(OnLikePressed);
         }
+
+        if (_editNameButton != null)
+        {
+            _editNameButton.onClick.RemoveListener(OnEditNamePressed);
+            _editNameButton.onClick.AddListener(OnEditNamePressed);
+        }
+
+        if (_copyCodeButton != null)
+        {
+            _copyCodeButton.onClick.RemoveListener(OnCopyCodePressed);
+            _copyCodeButton.onClick.AddListener(OnCopyCodePressed);
+        }
+
+        if (_nameInput != null)
+        {
+            _nameInput.onSubmit.RemoveListener(OnNameSubmitted);
+            _nameInput.onSubmit.AddListener(OnNameSubmitted);
+        }
     }
 
     public void ApplyVisualStyle()
@@ -385,14 +435,188 @@ public sealed class RemoteProfilePopup : MonoBehaviour
             ApplyTexturedButton(_closeButton, BlockyUITheme.RedHeader);
             EnsureSquareCloseButton(_closeButton);
         }
+        if (_editNameButton != null)
+            ApplyTexturedButton(_editNameButton, BlockyUITheme.BlueHeader);
+        if (_copyCodeButton != null)
+            ApplyTexturedButton(_copyCodeButton, BlockyUITheme.BlueHeader);
+        ApplyNameInputStyle();
 
     }
 
-    public void ConfigureVisualAssets(Sprite textureSprite, Sprite buttonGradientSprite, TMP_FontAsset sharedFont)
+    public void ConfigureVisualAssets(
+        Sprite textureSprite,
+        Sprite buttonGradientSprite,
+        TMP_FontAsset sharedFont,
+        Sprite editIconSprite = null)
     {
         _textureSprite = textureSprite;
         _buttonGradientSprite = buttonGradientSprite;
         _sharedFont = sharedFont;
+        if (editIconSprite != null)
+            _editIconSprite = editIconSprite;
+    }
+
+    private void EnsureProfileActions()
+    {
+        Transform root = _panel != null ? _panel.transform : transform;
+        Transform header = FindChildByName(root, "ProfileHeader");
+        Transform content = FindChildByName(root, "ProfileContent");
+        if (header == null || content == null)
+            return;
+
+        if (_editNameButton == null)
+            _editNameButton = FindComponentByName<Button>(root, "EditNameButton");
+        if (_copyCodeButton == null)
+            _copyCodeButton = FindComponentByName<Button>(root, "CopyCodeButton");
+        if (_nameInput == null)
+            _nameInput = FindComponentByName<TMP_InputField>(root, "NameInput");
+
+        if (_editNameButton == null)
+            _editNameButton = CreateEditNameButton(header);
+        if (_copyCodeButton == null)
+            _copyCodeButton = CreateCopyCodeButton(content);
+        if (_nameInput == null)
+            _nameInput = CreateNameInput(header);
+
+        if (_editNameButton != null)
+        {
+            _editNameIcon = FindComponentByName<Image>(_editNameButton.transform, "PencilIcon");
+            _editConfirmLabel = FindComponentByName<TMP_Text>(_editNameButton.transform, "ConfirmLabel");
+        }
+
+        if (_title != null)
+        {
+            RectTransform titleRect = _title.rectTransform;
+            titleRect.anchorMax = new Vector2(Mathf.Min(titleRect.anchorMax.x, 0.78f), titleRect.anchorMax.y);
+        }
+
+        UpdateOwnerActions();
+    }
+
+    private Button CreateEditNameButton(Transform header)
+    {
+        var buttonObject = new GameObject("EditNameButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        buttonObject.layer = header.gameObject.layer;
+        buttonObject.transform.SetParent(header, false);
+
+        var rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.82f, 0.5f);
+        rect.anchorMax = rect.anchorMin;
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(58f, 58f);
+
+        var background = buttonObject.GetComponent<Image>();
+        var button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = background;
+
+        var iconObject = new GameObject("PencilIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        iconObject.layer = buttonObject.layer;
+        iconObject.transform.SetParent(buttonObject.transform, false);
+        var iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0.17f, 0.17f);
+        iconRect.anchorMax = new Vector2(0.83f, 0.83f);
+        iconRect.offsetMin = Vector2.zero;
+        iconRect.offsetMax = Vector2.zero;
+        var icon = iconObject.GetComponent<Image>();
+        icon.sprite = _editIconSprite;
+        icon.color = Color.white;
+        icon.preserveAspect = true;
+        icon.raycastTarget = false;
+
+        var confirm = CreateText("ConfirmLabel", buttonObject.transform, Vector2.zero, Vector2.one, TextAlignmentOptions.Center, 25);
+        confirm.text = "OK";
+        confirm.raycastTarget = false;
+        confirm.gameObject.SetActive(false);
+
+        return button;
+    }
+
+    private Button CreateCopyCodeButton(Transform content)
+    {
+        var buttonObject = new GameObject("CopyCodeButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        buttonObject.layer = content.gameObject.layer;
+        buttonObject.transform.SetParent(content, false);
+
+        var rect = buttonObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.52f, 0.22f);
+        rect.anchorMax = rect.anchorMin;
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(54f, 54f);
+
+        var background = buttonObject.GetComponent<Image>();
+        var button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = background;
+
+        CreateCopySheet(buttonObject.transform, "CopyBack", new Vector2(-4f, 4f));
+        CreateCopySheet(buttonObject.transform, "CopyFront", new Vector2(5f, -5f));
+        return button;
+    }
+
+    private static void CreateCopySheet(Transform parent, string name, Vector2 position)
+    {
+        var sheetObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        sheetObject.layer = parent.gameObject.layer;
+        sheetObject.transform.SetParent(parent, false);
+        var rect = sheetObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = rect.anchorMin;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = new Vector2(25f, 29f);
+        var image = sheetObject.GetComponent<Image>();
+        image.color = Color.white;
+        image.raycastTarget = false;
+        AddOutline(sheetObject, new Vector2(2f, -2f), BlockyUITheme.BlackStroke);
+    }
+
+    private TMP_InputField CreateNameInput(Transform header)
+    {
+        var inputObject = new GameObject("NameInput", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(TMP_InputField));
+        inputObject.layer = header.gameObject.layer;
+        inputObject.transform.SetParent(header, false);
+        var rect = inputObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.055f, 0.18f);
+        rect.anchorMax = new Vector2(0.785f, 0.84f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        var text = CreateText("InputText", inputObject.transform, Vector2.zero, Vector2.one, TextAlignmentOptions.Left, 42);
+        text.margin = new Vector4(14f, 2f, 14f, 2f);
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+
+        var placeholder = CreateText("Placeholder", inputObject.transform, Vector2.zero, Vector2.one, TextAlignmentOptions.Left, 42);
+        placeholder.margin = new Vector4(14f, 2f, 14f, 2f);
+        placeholder.color = new Color(1f, 1f, 1f, 0.45f);
+        placeholder.text = L("UI/Friends/Nickname", "Nickname");
+
+        var input = inputObject.GetComponent<TMP_InputField>();
+        input.targetGraphic = inputObject.GetComponent<Image>();
+        input.textViewport = text.rectTransform;
+        input.textComponent = text;
+        input.placeholder = placeholder;
+        input.characterLimit = 16;
+        input.lineType = TMP_InputField.LineType.SingleLine;
+        input.contentType = TMP_InputField.ContentType.Standard;
+        input.restoreOriginalTextOnEscape = true;
+        inputObject.SetActive(false);
+        return input;
+    }
+
+    private void ApplyNameInputStyle()
+    {
+        if (_nameInput == null)
+            return;
+
+        var background = _nameInput.targetGraphic as Image ?? _nameInput.GetComponent<Image>();
+        if (background != null)
+        {
+            if (_textureSprite != null)
+                background.sprite = _textureSprite;
+            background.type = background.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+            background.pixelsPerUnitMultiplier = 1f;
+            background.color = new Color(0.11f, 0.055f, 0.025f, 0.94f);
+            AddOutline(background.gameObject, new Vector2(3f, -3f), BlockyUITheme.BlackStroke);
+        }
     }
 
     private void ApplyTexturedPanelStyle(
@@ -519,8 +743,160 @@ public sealed class RemoteProfilePopup : MonoBehaviour
         }
 
         UpdateLikeUi();
+        UpdateOwnerActions();
         if (_notice != null && _notice.gameObject.activeSelf && _likedToday)
             _notice.text = BuildAlreadyLikedText(null);
+    }
+
+    private void UpdateOwnerActions()
+    {
+        bool canRename = _isLocalOwner && ResolveApi() != null;
+        bool canCopyCode = _isLocalOwner && !string.IsNullOrWhiteSpace(_targetFriendCode);
+
+        if (_editNameButton != null)
+        {
+            _editNameButton.gameObject.SetActive(_isLocalOwner);
+            _editNameButton.interactable = canRename && !_renameInFlight;
+        }
+
+        if (_copyCodeButton != null)
+        {
+            _copyCodeButton.gameObject.SetActive(canCopyCode);
+            _copyCodeButton.interactable = canCopyCode;
+        }
+
+        if (!_isLocalOwner && _nameEditing)
+            SetNameEditMode(false);
+    }
+
+    private void OnEditNamePressed()
+    {
+        if (!_isLocalOwner || _renameInFlight)
+            return;
+
+        if (!_nameEditing)
+        {
+            SetNameEditMode(true);
+            return;
+        }
+
+        TryStartRename();
+    }
+
+    private void OnNameSubmitted(string _)
+    {
+        TryStartRename();
+    }
+
+    private void TryStartRename()
+    {
+        if (!_isLocalOwner || !_nameEditing || _renameInFlight || _nameInput == null)
+            return;
+
+        string newName = (_nameInput.text ?? string.Empty).Trim();
+        if (newName.Length < 3 || newName.Length > 16)
+        {
+            ShowNotice(L("UI/Friends/MinNameLength", "Minimum 3 characters"), ExtraLikeNoticeSeconds);
+            _nameInput.ActivateInputField();
+            return;
+        }
+
+        if (string.Equals(newName, (_displayName ?? string.Empty).Trim(), StringComparison.Ordinal))
+        {
+            SetNameEditMode(false);
+            return;
+        }
+
+        FriendsApi api = ResolveApi();
+        if (api == null)
+        {
+            ShowNotice(L("UI/Friends/FailedRename", "Failed to rename"), ExtraLikeNoticeSeconds);
+            return;
+        }
+
+        _renameRoutine = StartCoroutine(RenameRoutine(api, newName, _profileViewVersion));
+    }
+
+    private IEnumerator RenameRoutine(FriendsApi api, string newName, int viewVersion)
+    {
+        _renameInFlight = true;
+        if (_nameInput != null)
+            _nameInput.interactable = false;
+        UpdateOwnerActions();
+        ShowNotice(L("UI/Common/Loading", "Loading..."), 30f);
+
+        bool success = false;
+        string failure = null;
+        yield return api.RenameMePaid(
+            newName,
+            onOk: value => success = value,
+            onFail: message => failure = message);
+
+        _renameInFlight = false;
+        _renameRoutine = null;
+        bool ownsCurrentView = viewVersion == _profileViewVersion && _isLocalOwner;
+        if (ownsCurrentView && _nameInput != null)
+            _nameInput.interactable = true;
+
+        if (!ownsCurrentView)
+        {
+            UpdateOwnerActions();
+            yield break;
+        }
+
+        if (!success)
+        {
+            string message = !string.IsNullOrWhiteSpace(failure) && !failure.TrimStart().StartsWith("{", StringComparison.Ordinal)
+                ? failure
+                : L("UI/Friends/FailedRename", "Failed to rename");
+            ShowNotice(message, ExtraLikeNoticeSeconds);
+            UpdateOwnerActions();
+            if (_nameInput != null)
+                _nameInput.ActivateInputField();
+            yield break;
+        }
+
+        var profile = api.LocalProfile();
+        _displayName = string.IsNullOrWhiteSpace(profile.displayName) ? newName : profile.displayName.Trim();
+        SetNameEditMode(false);
+        RefreshLocalizedContent();
+        ShowNotice(L("UI/Friends/NicknameUpdated", "Nickname updated"), ExtraLikeNoticeSeconds);
+    }
+
+    private void SetNameEditMode(bool editing)
+    {
+        _nameEditing = editing && _isLocalOwner && _nameInput != null;
+
+        if (_title != null)
+            _title.gameObject.SetActive(!_nameEditing);
+        if (_nameInput != null)
+            _nameInput.gameObject.SetActive(_nameEditing);
+        if (_editNameIcon != null)
+            _editNameIcon.gameObject.SetActive(!_nameEditing);
+        if (_editConfirmLabel != null)
+            _editConfirmLabel.gameObject.SetActive(_nameEditing);
+
+        if (!_nameEditing || _nameInput == null)
+            return;
+
+        _nameInput.interactable = !_renameInFlight;
+        _nameInput.text = string.IsNullOrWhiteSpace(_displayName) ? string.Empty : _displayName.Trim();
+        _nameInput.Select();
+        _nameInput.ActivateInputField();
+        _nameInput.MoveTextEnd(false);
+    }
+
+    private void OnCopyCodePressed()
+    {
+        if (!_isLocalOwner || string.IsNullOrWhiteSpace(_targetFriendCode))
+            return;
+
+        bool copied = ZooClipboard.TryCopyText(_targetFriendCode.Trim());
+        ShowNotice(
+            copied
+                ? L("UI/Friends/Copied", "Copied")
+                : L("UI/Profile/CopyFailed", "Failed to copy code"),
+            ExtraLikeNoticeSeconds);
     }
 
     private void SubscribeLocalization()

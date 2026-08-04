@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 public class GameBootstrap : MonoBehaviour
@@ -24,13 +23,13 @@ public class GameBootstrap : MonoBehaviour
     private void Start()
     {
         _ = AnalyticsManager.Instance;
+        Instantiate(_localizationManager);
         Instantiate(_gameLoader);
         G.GameLoader.ShowLoadingScreen(true);
 
 
         Instantiate(_soundManager);
         Instantiate(_saveManager);
-        Instantiate(_localizationManager);
         Instantiate(_settings);
         Instantiate(_input);
         Instantiate(_gameManager);
@@ -45,22 +44,9 @@ public class GameBootstrap : MonoBehaviour
         new GameObject("AlbumProgressService").AddComponent<AlbumProgressService>();
 
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
-        TryCreateRuntimeUi("FriendRequestInboxUI", "FriendRequestInboxUI");
+        new GameObject("FriendRequestInboxUI").AddComponent<FriendRequestInboxUI>();
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
-    }
-
-    private static void TryCreateRuntimeUi(string objectName, string typeName)
-    {
-        var type = Type.GetType(typeName + ", Assembly-CSharp");
-        if (type == null)
-        {
-            Debug.LogWarning($"[GameBootstrap] Runtime UI type not found: {typeName}");
-            return;
-        }
-
-        var go = new GameObject(objectName);
-        go.AddComponent(type);
     }
 
 }

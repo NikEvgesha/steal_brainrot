@@ -39,6 +39,8 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private Transform _petPoint;
     [SerializeField] private int _baseXPperLvl;
     [SerializeField] private int _xpAddintPerLvl;
+    [SerializeField] private int _xpQuadraticPerLvl;
+    [SerializeField] private int _xpCubicPerLvl;
     [SerializeField] private Slider _xpProgressBar;
     [SerializeField] private Slider _foodTimeBar;
     [SerializeField] private TMP_Text _xpProgressText;
@@ -70,6 +72,7 @@ public class BigPetPoint : MonoBehaviour
     private DateTime _lastIncomeCollectTimestamp;
     private bool _initializedLocal;
     private Coroutine _incomeRoutine;
+    private Coroutine _groundAlignmentRoutine;
     private bool _quickAccessBound;
     private bool _hasOfflineIncomePending;
     private readonly List<Brainrot> _activePets = new List<Brainrot>();
@@ -105,6 +108,7 @@ public class BigPetPoint : MonoBehaviour
     private void OnDisable()
     {
         StopIncomeRoutine();
+        StopGroundAlignmentRoutine();
     }
 
     private void OnDestroy()
@@ -215,7 +219,12 @@ public class BigPetPoint : MonoBehaviour
         if (_remoteMode) return;
         if (_feedButton == null) return;
 
-        bool canFeed = _purchased && !_feeding && _playerInArea && item != null && item.Type == Item.Food;
+        bool canFeed = _purchased
+                       && !_feeding
+                       && _playerInArea
+                       && _currentLvl < _maxLvl
+                       && item != null
+                       && item.Type == Item.Food;
         if (canFeed)
         {
             InteractionPanel feedPanel = _feedButton.GetComponent<InteractionPanel>();
@@ -321,17 +330,34 @@ public class BigPetPoint : MonoBehaviour
     {
         if (_remoteMode) return;
 
+        _maxLvl = Mathf.Max(1, GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet));
+        _currentLvl = Mathf.Clamp(_currentLvl, 1, _maxLvl);
+        _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
+
+        if (_currentLvl >= _maxLvl)
+        {
+            _currentXp = 0;
+            G.Save.SaveBigPetXP(_currentXp);
+            UpdateXpUI();
+            return;
+        }
+
         if (_currentXp >= _xpForNextLvl)
         {
             int levelBefore = _currentLvl;
             int previousMaxAvailablePetIdx = _maxAvailablePetIdx;
-            while (_currentXp >= _xpForNextLvl)
+            while (_currentLvl < _maxLvl && _currentXp >= _xpForNextLvl)
             {
                 _currentLvl++;
                 _currentXp -= _xpForNextLvl;
-                _xpForNextLvl += _xpAddintPerLvl;
-            }       
+                _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
+            }
+
+            if (_currentLvl >= _maxLvl)
+                _currentXp = 0;
+
             G.Save.SaveBigPetLvl(_currentLvl);
+            G.Save.SaveBigPetXP(_currentXp);
             LocalLevelChanged?.Invoke(_currentLvl);
             BaseDirtyTracker.MarkDirty();
             if (_feeding)
@@ -362,10 +388,35 @@ public class BigPetPoint : MonoBehaviour
                 "result", "success"));
         }
 
+        UpdateXpUI();
+    }
+
+    private int GetXpRequiredForLevel(int level)
+    {
+        long baseXp = Mathf.Max(1, _baseXPperLvl);
+        long linear = Mathf.Max(0, _xpAddintPerLvl);
+        long quadratic = Mathf.Max(0, _xpQuadraticPerLvl);
+        long cubic = Mathf.Max(0, _xpCubicPerLvl);
+        long levelOffset = Mathf.Max(0, level - 1);
+        long levelSquared = levelOffset * levelOffset;
+        long result = baseXp
+                      + linear * levelOffset
+                      + quadratic * levelSquared
+                      + cubic * levelSquared * levelOffset;
+        return (int)Math.Min(int.MaxValue, result);
+    }
+
+    private void UpdateXpUI()
+    {
+        bool isMaxLevel = _currentLvl >= _maxLvl;
         if (_xpProgressBar != null)
-            _xpProgressBar.value = (float)_currentXp / _xpForNextLvl;
+            _xpProgressBar.value = isMaxLevel ? 1f : (float)_currentXp / Mathf.Max(1, _xpForNextLvl);
         if (_xpProgressText != null)
-            _xpProgressText.text = string.Format("LVL {0} : {1} / {2}", _currentLvl, _currentXp, _xpForNextLvl);
+        {
+            _xpProgressText.text = isMaxLevel
+                ? string.Format("LVL {0} : MAX", _currentLvl)
+                : string.Format("LVL {0} : {1} / {2}", _currentLvl, _currentXp, _xpForNextLvl);
+        }
     }
 
     private void CheckScale()
@@ -385,6 +436,7 @@ public class BigPetPoint : MonoBehaviour
         }
 
         AlignCurrentPetToGround();
+        ScheduleGroundAlignment();
     }
 
     private void SetPet(int idx)
@@ -488,7 +540,7 @@ public class BigPetPoint : MonoBehaviour
         for (int i = 0; i < renderers.Length; i++)
         {
             Renderer renderer = renderers[i];
-            if (renderer == null || !renderer.enabled)
+            if (!IsPetGeometryRenderer(renderer))
                 continue;
 
             if (!hasBounds)
@@ -509,6 +561,60 @@ public class BigPetPoint : MonoBehaviour
         float deltaY = targetBottom - bounds.min.y;
         if (Mathf.Abs(deltaY) > 0.001f)
             _currentPet.transform.position += Vector3.up * deltaY;
+    }
+
+    private bool IsPetGeometryRenderer(Renderer renderer)
+    {
+        if (renderer == null || !renderer.enabled)
+            return false;
+
+        // Elemental variants add particles, rays and a ground sprite below the model.
+        // Those effects must not affect the feet-to-ground calculation.
+        if (renderer is ParticleSystemRenderer ||
+            renderer is SpriteRenderer ||
+            renderer is TrailRenderer ||
+            renderer is LineRenderer)
+        {
+            return false;
+        }
+
+        Transform petRoot = _currentPet != null ? _currentPet.transform : null;
+        for (Transform current = renderer.transform;
+             current != null && current != petRoot;
+             current = current.parent)
+        {
+            if (current.name.StartsWith("Element", StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
+
+    private void ScheduleGroundAlignment()
+    {
+        StopGroundAlignmentRoutine();
+        if (isActiveAndEnabled && _currentPet != null)
+            _groundAlignmentRoutine = StartCoroutine(AlignCurrentPetAfterAnimationFrame());
+    }
+
+    private IEnumerator AlignCurrentPetAfterAnimationFrame()
+    {
+        // Let a newly instantiated Animator evaluate its initial pose before the
+        // final grounding pass. The immediate pass in CheckScale still prevents
+        // a visibly misplaced first frame.
+        yield return null;
+        yield return new WaitForEndOfFrame();
+        AlignCurrentPetToGround();
+        _groundAlignmentRoutine = null;
+    }
+
+    private void StopGroundAlignmentRoutine()
+    {
+        if (_groundAlignmentRoutine == null)
+            return;
+
+        StopCoroutine(_groundAlignmentRoutine);
+        _groundAlignmentRoutine = null;
     }
 
     private void ChangeActivePet(int variantIndex)
@@ -691,12 +797,13 @@ public class BigPetPoint : MonoBehaviour
             return;
         }
 
-        _currentLvl = Mathf.Max(1, lvl);
-        _currentXp = Mathf.Max(0, xp);
-        _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
-
-        _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
         _maxLvl = GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet);
+        _currentLvl = Mathf.Clamp(lvl, 1, _maxLvl);
+        _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
+        _currentXp = _currentLvl >= _maxLvl
+            ? 0
+            : Mathf.Clamp(xp, 0, Mathf.Max(0, _xpForNextLvl - 1));
+        _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
 
         if (_setPetUI != null)
             _setPetUI.SetMaxAvailablePet(_maxAvailablePetIdx);
@@ -923,12 +1030,12 @@ public class BigPetPoint : MonoBehaviour
         if (!ResolvePetList())
             return;
 
-        _currentLvl = Mathf.Max(1, G.Save.LoadBigPetLvl());
+        _maxLvl = GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet);
+        _currentLvl = Mathf.Clamp(G.Save.LoadBigPetLvl(), 1, _maxLvl);
         _currentXp = Mathf.Max(0, G.Save.LoadBigPetXP());
-        _xpForNextLvl = _baseXPperLvl + _xpAddintPerLvl * (_currentLvl - 1);
+        _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
         _maxAvailablePetIdx = GetMaxAvailablePetIndexForLevel(_currentLvl);
         _currentPetIdx = Mathf.Clamp(G.Save.LoadBigPetId(), 0, _maxAvailablePetIdx);
-        _maxLvl = GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet);
 
         if (_setPetUI != null)
         {

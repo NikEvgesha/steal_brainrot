@@ -145,7 +145,6 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private float debugTrafficSummaryIntervalSec = 1f;
     [Header("Debug Network")]
     [SerializeField] private bool debugSimulateOffline = false;
-    [SerializeField] private float remoteMemberStaleOfflineSec = 30f;
     [Header("WebSocket (pilot)")]
     [SerializeField] private bool useWebSocketLobby = true;
     [SerializeField] private float webSocketReconnectDelaySec = 3f;
@@ -276,11 +275,6 @@ public class LobbyClient : MonoBehaviour
             maxState404BeforeRecover = 3;
         }
 
-        if (remoteMemberStaleOfflineSec < 30f)
-        {
-            Debug.LogWarning($"[Lobby] remoteMemberStaleOfflineSec={remoteMemberStaleOfflineSec} is too low, forcing 30");
-            remoteMemberStaleOfflineSec = 30f;
-        }
     }
 
     private void Start()
@@ -2311,9 +2305,6 @@ public class LobbyClient : MonoBehaviour
 
             var isLocalMember = !string.IsNullOrEmpty(localId) && item.playerId == localId;
 
-            if (!isLocalMember && item.isOnline && IsRemoteMemberStale(item.updatedAt))
-                item.isOnline = false;
-
             if (!isLocalMember)
             {
                 var baseToken = obj["baseData"];
@@ -2553,18 +2544,6 @@ public class LobbyClient : MonoBehaviour
         }
 
         return item;
-    }
-
-    private bool IsRemoteMemberStale(string updatedAt)
-    {
-        if (remoteMemberStaleOfflineSec <= 0f)
-            return false;
-
-        if (!TryParseServerUtc(updatedAt, out var updatedUtc))
-            return false;
-
-        var ageSec = (DateTime.UtcNow - updatedUtc).TotalSeconds;
-        return ageSec > remoteMemberStaleOfflineSec;
     }
 
     private static bool TryParseServerUtc(string value, out DateTime utc)

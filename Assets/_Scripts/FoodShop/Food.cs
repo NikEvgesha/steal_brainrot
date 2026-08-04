@@ -14,5 +14,7 @@ public struct FoodData
 public class Food : InventoryItem
 {
     [SerializeField] private FoodData data;
-    public FoodData Data => data;    
+    public FoodData Data => data;
+    public long TotalExperience =>
+        (long)Mathf.Max(0, data.SecondsDuration) * Mathf.Max(0, data.XPPerSecond);
 }

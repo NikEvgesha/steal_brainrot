@@ -9,10 +9,6 @@ public class FriendsPanelController : MonoBehaviour
 {
     private static FriendsPanelController _instance;
 
-    [Header("Refs")]
-    private ZooBackendClient backend;
-    private SaveManager save;
-
     [Header("UI")]
     [SerializeField] private GameObject _ui;
     [SerializeField] private UniversalDecisionPopup yenOrNotPopup;
@@ -20,12 +16,13 @@ public class FriendsPanelController : MonoBehaviour
     [Header("Deps")]
     private FriendsApi api;
     [SerializeField] private RemoteBasesApplier remoteBases;
-    [SerializeField] private int remoteSlotIndex = 0;
 
     [Header("Top")]
     [SerializeField] private TMP_Text myNameText;
     [SerializeField] private TMP_Text myCodeText;
     [SerializeField] private Button copyCodeButton;
+    [SerializeField] private GameObject copyCodeIcon;
+    [SerializeField] private GameObject copiedCodeText;
 
     [Header("Rename")]
     [SerializeField] private TMP_InputField renameInput;
@@ -58,6 +55,7 @@ public class FriendsPanelController : MonoBehaviour
     private Coroutine _externalRefreshFlow;
     private Coroutine _availabilityFlow;
     private bool _isOpen;
+    private bool _visitInFlight;
 
     public static void RequestLiveRefresh()
     {
@@ -92,8 +90,6 @@ public class FriendsPanelController : MonoBehaviour
     private void Awake()
     {
         _instance = this;
-        if (backend == null) backend = G.Backend;
-        if (save == null) save = G.Save;
         if (api == null) api = G.Backend.FriendsApi;
         EnsureRemoteBases();
         EnsureDecisionPopup();
@@ -116,6 +112,7 @@ public class FriendsPanelController : MonoBehaviour
 
         _isOpen = !_isOpen;
         G.Control.CursorActive = _isOpen;
+        ResetCopyFeedback();
         _ui.SetActive(_isOpen);
         if (!_isOpen)
         {
@@ -141,6 +138,7 @@ public class FriendsPanelController : MonoBehaviour
     }
     private void OnEnable()
     {
+        ResetCopyFeedback();
         G.Initialized.AddListener(OnGameInitialized);
         if (G.Input != null)
         {
@@ -154,6 +152,8 @@ public class FriendsPanelController : MonoBehaviour
     }
     private void OnDisable()
     {
+        _visitInFlight = false;
+        ResetCopyFeedback();
         G.Initialized.RemoveListener(OnGameInitialized);
         if (G.Input != null)
         {
@@ -191,6 +191,7 @@ public class FriendsPanelController : MonoBehaviour
     }
     IEnumerator OpenFlow()
     {
+        ResetCopyFeedback();
         addStatusText.text = "";
         renameStatusText.text = "";
         if (requestsStatusText != null) requestsStatusText.text = "";
@@ -242,7 +243,7 @@ public class FriendsPanelController : MonoBehaviour
             var row = Instantiate(rowPrefab, listContent);
             row.Bind(f,
                 onRemove: () => StartCoroutine(RemoveFriendFlow(f.friendCode)),
-                onView: () => StartCoroutine(ViewFriendBaseStub(f.friendCode))
+                onView: () => StartCoroutine(VisitFriendLobbyFlow(f.friendCode))
             );
         }
     }
@@ -304,7 +305,7 @@ public class FriendsPanelController : MonoBehaviour
         if (code.Length == 0) yield break;
 
         bool ok = false;
-        yield return api.AddFriend(code, success => ok = success);
+        yield return api.SendFriendRequest(code, success => ok = success);
         TrackFriendRequest("send", code, ok, ok ? string.Empty : "request_failed");
 
         if (!ok)
@@ -314,8 +315,7 @@ public class FriendsPanelController : MonoBehaviour
         }
 
         addCodeInput.text = "";
-        yield return RefreshFriends();
-        yield return RefreshRequests();
+        addStatusText.text = LocalizationUtils.T("UI/Friends/RequestSent", "Request sent");
     }
 
     IEnumerator RemoveFriendFlow(string friendCode)
@@ -388,33 +388,88 @@ public class FriendsPanelController : MonoBehaviour
         renameStatusText.text = LocalizationUtils.T("UI/Friends/NicknameUpdated", "Nickname updated");
     }
 
-    IEnumerator ViewFriendBaseStub(string friendCode)
+    IEnumerator VisitFriendLobbyFlow(string friendCode)
     {
-        addStatusText.text = "";
-
-        FriendBaseResponse resp = null;
-        yield return backend.GetFriendBase(friendCode,
-            ok => resp = ok,
-            (code, err) => addStatusText.text = LocalizationUtils.T("UI/Friends/FailedLoadBase", "Failed to load friend's base"));
-
-        if (resp == null)
+        if (_visitInFlight)
             yield break;
 
+        _visitInFlight = true;
+        addStatusText.text = "";
+
+        var lobby = LobbyClient.Instance;
+        if (lobby == null || string.IsNullOrWhiteSpace(friendCode))
+        {
+            ShowVisitFailed();
+            _visitInFlight = false;
+            yield break;
+        }
+
+        addStatusText.text = LocalizationUtils.T("UI/Common/Loading", "Loading...");
+
+        bool joined = false;
+        yield return lobby.JoinWithFriend(friendCode, success => joined = success);
+        if (!joined)
+        {
+            ShowVisitFailed();
+            _visitInFlight = false;
+            yield break;
+        }
+
+        LobbyMemberStateDto friendMember = null;
+        const float memberResolveTimeout = 2f;
+        float deadline = Time.realtimeSinceStartup + memberResolveTimeout;
+        while (friendMember == null && Time.realtimeSinceStartup < deadline)
+        {
+            friendMember = FindLobbyMember(friendCode);
+            if (friendMember == null)
+                yield return null;
+        }
+
         EnsureRemoteBases();
-        if (remoteBases == null)
+        if (remoteBases == null || friendMember == null || friendMember.slotIndex < 0)
         {
-            Debug.LogWarning("[Friends] RemoteBasesApplier not found in scene.");
+            ShowVisitFailed();
+            _visitInFlight = false;
+            yield break;
         }
-        else if (resp.data == null)
+
+        int friendSlotIndex = friendMember.slotIndex;
+        _visitInFlight = false;
+        addStatusText.text = "";
+
+        if (_isOpen)
+            ToggleOpen();
+
+        yield return null;
+        remoteBases.TeleportPlayerToSlot(friendSlotIndex);
+        Debug.Log($"[Friends] Joined {friendCode} in lobby {lobby.LobbyId}, slot {friendSlotIndex}.");
+    }
+
+    private static LobbyMemberStateDto FindLobbyMember(string friendCode)
+    {
+        var lobby = LobbyClient.Instance;
+        var members = lobby != null ? lobby.LastMembers : null;
+        if (members == null)
+            return null;
+
+        for (int i = 0; i < members.Count; i++)
         {
-            Debug.LogWarning($"[Friends] Friend base data is empty. raw={resp.dataRaw}");
+            var member = members[i];
+            if (member != null &&
+                string.Equals(member.friendCode, friendCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return member;
+            }
         }
-        else
-        {
-            remoteBases.ApplyFriendBase(resp.data, remoteSlotIndex);
-            remoteBases.TeleportPlayerToSlot(remoteSlotIndex);
-        }
-        Debug.Log($"[Friends] Loaded base for {friendCode}");
+
+        return null;
+    }
+
+    private void ShowVisitFailed()
+    {
+        addStatusText.text = LocalizationUtils.T(
+            "UI/Friends/FailedJoinFriend",
+            "Failed to join friend's lobby");
     }
 
     private void EnsureRemoteBases()
@@ -464,8 +519,57 @@ public class FriendsPanelController : MonoBehaviour
 
     void CopyMyCode()
     {
+        if (api == null)
+        {
+            SetCopyFeedback(false);
+            return;
+        }
+
         var p = api.LocalProfile();
-        GUIUtility.systemCopyBuffer = p.friendCode;
+        bool copied = TryCopyText(p.friendCode);
+        SetCopyFeedback(copied);
+    }
+
+    public static bool TryCopyText(string text)
+    {
+        return ZooClipboard.TryCopyText(text);
+    }
+
+    private void ResetCopyFeedback()
+    {
+        SetCopyFeedback(false);
+    }
+
+    private void SetCopyFeedback(bool copied)
+    {
+        ResolveCopyFeedbackReferences();
+
+        if (myCodeText != null)
+            myCodeText.gameObject.SetActive(!copied);
+        if (copyCodeIcon != null)
+            copyCodeIcon.SetActive(!copied);
+        if (copiedCodeText != null)
+            copiedCodeText.SetActive(copied);
+    }
+
+    private void ResolveCopyFeedbackReferences()
+    {
+        if (copyCodeButton == null)
+            return;
+
+        if (copyCodeIcon == null)
+        {
+            var icon = copyCodeButton.transform.Find("Image");
+            if (icon != null)
+                copyCodeIcon = icon.gameObject;
+        }
+
+        if (copiedCodeText == null)
+        {
+            var copied = copyCodeButton.transform.Find("ID (1)");
+            if (copied != null)
+                copiedCodeText = copied.gameObject;
+        }
     }
 
     void ClearList()

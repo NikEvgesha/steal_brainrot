@@ -317,7 +317,18 @@ public class SaveManager : MonoBehaviour
 
     public void SaveRouletteDate(DateTime date)
     {
-        saveProvider.SaveRouletteDate(date);
+        if (saveProvider == null || !saveProvider.IsInitialized)
+        {
+            Debug.LogWarning("[SaveManager] Roulette date was not saved because the provider is not ready.");
+            return;
+        }
+
+        MarkProgressExists();
+        saveProvider.SaveRouletteDate(date.ToUniversalTime());
+
+        // A daily reward must survive an immediate page close/reload. Do not
+        // leave this timestamp waiting for the one-second background save loop.
+        saveProvider.SaveProgress();
     }
 
     public DateTime LoadRouletteDate()

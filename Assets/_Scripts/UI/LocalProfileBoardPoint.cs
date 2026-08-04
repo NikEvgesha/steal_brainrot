@@ -56,6 +56,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
 
     private void OnEnable()
     {
+        FriendsApi.LocalDisplayNameChanged += OnLocalDisplayNameChanged;
         if (interactionPanel != null)
             interactionPanel.InteractionComplete.AddListener(OnInteractionRequested);
         RefreshTargetData(force: true);
@@ -65,6 +66,7 @@ public class LocalProfileBoardPoint : MonoBehaviour
 
     private void OnDisable()
     {
+        FriendsApi.LocalDisplayNameChanged -= OnLocalDisplayNameChanged;
         if (interactionPanel != null)
             interactionPanel.InteractionComplete.RemoveListener(OnInteractionRequested);
         HideInteraction();
@@ -111,7 +113,16 @@ public class LocalProfileBoardPoint : MonoBehaviour
             _targetDisplayName,
             _targetStats ?? new PlayerPublicStatsDto(),
             _targetPlayerId,
-            _targetFriendCode);
+            _targetFriendCode,
+            _targetIsLocal);
+    }
+
+    private void OnLocalDisplayNameChanged(string displayName)
+    {
+        if (!_targetIsLocal || string.IsNullOrWhiteSpace(displayName))
+            return;
+
+        _targetDisplayName = displayName.Trim();
     }
 
     private PlayerPublicStatsDto BuildStats()
@@ -414,6 +425,12 @@ public class LocalProfileBoardPoint : MonoBehaviour
                     displayName = boardDisplayName;
                     stats = boardStats;
                     isLocalTarget = IsLocalProfile(boardPlayerId, boardFriendCode);
+                    if (isLocalTarget)
+                    {
+                        displayName = ResolveDisplayName();
+                        if (includeLocalStats)
+                            stats = BuildStats();
+                    }
                     return true;
                 }
             }

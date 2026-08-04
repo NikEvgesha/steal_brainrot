@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class AlbumScreenController : MonoBehaviour
@@ -364,6 +365,10 @@ public class AlbumScreenController : MonoBehaviour
             return;
 
         var wasOpen = IsOpen;
+        bool visualStateAlreadyApplied = panelRoot != null ? panelRoot.activeSelf == open : gameObject.activeSelf == open;
+        if (visualStateAlreadyApplied)
+            return;
+
         if (open && !gameObject.activeSelf)
             gameObject.SetActive(true);
 
@@ -391,6 +396,15 @@ public class AlbumScreenController : MonoBehaviour
 
             if (G.Input != null)
                 G.Input.AOpenWindow?.Invoke(this);
+        }
+        else if (EventSystem.current != null &&
+                 EventSystem.current.currentSelectedGameObject != null &&
+                 EventSystem.current.currentSelectedGameObject.transform.IsChildOf(transform))
+        {
+            // Do not leave the EventSystem focused on the now inactive close or
+            // reward button. That stale selection can swallow the next keyboard
+            // or gamepad submit intended for the external album button.
+            EventSystem.current.SetSelectedGameObject(null);
         }
 
         if (updateCursor && G.Control != null)

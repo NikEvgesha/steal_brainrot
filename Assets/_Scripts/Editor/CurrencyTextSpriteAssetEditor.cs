@@ -8,6 +8,7 @@ using UnityEngine.TextCore.LowLevel;
 
 internal static class CurrencyTextSpriteAssetEditor
 {
+    private const float InlineSpriteBearingYRatio = 0.9f;
     private const string CoinTexturePath = "Assets/_Sprites/ItemIcon_Coin.png";
     private const string CoinAssetPath =
         "Assets/TextMesh Pro/Resources/Sprite Assets/Coin.asset";
@@ -35,6 +36,7 @@ internal static class CurrencyTextSpriteAssetEditor
                 existing.spriteGlyphTable.Count > 0 &&
                 existing.spriteCharacterTable.Count > 0)
             {
+                EnsureInlineMetrics(existing);
                 return;
             }
 
@@ -68,8 +70,8 @@ internal static class CurrencyTextSpriteAssetEditor
             metrics = new GlyphMetrics(
                 sprite.rect.width,
                 sprite.rect.height,
-                -sprite.pivot.x,
-                sprite.rect.height - sprite.pivot.y,
+                0f,
+                sprite.rect.height * InlineSpriteBearingYRatio,
                 sprite.rect.width),
             glyphRect = new GlyphRect(sprite.rect),
             scale = 1f,
@@ -99,6 +101,30 @@ internal static class CurrencyTextSpriteAssetEditor
         AssetDatabase.SaveAssets();
         AssetDatabase.ImportAsset(CoinAssetPath, ImportAssetOptions.ForceUpdate);
         Debug.Log("[CurrencyText] Created inline coin TMP sprite asset.");
+    }
+
+    private static void EnsureInlineMetrics(TMP_SpriteAsset spriteAsset)
+    {
+        var glyph = spriteAsset.spriteGlyphTable[0];
+        var metrics = glyph.metrics;
+        var expectedBearingY = metrics.height * InlineSpriteBearingYRatio;
+        if (Mathf.Approximately(metrics.horizontalBearingX, 0f) &&
+            Mathf.Approximately(metrics.horizontalBearingY, expectedBearingY) &&
+            Mathf.Approximately(metrics.horizontalAdvance, metrics.width))
+        {
+            return;
+        }
+
+        glyph.metrics = new GlyphMetrics(
+            metrics.width,
+            metrics.height,
+            0f,
+            expectedBearingY,
+            metrics.width);
+        spriteAsset.UpdateLookupTables();
+        EditorUtility.SetDirty(spriteAsset);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[CurrencyText] Fixed inline coin glyph alignment.");
     }
 }
 #endif
