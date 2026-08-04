@@ -46,8 +46,8 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     private float _resumeProgress;
     private float _resumeUntilUnscaledTime;
     private bool _awaitReleaseAfterComplete;
-    private Image _rewardedAdBadgeImage;
-    private TMP_Text _rewardedAdBadgeLabelText;
+    [SerializeField] private Image _rewardedAdBadgeImage;
+    [SerializeField] private TMP_Text _rewardedAdBadgeLabelText;
     private Transform _rewardedAdBadgeParent;
     private AudioSource _interactionLoopSource;
 

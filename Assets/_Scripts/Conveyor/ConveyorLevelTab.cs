@@ -118,7 +118,16 @@ public class ConveyorLevelTab : MonoBehaviour
 
     private static string GetLocalizationKey(ConveyorLevel level)
     {
-        if (level == null || level.RareType == RareType.RareType)
+        if (level == null)
+            return null;
+
+        // Conveyor tiers are progression levels, not egg rarity labels. Two
+        // adjacent tiers can intentionally contain the same rarity, so using
+        // RareType here made different upgrades look like duplicates.
+        if (!string.IsNullOrWhiteSpace(level.Name))
+            return "UI/Conveyor/Level/" + level.Name.Trim();
+
+        if (level.RareType == RareType.RareType)
             return null;
 
         return "Boost/RareType/" + level.RareType;

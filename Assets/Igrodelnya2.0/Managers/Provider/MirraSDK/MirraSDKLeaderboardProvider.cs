@@ -34,9 +34,12 @@ public class MirraSDKLeaderboardProvider : LeaderboardProvider
 
     public override void SaveScore(string LBName, double score)
     {
-        //MirraSDK.Achievements.SetScore(
-        //    boardId: LBName,
-        //    score: score);
-        //Debug.Log(LBName + " set score " + score);
+        int safeScore = double.IsNaN(score) || score <= 0d
+            ? 0
+            : score >= int.MaxValue
+                ? int.MaxValue
+                : (int)Math.Round(score);
+        MirraSDK.Achievements.SetScore(LBName, safeScore);
+        Debug.Log(LBName + " set score " + safeScore);
     }
 }

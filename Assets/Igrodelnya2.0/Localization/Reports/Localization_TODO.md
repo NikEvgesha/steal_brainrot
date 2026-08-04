@@ -21,6 +21,11 @@
 - [x] Added live language-change refresh for the full conveyor chance scroll, conveyor income row and BigPet badge; RU/EN switching was verified through Unity Bridge.
 - [x] Added RU/EN keys `UI/BigPet/Header`, `UI/BigPet/Normal` and `UI/BigPet/Upgraded`; the redesigned selector refreshes all three labels on a live language change.
 
+## Mirra world leaderboards (2026-08-04)
+- [x] Added RU/EN `UI/Leaderboards/*` copy for five board titles, columns, loading/empty/current-player/cache states and the donation popup.
+- [x] Added a separate current-score fallback for Mirra responses that do not expose the local player's rank outside top-N.
+- [ ] Verify live RU/EN switching, long platform display names and donation prices in the final world-board layout through Play Mode and a Mirra WebGL build.
+
 ## Priority 0 - stability
 - [ ] Add strict fallback behavior: if key exists but selected language value is empty, use fallback language (EN) and never render empty text.
 - [ ] Add runtime guard for dynamic localization calls: missing key -> fallback text + one warning in log (no spam).

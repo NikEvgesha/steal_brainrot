@@ -1270,3 +1270,56 @@
 - Found that the server already computes authoritative lobby presence and returns `isOnline`, but `LobbyClient` repeated the decision locally by comparing the server `updatedAt` value with the device clock. Clock skew or an older activity timestamp could therefore turn a server-online participant into a client-offline participant and make `RemoteBasesApplier` hide that player.
 - Removed the redundant client-side stale override and its serialized timeout. The client still uses `updatedAt` to choose the newest duplicate member record, while visibility now follows the server `isOnline` contract.
 - Live Play Mode joined a lobby containing two real members, including a participant already present on the server. Both were online; the corresponding `RemotePlayer_0` was active with all 15 child renderers enabled. Unity recompilation and focused diff checks passed without errors.
+
+### 2026-08-04 (loading screen waits for the resolved player base)
+- Traced the early loading-screen dismissal to two independent startup feeds: `GameEntryPoint` waited only for legacy `/zoo/locations`, while lobby join, slot claim, local-save restore and player teleport continued afterward.
+- The loading screen now remains visible until the save is ready, the initial lobby attempt has resolved, the authoritative local slot has been restored and the player has actually reached that slot. The offline path similarly applies the local base before revealing gameplay.
+- Added 15-second startup request limits for guest auth, locations, lobby join/claim and state requests so an unreachable backend resolves into the existing offline path instead of leaving startup requests unbounded. Failed automatic slot claims are no longer reported as successful joins.
+- The active Unity bridge did not answer because it is attached to another editor process. Diff/YAML validation passed; the remaining acceptance is a fresh WebGL start with both a successful lobby join and a forced offline startup.
+
+### 2026-08-04 (timed interstitial reward in WebGL)
+- Traced the missing reward behind the `Ad in...` countdown to the Mirra WebGL interstitial close flag. The timed flow granted coins only for `success=true`, while some platform adapters can return `false` or an undefined value on a normal close after the fullscreen ad has already opened.
+- `MirraSDKAdsProvider` now treats a confirmed open followed by close as a completed automatic interstitial. Requests that never open still fail and grant nothing; rewarded-video completion rules are unchanged.
+- Added a build-side diagnostic with the reward and coin balance before/after delivery. Static diff validation passed; final acceptance requires waiting for the automatic ad in a platform WebGL build and confirming both the balance change and the diagnostic line.
+
+### 2026-08-04 (compact land and conveyor prices)
+- Territory interaction panels and conveyor upgrade buttons now use the shared `CurrencyManager` amount formatter instead of raw numeric `ToString` output.
+- Large prices therefore follow the same compact `K / M / B / T / ...` notation as the main balance UI. Both coin and gem conveyor prices are covered; exact purchase values remain unchanged.
+
+### 2026-08-04 (purchase affordability states)
+- Food-shop and conveyor purchase buttons now react to live coin/gem balance changes. An unaffordable option is disabled, gray and rendered with a smaller extrusion so it reads as already pressed instead of looking purchasable.
+- Conveyor upgrade purchases now reuse the food-shop palette and gradient: green for coins, blue for hard currency. The coin price also includes the shared coin glyph, while both prices retain compact currency formatting.
+
+### 2026-08-04 (unique conveyor tier names)
+- The two adjacent conveyor upgrades were distinct in price, eggs and multiplier but both displayed the localized `Uncommon` rarity, making them look duplicated.
+- Conveyor tabs and the selected-level header now localize by the tier's own progression name instead of its content rarity. The sequence is `Common / Uncommon / Rare / Epic / Legendary / Mythic / Divine` in both RU and EN; the first upgrade's internal name was corrected to `Uncommon`.
+
+### 2026-08-04 (sequential playtime rewards)
+- Replaced the six independent slot clocks with one panel-owned sequence, so only the nearest unfinished reward counts down. The serialized cumulative milestones `1 / 5 / 15 / 30 / 45 / 60` are converted to stage durations `1 / 4 / 10 / 15 / 15 / 15`, preserving the original total unlock schedule.
+- Upcoming cards show their stage duration without counting; the active duration is highlighted and updates in real time. Completed stages expose their claim action while the following stage becomes active.
+- Centered and enlarged the gem-and-amount row. The claim button is now fully hidden while timing, shares the timer's exact rectangle, and replaces the timer only when the stage completes; claimed rewards keep a disabled completion state.
+- Full Assembly-CSharp Roslyn compilation completed without errors. The Unity bridge did not respond after the machine restart, so the final Play Mode layout/interaction smoke remains for the connected editor.
+
+### 2026-08-04 (reliable rewarded-ad badge on egg speedup)
+- Embedded the rewarded-video clapperboard icon directly into the shared world interaction prefab instead of relying solely on runtime object construction. It remains inactive for ordinary actions and is enabled by `FieldCell` for the egg speedup interaction.
+- Serialized the badge reference in `InteractionPanel`, preserving the existing runtime fallback for older/custom interaction prefabs while making the primary egg prompt deterministic in Editor and WebGL instances.
+- Prefab file-ID/reference checks, diff validation and a full Assembly-CSharp Roslyn compilation completed without errors. The connected Unity bridge still targets the other editor, so final camera-facing placement needs a Play Mode glance in `steal_brainrot`.
+
+### 2026-08-04 (leaderboards and donations backlog)
+- Added handoff task `P2.3` for five world leaderboards near the central shop: all-time donation score, weekly earned coins, weekly hatches, the highest-income pet hatched during the month and all-time hatches.
+- The original backlog draft assumed custom-server receipt verification and period storage; this was superseded by the Mirra Games implementation recorded below.
+- Recorded two deliberate distinctions for implementation: weekly hatches and all-time hatches are separate boards, while cross-platform donations use configured SKU score instead of comparing incompatible real-world currencies.
+
+### 2026-08-04 (Mirra Games world leaderboards implementation)
+- Replaced the initial custom-backend design with Mirra Games Achievements at the user's request; the game backend repository remains unchanged.
+- Added five Mirra board IDs: `donations_all_time`, `income_weekly`, `hatches_weekly`, `best_pet_monthly` and `hatches_all_time`. Earnings, successful hatches, best-pet income and confirmed donation purchases now update their corresponding scores.
+- Mirra's integer score contract is handled with monotonic logarithmic encoding for large income values; the world UI decodes them back to the game's compact currency format. Unity Editor uses period-aware PlayerPrefs scores, while WebGL reads/writes Mirra and retains a cached snapshot on timeout.
+- Added runtime world boards and a platform donation popup using Mirra Purchases, RussoOne TMP and RU/EN localization. Existing all-time hatch progress is migrated without touching the online lobby API.
+- A focused Assembly-CSharp build including all newly added/stale runtime sources completed with zero C# errors. The correct Unity bridge remained unavailable, so final placement and Mirra WebGL account/reset smoke are still required.
+
+### 2026-08-05 (startup loading retry hardening)
+- Reproduced the loading overlay stuck at its intentional fake-progress ceiling of `92%`. The first verification was invalid because Unity auto-refresh had not imported the edited source; subsequent checks now compare the source and `Assembly-CSharp.dll` timestamps and explicitly import changed scripts before Play Mode acceptance.
+- Added visible runtime startup diagnostics. The real stuck state was `local_slot_not_resolved` even though the cached lobby contained the matching local player and a valid server slot.
+- Fixed three startup races: backend guest/auth requests now wait for the Mirra save before selecting a player ID; `RemoteBasesApplier` waits for the initial lobby resolution and applies the cached member state when the game scene appears after the lobby response; and `GameEntryPoint.ResolveRemoteBases` rejects the serialized prefab asset and resolves only a live component from a loaded scene.
+- Replaced the vulnerable one-shot readiness coroutine with a throttled `Update` poll. Intermediate exceptions are retried without revealing an incomplete world, loading dismissal can recover a missing static `G.GameLoader` reference, and analytics failures cannot strand the overlay.
+- After forced Unity import, a clean build-index `0` launch reached `Evgesha` with a runtime `RemoteBasesApplier`, `_loadingHidden=true`, reason `loading_hidden`, and zero Console errors/warnings. Platform WebGL startup remains the final acceptance pass.

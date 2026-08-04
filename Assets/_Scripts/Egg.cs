@@ -677,6 +677,10 @@ public class Egg : InventoryItem
             G.Album.TryDiscover(AlbumEntityType.Animal, brainrot.Name, brainrot.DinamicData.ElementType);
 
         LocalPlayerStatsStore.IncrementHatched();
+        G.Leaderboards?.RecordHatch(
+            brainrot.Name,
+            brainrot.DinamicData.ElementType,
+            brainrot.DinamicData.ResultIncome);
         _currentCell.UpdateFieldItem(Item.Brainrot);
         TutorialSignals.Raise(
             TutorialSignalType.AnimalHatched,

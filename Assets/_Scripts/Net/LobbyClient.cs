@@ -116,6 +116,7 @@ public class LobbyClient : MonoBehaviour
 
     [Header("Behavior")]
     [SerializeField] private bool autoJoinOnStart = true;
+    [SerializeField, Min(5)] private int initialRequestTimeoutSec = 15;
     [SerializeField] private float updateIntervalSec = 1f;
     [SerializeField] private float stateIntervalSec = 1f;
     [SerializeField] private float soloStateIntervalSec = 2.5f;
@@ -161,6 +162,7 @@ public class LobbyClient : MonoBehaviour
     [SerializeField] private ZooBaseSnapshotSync snapshotSync;
 
     public bool IsOnline { get; private set; }
+    public bool IsInitialJoinResolved { get; private set; }
     public LobbyNetworkMode NetworkMode { get; private set; } = LobbyNetworkMode.OfflineLocal;
     public bool DebugSimulateOffline => debugSimulateOffline;
     public string LobbyId { get; private set; }
@@ -281,6 +283,8 @@ public class LobbyClient : MonoBehaviour
     {
         if (autoJoinOnStart)
             StartCoroutine(JoinLobbyFlow());
+        else
+            IsInitialJoinResolved = true;
     }
 
     private void Update()
@@ -861,9 +865,16 @@ public class LobbyClient : MonoBehaviour
     {
         float analyticsJoinStartedAt = Time.realtimeSinceStartup;
         if (debugSimulateOffline)
+        {
+            IsInitialJoinResolved = true;
             yield break;
+        }
 
-        if (IsOnline) yield break;
+        if (IsOnline)
+        {
+            IsInitialJoinResolved = true;
+            yield break;
+        }
         if (backend == null)
         {
             var tries = 0;
@@ -880,6 +891,7 @@ public class LobbyClient : MonoBehaviour
         {
             DisableOnline("backend_missing");
             TrackLobbyJoin("auto", LobbyJoinResult.Failed, analyticsJoinStartedAt, "backend_missing");
+            IsInitialJoinResolved = true;
             yield break;
         }
 
@@ -897,6 +909,7 @@ public class LobbyClient : MonoBehaviour
             DisableOnline(joinResult == LobbyJoinResult.CapacityDegraded
                 ? "capacity_degraded"
                 : "join_failed");
+            IsInitialJoinResolved = true;
             yield break;
         }
 
@@ -921,6 +934,7 @@ public class LobbyClient : MonoBehaviour
             _sampleLoop = StartCoroutine(SampleLoop());
         StartWebSocketLoopIfNeeded();
         EnsureDebugMirrorLoopState();
+        IsInitialJoinResolved = true;
     }
 
     public IEnumerator JoinWithFriend(string friendCode, Action<bool> onDone = null)
@@ -1531,6 +1545,7 @@ public class LobbyClient : MonoBehaviour
         var url = $"{BaseUrl}/lobby/join";
         using var req = new UnityWebRequest(url, "POST");
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
         SetPlayerHeader(req);
 
         yield return req.SendWebRequest();
@@ -1585,12 +1600,24 @@ public class LobbyClient : MonoBehaviour
         {
             bool claimed = false;
             yield return TryClaimSlotWithRetry(availableSlotsCache, v => claimed = v);
-            if (claimed)
-                yield return FetchState();
+            if (!claimed)
+            {
+                onDone?.Invoke(LobbyJoinResult.Failed);
+                yield break;
+            }
+
+            yield return FetchState();
         }
         else if (needAutoClaim)
         {
-            yield return ClaimSlotAuto();
+            bool claimed = false;
+            yield return ClaimSlotAuto(v => claimed = v);
+            if (!claimed)
+            {
+                onDone?.Invoke(LobbyJoinResult.Failed);
+                yield break;
+            }
+
             yield return FetchState();
         }
 
@@ -1613,6 +1640,7 @@ public class LobbyClient : MonoBehaviour
         using var req = new UnityWebRequest(url, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
         req.SetRequestHeader("Content-Type", "application/json");
         SetPlayerHeader(req);
 
@@ -1668,12 +1696,24 @@ public class LobbyClient : MonoBehaviour
         {
             bool claimed = false;
             yield return TryClaimSlotWithRetry(availableSlotsCache, v => claimed = v);
-            if (claimed)
-                yield return FetchState();
+            if (!claimed)
+            {
+                onDone?.Invoke(LobbyJoinResult.Failed);
+                yield break;
+            }
+
+            yield return FetchState();
         }
         else if (needAutoClaim)
         {
-            yield return ClaimSlotAuto();
+            bool claimed = false;
+            yield return ClaimSlotAuto(v => claimed = v);
+            if (!claimed)
+            {
+                onDone?.Invoke(LobbyJoinResult.Failed);
+                yield break;
+            }
+
             yield return FetchState();
         }
     }
@@ -1712,6 +1752,7 @@ public class LobbyClient : MonoBehaviour
         using var req = new UnityWebRequest(url, "POST");
         req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
         req.SetRequestHeader("Content-Type", "application/json");
         if (string.IsNullOrEmpty(playerIdOverride))
             SetPlayerHeader(req);
@@ -1736,14 +1777,16 @@ public class LobbyClient : MonoBehaviour
 
 
 
-    private IEnumerator ClaimSlotAuto()
+    private IEnumerator ClaimSlotAuto(Action<bool> onDone = null)
     {
         var url = $"{BaseUrl}/lobby/slot/auto";
         using var req = new UnityWebRequest(url, "POST");
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
         SetPlayerHeader(req);
 
         yield return req.SendWebRequest();
+        onDone?.Invoke(req.result == UnityWebRequest.Result.Success);
     }
 
     private IEnumerator TryClaimSlotWithRetry(List<int> availableSlots, Action<bool> onDone = null)
@@ -1770,8 +1813,9 @@ public class LobbyClient : MonoBehaviour
         }
 
         // fallback: let server assign slot
-        yield return ClaimSlotAuto();
-        onDone?.Invoke(true);
+        var autoClaimed = false;
+        yield return ClaimSlotAuto(v => autoClaimed = v);
+        onDone?.Invoke(autoClaimed);
     }
 
     private bool TryGetDebugMirrorPlayerId(out string playerId)
@@ -2165,6 +2209,7 @@ public class LobbyClient : MonoBehaviour
         var url = $"{BaseUrl}/lobby/state?since={sinceVersion}";
         using var req = UnityWebRequest.Get(url);
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
         SetPlayerHeader(req);
 
         var startedAt = Time.realtimeSinceStartup;

@@ -523,7 +523,9 @@ public class AdsManager : MonoBehaviour
             return;
         }
 
+        double balanceBefore = G.Currency.Coins;
         G.Currency.AddCurrency(CurrencyType.Coins, finalReward);
+        Debug.Log($"[AdsManager] Timed interstitial reward granted: +{finalReward} coins ({balanceBefore} -> {G.Currency.Coins}).");
         GameAnalytics.Track(AnalyticsEventNames.TimedInterstitialRewardGranted, GameAnalytics.Params(
             "placement", "timed_interstitial",
             "currency_type", "coins",

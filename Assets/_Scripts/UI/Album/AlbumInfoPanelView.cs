@@ -292,6 +292,7 @@ public sealed class AlbumInfoPanelView : MonoBehaviour
             return;
         }
 
+        infoIcon.preserveAspect = true;
         infoIcon.sprite = icon;
         infoIcon.color = color;
         ApplyInfoIconFx(elementType, elementUnlocked, icon != null);

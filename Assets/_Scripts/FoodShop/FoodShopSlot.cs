@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 
 public class FoodShopSlot : MonoBehaviour
@@ -16,7 +15,9 @@ public class FoodShopSlot : MonoBehaviour
 
     private Food _food;
     private int _amount;
+    private bool _available;
     private FoodShopUI _ui;
+    private CurrencyManager _subscribedCurrencyManager;
 
     public Food Food => _food;
     public Transform CoinButtonTarget => _coinButton != null ? _coinButton.transform : transform;
@@ -26,13 +27,17 @@ public class FoodShopSlot : MonoBehaviour
         if (LocalizationManager.Instance != null)
             LocalizationManager.Instance.OnLanguageChanged += OnLanguageChanged;
 
+        SubscribeToCurrency();
         RefreshName();
+        RefreshPurchaseButtons();
     }
 
     private void OnDisable()
     {
         if (LocalizationManager.Instance != null)
             LocalizationManager.Instance.OnLanguageChanged -= OnLanguageChanged;
+
+        UnsubscribeFromCurrency();
     }
 
     public void Init(FoodShopUI ui, Food food)
@@ -45,6 +50,8 @@ public class FoodShopSlot : MonoBehaviour
         //_amountText.text = _food..ToString();
         _coinPrice.text = G.Currency.ToString(_food.Data.MoneyPrice);
         _gemPrice.text = G.Currency.ToString(_food.Data.GemPrice);
+        SubscribeToCurrency();
+        RefreshPurchaseButtons();
     }
 
     private void OnLanguageChanged(string _)
@@ -62,14 +69,58 @@ public class FoodShopSlot : MonoBehaviour
 
     public void SetAvailability(bool available)
     {
+        _available = available;
         _coinButton.gameObject.SetActive(available);
         _gemButton.gameObject.SetActive(available);
         _unavailablePanel.SetActive(!available);
+        RefreshPurchaseButtons();
     }
 
     public void SetAmount(int amount)
     {
+        _amount = amount;
         _amountText.text = "x" + amount.ToString();
+        RefreshPurchaseButtons();
+    }
+
+    private void SubscribeToCurrency()
+    {
+        if (_subscribedCurrencyManager != null || G.Currency == null)
+            return;
+
+        _subscribedCurrencyManager = G.Currency;
+        _subscribedCurrencyManager.CurrencyChanged?.AddListener(OnCurrencyChanged);
+    }
+
+    private void UnsubscribeFromCurrency()
+    {
+        if (_subscribedCurrencyManager == null)
+            return;
+
+        _subscribedCurrencyManager.CurrencyChanged?.RemoveListener(OnCurrencyChanged);
+        _subscribedCurrencyManager = null;
+    }
+
+    private void OnCurrencyChanged(CurrencyType _, double __)
+    {
+        RefreshPurchaseButtons();
+    }
+
+    private void RefreshPurchaseButtons()
+    {
+        if (_food == null)
+            return;
+
+        SubscribeToCurrency();
+        bool canPurchase = _available && _amount > 0 && G.Currency != null;
+        BlockyUITheme.StylePurchaseButton(
+            _coinButton,
+            CurrencyType.Coins,
+            canPurchase && G.Currency.Coins >= _food.Data.MoneyPrice);
+        BlockyUITheme.StylePurchaseButton(
+            _gemButton,
+            CurrencyType.Gems,
+            canPurchase && G.Currency.Gems >= _food.Data.GemPrice);
     }
 
     public void OnGemsButtonClick()

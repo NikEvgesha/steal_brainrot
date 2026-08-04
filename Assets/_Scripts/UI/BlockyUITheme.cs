@@ -34,6 +34,9 @@ public static class BlockyUITheme
     public static readonly Color CurrencyPanel = new Color(0.08f, 0.075f, 0.065f, 0.86f);
     public static readonly Color YellowAccent = new Color(1f, 0.86f, 0.02f, 1f);
     public static readonly Color BlackStroke = new Color(0.015f, 0.012f, 0.01f, 1f);
+    public static readonly Color PurchaseCoinGreen = new Color(0.01f, 0.99f, 0f, 1f);
+    public static readonly Color PurchaseGemBlue = new Color(0f, 0.797f, 0.992f, 1f);
+    public static readonly Color PurchaseDisabled = new Color(0.40f, 0.40f, 0.40f, 1f);
 
     public static void StyleWindow(GameObject root, Tone headerTone)
     {
@@ -161,6 +164,80 @@ public static class BlockyUITheme
         var layout = GetOrAdd<LayoutElement>(button.gameObject);
         layout.flexibleWidth = 0f;
         layout.flexibleHeight = 0f;
+    }
+
+    public static void StylePurchaseButton(
+        Button button,
+        CurrencyType currencyType,
+        bool affordable,
+        Sprite gradientSprite = null)
+    {
+        if (button == null)
+            return;
+
+        var image = button.targetGraphic as Image;
+        if (image == null)
+            image = button.GetComponent<Image>();
+        if (image == null)
+            image = button.gameObject.AddComponent<Image>();
+
+        Color activeColor = currencyType == CurrencyType.Gems
+            ? PurchaseGemBlue
+            : PurchaseCoinGreen;
+
+        image.color = affordable ? activeColor : PurchaseDisabled;
+        image.type = Image.Type.Sliced;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.raycastTarget = true;
+        button.targetGraphic = image;
+        button.interactable = affordable;
+
+        // A smaller extrusion makes an unavailable purchase look already pressed.
+        EnsureOutline(
+            image.gameObject,
+            affordable ? new Vector2(5f, -5f) : new Vector2(2f, -2f),
+            BlackStroke);
+
+        var colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.06f, 1.06f, 1.06f, 1f);
+        colors.pressedColor = new Color(0.80f, 0.80f, 0.80f, 1f);
+        colors.selectedColor = Color.white;
+        // The target image is explicitly gray when disabled, so don't tint it twice.
+        colors.disabledColor = Color.white;
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.08f;
+        button.colors = colors;
+        button.transition = Selectable.Transition.ColorTint;
+
+        Transform gradientTransform = button.transform.Find("Gradient");
+        Image gradient = gradientTransform != null ? gradientTransform.GetComponent<Image>() : null;
+        if (gradient == null && gradientSprite != null)
+        {
+            var gradientObject = new GameObject(
+                "Gradient",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            gradientObject.transform.SetParent(button.transform, false);
+            gradient = gradientObject.GetComponent<Image>();
+
+            var rect = gradient.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        if (gradient != null)
+        {
+            if (gradientSprite != null)
+                gradient.sprite = gradientSprite;
+            gradient.type = Image.Type.Simple;
+            gradient.color = new Color(1f, 1f, 1f, affordable ? 0.20f : 0.07f);
+            gradient.raycastTarget = false;
+            gradient.transform.SetAsFirstSibling();
+        }
     }
 
     public static void StyleTopNavigationButton(Button button)

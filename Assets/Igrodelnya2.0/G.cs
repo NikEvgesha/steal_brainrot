@@ -25,6 +25,7 @@ public static class G
     public static ZooBackendClient Backend;
     public static AlbumProgressService Album;
     public static TutorialManager Tutorial;
+    public static LeaderboardService Leaderboards;
 
     public static bool IsPaused;
     public static UnityEvent Initialized = new();

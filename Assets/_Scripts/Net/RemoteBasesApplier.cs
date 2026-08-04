@@ -143,6 +143,7 @@ public class RemoteBasesApplier : MonoBehaviour
     private void Start()
     {
         EnsureLocalHomeMarker();
+        StartCoroutine(ApplyInitialLobbyStateWhenAvailable());
 
         if (!applyOnStart || backend == null)
             return;
@@ -248,6 +249,27 @@ public class RemoteBasesApplier : MonoBehaviour
         _didInitialFullLobbySync = false;
         if (backend != null && backend.LastLocations != null && backend.LastLocations.Count > 0)
             ApplyLocations(new List<ZooLocationItem>(backend.LastLocations));
+    }
+
+    private IEnumerator ApplyInitialLobbyStateWhenAvailable()
+    {
+        while (isActiveAndEnabled)
+        {
+            var lobby = LobbyClient.Instance;
+            if (lobby != null && lobby.IsInitialJoinResolved)
+            {
+                if (!lobby.IsOnline)
+                    yield break;
+
+                if (lobby.LastMembers != null && lobby.LastMembers.Count > 0)
+                {
+                    ApplyLobbyMembers(new List<LobbyMemberStateDto>(lobby.LastMembers));
+                    yield break;
+                }
+            }
+
+            yield return null;
+        }
     }
 
     private int ResolveOfflineLocalSlotIndex()

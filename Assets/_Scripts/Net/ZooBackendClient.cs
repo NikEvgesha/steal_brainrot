@@ -98,6 +98,7 @@ public class ZooBackendClient : MonoBehaviour
 
     [Header("Locations")]
     [SerializeField] private bool autoFetchLocations = true;
+    [SerializeField, Min(5)] private int initialRequestTimeoutSec = 15;
     [SerializeField] private float locationsRefreshSec = 30f;
     [SerializeField] private int locationsLimit = 5;
     [SerializeField] private int locationsOnlineSec = 60;
@@ -158,6 +159,14 @@ public class ZooBackendClient : MonoBehaviour
     // ===== AUTH (guest) =====
     public IEnumerator EnsureGuest(Action<AuthGuestResponse> onOk = null, Action<long, string> onErr = null)
     {
+        while (saveManager == null || !saveManager.IsReady)
+        {
+            if (saveManager == null)
+                saveManager = G.Save;
+
+            yield return null;
+        }
+
         var p = Profile();
         if (!string.IsNullOrEmpty(p.playerId) && !string.IsNullOrEmpty(p.friendCode))
         {
@@ -180,6 +189,7 @@ public class ZooBackendClient : MonoBehaviour
 
         using var req = new UnityWebRequest(url, "POST");
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
 
         yield return req.SendWebRequest();
 
@@ -318,6 +328,7 @@ public class ZooBackendClient : MonoBehaviour
         var url = $"{baseUrl}/zoo/locations?limit={limit}&onlineSec={onlineSec}";
         using var req = UnityWebRequest.Get(url);
         req.downloadHandler = new DownloadHandlerBuffer();
+        req.timeout = Mathf.Max(5, initialRequestTimeoutSec);
         SetPlayerHeader(req);
 
         yield return req.SendWebRequest();

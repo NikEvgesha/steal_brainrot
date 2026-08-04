@@ -16,6 +16,7 @@ public class ConveyorUI : MonoBehaviour
     [SerializeField] private TMP_Text _incomeMultiplier;
     [SerializeField] private Button _buttonBuyGems;
     [SerializeField] private Button _buttonBuyCoins;
+    [SerializeField] private Sprite _buyButtonGradientSprite;
     [SerializeField] private Button _buttonActivate;
     [SerializeField] private GameObject _activeText;
     [SerializeField] private GameObject _notAvailableText;
@@ -44,6 +45,7 @@ public class ConveyorUI : MonoBehaviour
     private readonly List<ConveyorDropChanceCalculator.ChanceEntry> _cachedDropChancesWithLuck = new();
     private readonly List<ConveyorDropChanceCalculator.EggBreakdownEntry> _cachedEggBreakdown = new();
     private LocalizationManager _subscribedLocalizationManager;
+    private CurrencyManager _subscribedCurrencyManager;
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
@@ -95,6 +97,8 @@ public class ConveyorUI : MonoBehaviour
         LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
         LocalizationUtils.OnFallbackLanguageChanged += OnLanguageChanged;
         SubscribeToLocalizationManager(LocalizationManager.Instance);
+        SubscribeToCurrency();
+        SetButtons();
     }
 
     private void OnDisable()
@@ -102,6 +106,7 @@ public class ConveyorUI : MonoBehaviour
         LocalizationManager.OnInstanceReady -= OnLocalizationManagerReady;
         LocalizationUtils.OnFallbackLanguageChanged -= OnLanguageChanged;
         UnsubscribeFromLocalizationManager();
+        UnsubscribeFromCurrency();
     }
 
     public void ToggleOpen(bool open)
@@ -189,25 +194,69 @@ public class ConveyorUI : MonoBehaviour
         if (_currentLevelInfo == null)
             return;
 
+        SubscribeToCurrency();
         if (_activeText != null)
             _activeText.SetActive(_currentLevelInfo.IsActive);
         if (_notAvailableText != null)
             _notAvailableText.SetActive(!_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsAvailable);
         if (_buttonActivate != null)
             _buttonActivate.gameObject.SetActive(_currentLevelInfo.IsPurchased && !_currentLevelInfo.IsActive);
+        bool showPurchaseButtons = !_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable;
         if (_buttonBuyCoins != null)
-            _buttonBuyCoins.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
+            _buttonBuyCoins.gameObject.SetActive(showPurchaseButtons);
         if (_buttonBuyGems != null)
-            _buttonBuyGems.gameObject.SetActive(!_currentLevelInfo.IsPurchased && _currentLevelInfo.IsAvailable);
+            _buttonBuyGems.gameObject.SetActive(showPurchaseButtons);
         
 
         if (!_currentLevelInfo.IsPurchased)
         {
             if (_priceCoins != null)
-                _priceCoins.text = _currentLevelInfo.PriceCoin.ToString();
+                _priceCoins.text = CurrencyText.Coins(FormatPrice(_currentLevelInfo.PriceCoin));
             if (_priceGems != null)
-                _priceGems.text = _currentLevelInfo.PriceGems.ToString();
+                _priceGems.text = FormatPrice(_currentLevelInfo.PriceGems);
         }
+
+        bool currencyReady = G.Currency != null;
+        BlockyUITheme.StylePurchaseButton(
+            _buttonBuyCoins,
+            CurrencyType.Coins,
+            showPurchaseButtons && currencyReady && G.Currency.Coins >= _currentLevelInfo.PriceCoin,
+            _buyButtonGradientSprite);
+        BlockyUITheme.StylePurchaseButton(
+            _buttonBuyGems,
+            CurrencyType.Gems,
+            showPurchaseButtons && currencyReady && G.Currency.Gems >= _currentLevelInfo.PriceGems,
+            _buyButtonGradientSprite);
+    }
+
+    private void SubscribeToCurrency()
+    {
+        if (_subscribedCurrencyManager != null || G.Currency == null)
+            return;
+
+        _subscribedCurrencyManager = G.Currency;
+        _subscribedCurrencyManager.CurrencyChanged?.AddListener(OnCurrencyChanged);
+    }
+
+    private void UnsubscribeFromCurrency()
+    {
+        if (_subscribedCurrencyManager == null)
+            return;
+
+        _subscribedCurrencyManager.CurrencyChanged?.RemoveListener(OnCurrencyChanged);
+        _subscribedCurrencyManager = null;
+    }
+
+    private void OnCurrencyChanged(CurrencyType _, double __)
+    {
+        SetButtons();
+    }
+
+    private static string FormatPrice(double price)
+    {
+        return G.Currency != null
+            ? G.Currency.ToString(price)
+            : Math.Round(price).ToString("0");
     }
 
 

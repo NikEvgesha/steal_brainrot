@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -12,6 +13,7 @@ public sealed class IncomeModifiersHub : MonoBehaviour
     private CurrencyManager _currencyManager;
 
     public event UnityAction Changed;
+    public event Action<double> CoinsEarned;
 
     public IReadOnlyList<IncomeModifierBehaviour> Modifiers => _modifiers;
 
@@ -131,6 +133,8 @@ public sealed class IncomeModifiersHub : MonoBehaviour
 
         double final = Apply(baseIncome);
         currencyManager.AddCurrency(CurrencyType.Coins, final, playAudio);
+        if (double.IsFinite(final) && final > 0d)
+            CoinsEarned?.Invoke(final);
         return true;
     }
 

@@ -52,7 +52,7 @@ public class Field : MonoBehaviour
         _touchHandler = GetComponentInChildren<BuyTouchHandler>(true);
         EnsureCells();
         if (_buyPanel != null)
-            _buyPanel.SetInfoLocalized("UnlockLevel", "Unlock", _price.ToString());
+            _buyPanel.SetInfoLocalized("UnlockLevel", "Unlock", FormatUnlockPrice());
 
         if (_unblocked)
         {
@@ -151,7 +151,14 @@ public class Field : MonoBehaviour
     {
         _price = Mathf.Max(0f, price);
         if (_buyPanel != null)
-            _buyPanel.SetInfoLocalized("UnlockLevel", "Unlock", _price.ToString("0"));
+            _buyPanel.SetInfoLocalized("UnlockLevel", "Unlock", FormatUnlockPrice());
+    }
+
+    private string FormatUnlockPrice()
+    {
+        return G.Currency != null
+            ? G.Currency.ToString(_price)
+            : Mathf.Round(_price).ToString("0");
     }
 
 

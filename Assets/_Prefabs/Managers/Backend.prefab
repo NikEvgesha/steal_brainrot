@@ -57,6 +57,7 @@ GameObject:
   - component: {fileID: 4345696199425956250}
   - component: {fileID: 6803768513613521876}
   - component: {fileID: 9012345678901234567}
+  - component: {fileID: 3162358820990367281}
   m_Layer: 0
   m_Name: Backend
   m_TagString: Untagged
@@ -95,6 +96,7 @@ MonoBehaviour:
   baseUrl: https://api.igrodelnya-zoogame.ru
   saveManager: {fileID: 0}
   friendsApi: {fileID: 3092746341201573896}
+  initialRequestTimeoutSec: 15
 --- !u!114 &9012345678901234567
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -110,3 +112,18 @@ MonoBehaviour:
   backend: {fileID: 6803768513613521876}
   save: {fileID: 0}
   publishIntervalSec: 5
+--- !u!114 &3162358820990367281
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4838031678322995785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644c48f800dd44688a7c2cbaad3162d0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::LeaderboardService
+  topEntries: 10
+  flushIntervalSeconds: 15
+  refreshIntervalSeconds: 60

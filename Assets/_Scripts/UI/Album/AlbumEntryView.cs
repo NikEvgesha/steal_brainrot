@@ -69,6 +69,7 @@ public class AlbumEntryView : MonoBehaviour, IPointerClickHandler
 
         if (iconImage != null)
         {
+            iconImage.preserveAspect = true;
             iconImage.sprite = icon;
             iconImage.color = unlocked ? unlockedColor : lockedColor;
         }
