@@ -9,6 +9,10 @@ public sealed class SpecialShopEternalTrackView : MonoBehaviour
 {
     private const int VisibleSteps = 5;
 
+    [Header("Visual template")]
+    [SerializeField, Tooltip("Edit this prefab to change the visual layout of every Eternal Track reward.")]
+    private SpecialShopEternalRewardCellView _cellTemplate;
+
     private SpecialShop _shop;
     private ShopPackData _pack;
     private Sprite _cellSprite;
@@ -70,28 +74,40 @@ public sealed class SpecialShopEternalTrackView : MonoBehaviour
 
     private void EnsureLayout()
     {
-        if (transform is RectTransform rect)
-        {
-            rect.anchorMin = new Vector2(0.02f, 0.08f);
-            rect.anchorMax = new Vector2(0.98f, 0.78f);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
-
         _layout = GetComponent<HorizontalLayoutGroup>();
         if (_layout == null)
+        {
             _layout = gameObject.AddComponent<HorizontalLayoutGroup>();
-        _layout.padding = new RectOffset(6, 6, 4, 4);
-        _layout.spacing = 10f;
-        _layout.childAlignment = TextAnchor.MiddleCenter;
-        _layout.childControlWidth = true;
-        _layout.childControlHeight = true;
-        _layout.childForceExpandWidth = true;
-        _layout.childForceExpandHeight = true;
+            _layout.padding = new RectOffset(6, 6, 4, 4);
+            _layout.spacing = 10f;
+            _layout.childAlignment = TextAnchor.MiddleCenter;
+            _layout.childControlWidth = true;
+            _layout.childControlHeight = true;
+            _layout.childForceExpandWidth = true;
+            _layout.childForceExpandHeight = true;
+        }
     }
 
     private void CreateStep(int stepIndex, ShopTrackStep step, bool current)
     {
+        if (_cellTemplate != null)
+        {
+            SpecialShopEternalRewardCellView cellView = Instantiate(_cellTemplate, transform);
+            GameObject templateCell = cellView.gameObject;
+            templateCell.name = "Reward_" + stepIndex;
+            templateCell.SetActive(true);
+            Sprite currencySprite = !step.Free && G.Currency != null
+                ? G.Currency.GetCurrencyIcon(step.PriceCurrencyType)
+                : null;
+            cellView.Configure(
+                step,
+                current,
+                ResolveRewardIcon(step.Reward),
+                currencySprite,
+                current ? () => StartCoroutine(ClaimRoutine(templateCell)) : null);
+            return;
+        }
+
         var cell = new GameObject(
             "Reward_" + stepIndex,
             typeof(RectTransform),
@@ -173,15 +189,42 @@ public sealed class SpecialShopEternalTrackView : MonoBehaviour
         Color color = current
             ? step.Free ? new Color(0.92f, 1f, 0.28f, 1f) : Color.white
             : new Color(0.72f, 0.78f, 0.86f, 1f);
+        bool hasCurrencyIcon = !step.Free && CreatePriceCurrencyIcon(parent, step.PriceCurrencyType);
         CreateText(
             parent,
             "Price",
             label,
-            new Vector2(0.03f, 0.02f),
+            hasCurrencyIcon ? new Vector2(0.37f, 0.02f) : new Vector2(0.03f, 0.02f),
             new Vector2(0.97f, 0.28f),
             step.Free ? 20f : 27f,
             TextAlignmentOptions.Center,
             color);
+    }
+
+    private static bool CreatePriceCurrencyIcon(Transform parent, CurrencyType currencyType)
+    {
+        Sprite sprite = G.Currency != null ? G.Currency.GetCurrencyIcon(currencyType) : null;
+        if (sprite == null)
+            return false;
+
+        var iconObject = new GameObject(
+            "PriceCurrencyIcon",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image));
+        iconObject.transform.SetParent(parent, false);
+
+        var rect = iconObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.13f, 0.045f);
+        rect.anchorMax = new Vector2(0.38f, 0.265f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        var image = iconObject.GetComponent<Image>();
+        image.sprite = sprite;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        return true;
     }
 
     private void CreateLock(Transform parent)

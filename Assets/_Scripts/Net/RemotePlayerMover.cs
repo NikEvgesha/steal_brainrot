@@ -37,6 +37,11 @@ public class RemotePlayerMover : MonoBehaviour
     private int _lastSamplesHash;
     private int _lastSamplesCount;
 
+    private void Awake()
+    {
+        GroundBlobShadow.Ensure(gameObject, GroundBlobShadowPreset.Player);
+    }
+
     public void SetDelay(float delay)
     {
         delaySec = Mathf.Max(0f, delay);

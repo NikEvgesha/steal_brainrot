@@ -10,14 +10,26 @@ public class PurchaseData
     public string Description { get; private set; }
     public string Price { get; private set; }
     public string CurrencyImageURL { get; private set; }
+    public string CurrencyCode { get; private set; }
 
-    public PurchaseData(string id, string title, string description, string price, string currencyImageURL)
+    public string DisplayPrice => string.IsNullOrWhiteSpace(CurrencyCode)
+        ? Price
+        : $"{Price} {CurrencyCode}";
+
+    public PurchaseData(
+        string id,
+        string title,
+        string description,
+        string price,
+        string currencyImageURL,
+        string currencyCode = "")
     {
         Id = id ?? "";
         Title = title ?? "";
         Description = description ?? "";
         Price = price ?? "";
         CurrencyImageURL = currencyImageURL ?? "";
+        CurrencyCode = currencyCode ?? "";
     }
 
     public static PurchaseData Fallback(string id)

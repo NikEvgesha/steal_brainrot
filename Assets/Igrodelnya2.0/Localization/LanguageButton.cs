@@ -26,22 +26,8 @@ public class LanguageButton : MonoBehaviour
             provider.SwitchLanguage(formattedLanguage);
         }
 
-        if (manager != null)
-        {
-            string previousLanguage = manager.CurrentLanguage;
-            manager.ChangeLanguage(language);
-            Debug.LogFormat("Selected language: {0}", manager.CurrentLanguage);
-            if (!string.Equals(previousLanguage, manager.CurrentLanguage, System.StringComparison.OrdinalIgnoreCase))
-            {
-                GameAnalytics.Track(AnalyticsEventNames.SettingsChanged, GameAnalytics.Params(
-                    "setting_name", "language",
-                    "value_before", previousLanguage,
-                    "value_after", manager.CurrentLanguage,
-                    "source", "language_button",
-                    "result", "changed"));
-            }
+        if (Application.isPlaying)
             return;
-        }
 
         ApplyEditorFallback(language);
     }

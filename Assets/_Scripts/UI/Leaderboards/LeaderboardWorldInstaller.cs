@@ -11,17 +11,22 @@ public sealed class LeaderboardWorldInstaller : MonoBehaviour
 {
     private static readonly BoardDefinition[] Definitions =
     {
-        new("donations_all_time", "UI/Leaderboards/Donations", "Топ донатов", new Color(1f, 0.72f, 0.05f)),
-        new("income_weekly", "UI/Leaderboards/WeeklyIncome", "Доход за неделю", new Color(1f, 0.82f, 0.08f)),
-        new("hatches_weekly", "UI/Leaderboards/WeeklyHatches", "Вылупления за неделю", new Color(0.95f, 0.9f, 0.78f)),
-        new("best_pet_monthly", "UI/Leaderboards/BestPetMonthly", "Лучший питомец месяца", new Color(0.88f, 0.05f, 0.85f)),
-        new("hatches_all_time", "UI/Leaderboards/AllTimeHatches", "Вылуплено за всё время", new Color(0.12f, 0.82f, 0.95f))
+        new(LeaderboardService.DonationsBoardId, "UI/Leaderboards/Donations", "Топ донатов", new Color(1f, 0.72f, 0.05f)),
+        new(LeaderboardService.WeeklyIncomeBoardId, "UI/Leaderboards/WeeklyIncome", "Доход за неделю", new Color(1f, 0.82f, 0.08f)),
+        new(LeaderboardService.WeeklyHatchesBoardId, "UI/Leaderboards/WeeklyHatches", "Вылупления за неделю", new Color(0.95f, 0.9f, 0.78f)),
+        new(LeaderboardService.MonthlyBestPetBoardId, "UI/Leaderboards/BestPetMonthly", "Лучший питомец месяца", new Color(0.88f, 0.05f, 0.85f)),
+        new(LeaderboardService.AllTimeHatchesBoardId, "UI/Leaderboards/AllTimeHatches", "Вылуплено за всё время", new Color(0.12f, 0.82f, 0.95f))
     };
+
+    public static IReadOnlyList<BoardDefinition> BoardDefinitions => Definitions;
 
     private readonly List<LeaderboardWorldBoard> _boards = new();
 
     public static void EnsureExists()
     {
+        if (!LeaderboardService.RuntimeEnabled)
+            return;
+
         if (FindAnyObjectByType<LeaderboardWorldInstaller>() != null)
             return;
         new GameObject("LeaderboardWorldInstaller").AddComponent<LeaderboardWorldInstaller>();
@@ -29,19 +34,10 @@ public sealed class LeaderboardWorldInstaller : MonoBehaviour
 
     private IEnumerator Start()
     {
-        Transform shop = null;
-        while (shop == null)
-        {
-            var shopObject = GameObject.Find("Shop");
-            shop = shopObject != null ? shopObject.transform : null;
-            if (shop == null)
-                yield return null;
-        }
-
         while (G.Leaderboards == null)
             yield return null;
 
-        BuildBoards(shop);
+        RegisterSceneBoards();
         G.Leaderboards.SnapshotUpdated += Render;
         Render(G.Leaderboards.Snapshot);
 
@@ -64,33 +60,28 @@ public sealed class LeaderboardWorldInstaller : MonoBehaviour
         Render(G.Leaderboards != null ? G.Leaderboards.Snapshot : null);
     }
 
-    private void BuildBoards(Transform shop)
+    private void RegisterSceneBoards()
     {
-        if (_boards.Count > 0)
-            return;
+        _boards.Clear();
+        var sceneBoards = FindObjectsByType<LeaderboardWorldBoard>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None)
+            .Where(board => board != null && !string.IsNullOrWhiteSpace(board.BoardId))
+            .OrderBy(board => board.transform.position.x);
 
-        Bounds bounds = ResolveBounds(shop);
-        const float boardWidth = 4.8f;
-        const float spacing = 0.35f;
-        float totalWidth = Definitions.Length * boardWidth + (Definitions.Length - 1) * spacing;
-        float left = bounds.center.x - totalWidth * 0.5f + boardWidth * 0.5f;
-        float y = bounds.min.y + 2.25f;
-        float z = bounds.min.z - 0.45f;
-
-        var root = new GameObject("WorldLeaderboards").transform;
-        root.SetParent(shop.parent, true);
-
-        for (int i = 0; i < Definitions.Length; i++)
+        foreach (var board in sceneBoards)
         {
-            var boardObject = new GameObject($"Leaderboard_{Definitions[i].BoardId}");
-            boardObject.transform.SetParent(root, true);
-            boardObject.transform.position = new Vector3(left + i * (boardWidth + spacing), y, z);
-            boardObject.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            if (_boards.Any(existing => existing.BoardId == board.BoardId))
+            {
+                Debug.LogWarning($"[Leaderboards] Duplicate scene board '{board.BoardId}' ignored.", board);
+                continue;
+            }
 
-            var view = boardObject.AddComponent<LeaderboardWorldBoard>();
-            view.Build(Definitions[i]);
-            _boards.Add(view);
+            _boards.Add(board);
         }
+
+        if (_boards.Count == 0)
+            Debug.LogError("[Leaderboards] No LeaderboardWorldBoard prefabs are placed in the active scene.");
     }
 
     private void Render(LeaderboardsResponse snapshot)
@@ -102,24 +93,13 @@ public sealed class LeaderboardWorldInstaller : MonoBehaviour
         }
     }
 
-    private static Bounds ResolveBounds(Transform root)
+    [Serializable]
+    public struct BoardDefinition
     {
-        var renderers = root.GetComponentsInChildren<Renderer>(true);
-        if (renderers.Length == 0)
-            return new Bounds(root.position, new Vector3(24f, 5f, 8f));
-
-        var bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-            bounds.Encapsulate(renderers[i].bounds);
-        return bounds;
-    }
-
-    public readonly struct BoardDefinition
-    {
-        public readonly string BoardId;
-        public readonly string TitleKey;
-        public readonly string TitleFallback;
-        public readonly Color Accent;
+        public string BoardId;
+        public string TitleKey;
+        public string TitleFallback;
+        public Color Accent;
 
         public BoardDefinition(string boardId, string titleKey, string titleFallback, Color accent)
         {
@@ -131,56 +111,115 @@ public sealed class LeaderboardWorldInstaller : MonoBehaviour
     }
 }
 
-public sealed class LeaderboardWorldBoard : MonoBehaviour
+public class LeaderboardWorldBoardBase : MonoBehaviour
 {
     private const int VisibleRows = 10;
-    private LeaderboardWorldInstaller.BoardDefinition _definition;
-    private Canvas _canvas;
-    private TMP_Text _title;
-    private TMP_Text _rankColumn;
-    private TMP_Text _nameColumn;
-    private TMP_Text _scoreColumn;
-    private TMP_Text _footer;
-    private Button _donateButton;
+    [SerializeField] private LeaderboardWorldInstaller.BoardDefinition _definition;
+    [SerializeField] private Material _outerMaterial;
+    [SerializeField] private Material _innerMaterial;
+    [SerializeField] private Material _accentMaterial;
+    [SerializeField] private Canvas _canvas;
+    [SerializeField] private Image _header;
+    [SerializeField] private TMP_Text _title;
+    [SerializeField] private TMP_Text _rankHeader;
+    [SerializeField] private TMP_Text _nameHeader;
+    [SerializeField] private TMP_Text _scoreHeader;
+    [SerializeField] private TMP_Text[] _rankRows;
+    [SerializeField] private TMP_Text[] _nameRows;
+    [SerializeField] private TMP_Text[] _scoreRows;
+    [SerializeField] private TMP_Text _footer;
+    [SerializeField] private Button _donateButton;
     private LeaderboardBoardDto _lastBoard;
     private bool _lastCached;
 
     public string BoardId => _definition.BoardId;
 
-    public void Build(LeaderboardWorldInstaller.BoardDefinition definition)
+    private void Awake()
     {
+        if (_donateButton != null)
+        {
+            _donateButton.onClick.RemoveListener(LeaderboardDonationPopup.Open);
+            _donateButton.onClick.AddListener(LeaderboardDonationPopup.Open);
+        }
+
+        RefreshLocalizedText();
+    }
+
+    private void OnValidate()
+    {
+        if (_header != null)
+            _header.color = _definition.Accent;
+        if (_donateButton != null && _donateButton.image != null)
+            _donateButton.image.color = _definition.Accent;
+        ApplyMaterialColor(_accentMaterial, _definition.Accent);
+        if (!Application.isPlaying && _title != null)
+            _title.text = string.IsNullOrWhiteSpace(_definition.TitleFallback)
+                ? _definition.BoardId
+                : _definition.TitleFallback;
+    }
+
+    public void Build(
+        LeaderboardWorldInstaller.BoardDefinition definition,
+        Material outerMaterial,
+        Material innerMaterial,
+        Material accentMaterial)
+    {
+        if (transform.childCount > 0)
+        {
+            Debug.LogWarning($"[Leaderboards] '{name}' already has generated visuals.", this);
+            return;
+        }
+
         _definition = definition;
-        CreateBacking(new Vector3(5.05f, 4.48f, 0.18f), Color.black, 0.08f);
-        CreateBacking(new Vector3(4.85f, 4.28f, 0.2f), new Color(0.16f, 0.055f, 0.025f), 0f);
+        _outerMaterial = outerMaterial;
+        _innerMaterial = innerMaterial;
+        _accentMaterial = accentMaterial;
+        ApplyMaterialColor(_accentMaterial, definition.Accent);
+
+        CreateBacking("OuterFrame", new Vector3(5.18f, 7.48f, 0.24f), _outerMaterial, 0.10f, new Vector2(0f, -1.47f));
+        CreateBacking("BoardBody", new Vector3(4.72f, 7.02f, 0.26f), _innerMaterial, -0.01f, new Vector2(0f, -1.47f));
+        CreateBacking("TopCap", new Vector3(5.48f, 0.32f, 0.42f), _accentMaterial, -0.02f, new Vector2(0f, 2.35f));
+        CreateBacking("BottomBeam", new Vector3(5.32f, 0.28f, 0.40f), _accentMaterial, -0.02f, new Vector2(0f, -5.18f));
+        CreateBacking("LeftPost", new Vector3(0.30f, 7.35f, 0.38f), _accentMaterial, -0.02f, new Vector2(-2.53f, -1.48f));
+        CreateBacking("RightPost", new Vector3(0.30f, 7.35f, 0.38f), _accentMaterial, -0.02f, new Vector2(2.53f, -1.48f));
+        CreateBacking("LeftFoot", new Vector3(1.28f, 0.22f, 0.82f), _outerMaterial, -0.18f, new Vector2(-1.62f, -5.34f));
+        CreateBacking("RightFoot", new Vector3(1.28f, 0.22f, 0.82f), _outerMaterial, -0.18f, new Vector2(1.62f, -5.34f));
+        for (int i = -2; i <= 2; i++)
+            CreateStud(i * 0.86f, 2.58f);
 
         var canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         canvasObject.transform.SetParent(transform, false);
-        canvasObject.transform.localPosition = new Vector3(0f, 0f, -0.115f);
+        canvasObject.transform.localPosition = new Vector3(0f, -1.47f, -0.235f);
         canvasObject.transform.localRotation = Quaternion.identity;
-        canvasObject.transform.localScale = Vector3.one * 0.008f;
+        canvasObject.transform.localScale = Vector3.one * 0.0075f;
         _canvas = canvasObject.GetComponent<Canvas>();
         _canvas.renderMode = RenderMode.WorldSpace;
 
         var rect = canvasObject.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(600f, 520f);
+        rect.sizeDelta = new Vector2(600f, 920f);
 
-        CreatePanel(rect, "Header", new Vector2(0f, 220f), new Vector2(590f, 70f), definition.Accent);
-        CreatePanel(rect, "Columns", new Vector2(0f, 170f), new Vector2(570f, 36f), new Color(0.04f, 0.025f, 0.02f, 0.96f));
-        CreatePanel(rect, "Rows", new Vector2(0f, -2f), new Vector2(570f, 305f), new Color(0.07f, 0.025f, 0.012f, 0.94f));
-        CreatePanel(rect, "Footer", new Vector2(0f, -201f), new Vector2(570f, 66f), new Color(0.12f, 0.05f, 0.025f, 0.98f));
+        Sprite studSprite = Resources.Load<Sprite>("BlockyUI/BlockyStudPanel");
+        Sprite plainSprite = Resources.Load<Sprite>("BlockyUI/BlockyPlainPanel");
+        bool isDonationBoard = definition.BoardId == LeaderboardService.DonationsBoardId;
 
-        _title = CreateText(rect, "Title", new Vector2(0f, 220f), new Vector2(560f, 66f), 34f, TextAlignmentOptions.Center);
-        _rankColumn = CreateText(rect, "Ranks", new Vector2(-250f, -1f), new Vector2(55f, 305f), 24f, TextAlignmentOptions.TopRight);
-        _nameColumn = CreateText(rect, "Names", new Vector2(-72f, -1f), new Vector2(285f, 305f), 24f, TextAlignmentOptions.TopLeft);
-        _scoreColumn = CreateText(rect, "Scores", new Vector2(205f, -1f), new Vector2(190f, 305f), 24f, TextAlignmentOptions.TopRight);
-        _footer = CreateText(rect, "FooterText", new Vector2(0f, -201f), new Vector2(550f, 60f), 22f, TextAlignmentOptions.Center);
+        _header = CreatePanel(rect, "Header", new Vector2(0f, 404f), new Vector2(574f, 102f), definition.Accent, studSprite, true, true);
+        CreatePanel(rect, "Columns", new Vector2(0f, 326f), new Vector2(570f, 46f), new Color(0.075f, 0.028f, 0.012f, 1f), plainSprite, true, true);
+        CreatePanel(rect, "Rows", new Vector2(0f, -1f), new Vector2(570f, 628f), new Color(0.115f, 0.042f, 0.017f, 0.99f), studSprite, true, true);
 
-        var header = CreateText(rect, "ColumnHeader", new Vector2(0f, 170f), new Vector2(550f, 34f), 18f, TextAlignmentOptions.Center);
-        header.text = LocalizationUtils.T("UI/Leaderboards/Columns", "МЕСТО     ИГРОК                         РЕЗУЛЬТАТ");
+        Vector2 footerPosition = isDonationBoard ? new Vector2(0f, -346f) : new Vector2(0f, -389f);
+        Vector2 footerSize = isDonationBoard ? new Vector2(570f, 38f) : new Vector2(570f, 70f);
+        CreatePanel(rect, "Footer", footerPosition, footerSize, new Color(0.105f, 0.045f, 0.018f, 1f), plainSprite, true, true);
 
-        if (definition.BoardId == "donations_all_time")
+        _title = CreateText(rect, "Title", new Vector2(0f, 404f), new Vector2(536f, 90f), 44f, TextAlignmentOptions.Center, false, true);
+        _rankHeader = CreateText(rect, "RankHeader", new Vector2(-236f, 326f), new Vector2(72f, 40f), 22f, TextAlignmentOptions.Center);
+        _nameHeader = CreateText(rect, "NameHeader", new Vector2(-46f, 326f), new Vector2(292f, 40f), 22f, TextAlignmentOptions.Center, false, true);
+        _scoreHeader = CreateText(rect, "ScoreHeader", new Vector2(192f, 326f), new Vector2(168f, 40f), 20f, TextAlignmentOptions.Center, false, true);
+        CreateLeaderboardRows(rect, plainSprite, definition.Accent);
+        _footer = CreateText(rect, "FooterText", footerPosition, footerSize - new Vector2(18f, 8f), 24f, TextAlignmentOptions.Center, true);
+
+        if (isDonationBoard)
         {
-            _donateButton = CreateButton(rect, new Vector2(0f, -250f), new Vector2(260f, 48f), definition.Accent);
+            _donateButton = CreateButton(rect, new Vector2(0f, -414f), new Vector2(360f, 54f), definition.Accent, studSprite);
             _donateButton.onClick.AddListener(LeaderboardDonationPopup.Open);
             _donateButton.GetComponentInChildren<TMP_Text>().text = LocalizationUtils.T("UI/Leaderboards/Donate", "ПОДДЕРЖАТЬ ИГРУ");
         }
@@ -198,9 +237,15 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
     {
         if (_title != null)
             _title.text = LocalizationUtils.T(_definition.TitleKey, _definition.TitleFallback);
+        if (_rankHeader != null)
+            _rankHeader.text = LocalizationUtils.T("UI/Leaderboards/RankColumn", "№");
+        if (_nameHeader != null)
+            _nameHeader.text = LocalizationUtils.T("UI/Leaderboards/PlayerColumn", "ИГРОК");
+        if (_scoreHeader != null)
+            _scoreHeader.text = LocalizationUtils.T("UI/Leaderboards/ScoreColumn", "РЕЗУЛЬТАТ");
         if (_donateButton != null)
             _donateButton.GetComponentInChildren<TMP_Text>().text = LocalizationUtils.T("UI/Leaderboards/Donate", "ПОДДЕРЖАТЬ ИГРУ");
-        if (_lastBoard != null || _rankColumn != null)
+        if (_lastBoard != null || HasRows())
             Render(_lastBoard, _lastCached);
     }
 
@@ -208,41 +253,35 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
     {
         _lastBoard = board;
         _lastCached = cached;
-        if (_rankColumn == null)
+        if (!HasRows())
             return;
+
+        ClearRows();
 
         if (board?.entries == null)
         {
-            _rankColumn.text = string.Empty;
-            _nameColumn.text = LocalizationUtils.T("UI/Leaderboards/Loading", "Загрузка...");
-            _scoreColumn.text = string.Empty;
+            _nameRows[0].text = LocalizationUtils.T("UI/Leaderboards/Loading", "Загрузка...");
             _footer.text = string.Empty;
             return;
         }
 
-        var ranks = new List<string>();
-        var names = new List<string>();
-        var scores = new List<string>();
+        int rowIndex = 0;
         foreach (var entry in board.entries.Take(VisibleRows))
         {
-            ranks.Add(entry.rank.ToString(CultureInfo.InvariantCulture));
-            names.Add(Ellipsize(entry.displayName, 18));
-            scores.Add(FormatScore(entry.score));
+            string color = ResolvePlaceColor(entry.rank);
+            _rankRows[rowIndex].text = Colorize(entry.rank.ToString(CultureInfo.InvariantCulture), color);
+            _nameRows[rowIndex].text = Colorize(Ellipsize(entry.displayName, 18), color);
+            _scoreRows[rowIndex].text = Colorize(FormatScore(entry.score), color);
+            rowIndex++;
         }
 
-        if (ranks.Count == 0)
-        {
-            names.Add(LocalizationUtils.T("UI/Leaderboards/NoResults", "Пока нет результатов"));
-        }
-
-        _rankColumn.text = string.Join("\n", ranks);
-        _nameColumn.text = string.Join("\n", names);
-        _scoreColumn.text = string.Join("\n", scores);
+        if (rowIndex == 0)
+            _nameRows[0].text = LocalizationUtils.T("UI/Leaderboards/NoResults", "Пока нет результатов");
 
         string footer = board.currentPlayer != null
             ? LocalizationUtils.Format(
                 "UI/Leaderboards/YourPlace",
-                "Твоё место: {0}  •  {1}",
+                "Твоё место: {0}  |  {1}",
                 board.currentPlayer.rank,
                 FormatScore(board.currentPlayer.score))
             : LocalizationUtils.T("UI/Leaderboards/NotRanked", "Твоего результата пока нет");
@@ -250,38 +289,157 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         {
             footer = LocalizationUtils.Format(
                 "UI/Leaderboards/YourScore",
-                "Your score: {0}",
+                "Твой результат: {0}",
                 FormatScore(board.currentPlayer.score));
         }
         if (cached)
-            footer += "  •  " + LocalizationUtils.T("UI/Leaderboards/Cached", "офлайн-копия");
+            footer += "  |  " + LocalizationUtils.T("UI/Leaderboards/Cached", "офлайн-копия");
         _footer.text = footer;
     }
 
     private string FormatScore(double score)
     {
         if (_definition.BoardId.Contains("hatches", StringComparison.Ordinal) ||
-            _definition.BoardId == "donations_all_time")
+            _definition.BoardId == LeaderboardService.DonationsBoardId)
             return Math.Round(score).ToString("N0", CultureInfo.InvariantCulture);
         return G.Currency != null ? G.Currency.ToString(score) : score.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
-    private void CreateBacking(Vector3 size, Color color, float localZ)
+    private void CreateBacking(
+        string objectName,
+        Vector3 size,
+        Material material,
+        float localZ,
+        Vector2? localPosition = null)
     {
         var backing = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        backing.name = "Backing";
+        backing.name = objectName;
         backing.transform.SetParent(transform, false);
-        backing.transform.localPosition = new Vector3(0f, 0f, localZ);
+        Vector2 position = localPosition ?? Vector2.zero;
+        backing.transform.localPosition = new Vector3(position.x, position.y, localZ);
         backing.transform.localScale = size;
         var collider = backing.GetComponent<Collider>();
         if (collider != null)
-            Destroy(collider);
+        {
+            if (Application.isPlaying)
+                Destroy(collider);
+            else
+                DestroyImmediate(collider);
+        }
         var renderer = backing.GetComponent<Renderer>();
+        if (material != null)
+        {
+            renderer.sharedMaterial = material;
+            return;
+        }
+
         var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        renderer.material = new Material(shader) { color = color };
+        renderer.material = new Material(shader) { color = Color.magenta };
     }
 
-    private static Image CreatePanel(RectTransform parent, string name, Vector2 position, Vector2 size, Color color)
+    private void CreateStud(float localX, float localY)
+    {
+        var stud = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        stud.name = "TopStud";
+        stud.transform.SetParent(transform, false);
+        stud.transform.localPosition = new Vector3(localX, localY, -0.02f);
+        stud.transform.localScale = new Vector3(0.18f, 0.10f, 0.18f);
+        var collider = stud.GetComponent<Collider>();
+        if (collider != null)
+        {
+            if (Application.isPlaying)
+                Destroy(collider);
+            else
+                DestroyImmediate(collider);
+        }
+        stud.GetComponent<Renderer>().sharedMaterial = _accentMaterial;
+    }
+
+    private void CreateLeaderboardRows(RectTransform parent, Sprite sprite, Color accent)
+    {
+        _rankRows = new TMP_Text[VisibleRows];
+        _nameRows = new TMP_Text[VisibleRows];
+        _scoreRows = new TMP_Text[VisibleRows];
+
+        for (int i = 0; i < VisibleRows; i++)
+        {
+            Color rankColor;
+            Color nameColor;
+            Color scoreColor;
+            if (i == 0)
+            {
+                rankColor = new Color(1f, 0.58f, 0.015f, 1f);
+                nameColor = new Color(0.90f, 0.44f, 0.01f, 1f);
+                scoreColor = new Color(1f, 0.58f, 0.015f, 1f);
+            }
+            else if (i == 1)
+            {
+                rankColor = new Color(0.61f, 0.65f, 0.67f, 1f);
+                nameColor = new Color(0.42f, 0.46f, 0.48f, 1f);
+                scoreColor = new Color(0.61f, 0.65f, 0.67f, 1f);
+            }
+            else if (i == 2)
+            {
+                rankColor = new Color(0.76f, 0.32f, 0.055f, 1f);
+                nameColor = new Color(0.57f, 0.22f, 0.035f, 1f);
+                scoreColor = new Color(0.76f, 0.32f, 0.055f, 1f);
+            }
+            else
+            {
+                Color baseColor = i % 2 == 0
+                    ? new Color(0.205f, 0.078f, 0.025f, 0.98f)
+                    : new Color(0.145f, 0.047f, 0.016f, 0.98f);
+                rankColor = Color.Lerp(baseColor, accent, 0.02f);
+                nameColor = Color.Lerp(baseColor, Color.black, 0.07f);
+                scoreColor = Color.Lerp(baseColor, accent, 0.02f);
+            }
+
+            float rowY = 282f - i * 61.5f;
+            CreatePanel(parent, $"RankCell_{i + 1:00}", new Vector2(-236f, rowY), new Vector2(72f, 55f), rankColor, sprite, true, true);
+            CreatePanel(parent, $"NameCell_{i + 1:00}", new Vector2(-46f, rowY), new Vector2(292f, 55f), nameColor, sprite, true, true);
+            CreatePanel(parent, $"ScoreCell_{i + 1:00}", new Vector2(192f, rowY), new Vector2(168f, 55f), scoreColor, sprite, true, true);
+
+            float rankSize = i < 3 ? 38f : 33f;
+            float nameSize = i < 3 ? 31f : 29f;
+            float scoreSize = i < 3 ? 32f : 29f;
+            _rankRows[i] = CreateText(parent, $"Rank_{i + 1:00}", new Vector2(-236f, rowY), new Vector2(64f, 51f), rankSize, TextAlignmentOptions.Center, false, true);
+            _nameRows[i] = CreateText(parent, $"Name_{i + 1:00}", new Vector2(-46f, rowY), new Vector2(274f, 51f), nameSize, TextAlignmentOptions.Center, false, true);
+            _scoreRows[i] = CreateText(parent, $"Score_{i + 1:00}", new Vector2(192f, rowY), new Vector2(156f, 51f), scoreSize, TextAlignmentOptions.Center, false, true);
+        }
+    }
+
+    private bool HasRows()
+    {
+        return _rankRows != null &&
+               _nameRows != null &&
+               _scoreRows != null &&
+               _rankRows.Length == VisibleRows &&
+               _nameRows.Length == VisibleRows &&
+               _scoreRows.Length == VisibleRows;
+    }
+
+    private void ClearRows()
+    {
+        for (int i = 0; i < VisibleRows; i++)
+        {
+            if (_rankRows[i] != null)
+                _rankRows[i].text = string.Empty;
+            if (_nameRows[i] != null)
+                _nameRows[i].text = string.Empty;
+            if (_scoreRows[i] != null)
+                _scoreRows[i].text = string.Empty;
+        }
+    }
+
+    private static Image CreatePanel(
+        RectTransform parent,
+        string name,
+        Vector2 position,
+        Vector2 size,
+        Color color,
+        Sprite sprite = null,
+        bool tiled = false,
+        bool outlined = false)
     {
         var gameObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         var rect = gameObject.GetComponent<RectTransform>();
@@ -290,7 +448,16 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         rect.sizeDelta = size;
         var image = gameObject.GetComponent<Image>();
         image.color = color;
+        image.sprite = sprite;
+        image.type = sprite != null && tiled ? Image.Type.Tiled : Image.Type.Simple;
+        image.pixelsPerUnitMultiplier = 2.2f;
         image.raycastTarget = false;
+        if (outlined)
+        {
+            var outline = gameObject.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(3f, -3f);
+        }
         return image;
     }
 
@@ -300,7 +467,9 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         Vector2 position,
         Vector2 size,
         float fontSize,
-        TextAlignmentOptions alignment)
+        TextAlignmentOptions alignment,
+        bool wordWrapping = false,
+        bool autoSizing = false)
     {
         var gameObject = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         var rect = gameObject.GetComponent<RectTransform>();
@@ -308,19 +477,34 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
         var text = gameObject.GetComponent<TextMeshProUGUI>();
-        text.font = ResolveFont();
+        TMP_FontAsset font = ResolveFont();
+        text.font = font;
+        Material outlinedMaterial = Resources.Load<Material>("Materials/LeaderboardRussoOutlined");
+        if (outlinedMaterial != null)
+        {
+            text.fontSharedMaterial = outlinedMaterial;
+        }
+        else if (font != null && font.material != null)
+        {
+            text.fontSharedMaterial = font.material;
+            text.outlineColor = Color.black;
+            text.outlineWidth = 0.24f;
+        }
         text.fontSize = fontSize;
         text.alignment = alignment;
         text.color = Color.white;
-        text.enableWordWrapping = false;
-        text.overflowMode = TextOverflowModes.Ellipsis;
-        text.outlineColor = Color.black;
-        text.outlineWidth = 0.18f;
+        text.enableWordWrapping = wordWrapping;
+        text.enableAutoSizing = wordWrapping || autoSizing;
+        text.fontSizeMin = wordWrapping || autoSizing ? Mathf.Max(18f, fontSize * 0.62f) : fontSize;
+        text.fontSizeMax = fontSize;
+        text.fontStyle = FontStyles.Bold;
+        text.lineSpacing = -8f;
+        text.overflowMode = wordWrapping ? TextOverflowModes.Overflow : TextOverflowModes.Ellipsis;
         text.raycastTarget = false;
         return text;
     }
 
-    private static Button CreateButton(RectTransform parent, Vector2 position, Vector2 size, Color color)
+    private static Button CreateButton(RectTransform parent, Vector2 position, Vector2 size, Color color, Sprite sprite)
     {
         var gameObject = new GameObject("DonateButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         var rect = gameObject.GetComponent<RectTransform>();
@@ -329,6 +513,9 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         rect.sizeDelta = size;
         var image = gameObject.GetComponent<Image>();
         image.color = color;
+        image.sprite = sprite;
+        image.type = sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+        image.pixelsPerUnitMultiplier = 2.2f;
         var outline = gameObject.AddComponent<Outline>();
         outline.effectColor = Color.black;
         outline.effectDistance = new Vector2(4f, -4f);
@@ -336,10 +523,41 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         return gameObject.GetComponent<Button>();
     }
 
+    private static string ResolvePlaceColor(int rank)
+    {
+        return rank switch
+        {
+            1 => "#FFF7D6",
+            2 => "#FFFFFF",
+            3 => "#FFF0E2",
+            _ => "#FFFFFF"
+        };
+    }
+
+    private static string Colorize(string value, string color)
+    {
+        return $"<color={color}>{value}</color>";
+    }
+
+    private static void ApplyMaterialColor(Material material, Color color)
+    {
+        if (material == null)
+            return;
+        if (material.HasProperty("_BaseColor"))
+            material.SetColor("_BaseColor", color);
+        if (material.HasProperty("_Color"))
+            material.SetColor("_Color", color);
+    }
+
     internal static TMP_FontAsset ResolveFont()
     {
-        var russo = Resources.FindObjectsOfTypeAll<TMP_FontAsset>()
-            .FirstOrDefault(font => font != null && font.name.Contains("RussoOne", StringComparison.OrdinalIgnoreCase));
+        TMP_FontAsset[] fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+        var russo = fonts.FirstOrDefault(font =>
+                        font != null &&
+                        font.name.Equals("RussoOne-Regular Cyrillic SDF", StringComparison.OrdinalIgnoreCase))
+                    ?? fonts.FirstOrDefault(font =>
+                        font != null &&
+                        font.name.Equals("RussoOne-Regular SDF", StringComparison.OrdinalIgnoreCase));
         return russo != null ? russo : TMP_Settings.defaultFontAsset;
     }
 
@@ -348,7 +566,7 @@ public sealed class LeaderboardWorldBoard : MonoBehaviour
         if (string.IsNullOrWhiteSpace(value))
             return "Player";
         var trimmed = value.Trim();
-        return trimmed.Length <= maxLength ? trimmed : trimmed[..(maxLength - 1)] + "…";
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..(maxLength - 3)] + "...";
     }
 }
 

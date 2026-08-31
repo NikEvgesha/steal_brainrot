@@ -6,6 +6,9 @@ using UnityEngine.UI;
 
 public class LoadingProgressBarUI : MonoBehaviour
 {
+    private static readonly Vector2 LoadingWindowSize = new Vector2(800f, 650f);
+    private const float SafeMargin = 32f;
+
     public static LoadingProgressBarUI Instance { get; private set; }
     [SerializeField] private Image _image;
     [SerializeField] private List<AnimationCurve> _visuals;
@@ -18,9 +21,13 @@ public class LoadingProgressBarUI : MonoBehaviour
     private Coroutine _fakeProgressRoutine;
     private Coroutine _finishProgressRoutine;
     private float _realProgressTarget;
+    private RectTransform _windowRect;
+    private Vector2 _lastViewportSize = new Vector2(float.NaN, float.NaN);
 
     private void Awake()
     {
+        ApplyResponsiveLayout(true);
+
         if (Instance == null)
         {
             Instance = this;
@@ -33,6 +40,7 @@ public class LoadingProgressBarUI : MonoBehaviour
 
     private void OnEnable()
     {
+        ApplyResponsiveLayout(true);
         _realProgressTarget = 0f;
         SetVisualProgress(0f);
         RestartFakeProgress();
@@ -42,6 +50,11 @@ public class LoadingProgressBarUI : MonoBehaviour
     {
         StopProgressRoutine(ref _fakeProgressRoutine);
         StopProgressRoutine(ref _finishProgressRoutine);
+    }
+
+    private void LateUpdate()
+    {
+        ApplyResponsiveLayout(false);
     }
 
     public void Progress(float progress)
@@ -135,5 +148,94 @@ public class LoadingProgressBarUI : MonoBehaviour
 
         StopCoroutine(routine);
         routine = null;
+    }
+
+    private void ApplyResponsiveLayout(bool force)
+    {
+        if (_windowRect == null)
+        {
+            Transform current = transform;
+            while (current != null && current.name != "LoadingWindow")
+                current = current.parent;
+            _windowRect = current as RectTransform;
+        }
+
+        if (_windowRect == null)
+            return;
+
+        Canvas canvas = _windowRect.GetComponentInParent<Canvas>();
+        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+        Vector2 viewportSize = canvasRect != null ? canvasRect.rect.size : Vector2.zero;
+        if (viewportSize.x <= 1f || viewportSize.y <= 1f)
+            return;
+        if (!force && (viewportSize - _lastViewportSize).sqrMagnitude < 0.25f)
+            return;
+
+        float availableWidth = Mathf.Max(1f, viewportSize.x - SafeMargin * 2f);
+        float availableHeight = Mathf.Max(1f, viewportSize.y - SafeMargin * 2f);
+        float scale = Mathf.Clamp(
+            Mathf.Min(availableWidth / LoadingWindowSize.x, availableHeight / LoadingWindowSize.y),
+            0.1f,
+            1f);
+
+        _windowRect.anchorMin = _windowRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _windowRect.pivot = new Vector2(0.5f, 0.5f);
+        _windowRect.anchoredPosition = Vector2.zero;
+        _windowRect.sizeDelta = LoadingWindowSize;
+        _windowRect.localScale = new Vector3(scale, scale, 1f);
+
+        RectTransform content = _windowRect.Find("Content") as RectTransform;
+        RectTransform header = _windowRect.Find("Header") as RectTransform;
+        RectTransform tip = _windowRect.Find("Tip") as RectTransform;
+
+        ConfigureRect(header, new Vector2(0f, 0.79f), Vector2.one, Vector2.zero, Vector2.zero);
+        ConfigureRect(content, Vector2.zero, new Vector2(1f, 0.79f), Vector2.zero, Vector2.zero);
+        ConfigureRect(tip, Vector2.zero, new Vector2(1f, 0.07f), new Vector2(18f, 2f), new Vector2(-18f, -2f));
+        ConfigureRect(transform as RectTransform, new Vector2(0.10f, 0.10f), new Vector2(0.90f, 0.24f), Vector2.zero, Vector2.zero);
+
+        if (content != null)
+        {
+            RectTransform subtitle = content.Find("Subtitle") as RectTransform;
+            ConfigureRect(subtitle, new Vector2(0.06f, 0.29f), new Vector2(0.94f, 0.46f), new Vector2(8f, 2f), new Vector2(-8f, -2f));
+            ConfigureLoadingText(subtitle != null ? subtitle.GetComponent<TMP_Text>() : null, 18f, 34f);
+        }
+
+        RectTransform title = header != null ? header.Find("Title") as RectTransform : null;
+        ConfigureLoadingText(title != null ? title.GetComponent<TMP_Text>() : null, 28f, 58f);
+        ConfigureLoadingText(tip != null ? tip.GetComponent<TMP_Text>() : null, 16f, 30f);
+        ConfigureLoadingText(_text, 18f, 34f);
+
+        _lastViewportSize = viewportSize;
+    }
+
+    private static void ConfigureRect(
+        RectTransform rect,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 offsetMin,
+        Vector2 offsetMax)
+    {
+        if (rect == null)
+            return;
+
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = offsetMin;
+        rect.offsetMax = offsetMax;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ConfigureLoadingText(TMP_Text text, float minSize, float maxSize)
+    {
+        if (text == null)
+            return;
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = minSize;
+        text.fontSizeMax = maxSize;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.alignment = TextAlignmentOptions.Center;
     }
 }

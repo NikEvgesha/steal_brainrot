@@ -8,6 +8,7 @@ public class PlayerInput : MonoBehaviour
 {
     public Vector3 Movement { get; private set; }
     public Vector2 Rotation { get; private set; }
+    public float Zoom { get; private set; }
 
     public float TrainMove { get; private set; }
 
@@ -174,7 +175,10 @@ public class PlayerInput : MonoBehaviour
     private void Update()
     {
         if (TMP_InputFieldIsFocused())
+        {
+            Zoom = 0f;
             return;
+        }
         CheckControls();
         UpdateMovement();
         UpdateRotation();
@@ -293,13 +297,21 @@ public class PlayerInput : MonoBehaviour
     {
         if (UseTouchControls)
         {
-            Rotation = EnsureTouchControls() && _touchControls.cameraTouchController != null
-                ? _touchControls.cameraTouchController.GetRotationInput()
-                : Vector2.zero;
+            if (EnsureTouchControls() && _touchControls.cameraTouchController != null)
+            {
+                Rotation = _touchControls.cameraTouchController.GetRotationInput();
+                Zoom = _touchControls.cameraTouchController.GetZoomInput();
+            }
+            else
+            {
+                Rotation = Vector2.zero;
+                Zoom = 0f;
+            }
         }
         else
         {
             Rotation = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+            Zoom = 0f;
         }
     }
 

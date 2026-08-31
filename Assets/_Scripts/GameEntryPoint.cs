@@ -33,6 +33,7 @@ public class GameEntryPoint : MonoBehaviour
         _initialWorldWaitStartedAt = Time.realtimeSinceStartup;
 
         Instantiate(_playerManager).Init(_playerSpawnPoint);
+        FallRecoveryVolume.EnsureExists(_playerSpawnPoint);
         Instantiate(_elements);
         Instantiate(_quickAccess).Init();
         Instantiate(_inventory).Init();

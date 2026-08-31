@@ -24,7 +24,15 @@ public class SpecialShop : MonoBehaviour
     [SerializeField] private GameObject _shopCanvas;
     [SerializeField] private ScrollRect _scrollRect;
     [SerializeField] private Transform _content;
-    [SerializeField] private SpecialShopSlot _slotPrefab;
+    [Header("Card Templates - Active")]
+    [SerializeField, Tooltip("Half-width card with a Use button for consumable products.")]
+    private SpecialShopSlot _smallUseSlotPrefab;
+    [SerializeField, Tooltip("Half-width card without a Use button.")]
+    private SpecialShopSlot _smallSlotPrefab;
+    [SerializeField, Tooltip("Full-width card occupying an entire shop row.")]
+    private SpecialShopSlot _wideSlotPrefab;
+    [SerializeField, Tooltip("Dedicated Eternal Pack card.")]
+    private SpecialShopSlot _eternalPackSlotPrefab;
     [SerializeField] private ShopRow _rowPrefab;
     [SerializeField] private SpecialShopSectionHeader _sectionHeaderPrefab;
     [SerializeField] private int _maxItemsPerRow = 2;
@@ -43,6 +51,7 @@ public class SpecialShop : MonoBehaviour
     private string _inAppPreviewPrice = "1.99 USD";
 
     private readonly Dictionary<string, ShopPackData> _purchaseData = new();
+    private readonly Dictionary<string, PurchaseData> _cachedPlatformPurchaseData = new();
     private readonly List<string> _pendingRestoredPurchaseIds = new();
     private readonly HashSet<string> _pendingPurchaseIds = new();
     private readonly List<ShopRow> _rows = new();
@@ -53,12 +62,15 @@ public class SpecialShop : MonoBehaviour
     private ShopCategory _currentCategory;
     private bool _isOpen;
     private bool _slotsInitialized;
+    private bool _slotStateDirty;
     private bool _lastPurchasesAvailable;
+    private bool _restorePurchasesRequested;
     private bool _rewardedAdPurchasePending;
     private Coroutine _scrollCoroutine;
-    private float _nextPlatformRefresh;
+    private Coroutine _purchaseCatalogRefreshCoroutine;
     private float _nextPendingRestoreRetry;
     private LocalizationManager _subscribedLocalizationManager;
+    private CanvasGroup _shopCanvasGroup;
     private static readonly Vector2 ShopWindowSize = new Vector2(1240f, 820f);
     private const float ShopSafeMargin = 32f;
     private Vector2 _lastShopViewportSize = new Vector2(float.NaN, float.NaN);
@@ -106,8 +118,14 @@ public class SpecialShop : MonoBehaviour
     private void Start()
     {
         _effects?.RestoreOwnedPermanentEffects(_packs);
-        InitSlots();
-        G.Purchases?.RestorePurchases();
+        // Do not touch the platform purchase SDK during gameplay startup. On
+        // WebGL that request can occupy the main thread while the offline reward
+        // popup is already visible. The real catalog is refreshed on shop entry.
+        // This is a local platform capability check; it does not request the
+        // product catalog. It lets us prebuild the correct set of cards.
+        _lastPurchasesAvailable = PurchasesAvailable();
+        InitSlots(false);
+        PrewarmShopCanvas();
     }
 
     private void Update()
@@ -123,13 +141,6 @@ public class SpecialShop : MonoBehaviour
             FlushPendingRestores();
         }
 
-        if (!_isOpen || Time.unscaledTime < _nextPlatformRefresh)
-            return;
-
-        _nextPlatformRefresh = Time.unscaledTime + 1f;
-        bool purchasesAvailable = PurchasesAvailable();
-        if (purchasesAvailable != _lastPurchasesAvailable)
-            InitSlots();
     }
 
     private void OnEnable()
@@ -139,11 +150,13 @@ public class SpecialShop : MonoBehaviour
         SubscribeToLocalizationManager(LocalizationManager.Instance);
 
         if (_effects != null)
-            _effects.Changed += RefreshSlots;
+            _effects.Changed += OnEffectsChanged;
         if (G.Currency != null)
         {
             G.Currency.NoGems.RemoveListener(OpenCurrency);
             G.Currency.NoGems.AddListener(OpenCurrency);
+            G.Currency.CurrencyChanged.RemoveListener(OnCurrencyChanged);
+            G.Currency.CurrencyChanged.AddListener(OnCurrencyChanged);
         }
     }
 
@@ -154,9 +167,12 @@ public class SpecialShop : MonoBehaviour
         UnsubscribeFromLocalizationManager();
 
         if (_effects != null)
-            _effects.Changed -= RefreshSlots;
+            _effects.Changed -= OnEffectsChanged;
         if (G.Currency != null)
+        {
             G.Currency.NoGems.RemoveListener(OpenCurrency);
+            G.Currency.CurrencyChanged.RemoveListener(OnCurrencyChanged);
+        }
     }
 
     private void OnDestroy()
@@ -167,6 +183,22 @@ public class SpecialShop : MonoBehaviour
 
         if (G.SpecialShop == this)
             G.SpecialShop = null;
+    }
+
+    private void OnCurrencyChanged(CurrencyType currencyType, double _)
+    {
+        if (_isOpen)
+            RefreshSlotAffordability(currencyType);
+        else
+            _slotStateDirty = true;
+    }
+
+    private void OnEffectsChanged()
+    {
+        if (_isOpen)
+            RefreshSlots();
+        else
+            _slotStateDirty = true;
     }
 
     private void OnLocalizationManagerReady(LocalizationManager manager)
@@ -199,19 +231,21 @@ public class SpecialShop : MonoBehaviour
             InitSlots();
     }
 
-    public void InitSlots()
+    public void InitSlots(bool refreshPurchaseAvailability = false)
     {
         ClearSlots();
         _slotsInitialized = false;
         _purchaseData.Clear();
 
-        if (_content == null || _slotPrefab == null || _rowPrefab == null || _sectionHeaderPrefab == null)
+        if (_content == null || _smallSlotPrefab == null || _wideSlotPrefab == null ||
+            _eternalPackSlotPrefab == null || _rowPrefab == null || _sectionHeaderPrefab == null)
         {
-            Debug.LogError("[SpecialShop] Content, slot, row or section header prefab is missing.");
+            Debug.LogError("[SpecialShop] Content, one of the four card templates, row or section header prefab is missing.");
             return;
         }
 
-        _lastPurchasesAvailable = PurchasesAvailable();
+        if (refreshPurchaseAvailability)
+            _lastPurchasesAvailable = PurchasesAvailable();
         for (int categoryIndex = 0; categoryIndex < SectionCategories.Length; categoryIndex++)
         {
             ShopCategory category = SectionCategories[categoryIndex];
@@ -240,7 +274,8 @@ public class SpecialShop : MonoBehaviour
                 }
 
                 Transform row = GetOrCreateAvailableRow(item, sectionRows);
-                var slot = Instantiate(_slotPrefab, row);
+                SpecialShopSlot slotPrefab = ResolveSlotPrefab(item);
+                var slot = Instantiate(slotPrefab, row);
                 string purchaseId = GetPurchaseId(item);
                 PurchaseData data = ResolvePurchaseData(item, purchaseId);
 
@@ -254,6 +289,7 @@ public class SpecialShop : MonoBehaviour
         }
 
         _slotsInitialized = true;
+        _slotStateDirty = false;
         UpdateCategoryButtons();
         FlushPendingRestores();
         Canvas.ForceUpdateCanvases();
@@ -293,17 +329,28 @@ public class SpecialShop : MonoBehaviour
             return;
 
         bool wasOpen = _isOpen;
+        if (!wasOpen)
+        {
+            BeginPurchaseCatalogRefreshOnEntry();
+            if (!_restorePurchasesRequested)
+            {
+                _restorePurchasesRequested = true;
+                G.Purchases?.RestorePurchases();
+            }
+        }
+
         _isOpen = true;
-        _shopCanvas.SetActive(true);
+        SetShopCanvasVisible(true);
         UpdateResponsiveWindowScale(true);
-        bool purchasesAvailable = PurchasesAvailable();
-        if (!_slotsInitialized || purchasesAvailable != _lastPurchasesAvailable)
+        bool purchasesAvailable = _lastPurchasesAvailable;
+        if (!_slotsInitialized)
             InitSlots();
         if (G.Control != null)
             G.Control.CursorActive = true;
         G.Currency?.ShowGems?.Invoke(true);
         G.Input?.AOpenWindow?.Invoke(this);
-        RefreshSlots();
+        if (_slotStateDirty)
+            RefreshSlots();
         ScrollToSection(category, false);
         G.Sound?.Play(GameAudioId.SFX_UI_OPEN);
         if (!wasOpen)
@@ -327,12 +374,49 @@ public class SpecialShop : MonoBehaviour
 
         bool wasOpen = _isOpen;
         _isOpen = false;
-        _shopCanvas.SetActive(false);
+        if (_purchaseCatalogRefreshCoroutine != null)
+        {
+            StopCoroutine(_purchaseCatalogRefreshCoroutine);
+            _purchaseCatalogRefreshCoroutine = null;
+        }
+        SetShopCanvasVisible(false);
         if (G.Control != null)
             G.Control.CursorActive = false;
         G.Sound?.Play(GameAudioId.SFX_UI_CLOSE);
         if (wasOpen)
             Closed?.Invoke();
+    }
+
+    private void PrewarmShopCanvas()
+    {
+        if (_shopCanvas == null)
+            return;
+
+        _isOpen = false;
+        _shopCanvas.SetActive(true);
+        SetShopCanvasVisible(false);
+        UpdateResponsiveWindowScale(true);
+        Canvas.ForceUpdateCanvases();
+    }
+
+    private void SetShopCanvasVisible(bool visible)
+    {
+        if (_shopCanvas == null)
+            return;
+
+        if (!_shopCanvas.activeSelf)
+            _shopCanvas.SetActive(true);
+
+        if (_shopCanvasGroup == null)
+        {
+            _shopCanvasGroup = _shopCanvas.GetComponent<CanvasGroup>();
+            if (_shopCanvasGroup == null)
+                _shopCanvasGroup = _shopCanvas.AddComponent<CanvasGroup>();
+        }
+
+        _shopCanvasGroup.alpha = visible ? 1f : 0f;
+        _shopCanvasGroup.interactable = visible;
+        _shopCanvasGroup.blocksRaycasts = visible;
     }
 
     public void OnPurchaseRestore(string id)
@@ -360,6 +444,9 @@ public class SpecialShop : MonoBehaviour
     public void TryBuy(PurchaseData purchaseData, ShopPackData packData)
     {
         if (packData == null)
+            return;
+
+        if (!RefreshPurchaseStateBeforeBuy(packData, ref purchaseData))
             return;
 
         GameAnalytics.Track(AnalyticsEventNames.ShopOfferSelected, GameAnalytics.Params(
@@ -448,7 +535,7 @@ public class SpecialShop : MonoBehaviour
         return packData != null
             && packData.PriceCurrencyType == CurrencyType.Real
             && packData.RewardedAdFallback
-            && !PurchasesAvailable();
+            && !_lastPurchasesAvailable;
     }
 
     public bool CanPurchasePack(ShopPackData packData)
@@ -466,7 +553,7 @@ public class SpecialShop : MonoBehaviour
 
         if (packData.PriceCurrencyType == CurrencyType.Real &&
             !IsInAppPreviewActive() &&
-            !PurchasesAvailable())
+            !_lastPurchasesAvailable)
         {
             return false;
         }
@@ -838,7 +925,8 @@ public class SpecialShop : MonoBehaviour
 
     private Transform GetOrCreateAvailableRow(ShopPackData pack, List<ShopRow> sectionRows)
     {
-        int itemsPerRow = pack != null ? pack.ItemsPerRow : Mathf.Max(1, _maxItemsPerRow);
+        int requestedItems = pack != null ? pack.ItemsPerRow : _maxItemsPerRow;
+        int itemsPerRow = Mathf.Clamp(requestedItems, 1, Mathf.Max(1, _maxItemsPerRow));
         if (itemsPerRow > 1)
         {
             for (int i = 0; i < sectionRows.Count; i++)
@@ -874,10 +962,113 @@ public class SpecialShop : MonoBehaviour
                     : _inAppPreviewPrice,
                 string.Empty);
 
-        if (G.Purchases != null && G.Purchases.PurchasesAvailable())
-            return G.Purchases.GetPurchaseData(purchaseId);
+        if (_cachedPlatformPurchaseData.TryGetValue(purchaseId, out PurchaseData cachedData))
+            return cachedData;
 
         return PurchaseData.Fallback(purchaseId);
+    }
+
+    private SpecialShopSlot ResolveSlotPrefab(ShopPackData pack)
+    {
+        if (pack == null)
+            return _smallSlotPrefab != null ? _smallSlotPrefab : _wideSlotPrefab;
+        if (pack.OfferStyle == ShopOfferStyle.EternalPack)
+            return _eternalPackSlotPrefab;
+        if (pack.ItemsPerRow <= 1)
+            return _wideSlotPrefab;
+        if (pack.HasConsumableReward && _smallUseSlotPrefab != null)
+            return _smallUseSlotPrefab;
+        return _smallSlotPrefab;
+    }
+
+    private void BeginPurchaseCatalogRefreshOnEntry()
+    {
+        bool purchasesAvailable = PurchasesAvailable();
+        bool availabilityChanged = purchasesAvailable != _lastPurchasesAvailable;
+        _lastPurchasesAvailable = purchasesAvailable;
+
+        if (!purchasesAvailable || G.Purchases == null)
+            _cachedPlatformPurchaseData.Clear();
+
+        if (!_slotsInitialized || availabilityChanged)
+            InitSlots(false);
+
+        if (!purchasesAvailable || G.Purchases == null)
+            return;
+
+        if (_purchaseCatalogRefreshCoroutine != null)
+            StopCoroutine(_purchaseCatalogRefreshCoroutine);
+        _purchaseCatalogRefreshCoroutine = StartCoroutine(RefreshPurchaseCatalogOnEntryRoutine());
+    }
+
+    private IEnumerator RefreshPurchaseCatalogOnEntryRoutine()
+    {
+        if (_packs == null || G.Purchases == null)
+            yield break;
+
+        // Open and render the window first; querying Mirra in the same frame is
+        // exactly the hitch this routine is intended to avoid.
+        yield return null;
+
+        var refreshedIds = new HashSet<string>();
+        for (int i = 0; i < _packs.Count; i++)
+        {
+            if (!_isOpen)
+                break;
+
+            ShopPackData pack = _packs[i];
+            if (pack == null || pack.PriceCurrencyType != CurrencyType.Real || !IsOfferAvailable(pack))
+                continue;
+
+            string purchaseId = GetPurchaseId(pack);
+            if (!refreshedIds.Add(purchaseId))
+                continue;
+
+            PurchaseData purchaseData = G.Purchases.GetPurchaseData(purchaseId);
+            if (purchaseData != null && !string.IsNullOrWhiteSpace(purchaseData.Id))
+            {
+                _cachedPlatformPurchaseData[purchaseId] = purchaseData;
+
+                for (int slotIndex = 0; slotIndex < _slots.Count; slotIndex++)
+                {
+                    SpecialShopSlot slot = _slots[slotIndex];
+                    ShopPackData slotPack = slot != null ? slot.PackData : null;
+                    if (slotPack != null && string.Equals(GetPurchaseId(slotPack), purchaseId, StringComparison.Ordinal))
+                        slot.RefreshPurchaseData(purchaseData);
+                }
+            }
+
+            // Mirra obtains price and currency through synchronous WebGL calls.
+            // Spreading products over frames prevents a large hitch on shop open.
+            yield return null;
+        }
+
+        _purchaseCatalogRefreshCoroutine = null;
+    }
+
+    private bool RefreshPurchaseStateBeforeBuy(
+        ShopPackData pack,
+        ref PurchaseData purchaseData)
+    {
+        if (pack == null || pack.PriceCurrencyType != CurrencyType.Real || IsInAppPreviewActive())
+            return true;
+
+        bool purchasesAvailable = PurchasesAvailable();
+        bool availabilityChanged = purchasesAvailable != _lastPurchasesAvailable;
+        _lastPurchasesAvailable = purchasesAvailable;
+        if (availabilityChanged)
+            InitSlots(false);
+
+        if (!purchasesAvailable)
+            return pack.RewardedAdFallback;
+        if (G.Purchases == null)
+            return false;
+
+        string purchaseId = GetPurchaseId(pack);
+        purchaseData = G.Purchases.GetPurchaseData(purchaseId);
+        if (purchaseData != null && !string.IsNullOrWhiteSpace(purchaseData.Id))
+            _cachedPlatformPurchaseData[purchaseId] = purchaseData;
+        return purchaseData != null && !string.IsNullOrWhiteSpace(purchaseData.Id);
     }
 
     private void ScrollToSection(ShopCategory category, bool animated = true)
@@ -1042,7 +1233,7 @@ public class SpecialShop : MonoBehaviour
                 break;
             case ShopOfferStyle.MonthlyPass:
                 key = "UI/Shop/Group/MonthlyPass";
-                fallback = "Ad-free packs";
+                fallback = "Premium packs";
                 break;
             case ShopOfferStyle.EternalPack:
                 key = "UI/Shop/Group/EternalPack";
@@ -1367,6 +1558,14 @@ public class SpecialShop : MonoBehaviour
     {
         for (int i = 0; i < _slots.Count; i++)
             _slots[i]?.RefreshState();
+
+        _slotStateDirty = false;
+    }
+
+    private void RefreshSlotAffordability(CurrencyType currencyType)
+    {
+        for (int i = 0; i < _slots.Count; i++)
+            _slots[i]?.RefreshAffordability(currencyType);
     }
 
     private void UpdateCategoryButtons()
@@ -1380,6 +1579,7 @@ public class SpecialShop : MonoBehaviour
             ShopCategory category = i < ButtonCategories.Length ? ButtonCategories[i] : (ShopCategory)i;
             bool available = GetSectionPacks(category).Count > 0;
             button.gameObject.SetActive(available);
+            button.interactable = available;
             if (!available)
                 continue;
 
@@ -1653,7 +1853,11 @@ public class SpecialShop : MonoBehaviour
 
     private static string GetPurchaseId(ShopPackData pack)
     {
-        return "Pack_" + (pack != null ? pack.Id : string.Empty);
+        // Mirra product IDs must match the configured catalog exactly.
+        // The old synthetic "Pack_" prefix made every real-money SKU differ
+        // from the IDs supplied to the platform (for example,
+        // limited_egg_10 became Pack_limited_egg_10).
+        return pack != null ? pack.Id : string.Empty;
     }
 
     public static void DeliverOrQueueRestoredPurchase(string id)

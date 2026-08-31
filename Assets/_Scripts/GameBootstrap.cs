@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class GameBootstrap : MonoBehaviour
@@ -20,10 +21,10 @@ public class GameBootstrap : MonoBehaviour
     [SerializeField] private GameScene _gameScene;
 
 
-    private void Start()
+    private IEnumerator Start()
     {
         _ = AnalyticsManager.Instance;
-        Instantiate(_localizationManager);
+        LocalizationManager localization = Instantiate(_localizationManager);
         Instantiate(_gameLoader);
         G.GameLoader.ShowLoadingScreen(true);
 
@@ -45,6 +46,21 @@ public class GameBootstrap : MonoBehaviour
 
         new GameObject("GiftInboxUI").AddComponent<GiftInboxUI>();
         new GameObject("FriendRequestInboxUI").AddComponent<FriendRequestInboxUI>();
+
+        // Wait for the actual Mirra platform language before leaving the
+        // bootstrap scene. This gives the localized loading labels a rendered
+        // frame instead of updating them during a synchronous scene change.
+        while (localization != null && !localization.IsLanguageReady)
+            yield return null;
+
+        // Keep the bootstrap loading screen in front until the startup ad has
+        // either closed or exhausted its readiness timeout. This prevents the
+        // first interstitial from appearing over the already running world.
+        while (G.Ad != null && !G.Ad.StartupInterstitialFinished)
+            yield return null;
+
+        Canvas.ForceUpdateCanvases();
+        yield return null;
 
         G.GameLoader.LoadNextScene(_gameScene.ToString(), false);
     }

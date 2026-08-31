@@ -2,16 +2,15 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using MirraGames.SDK;  // пространство имён MirraSDK
-using MirraGames.SDK.Common;
 
 public class MirraSDKLocalizationProvider : LocalizationProvider
 {
     // событие при смене языка, передаём код в lowercase, например "en", "ru"
     public override event Action<string> OnSwitchLang;
 
-    // хранит последний известный код языка
-    private string lastLangCode = null;
-    private string _langCode = null;
+    // Хранит последний опубликованный код языка.
+    private string lastLangCode;
+    private bool _isEnabled;
 
     // словарь для нестандартных кодов ISO
     private static readonly Dictionary<string, string> _exceptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -23,35 +22,39 @@ public class MirraSDKLocalizationProvider : LocalizationProvider
 
     private void OnEnable()
     {
+        _isEnabled = true;
+
         // Ждём, пока провайдеры локализации не инициализируются
         MirraSDK.WaitForProviders(() =>
         {
-            // устанавливаем начальное значение
-            lastLangCode = GetCurrentLanguage();
+            if (!_isEnabled)
+                return;
+
+            PublishCurrentLanguage();
         });
     }
-    private void CheckLeng()
+
+    private void PublishCurrentLanguage()
     {
-        if (!MirraSDK.IsInitialized) return;
-        // получаем текущий код языка
-        string current = _langCode;
-        Debug.Log("Был язык: " + lastLangCode + " Новый язык: " + current);
-        // если изменилось — уведомляем подписчиков
-        if (lastLangCode != null && current != lastLangCode)
-        {
+        string current = GetCurrentLanguage();
+        if (string.IsNullOrEmpty(current) ||
+            string.Equals(lastLangCode, current, StringComparison.OrdinalIgnoreCase))
+            return;
 
-            Debug.Log("Изменяем язык на " + current);
-            lastLangCode = current;
-            OnSwitchLang?.Invoke(current);
-        }
-
+        lastLangCode = current;
+        OnSwitchLang?.Invoke(current);
     }
     /// <summary>
     /// Возвращаем код текущего языка: двухбуквенный ISO или из словаря исключений
     /// </summary>
     public override string GetCurrentLanguage()
     {
-        if (!MirraSDK.IsInitialized) return "en";
+        // До готовности SDK не подставляем искусственный язык. Менеджер может
+        // показать свой prefab fallback, а после WaitForProviders получит
+        // настоящий язык платформы через OnSwitchLang.
+        if (!MirraSDK.IsInitialized)
+            return string.Empty;
+
         string name = MirraSDK.Language.Current.ToString();
 
         //Debug.Log(name + " = Берем значение языка из СДК ");
@@ -75,30 +78,14 @@ public class MirraSDKLocalizationProvider : LocalizationProvider
     /// </summary>
     public override void SwitchLanguage(string langCode)
     {
-        //Debug.Log("Проверка инициализации СДК - " + MirraSDK.IsInitialized);
-        if (!MirraSDK.IsInitialized) return;
-        // приводим к нижнему регистру
-        langCode = langCode.ToLowerInvariant();
-
-        // перебираем все значения enum LanguageType
-        foreach (LanguageType candidate in Enum.GetValues(typeof(LanguageType)))
-        {
-            string candidateName = candidate.ToString().ToLowerInvariant();
-            if (candidateName.StartsWith(langCode))
-            {
-                _langCode = langCode.ToLowerInvariant();
-                //MirraSDK.Language.Current = candidate;
-                //Debug.Log("Усталавливаем MirraSDK.Language.Current = " + candidate);
-                CheckLeng();
-                return;
-            }
-        }
-
-        Debug.LogWarning($"MirraSDKLocalizationProvider: unsupported language code '{langCode}'");
+        // Язык определяется площадкой через Mirra SDK. Ручной выбор в игровом
+        // интерфейсе намеренно не поддерживается.
+        PublishCurrentLanguage();
     }
 
     private void OnDisable()
     {
+        _isEnabled = false;
         // очищаем, чтобы не было утечек
         lastLangCode = null;
     }

@@ -22,6 +22,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     [Header("Rewarded Ad Badge")]
     [SerializeField] private bool _showRewardedAdBadge;
     [SerializeField] private Sprite _rewardedAdBadgeSprite;
+    [SerializeField] private Material _rewardedAdBadgeMaterial;
     [SerializeField] private string _rewardedAdBadgeLabel;
     [SerializeField] private Vector2 _rewardedAdBadgeSize = new Vector2(36f, 36f);
     [SerializeField] private Vector2 _rewardedAdBadgeOffset = new Vector2(-7f, -7f);
@@ -481,6 +482,7 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             return;
 
         badgeImage.sprite = _rewardedAdBadgeSprite != null ? _rewardedAdBadgeSprite : AdButtonIconDecorator.GetIconSprite();
+        badgeImage.material = _rewardedAdBadgeMaterial;
         badgeImage.type = Image.Type.Simple;
         badgeImage.preserveAspect = true;
         badgeImage.color = Color.white;
@@ -537,8 +539,13 @@ public class InteractionPanel : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             _rewardedAdBadgeLabelText = TmpUiTextFactory.Add(labelTransform.gameObject);
 
         TmpUiTextFactory.ApplyDefaults(_rewardedAdBadgeLabelText);
-        if (_actionText != null && _actionText.font != null)
-            _rewardedAdBadgeLabelText.font = _actionText.font;
+        if (_actionText != null)
+        {
+            if (_actionText.font != null)
+                _rewardedAdBadgeLabelText.font = _actionText.font;
+            if (_actionText.fontSharedMaterial != null)
+                _rewardedAdBadgeLabelText.fontSharedMaterial = _actionText.fontSharedMaterial;
+        }
         _rewardedAdBadgeLabelText.alignment = TextAlignmentOptions.Center;
         _rewardedAdBadgeLabelText.color = _rewardedAdBadgeLabelColor;
         _rewardedAdBadgeLabelText.fontSize = _rewardedAdBadgeLabelFontSize;

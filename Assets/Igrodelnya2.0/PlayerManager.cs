@@ -18,6 +18,7 @@ public class PlayerManager : MonoBehaviour
             G.Player = this;
             _tPPlayer = GetComponent<TPPlayerController>();
             _controller = GetComponent<CharacterController>();
+            GroundBlobShadow.Ensure(gameObject, GroundBlobShadowPreset.Player);
         }
         else
         {

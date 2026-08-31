@@ -34,6 +34,9 @@ public class LocalizationData : ScriptableObject
     public string GetTranslation(string key)
     {
         var manager = LocalizationManager.Instance;
+        if (Application.isPlaying && manager != null && !manager.IsLanguageReady)
+            return string.Empty;
+
         var language = manager != null ? manager.CurrentLanguage : (languages.Count > 0 ? languages[0] : string.Empty);
         return GetTranslation(key, language);
     }

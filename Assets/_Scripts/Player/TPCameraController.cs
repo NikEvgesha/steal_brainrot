@@ -8,6 +8,8 @@ using UnityEngine;
 [DefaultExecutionOrder(50)]
 public class TPCameraController : MonoBehaviour
 {
+    private const float WebGlPointerLockCooldownSeconds = 1f;
+
     [Header("Target & Orbit")]
     [SerializeField] private Transform target;
     [SerializeField] private float yaw;
@@ -23,6 +25,7 @@ public class TPCameraController : MonoBehaviour
     [SerializeField] private float minDistance = 1.6f;
     [SerializeField] private float maxDistance = 18f;
     [SerializeField] private float zoomSpeed = 3f;
+    [SerializeField] private float touchZoomSpeed = 2.2f;
     [SerializeField] private float backReturnSpeed = 8f;
 
     [Header("Collision")]
@@ -46,6 +49,8 @@ public class TPCameraController : MonoBehaviour
     private float _yawVelocity;
     private float _pitchVelocity;
     private bool _orbitInitialized;
+    private bool _ownsPointerLock;
+    private float _nextPointerLockRequestTime = -WebGlPointerLockCooldownSeconds;
     private RaycastHit _hit;
     private readonly RaycastHit[] _collisionHits = new RaycastHit[32];
 
@@ -74,13 +79,20 @@ public class TPCameraController : MonoBehaviour
         InitializeOrbitAngles();
 
         bool useTouchInput = G.Control != null && G.Control.UseTouchControl && G.Input != null;
-        bool pressedThisFrame = !useTouchInput && rotateOnRightMouse && Input.GetMouseButtonDown(1);
-        bool canRotate = useTouchInput || !rotateOnRightMouse || Input.GetMouseButton(1);
+        bool mouseLookBlocked = !useTouchInput && IsMouseLookBlocked();
+        bool pressedThisFrame = !mouseLookBlocked
+                                && !useTouchInput
+                                && rotateOnRightMouse
+                                && Input.GetMouseButtonDown(1);
+        bool canRotate = !mouseLookBlocked
+                         && (useTouchInput || !rotateOnRightMouse || Input.GetMouseButton(1));
+
+        if (mouseLookBlocked)
+            ReleasePointerLock();
 
         if (pressedThisFrame)
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            TryAcquirePointerLock();
             ResetAngularVelocity();
         }
 
@@ -104,15 +116,15 @@ public class TPCameraController : MonoBehaviour
         }
 
         if (!useTouchInput && rotateOnRightMouse && Input.GetMouseButtonUp(1))
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
+            ReleasePointerLock();
 
-        float scroll = Input.GetAxis("Mouse ScrollWheel");
-        if (Mathf.Abs(scroll) > 0.0001f)
+        float zoomInput = mouseLookBlocked
+            ? 0f
+            : useTouchInput ? G.Input.Zoom : Input.GetAxis("Mouse ScrollWheel");
+        if (Mathf.Abs(zoomInput) > 0.0001f)
         {
-            float zoomDelta = -scroll * (_desiredDistance * 0.5f + 1f) * zoomSpeed;
+            float currentZoomSpeed = useTouchInput ? touchZoomSpeed : zoomSpeed;
+            float zoomDelta = -zoomInput * (_desiredDistance * 0.5f + 1f) * currentZoomSpeed;
             _desiredDistance = Mathf.Clamp(_desiredDistance + zoomDelta, minDistance, maxDistance);
         }
     }
@@ -181,6 +193,59 @@ public class TPCameraController : MonoBehaviour
     {
         _yawVelocity = 0f;
         _pitchVelocity = 0f;
+    }
+
+    private static bool IsMouseLookBlocked()
+    {
+        if (G.IsPaused)
+            return true;
+
+        // CursorActive is deliberately true while the desktop cursor is free and
+        // visible. It is not a modal-input flag, so using it here permanently
+        // disabled RMB camera orbit after the cursor behaviour was changed.
+        return PauseManager.Instance != null && PauseManager.Instance.IsPaused;
+    }
+
+    private void TryAcquirePointerLock()
+    {
+        if (Cursor.lockState == CursorLockMode.Locked)
+        {
+            _ownsPointerLock = true;
+            Cursor.visible = false;
+            return;
+        }
+
+#if UNITY_WEBGL
+        // Unity defers requestPointerLock to the next browser input event. Rapid
+        // right-clicks can otherwise enqueue enough requests for Chrome to reject
+        // them with "Too many pointer lock requests in a short window of time".
+        if (Time.unscaledTime < _nextPointerLockRequestTime)
+            return;
+        _nextPointerLockRequestTime = Time.unscaledTime + WebGlPointerLockCooldownSeconds;
+#endif
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        _ownsPointerLock = true;
+    }
+
+    private void ReleasePointerLock()
+    {
+        if (_ownsPointerLock || Cursor.lockState == CursorLockMode.Locked)
+            Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        _ownsPointerLock = false;
+    }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus)
+            ReleasePointerLock();
+    }
+
+    private void OnDisable()
+    {
+        ReleasePointerLock();
     }
 
     private bool TryGetNearestCameraCollision(Vector3 pivot, Vector3 direction, float distance, out RaycastHit nearestHit)

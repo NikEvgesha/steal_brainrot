@@ -1391,6 +1391,10 @@ MonoBehaviour:
     Translations:
     - "\u041D\u0430\u0433\u0440\u0430\u0434\u0430: +{0}"
     - 'Reward: +{0}'
+  - Key: UI/Ads/TimedRewardTitle
+    Translations:
+    - "\u041D\u0430\u0433\u0440\u0430\u0434\u0430 \u0437\u0430 \u0438\u0433\u0440\u0443"
+    - Play reward
   - Key: UI/Brainrot/OfflineIncome
     Translations:
     - "\u041E\u0444\u043B\u0430\u0439\u043D \u0434\u043E\u0445\u043E\u0434 = <sprite=\"Coin\" index=0>{0}"
@@ -2805,8 +2809,8 @@ MonoBehaviour:
     - "Limited egg — 21 days left"
   - Key: UI/Shop/Group/MonthlyPass
     Translations:
-    - "Пакеты без рекламы"
-    - "Ad-free packs"
+    - "Премиум-наборы"
+    - "Premium packs"
   - Key: UI/Shop/Group/EternalPack
     Translations:
     - "Ежедневная лента наград"
@@ -3039,6 +3043,18 @@ MonoBehaviour:
     Translations:
     - "МЕСТО     ИГРОК                         РЕЗУЛЬТАТ"
     - "RANK       PLAYER                         SCORE"
+  - Key: UI/Leaderboards/RankColumn
+    Translations:
+    - "№"
+    - "#"
+  - Key: UI/Leaderboards/PlayerColumn
+    Translations:
+    - "ИГРОК"
+    - "PLAYER"
+  - Key: UI/Leaderboards/ScoreColumn
+    Translations:
+    - "РЕЗУЛЬТАТ"
+    - "SCORE"
   - Key: UI/Leaderboards/Loading
     Translations:
     - "Загрузка..."

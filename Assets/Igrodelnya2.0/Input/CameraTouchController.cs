@@ -10,6 +10,7 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
     [SerializeField] private float _dragSpeed = 0.035f;
     [SerializeField] private float _deadZone = 1f;
     [SerializeField] private float _smoothSpeed = 18f;
+    [SerializeField] private float _pinchZoomSensitivity = 1.35f;
     [SerializeField] private bool _ignoreTouchesOverUI = true;
 
     private readonly List<RaycastResult> _raycastResults = new List<RaycastResult>(16);
@@ -18,9 +19,12 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
     private Vector2 _targetInput;
     private Vector2 _currentInput;
     private int _cameraTouchId = -1;
+    private float _zoomInput;
+    private bool _isPinching;
 
     private void Update()
     {
+        _zoomInput = 0f;
         ProcessTouches();
 
         float blend = 1f - Mathf.Exp(-Mathf.Max(0.01f, _smoothSpeed) * Time.unscaledDeltaTime);
@@ -30,6 +34,16 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
 
     private void ProcessTouches()
     {
+        if (TryProcessPinch())
+            return;
+
+        if (_isPinching)
+        {
+            _isPinching = false;
+            EndDrag();
+            return;
+        }
+
         for (int i = 0; i < Input.touchCount; i++)
         {
             Touch touch = Input.GetTouch(i);
@@ -53,6 +67,50 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
             else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
                 EndDrag();
         }
+    }
+
+    private bool TryProcessPinch()
+    {
+        Touch first = default;
+        Touch second = default;
+        int eligibleTouches = 0;
+        float rightBoundary = Screen.width * _rightSideStart;
+
+        for (int i = 0; i < Input.touchCount && eligibleTouches < 2; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                continue;
+            if (touch.position.x < rightBoundary)
+                continue;
+            if (_ignoreTouchesOverUI && IsPointerBlockedByUI(touch.fingerId, touch.position))
+                continue;
+
+            if (eligibleTouches == 0)
+                first = touch;
+            else
+                second = touch;
+            eligibleTouches++;
+        }
+
+        if (eligibleTouches < 2)
+            return false;
+
+        if (!_isPinching)
+        {
+            EndDrag();
+            _isPinching = true;
+        }
+
+        Vector2 firstPrevious = first.position - first.deltaPosition;
+        Vector2 secondPrevious = second.position - second.deltaPosition;
+        float previousDistance = Vector2.Distance(firstPrevious, secondPrevious);
+        float currentDistance = Vector2.Distance(first.position, second.position);
+        float screenReference = Mathf.Max(1f, Mathf.Min(Screen.width, Screen.height));
+        _zoomInput = (currentDistance - previousDistance) / screenReference * _pinchZoomSensitivity;
+        _targetInput = Vector2.zero;
+        _currentInput = Vector2.zero;
+        return true;
     }
 
     public void StartDrag(Vector3 startPos, int fingerId = -1)
@@ -111,6 +169,11 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
         return _currentInput;
     }
 
+    public float GetZoomInput()
+    {
+        return _zoomInput;
+    }
+
     private bool IsPointerBlockedByUI(int pointerId, Vector2 position)
     {
         EventSystem eventSystem = EventSystem.current;
@@ -141,6 +204,8 @@ public class CameraTouchController : MonoBehaviour, IPointerDownHandler, IPointe
 
     private void OnDisable()
     {
+        _isPinching = false;
+        _zoomInput = 0f;
         EndDrag();
     }
 }

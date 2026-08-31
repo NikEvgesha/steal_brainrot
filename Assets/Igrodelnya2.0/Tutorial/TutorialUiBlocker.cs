@@ -75,6 +75,11 @@ public sealed class TutorialUiBlocker : MonoBehaviour
     {
         if (_tutorialView != null && button.transform.IsChildOf(_tutorialView.transform))
             return false;
+        // The offline-income window is a startup system dialog. Its hierarchy
+        // contains the word "Reward", but it must remain dismissible even while
+        // the tutorial limits access to optional reward screens.
+        if (button.GetComponentInParent<OfflineRewardWindow>(true) != null)
+            return false;
         if (button.GetComponentInParent<InteractionPanel>(true) != null)
             return false;
         if (button.GetComponentInParent<ControlUI>(true) != null)

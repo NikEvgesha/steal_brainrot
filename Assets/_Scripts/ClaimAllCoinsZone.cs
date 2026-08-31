@@ -1138,6 +1138,18 @@ public class ClaimAllCoinsZone : MonoBehaviour
         image.type = Image.Type.Simple;
         image.color = new Color(0.025f, 0.012f, 0.02f, 0.62f);
         image.raycastTarget = true;
+
+        // UniversalDecisionPopup hides its serialized visibility root
+        // (normally "container"), not the whole prefab object. The backdrop
+        // is a sibling of that root so it needs to explicitly follow the same
+        // visibility state; otherwise it remains as a black raycast blocker
+        // after the window is closed.
+        Transform visibilityRoot = popupTransform.Find("container");
+        var follower = backdrop.GetComponent<BlockyDimOverlayFollower>();
+        if (follower == null)
+            follower = backdrop.gameObject.AddComponent<BlockyDimOverlayFollower>();
+        follower.Init(visibilityRoot != null ? visibilityRoot.gameObject : popupTransform.gameObject);
+
         backdrop.SetAsFirstSibling();
     }
 

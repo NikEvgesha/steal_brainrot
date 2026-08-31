@@ -32,6 +32,9 @@ public static class LocalizationUtils
         if (data == null)
             return fallback ?? key;
 
+        if (Application.isPlaying && manager != null && !manager.IsLanguageReady)
+            return string.Empty;
+
         var language = manager != null ? manager.CurrentLanguage : fallbackLanguage;
         if (string.IsNullOrWhiteSpace(language) && data.Languages.Count > 0)
             language = data.Languages[0];

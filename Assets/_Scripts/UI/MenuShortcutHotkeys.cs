@@ -43,6 +43,16 @@ public class MenuShortcutHotkeys : MonoBehaviour
     private const float MenuIconExpandedSize = 92f;
     private static readonly Dictionary<string, Sprite> SpriteCache = new();
 
+    private void OnEnable()
+    {
+        // The menu canvas can be disabled while another screen or the loading
+        // flow owns the UI. Rebind the album action when it returns so a
+        // runtime listener cannot be lost while the keyboard shortcut keeps
+        // working independently.
+        ResolveButtons();
+        EnsureAlbumButton();
+    }
+
     private void Start()
     {
         ResolveButtons();
@@ -382,6 +392,7 @@ public class MenuShortcutHotkeys : MonoBehaviour
             BlockyUITheme.ApplyPanel(background, backgroundColor, true);
         background.raycastTarget = true;
         button.targetGraphic = background;
+        EnsureButtonChildGraphicsPassThrough(button, background);
 
         var shadow = GetOrAddShadow(button.gameObject);
         shadow.effectColor = new Color(0f, 0f, 0f, 0.36f);
@@ -402,6 +413,22 @@ public class MenuShortcutHotkeys : MonoBehaviour
 
         if (button.GetComponent<BlockyUIButtonFeedback>() == null)
             button.gameObject.AddComponent<BlockyUIButtonFeedback>();
+    }
+
+    private static void EnsureButtonChildGraphicsPassThrough(Button button, Graphic targetGraphic)
+    {
+        if (button == null)
+            return;
+
+        // Icons, badges and the decorative gradient must not become the first
+        // click target. Keeping only the Button background raycastable makes
+        // pointer handling identical across Standalone and WebGL event input.
+        var graphics = button.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            if (graphics[i] != null)
+                graphics[i].raycastTarget = graphics[i] == targetGraphic;
+        }
     }
 
     private void UpdateKeyBadges()

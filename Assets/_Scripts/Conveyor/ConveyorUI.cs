@@ -46,6 +46,7 @@ public class ConveyorUI : MonoBehaviour
     private readonly List<ConveyorDropChanceCalculator.EggBreakdownEntry> _cachedEggBreakdown = new();
     private LocalizationManager _subscribedLocalizationManager;
     private CurrencyManager _subscribedCurrencyManager;
+    private Button _closeButton;
 
     [HideInInspector]
     public UnityEvent<ConveyorLevel> LevelActivated = new();
@@ -87,6 +88,7 @@ public class ConveyorUI : MonoBehaviour
         _conveyor = GetComponentInParent<Conveyor>(true);
         EnsurePanel();
         ConfigureResponsiveLayout();
+        ConfigureHeaderVisuals();
         ConfigureInfoCardVisuals();
         StyleIncomeBonusDisplay();
     }
@@ -403,6 +405,12 @@ public class ConveyorUI : MonoBehaviour
             eggSection.anchorMax = new Vector2(0.98f, 0.90f);
             eggSection.anchoredPosition = Vector2.zero;
             eggSection.sizeDelta = Vector2.zero;
+
+            ConfigureSectionLayout(
+                eggSection,
+                "Image",
+                new Vector2(0.02f, 0.04f),
+                new Vector2(0.27f, 0.70f));
         }
 
         var petsSection = infoPanel.Find("Brainrots") as RectTransform;
@@ -412,10 +420,284 @@ public class ConveyorUI : MonoBehaviour
             petsSection.anchorMax = new Vector2(0.98f, 0.64f);
             petsSection.anchoredPosition = Vector2.zero;
             petsSection.sizeDelta = Vector2.zero;
+
+            ConfigureSectionLayout(
+                petsSection,
+                "layout",
+                new Vector2(0f, 0.02f),
+                new Vector2(1f, 0.70f));
         }
 
         CenterStretchChild(infoPanel.Find("Info") as RectTransform);
         CenterStretchChild(infoPanel.Find("Name") as RectTransform);
+    }
+
+    private static void ConfigureSectionLayout(
+        RectTransform section,
+        string contentName,
+        Vector2 contentAnchorMin,
+        Vector2 contentAnchorMax)
+    {
+        if (section == null)
+            return;
+
+        var header = section.Find("HeaderBackground") as RectTransform;
+        if (header != null)
+        {
+            header.anchorMin = new Vector2(0f, 0.78f);
+            header.anchorMax = Vector2.one;
+            header.anchoredPosition = Vector2.zero;
+            header.sizeDelta = Vector2.zero;
+        }
+
+        var title = section.Find("Text (Legacy)") as RectTransform;
+        if (title != null)
+        {
+            title.anchorMin = new Vector2(0f, 0.80f);
+            title.anchorMax = Vector2.one;
+            title.anchoredPosition = Vector2.zero;
+            title.sizeDelta = Vector2.zero;
+        }
+
+        var content = section.Find(contentName) as RectTransform;
+        if (content != null)
+        {
+            content.anchorMin = contentAnchorMin;
+            content.anchorMax = contentAnchorMax;
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            content.SetAsFirstSibling();
+        }
+
+        // Header and text must be rendered after the cards even if a future
+        // layout adjustment lets their rectangles touch again.
+        header?.SetAsLastSibling();
+        title?.SetAsLastSibling();
+    }
+
+    private void ConfigureHeaderVisuals()
+    {
+        var window = transform.Find("container/Panel") as RectTransform;
+        var header = window != null ? window.Find("Top") as RectTransform : null;
+        if (window == null || header == null)
+            return;
+
+        header.anchorMin = new Vector2(0f, 0.86f);
+        header.anchorMax = Vector2.one;
+        header.anchoredPosition = Vector2.zero;
+        header.sizeDelta = Vector2.zero;
+
+        var headerImage = header.GetComponent<Image>();
+        if (headerImage != null)
+        {
+            headerImage.type = headerImage.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+            headerImage.pixelsPerUnitMultiplier = 1f;
+        }
+
+        var title = header.Find("Text (Legacy)")?.GetComponent<TMP_Text>();
+        if (title != null)
+        {
+            title.color = Color.white;
+            title.fontStyle |= FontStyles.Bold;
+            title.alignment = TextAlignmentOptions.Center;
+            title.outlineColor = BlockyUITheme.BlackStroke;
+            title.outlineWidth = Mathf.Max(title.outlineWidth, 0.18f);
+            title.enableAutoSizing = true;
+            title.fontSizeMin = 28f;
+            title.fontSizeMax = 58f;
+
+            if (title.transform is RectTransform titleRect)
+            {
+                titleRect.anchorMin = new Vector2(0.14f, 0f);
+                titleRect.anchorMax = new Vector2(0.86f, 1f);
+                titleRect.anchoredPosition = Vector2.zero;
+                titleRect.sizeDelta = Vector2.zero;
+            }
+        }
+
+        EnsureGradient(header, "HeaderGradient", _buyButtonGradientSprite, 0.22f);
+        if (title != null)
+            title.transform.SetAsLastSibling();
+
+        EnsureCloseButton(window, headerImage, title);
+    }
+
+    private void EnsureCloseButton(RectTransform window, Image headerImage, TMP_Text titleTemplate)
+    {
+        if (window == null)
+            return;
+
+        Transform existing = window.Find("CloseButton");
+        GameObject closeObject;
+        if (existing == null)
+        {
+            closeObject = new GameObject(
+                "CloseButton",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Button),
+                typeof(AspectRatioFitter),
+                typeof(Outline),
+                typeof(Shadow));
+            closeObject.transform.SetParent(window, false);
+        }
+        else
+        {
+            closeObject = existing.gameObject;
+        }
+
+        var rect = closeObject.transform as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(0.98f, 0.875f);
+            rect.anchorMax = new Vector2(0.98f, 0.985f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.anchoredPosition = new Vector2(-8f, 0f);
+            rect.sizeDelta = Vector2.zero;
+        }
+
+        var aspect = closeObject.GetComponent<AspectRatioFitter>();
+        aspect.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+        aspect.aspectRatio = 1f;
+
+        var image = closeObject.GetComponent<Image>();
+        image.sprite = headerImage != null ? headerImage.sprite : null;
+        image.type = image.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
+        image.pixelsPerUnitMultiplier = 1f;
+        image.color = BlockyUITheme.RedHeader;
+        image.raycastTarget = true;
+
+        var outline = closeObject.GetComponent<Outline>();
+        outline.effectColor = BlockyUITheme.BlackStroke;
+        outline.effectDistance = new Vector2(3f, -3f);
+
+        Shadow shadow = null;
+        var shadows = closeObject.GetComponents<Shadow>();
+        for (int i = 0; i < shadows.Length; i++)
+        {
+            if (shadows[i] != null && !(shadows[i] is Outline))
+            {
+                shadow = shadows[i];
+                break;
+            }
+        }
+
+        if (shadow == null)
+            shadow = closeObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.38f);
+        shadow.effectDistance = new Vector2(0f, -3f);
+        shadow.useGraphicAlpha = true;
+
+        _closeButton = closeObject.GetComponent<Button>();
+        _closeButton.targetGraphic = image;
+        _closeButton.onClick.RemoveListener(CloseFromButton);
+        _closeButton.onClick.AddListener(CloseFromButton);
+
+        var colors = _closeButton.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+        colors.pressedColor = new Color(0.80f, 0.80f, 0.80f, 1f);
+        colors.selectedColor = Color.white;
+        colors.disabledColor = new Color(0.48f, 0.48f, 0.48f, 0.78f);
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.08f;
+        _closeButton.colors = colors;
+
+        EnsureGradient(closeObject.transform, "Gradient", _buyButtonGradientSprite, 0.20f);
+        EnsureCloseGlyph(closeObject.transform, titleTemplate);
+        closeObject.transform.SetAsLastSibling();
+    }
+
+    private static void EnsureGradient(Transform parent, string objectName, Sprite sprite, float alpha)
+    {
+        if (parent == null || sprite == null)
+            return;
+
+        Transform existing = parent.Find(objectName);
+        GameObject gradientObject;
+        if (existing == null)
+        {
+            gradientObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            gradientObject.transform.SetParent(parent, false);
+        }
+        else
+        {
+            gradientObject = existing.gameObject;
+        }
+
+        var rect = gradientObject.transform as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+        }
+
+        var image = gradientObject.GetComponent<Image>();
+        image.sprite = sprite;
+        image.type = Image.Type.Simple;
+        image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(alpha));
+        image.raycastTarget = false;
+        gradientObject.transform.SetAsFirstSibling();
+    }
+
+    private static void EnsureCloseGlyph(Transform parent, TMP_Text titleTemplate)
+    {
+        if (parent == null)
+            return;
+
+        Transform existing = parent.Find("Text");
+        GameObject textObject;
+        if (existing == null)
+        {
+            textObject = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(parent, false);
+        }
+        else
+        {
+            textObject = existing.gameObject;
+        }
+
+        var rect = textObject.transform as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(-10f, -8f);
+        }
+
+        var text = textObject.GetComponent<TMP_Text>();
+        if (titleTemplate != null)
+        {
+            text.font = titleTemplate.font;
+            text.fontSharedMaterial = titleTemplate.fontSharedMaterial;
+        }
+        else
+        {
+            TmpUiTextFactory.ApplyDefaults(text);
+        }
+
+        text.text = "X";
+        text.color = Color.white;
+        text.fontStyle = FontStyles.Bold;
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 24f;
+        text.fontSizeMax = 54f;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.outlineColor = BlockyUITheme.BlackStroke;
+        text.outlineWidth = Mathf.Max(text.outlineWidth, 0.18f);
+        text.raycastTarget = false;
+        textObject.transform.SetAsLastSibling();
+    }
+
+    private void CloseFromButton()
+    {
+        ToggleOpen(false);
     }
 
     private void ConfigureInfoCardVisuals()

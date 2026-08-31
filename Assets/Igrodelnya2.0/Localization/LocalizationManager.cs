@@ -1,10 +1,9 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class LocalizationManager : MonoBehaviour
 {
-    private const string DefaultLanguage = "En";
-
     public static LocalizationManager Instance { get; private set; }
     public static event Action<LocalizationManager> OnInstanceReady;
 
@@ -16,12 +15,19 @@ public class LocalizationManager : MonoBehaviour
 
     public LocalizationData LocalizationData => localizationData;
     public string CurrentLanguage => currentLanguage;
+    public bool IsLanguageReady => !string.IsNullOrEmpty(currentLanguage);
 
     private void Awake()
     {
         if (Instance == null)
         {
+            // Serialized values are useful for prefab previews only. At runtime the
+            // language must come exclusively from the active platform provider.
+            currentLanguage = string.Empty;
             Instance = this;
+            G.Localization = this;
+            LocalizationProvider = GetComponent<LocalizationProvider>();
+            DontDestroyOnLoad(gameObject);
             OnInstanceReady?.Invoke(this);
         }
         else
@@ -30,16 +36,35 @@ public class LocalizationManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
-        LocalizationProvider = GetComponent<LocalizationProvider>();
     }
 
     private void OnEnable()
     {
+        // Unity may reload the scripting domain while keeping the persistent
+        // GameObject alive. Restore all non-serialized runtime references so the
+        // game never falls back to the languages serialized in scene prefabs.
+        if (Instance == null)
+        {
+            Instance = this;
+            G.Localization = this;
+            LocalizationProvider = GetComponent<LocalizationProvider>();
+            DontDestroyOnLoad(gameObject);
+            OnInstanceReady?.Invoke(this);
+        }
+        else if (Instance != this)
+        {
+            return;
+        }
+        else if (LocalizationProvider == null)
+        {
+            LocalizationProvider = GetComponent<LocalizationProvider>();
+        }
+
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+
         if (LocalizationProvider == null)
         {
             Debug.LogWarning("LocalizationProvider is not assigned.");
-            ApplyFallbackLanguage();
             return;
         }
 
@@ -47,16 +72,15 @@ public class LocalizationManager : MonoBehaviour
 
         var providerLang = LocalizationProvider.GetCurrentLanguage();
         if (!string.IsNullOrEmpty(providerLang))
-        {
             OnSwitchLanguage(providerLang);
-            return;
-        }
 
-        ApplyFallbackLanguage();
+        RefreshLoadedLocalizedTexts();
     }
 
     private void OnDisable()
     {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+
         if (LocalizationProvider != null)
             LocalizationProvider.OnSwitchLang -= OnSwitchLanguage;
     }
@@ -64,7 +88,11 @@ public class LocalizationManager : MonoBehaviour
     private void OnDestroy()
     {
         if (Instance == this)
+        {
             Instance = null;
+            if (G.Localization == this)
+                G.Localization = null;
+        }
     }
 
     public void ChangeLanguage(string newLanguage)
@@ -72,37 +100,57 @@ public class LocalizationManager : MonoBehaviour
         if (localizationData == null)
             return;
 
+        if (Application.isPlaying)
+        {
+            LocalizationProvider?.SwitchLanguage(newLanguage);
+            return;
+        }
+
+        ApplyProviderLanguage(newLanguage);
+    }
+
+    private void ApplyProviderLanguage(string newLanguage)
+    {
+        if (localizationData == null)
+            return;
+
         var resolvedLanguage = ResolveLanguageName(newLanguage);
         if (string.IsNullOrEmpty(resolvedLanguage))
-            resolvedLanguage = ResolveFallbackLanguage();
+        {
+            if (!string.IsNullOrWhiteSpace(newLanguage))
+                Debug.LogWarning($"LocalizationManager: provider language '{newLanguage}' is not configured.");
+            return;
+        }
 
         if (string.IsNullOrEmpty(resolvedLanguage) || string.Equals(resolvedLanguage, currentLanguage, StringComparison.Ordinal))
             return;
 
         currentLanguage = resolvedLanguage;
         OnLanguageChanged?.Invoke(resolvedLanguage);
+        RefreshLoadedLocalizedTexts();
     }
 
     private void OnSwitchLanguage(string langCode)
     {
-        ChangeLanguage(langCode);
+        ApplyProviderLanguage(langCode);
     }
 
-    private void ApplyFallbackLanguage()
+    private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        ChangeLanguage(currentLanguage);
+        RefreshLoadedLocalizedTexts();
     }
 
-    private string ResolveFallbackLanguage()
+    private void RefreshLoadedLocalizedTexts()
     {
-        if (localizationData == null || localizationData.Languages == null || localizationData.Languages.Count == 0)
-            return string.Empty;
+        if (!IsLanguageReady)
+            return;
 
-        var byDefault = ResolveLanguageName(DefaultLanguage);
-        if (!string.IsNullOrEmpty(byDefault))
-            return byDefault;
+        var localizedTexts = FindObjectsByType<LocalizedText>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
 
-        return localizationData.Languages[0];
+        for (var i = 0; i < localizedTexts.Length; i++)
+            localizedTexts[i].SetLanguage(currentLanguage);
     }
 
     private string ResolveLanguageName(string candidate)

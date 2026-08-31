@@ -51,10 +51,20 @@ MonoBehaviour:
   waitForRewardedProvider: 1
   rewardedReadyTimeoutSeconds: 3
   rewardedReadyPollSeconds: 0.15
+  startupInterstitialEnabled: 1
+  startupInterstitialDelaySeconds: 0.5
+  startupInterstitialReadyTimeoutSeconds: 20
+  startupInterstitialReadyPollSeconds: 0.25
+  interstitialCallbackTimeoutSeconds: 20
   timedInterstitialEnabled: 1
   interstitialIntervalSeconds: 60
-  interstitialCountdownSeconds: 3
   interstitialIncomeRewardMultiplier: 2
+  timedRewardedAdId: TimedIncomeRewardX2
+  timedInterstitialCountdownLocalizationKey: UI/Ads/TimedInterstitialCountdown
+  timedInterstitialCountdownText: 'Ad in {0}'
+  timedRewardX2ButtonText: X2
+  timedInterstitialRewardLocalizationKey: UI/Ads/TimedInterstitialReward
+  timedInterstitialRewardText: 'Reward: +{0}'
 --- !u!114 &4162030901523556965
 MonoBehaviour:
   m_ObjectHideFlags: 0

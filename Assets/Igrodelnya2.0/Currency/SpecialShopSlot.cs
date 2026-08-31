@@ -6,6 +6,11 @@ using UnityEngine.UI;
 
 public class SpecialShopSlot : MonoBehaviour
 {
+    [Header("Template Layout")]
+    [SerializeField, Tooltip("Keep the RectTransform layout authored in this prefab instead of rebuilding it at runtime.")]
+    private bool _useAuthoredLayout;
+    [SerializeField] private ShopOfferStyle _authoredLayoutStyle;
+
     [Header("Content")]
     [SerializeField] private TextMeshProUGUI _name;
     [SerializeField] private TextMeshProUGUI _description;
@@ -19,6 +24,8 @@ public class SpecialShopSlot : MonoBehaviour
     [Header("Purchase")]
     [SerializeField] private Button _buyButton;
     [SerializeField] private TextMeshProUGUI _price;
+    [SerializeField, Tooltip("Optional alternative label for a real-money/platform price. Keep the PriceVal object disabled in the prefab.")]
+    private TextMeshProUGUI _platformPrice;
     [SerializeField] protected Image _currencyIcon;
     [SerializeField] protected TextMeshProUGUI _currencyText;
 
@@ -32,14 +39,25 @@ public class SpecialShopSlot : MonoBehaviour
     private ShopPackData _shopPackData;
     private PurchaseData _productData;
     private float _nextTimerRefresh;
-    private Image _badgeBackground;
-    private TextMeshProUGUI _badgeText;
-    private TextMeshProUGUI _originalPriceText;
-    private SpecialShopEternalTrackView _eternalTrack;
+    [SerializeField, HideInInspector] private Image _badgeBackground;
+    [SerializeField, HideInInspector] private TextMeshProUGUI _badgeText;
+    [SerializeField, HideInInspector] private TextMeshProUGUI _originalPriceText;
+    [SerializeField, HideInInspector] private SpecialShopEternalTrackView _eternalTrack;
+
+    public ShopPackData PackData => _shopPackData;
 
     private void Awake()
     {
-        ApplyCardLayout();
+        ResolveOptionalPlatformPrice();
+        if (_platformPrice != null)
+            _platformPrice.gameObject.SetActive(false);
+
+        if (!_useAuthoredLayout)
+        {
+            ApplyCardLayout(_shopPackData != null
+                ? _shopPackData.OfferStyle
+                : ShopOfferStyle.Standard);
+        }
     }
 
     public void Init(SpecialShop shop, ShopPackData pack, PurchaseData purchaseData)
@@ -54,7 +72,8 @@ public class SpecialShopSlot : MonoBehaviour
             return;
         }
 
-        ApplyCardLayout(pack.OfferStyle);
+        if (!_useAuthoredLayout)
+            ApplyCardLayout(pack.OfferStyle);
         ConfigureOfferDecorations(pack);
 
         if (_name != null)
@@ -97,6 +116,12 @@ public class SpecialShopSlot : MonoBehaviour
         else
             BuildRewardIcons(pack);
 
+        // Reward-grid rebuilding can restore prefab RectTransform values on sibling
+        // artwork. Apply the offer-specific layout once more after all dynamic
+        // content has been created so the final card geometry is deterministic.
+        if (!_useAuthoredLayout)
+            ApplyCardLayout(pack.OfferStyle);
+        ConfigureOfferDecorations(pack);
         ConfigureActionLayout(pack.HasConsumableReward, pack.OfferStyle);
         RefreshPrice();
         RefreshState();
@@ -104,13 +129,38 @@ public class SpecialShopSlot : MonoBehaviour
 
     private void Update()
     {
-        if (_shopPackData == null || Time.unscaledTime < _nextTimerRefresh)
+        if (_shopPackData == null ||
+            (_shop != null && !_shop.Opened) ||
+            !RequiresPeriodicRefresh(_shopPackData) ||
+            Time.unscaledTime < _nextTimerRefresh)
             return;
 
-        _nextTimerRefresh = Time.unscaledTime + 0.5f;
-        RefreshState();
-        if (_shopPackData.OfferStyle == ShopOfferStyle.SoftCurrency && _effectText != null)
-            _effectText.text = _shop != null ? _shop.BuildRewardSummary(_shopPackData) : string.Empty;
+        bool hasActiveTimer = HasTimerReward(_shopPackData);
+        _nextTimerRefresh = Time.unscaledTime + (hasActiveTimer ? 1f : 60f);
+        if (hasActiveTimer)
+            RefreshActiveTimer(_shop != null ? _shop.Effects : null);
+
+        if (_shopPackData.AvailabilityDays > 0)
+            RefreshAvailabilityBadge();
+    }
+
+    /// <summary>
+    /// Currency changes are frequent while the farm is producing income. They
+    /// only affect whether this card can be bought, so avoid rebuilding reward
+    /// grids, recalculating farm income or refreshing the eternal track here.
+    /// </summary>
+    public void RefreshAffordability(CurrencyType changedCurrency)
+    {
+        if (_shopPackData == null ||
+            _buyButton == null ||
+            _shopPackData.PriceCurrencyType != changedCurrency)
+            return;
+
+        var effects = _shop != null ? _shop.Effects : null;
+        bool permanentOwned = effects != null && effects.IsPermanentPackOwned(_shopPackData);
+        bool interactable = !permanentOwned && (_shop == null || _shop.CanPurchasePack(_shopPackData));
+        if (_buyButton.interactable != interactable)
+            _buyButton.interactable = interactable;
     }
 
     public void RefreshState()
@@ -130,8 +180,8 @@ public class SpecialShopSlot : MonoBehaviour
 
         if (_buyButton != null)
             _buyButton.interactable = !permanentOwned && (_shop == null || _shop.CanPurchasePack(_shopPackData));
-        if (_price != null && permanentOwned)
-            _price.text = LocalizationUtils.T("UI/Shop/Owned", "Куплено");
+        if (permanentOwned)
+            SetPriceText(LocalizationUtils.T("UI/Shop/Owned", "Куплено"), false);
         else
             RefreshPrice();
 
@@ -153,6 +203,13 @@ public class SpecialShopSlot : MonoBehaviour
         RefreshAvailabilityBadge();
     }
 
+    public void RefreshPurchaseData(PurchaseData purchaseData)
+    {
+        _productData = purchaseData ?? PurchaseData.Fallback(_shopPackData != null ? _shopPackData.Id : string.Empty);
+        RefreshPrice();
+        RefreshState();
+    }
+
     public void OnClick()
     {
         _shop?.TryBuy(_productData, _shopPackData);
@@ -170,16 +227,14 @@ public class SpecialShopSlot : MonoBehaviour
 
         bool rewardedAdFallback = _shop != null && _shop.IsRewardedAdFallback(_shopPackData);
         bool realPurchase = _shopPackData.PriceCurrencyType == CurrencyType.Real;
-        string providerPrice = _productData != null ? _productData.Price : string.Empty;
-        if (_price != null)
-        {
-            if (rewardedAdFallback)
-                _price.text = LocalizationUtils.Format("UI/Shop/RewardedAdPrice", "+{0}", _shopPackData.RewardedAdGems);
-            else
-                _price.text = realPurchase && !string.IsNullOrWhiteSpace(providerPrice)
-                    ? providerPrice
-                    : _shopPackData.Price.ToString();
-        }
+        string providerPrice = _productData != null ? _productData.DisplayPrice : string.Empty;
+        bool platformPriceReady = !realPurchase || !string.IsNullOrWhiteSpace(providerPrice);
+        string displayedPrice = rewardedAdFallback
+            ? LocalizationUtils.Format("UI/Shop/RewardedAdPrice", "+{0}", _shopPackData.RewardedAdGems)
+            : realPurchase
+                ? platformPriceReady ? providerPrice : "…"
+                : _shopPackData.Price.ToString();
+        SetPriceText(displayedPrice, realPurchase && !rewardedAdFallback);
 
         if (_currencyIcon != null)
         {
@@ -199,6 +254,48 @@ public class SpecialShopSlot : MonoBehaviour
                 : LocalizationUtils.T(
                     "UI/Currency/" + _shopPackData.PriceCurrencyType,
                     _shopPackData.PriceCurrencyType.ToString());
+
+        if (_buyButton != null && realPurchase && !rewardedAdFallback)
+            _buyButton.interactable = platformPriceReady &&
+                                      (_shop == null || _shop.CanPurchasePack(_shopPackData));
+    }
+
+    private void SetPriceText(string value, bool usePlatformLayout)
+    {
+        ResolveOptionalPlatformPrice();
+        bool showPlatformPrice = usePlatformLayout && _platformPrice != null;
+
+        if (_platformPrice != null)
+        {
+            if (showPlatformPrice)
+                _platformPrice.text = value;
+            if (_platformPrice.gameObject.activeSelf != showPlatformPrice)
+                _platformPrice.gameObject.SetActive(showPlatformPrice);
+        }
+
+        if (_price != null)
+        {
+            if (!showPlatformPrice)
+                _price.text = value;
+            if (_price.gameObject.activeSelf == showPlatformPrice)
+                _price.gameObject.SetActive(!showPlatformPrice);
+        }
+    }
+
+    private void ResolveOptionalPlatformPrice()
+    {
+        if (_platformPrice != null)
+            return;
+
+        var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            if (string.Equals(texts[i].gameObject.name, "PriceVal", StringComparison.Ordinal))
+            {
+                _platformPrice = texts[i];
+                return;
+            }
+        }
     }
 
     private void RefreshActiveTimer(ShopEffectsService effects)
@@ -225,14 +322,18 @@ public class SpecialShopSlot : MonoBehaviour
             }
         }
 
-        _activeTimerText.gameObject.SetActive(seconds > 0);
+        bool shouldShow = seconds > 0;
+        if (_activeTimerText.gameObject.activeSelf != shouldShow)
+            _activeTimerText.gameObject.SetActive(shouldShow);
         if (seconds > 0)
         {
             TimeSpan remaining = TimeSpan.FromSeconds(seconds);
             string timer = seconds >= 3600
                 ? remaining.ToString(@"hh\:mm\:ss")
                 : remaining.ToString(@"mm\:ss");
-            _activeTimerText.text = LocalizationUtils.Format("UI/Shop/ActiveTimer", "Активно: {0}", timer);
+            string label = LocalizationUtils.Format("UI/Shop/ActiveTimer", "Активно: {0}", timer);
+            if (!string.Equals(_activeTimerText.text, label, StringComparison.Ordinal))
+                _activeTimerText.text = label;
         }
     }
 
@@ -300,8 +401,55 @@ public class SpecialShopSlot : MonoBehaviour
     [ContextMenu("Apply shop card layout")]
     public void ApplyCardLayout()
     {
-        ApplyCardLayout(ShopOfferStyle.Standard);
+        ApplyCardLayout(_useAuthoredLayout
+            ? _authoredLayoutStyle
+            : _shopPackData != null
+                ? _shopPackData.OfferStyle
+                : ShopOfferStyle.Standard);
     }
+
+#if UNITY_EDITOR
+    public void ConfigureAsAuthoredTemplate(ShopOfferStyle style)
+    {
+        _useAuthoredLayout = false;
+        _authoredLayoutStyle = style;
+        ApplyCardLayout(style);
+        EnsureDecorations();
+
+        bool monthly = style == ShopOfferStyle.MonthlyPass;
+        if (_badgeBackground != null && _badgeBackground.transform is RectTransform badgeRect)
+        {
+            badgeRect.anchorMin = monthly ? new Vector2(0.56f, 0.73f) : new Vector2(0.70f, 0.85f);
+            badgeRect.anchorMax = monthly ? new Vector2(0.96f, 0.81f) : new Vector2(0.98f, 0.98f);
+            badgeRect.offsetMin = new Vector2(4f, 1f);
+            badgeRect.offsetMax = new Vector2(-4f, -2f);
+        }
+
+        if (_originalPriceText != null && monthly)
+        {
+            ConfigureRect(
+                _originalPriceText.rectTransform,
+                new Vector2(0.62f, 0.20f),
+                new Vector2(0.96f, 0.28f),
+                new Vector2(3f, 1f),
+                new Vector2(-3f, -1f));
+        }
+
+        if (style == ShopOfferStyle.EternalPack && _eternalTrack == null)
+        {
+            var trackObject = new GameObject("EternalTrack", typeof(RectTransform));
+            trackObject.transform.SetParent(transform, false);
+            _eternalTrack = trackObject.AddComponent<SpecialShopEternalTrackView>();
+        }
+
+        _badgeBackground.gameObject.SetActive(false);
+        if (_originalPriceText != null)
+            _originalPriceText.gameObject.SetActive(false);
+        if (_eternalTrack != null)
+            _eternalTrack.gameObject.SetActive(style == ShopOfferStyle.EternalPack);
+        _useAuthoredLayout = true;
+    }
+#endif
 
     private void ApplyCardLayout(ShopOfferStyle style)
     {
@@ -314,6 +462,7 @@ public class SpecialShopSlot : MonoBehaviour
 
         bool strip = style == ShopOfferStyle.TimedIncome || style == ShopOfferStyle.TimedLuck;
         bool eternal = style == ShopOfferStyle.EternalPack;
+        bool monthlyPass = style == ShopOfferStyle.MonthlyPass;
         if (strip)
         {
             ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0.02f, 0.72f), new Vector2(0.72f, 0.98f), new Vector2(12f, 2f), new Vector2(-8f, -2f));
@@ -331,14 +480,29 @@ public class SpecialShopSlot : MonoBehaviour
             ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0.02f, 0.79f), new Vector2(0.72f, 0.98f), new Vector2(12f, 2f), new Vector2(-8f, -2f));
             ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.02f, 0.72f), new Vector2(0.72f, 0.83f), new Vector2(12f, 0f), new Vector2(-8f, 0f));
         }
+        else if (monthlyPass)
+        {
+            // Monthly packs contain a title, a badge, a two-line description,
+            // a main icon, multiple rewards and a price. Give every element a
+            // dedicated band so localized strings cannot overlap the artwork.
+            ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0.04f, 0.84f), new Vector2(0.96f, 0.98f), new Vector2(8f, 2f), new Vector2(-8f, -2f));
+            ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.04f, 0.58f), new Vector2(0.96f, 0.71f), new Vector2(6f, 2f), new Vector2(-6f, -2f));
+            ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.05f, 0.30f), new Vector2(0.32f, 0.55f), new Vector2(8f, 4f), new Vector2(-8f, -4f));
+            ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.36f, 0.30f), new Vector2(0.96f, 0.55f), new Vector2(6f, 4f), new Vector2(-6f, -4f));
+            ConfigureRect(_rewardParent as RectTransform, new Vector2(0.36f, 0.30f), new Vector2(0.96f, 0.55f), new Vector2(6f, 4f), new Vector2(-6f, -4f));
+            ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.04f, 0.03f), new Vector2(0.96f, 0.19f), Vector2.zero, Vector2.zero);
+            ConfigureRect(_useButton != null ? _useButton.transform as RectTransform : null, new Vector2(0.04f, 0.03f), new Vector2(0.47f, 0.19f), Vector2.zero, Vector2.zero);
+            ConfigureRect(_ownedText != null ? _ownedText.rectTransform : null, new Vector2(0.04f, 0.20f), new Vector2(0.47f, 0.28f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+            ConfigureRect(_activeTimerText != null ? _activeTimerText.rectTransform : null, new Vector2(0.52f, 0.20f), new Vector2(0.96f, 0.28f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
+        }
         else
         {
-            ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0f, 0.78f), Vector2.one, new Vector2(12f, 4f), new Vector2(-12f, -6f));
-            ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.03f, 0.25f), new Vector2(0.34f, 0.75f), new Vector2(10f, 8f), new Vector2(-10f, -8f));
-            ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.36f, 0.48f), new Vector2(0.97f, 0.74f), new Vector2(6f, 2f), new Vector2(-6f, -2f));
-            ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.36f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
-            ConfigureRect(_rewardParent as RectTransform, new Vector2(0.35f, 0.27f), new Vector2(0.97f, 0.75f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
-            ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.36f, 0.04f), new Vector2(0.97f, 0.24f), Vector2.zero, Vector2.zero);
+            ConfigureRect(_name != null ? _name.rectTransform : null, new Vector2(0f, 0.80f), Vector2.one, new Vector2(12f, 4f), new Vector2(-12f, -6f));
+            ConfigureRect(_productIcon != null ? _productIcon.rectTransform : null, new Vector2(0.03f, 0.27f), new Vector2(0.34f, 0.76f), new Vector2(10f, 8f), new Vector2(-10f, -8f));
+            ConfigureRect(_description != null ? _description.rectTransform : null, new Vector2(0.36f, 0.56f), new Vector2(0.97f, 0.76f), new Vector2(6f, 2f), new Vector2(-6f, -2f));
+            ConfigureRect(_effectText != null ? _effectText.rectTransform : null, new Vector2(0.36f, 0.29f), new Vector2(0.97f, 0.55f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
+            ConfigureRect(_rewardParent as RectTransform, new Vector2(0.35f, 0.29f), new Vector2(0.97f, 0.55f), new Vector2(6f, 6f), new Vector2(-6f, -6f));
+            ConfigureRect(_buyButton != null ? _buyButton.transform as RectTransform : null, new Vector2(0.36f, 0.04f), new Vector2(0.97f, 0.23f), Vector2.zero, Vector2.zero);
             ConfigureRect(_useButton != null ? _useButton.transform as RectTransform : null, new Vector2(0.03f, 0.04f), new Vector2(0.47f, 0.24f), Vector2.zero, Vector2.zero);
             ConfigureRect(_ownedText != null ? _ownedText.rectTransform : null, new Vector2(0.03f, 0.24f), new Vector2(0.47f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
             ConfigureRect(_activeTimerText != null ? _activeTimerText.rectTransform : null, new Vector2(0.52f, 0.24f), new Vector2(0.97f, 0.36f), new Vector2(4f, 0f), new Vector2(-4f, 0f));
@@ -383,6 +547,9 @@ public class SpecialShopSlot : MonoBehaviour
         }
 
         _buyButton.gameObject.SetActive(true);
+        if (_useAuthoredLayout)
+            return;
+
         if (style == ShopOfferStyle.TimedIncome || style == ShopOfferStyle.TimedLuck)
         {
             if (!hasConsumableReward)
@@ -392,6 +559,13 @@ public class SpecialShopSlot : MonoBehaviour
                     new Vector2(0.98f, 0.34f),
                     Vector2.zero,
                     Vector2.zero);
+            return;
+        }
+
+        if (style == ShopOfferStyle.MonthlyPass)
+        {
+            Vector2 monthlyMin = hasConsumableReward ? new Vector2(0.52f, 0.03f) : new Vector2(0.04f, 0.03f);
+            ConfigureRect(_buyButton.transform as RectTransform, monthlyMin, new Vector2(0.96f, 0.19f), Vector2.zero, Vector2.zero);
             return;
         }
 
@@ -406,23 +580,30 @@ public class SpecialShopSlot : MonoBehaviour
             ? _shop.BuildPackBadge(pack)
             : LocalizationUtils.T(pack.BadgeFallback, pack.BadgeFallback);
         bool showBadge = !string.IsNullOrWhiteSpace(localizedBadge);
-        if (_badgeBackground.transform is RectTransform badgeRect)
+        bool monthlyPass = pack.OfferStyle == ShopOfferStyle.MonthlyPass;
+        if (!_useAuthoredLayout && _badgeBackground.transform is RectTransform badgeRect)
         {
-            badgeRect.anchorMin = new Vector2(0.69f, 0.84f);
-            badgeRect.anchorMax = new Vector2(0.98f, 0.98f);
+            badgeRect.anchorMin = monthlyPass
+                ? new Vector2(0.56f, 0.73f)
+                : new Vector2(0.70f, 0.85f);
+            badgeRect.anchorMax = monthlyPass
+                ? new Vector2(0.96f, 0.81f)
+                : new Vector2(0.98f, 0.98f);
+            badgeRect.offsetMin = new Vector2(4f, 1f);
+            badgeRect.offsetMax = new Vector2(-4f, -2f);
         }
 
         bool strip = pack.OfferStyle == ShopOfferStyle.TimedIncome ||
                      pack.OfferStyle == ShopOfferStyle.TimedLuck;
         bool eternal = pack.OfferStyle == ShopOfferStyle.EternalPack;
-        if (_name != null && showBadge && !strip && !eternal)
+        if (!_useAuthoredLayout && _name != null && showBadge && !strip && !eternal)
         {
             ConfigureRect(
                 _name.rectTransform,
-                new Vector2(0.01f, 0.78f),
-                new Vector2(0.68f, 0.99f),
+                monthlyPass ? new Vector2(0.04f, 0.84f) : new Vector2(0.01f, 0.78f),
+                monthlyPass ? new Vector2(0.96f, 0.98f) : new Vector2(0.67f, 0.99f),
                 new Vector2(8f, 2f),
-                new Vector2(-3f, -3f));
+                new Vector2(-6f, -3f));
             _name.alignment = TextAlignmentOptions.Center;
         }
 
@@ -430,10 +611,8 @@ public class SpecialShopSlot : MonoBehaviour
         if (showBadge)
             _badgeText.text = localizedBadge;
 
-        bool showOriginalPrice = pack.OriginalPrice > pack.Price;
-        _originalPriceText.gameObject.SetActive(showOriginalPrice);
-        if (showOriginalPrice)
-            _originalPriceText.text = "<s>" + pack.OriginalPrice + "</s>";
+        if (_originalPriceText != null)
+            _originalPriceText.gameObject.SetActive(false);
     }
 
     private void RefreshAvailabilityBadge()
@@ -447,15 +626,19 @@ public class SpecialShopSlot : MonoBehaviour
 
         if (seconds == 0L)
         {
-            _badgeText.text = LocalizationUtils.T("UI/Shop/Expired", "АКЦИЯ ЗАВЕРШЕНА");
+            string expired = LocalizationUtils.T("UI/Shop/Expired", "АКЦИЯ ЗАВЕРШЕНА");
+            if (!string.Equals(_badgeText.text, expired, StringComparison.Ordinal))
+                _badgeText.text = expired;
             return;
         }
 
         long days = Math.Max(1L, (seconds + 86399L) / 86400L);
-        _badgeText.text = LocalizationUtils.Format(
+        string label = LocalizationUtils.Format(
             "UI/Shop/DaysRemaining",
             "ОСТАЛОСЬ {0} Д.",
             days);
+        if (!string.Equals(_badgeText.text, label, StringComparison.Ordinal))
+            _badgeText.text = label;
     }
 
     private void EnsureDecorations()
@@ -489,17 +672,6 @@ public class SpecialShopSlot : MonoBehaviour
                 Color.white);
         }
 
-        if (_originalPriceText == null)
-        {
-            _originalPriceText = CreateRuntimeText(
-                transform,
-                "OriginalPrice",
-                new Vector2(0.70f, 0.23f),
-                new Vector2(0.96f, 0.34f),
-                20f,
-                TextAlignmentOptions.Center,
-                new Color(1f, 0.18f, 0.14f, 1f));
-        }
     }
 
     private TextMeshProUGUI CreateRuntimeText(
@@ -565,13 +737,48 @@ public class SpecialShopSlot : MonoBehaviour
                pack.OfferStyle == ShopOfferStyle.MonthlyPass;
     }
 
+    private static bool RequiresPeriodicRefresh(ShopPackData pack)
+    {
+        if (pack == null)
+            return false;
+        if (pack.AvailabilityDays > 0)
+            return true;
+
+        return HasTimerReward(pack);
+    }
+
+    private static bool HasTimerReward(ShopPackData pack)
+    {
+        if (pack == null)
+            return false;
+
+        if (pack.Rewards == null)
+            return false;
+
+        for (int i = 0; i < pack.Rewards.Count; i++)
+        {
+            switch (pack.Rewards[i].Type)
+            {
+                case ShopRewardType.ConsumableIncomeBoost:
+                case ShopRewardType.TimedIncomeBoost:
+                case ShopRewardType.ConsumableElementLuckBoost:
+                case ShopRewardType.TimedElementLuckBoost:
+                case ShopRewardType.ConsumableHatchSpeedBoost:
+                case ShopRewardType.ConsumableOmniBoost:
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private static float GetPreferredHeight(ShopOfferStyle style)
     {
         switch (style)
         {
             case ShopOfferStyle.LimitedEgg:
             case ShopOfferStyle.MonthlyPass:
-                return 280f;
+                return 320f;
             case ShopOfferStyle.EternalPack:
                 return 300f;
             case ShopOfferStyle.TimedIncome:
@@ -579,12 +786,12 @@ public class SpecialShopSlot : MonoBehaviour
                 return 220f;
             case ShopOfferStyle.PremiumCurrency:
             case ShopOfferStyle.SoftCurrency:
-                return 230f;
+                return 270f;
             case ShopOfferStyle.Potion:
             case ShopOfferStyle.Permanent:
-                return 255f;
+                return 285f;
             default:
-                return 250f;
+                return 280f;
         }
     }
 

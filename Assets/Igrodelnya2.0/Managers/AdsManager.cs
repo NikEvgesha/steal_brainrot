@@ -10,6 +10,7 @@ public class AdsManager : MonoBehaviour
 {
     private const string NoAdsForeverKey = "Ads.NoInterstitialForever";
     private const string NoAdsUntilUnixKey = "Ads.NoInterstitialUntilUnix";
+    private const int InterstitialWarningSeconds = 2;
 
     [SerializeField] private List<AdsProvider> adsProviders = new List<AdsProvider>();
 
@@ -21,13 +22,21 @@ public class AdsManager : MonoBehaviour
     [SerializeField] private float rewardedReadyTimeoutSeconds = 3f;
     [SerializeField] private float rewardedReadyPollSeconds = 0.15f;
 
-    [Header("Timed Interstitial")]
+    [Header("Startup Interstitial")]
+    [SerializeField] private bool startupInterstitialEnabled = true;
+    [SerializeField, Min(0f)] private float startupInterstitialDelaySeconds = 0.5f;
+    [SerializeField, Min(1f)] private float startupInterstitialReadyTimeoutSeconds = 20f;
+    [SerializeField, Min(0.02f)] private float startupInterstitialReadyPollSeconds = 0.25f;
+    [SerializeField, Min(3f)] private float interstitialCallbackTimeoutSeconds = 20f;
+
+    [Header("Timed Reward")]
     [SerializeField] private bool timedInterstitialEnabled = true;
     [SerializeField] private float interstitialIntervalSeconds = 60f;
-    [SerializeField] private int interstitialCountdownSeconds = 3;
     [SerializeField] private double interstitialIncomeRewardMultiplier = 2d;
+    [SerializeField] private string timedRewardedAdId = "TimedIncomeRewardX2";
     [SerializeField] private string timedInterstitialCountdownLocalizationKey = "UI/Ads/TimedInterstitialCountdown";
     [SerializeField] private string timedInterstitialCountdownText = "Ad in {0}";
+    [SerializeField] private string timedRewardX2ButtonText = "X2";
     [SerializeField] private string timedInterstitialRewardLocalizationKey = "UI/Ads/TimedInterstitialReward";
     [SerializeField] private string timedInterstitialRewardText = "Reward: +{0}";
 
@@ -35,9 +44,15 @@ public class AdsManager : MonoBehaviour
 
     private bool _rewardedInProgress;
     private bool _interstitialInProgress;
+    private int _interstitialRequestVersion;
+    private bool _runtimeStarted;
+    private bool _startupInterstitialFinished;
+    private Coroutine _startupInterstitialRoutine;
+    private Coroutine _interstitialCallbackWatchdogRoutine;
     private Coroutine _timedInterstitialRoutine;
     private Coroutine _adButtonIconRoutine;
     private Coroutine _rewardPopupRoutine;
+    private Coroutine _rewardedCallbackWatchdogRoutine;
 #if UNITY_EDITOR
     private Coroutine _editorCountdownPreviewRoutine;
 #endif
@@ -45,6 +60,11 @@ public class AdsManager : MonoBehaviour
     private bool _timedInterstitialFlowInProgress;
     private bool _tutorialInterstitialSuppressed;
     private float _tutorialInterstitialGraceUntilRealtime;
+    private int _adPauseDepth;
+    private bool _wasGloballyPausedBeforeAd;
+    private PauseManager _adPauseManager;
+    private float _timeScaleBeforeAd;
+    private bool _audioPauseBeforeAd;
 
     private Canvas _adOverlayCanvas;
     private RectTransform _countdownPanel;
@@ -52,6 +72,11 @@ public class AdsManager : MonoBehaviour
     private TextMeshProUGUI _countdownRewardText;
     private RectTransform _rewardTextRect;
     private TextMeshProUGUI _rewardText;
+    private Button _timedRewardX2Button;
+    private TextMeshProUGUI _timedRewardX2ButtonText;
+    private Image _adInputBlocker;
+    private bool _usesPrefabOverlayLayout;
+    private bool _timedRewardX2ButtonInitialized;
 
     public bool AreInterstitialAdsDisabled
     {
@@ -73,6 +98,15 @@ public class AdsManager : MonoBehaviour
         }
     }
 
+    public bool ShouldDeferStartupModal =>
+        (startupInterstitialEnabled && !_startupInterstitialFinished) ||
+        _interstitialInProgress ||
+        _rewardedInProgress ||
+        _adPauseDepth > 0;
+
+    public bool StartupInterstitialFinished =>
+        !startupInterstitialEnabled || _startupInterstitialFinished;
+
     private void Awake()
     {
         if (G.Ad == null)
@@ -87,14 +121,46 @@ public class AdsManager : MonoBehaviour
         }
 
         InitializeProviders();
+        EnsureRuntimeStarted();
     }
 
     private void Start()
     {
+        EnsureRuntimeStarted();
+    }
+
+    private void EnsureRuntimeStarted()
+    {
+        if (_runtimeStarted)
+            return;
+
+        _runtimeStarted = true;
         SubscribeProviders(true);
         ResetTimedInterstitialTimer();
+        EnsureAdRoutinesRunning();
+    }
+
+    private void EnsureAdRoutinesRunning()
+    {
+        StartStartupInterstitialRoutine();
         StartTimedInterstitialRoutine();
         StartAdButtonIconRoutine();
+    }
+
+    private void Update()
+    {
+        if (!_runtimeStarted)
+            return;
+
+        if (_interstitialInProgress && _interstitialCallbackWatchdogRoutine == null)
+        {
+            _interstitialInProgress = false;
+            _interstitialRequestVersion++;
+            ReleaseAdPause();
+        }
+
+        StartStartupInterstitialRoutine();
+        StartTimedInterstitialRoutine();
     }
 
     private void OnDisable()
@@ -102,10 +168,15 @@ public class AdsManager : MonoBehaviour
         SubscribeProviders(false);
     }
 
+    private void OnDestroy()
+    {
+        while (_adPauseDepth > 0)
+            ReleaseAdPause();
+    }
+
     private void OnAdClosed()
     {
         ResetTimedInterstitialTimer();
-        AdClosed?.Invoke();
     }
 
     private void InitializeProviders()
@@ -182,22 +253,25 @@ public class AdsManager : MonoBehaviour
         TryShowInterstitialAd(onComplete);
     }
 
-    private bool TryShowInterstitialAd(Action<bool> onComplete)
+    private bool TryShowInterstitialAd(
+        Action<bool> onComplete,
+        bool ignoreTemporarySuppression = false,
+        string placement = "interstitial")
     {
         string requestId = Guid.NewGuid().ToString("N");
         float requestedAt = Time.realtimeSinceStartup;
-        TrackAdRequested("interstitial", "interstitial", requestId);
+        TrackAdRequested("interstitial", placement, requestId);
 
-        if (IsInterstitialTemporarilySuppressed)
+        if (!ignoreTemporarySuppression && IsInterstitialTemporarilySuppressed)
         {
-            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "tutorial_suppressed");
+            TrackAdResult("interstitial", placement, requestId, null, requestedAt, false, "tutorial_suppressed");
             onComplete?.Invoke(false);
             return false;
         }
 
         if (AreInterstitialAdsDisabled)
         {
-            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "no_ads_unlocked");
+            TrackAdResult("interstitial", placement, requestId, null, requestedAt, false, "no_ads_unlocked");
             onComplete?.Invoke(false);
             return false;
         }
@@ -205,7 +279,7 @@ public class AdsManager : MonoBehaviour
         if (_interstitialInProgress)
         {
             Debug.LogWarning("Interstitial ad is already in progress.");
-            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "already_in_progress");
+            TrackAdResult("interstitial", placement, requestId, null, requestedAt, false, "already_in_progress");
             onComplete?.Invoke(false);
             return false;
         }
@@ -214,23 +288,124 @@ public class AdsManager : MonoBehaviour
         if (provider == null)
         {
             Debug.LogWarning("No interstitial ads available.");
-            TrackAdResult("interstitial", "interstitial", requestId, null, requestedAt, false, "provider_unavailable");
+            TrackAdResult("interstitial", placement, requestId, null, requestedAt, false, "provider_unavailable");
             onComplete?.Invoke(false);
             return false;
         }
 
         _interstitialInProgress = true;
         ResetTimedInterstitialTimer();
-        provider.ShowInterstitialAd(success =>
+        int requestVersion = ++_interstitialRequestVersion;
+        bool resolved = false;
+        AcquireAdPause();
+
+        void ResolveRequest(bool success, string failureReason)
         {
+            if (resolved || requestVersion != _interstitialRequestVersion)
+                return;
+
+            resolved = true;
+            if (_interstitialCallbackWatchdogRoutine != null)
+            {
+                StopCoroutine(_interstitialCallbackWatchdogRoutine);
+                _interstitialCallbackWatchdogRoutine = null;
+            }
+
             _interstitialInProgress = false;
             RegisterAdWatched(success);
-            TrackAdResult("interstitial", "interstitial", requestId, provider, requestedAt, success,
-                success ? string.Empty : "provider_failed");
+            TrackAdResult("interstitial", placement, requestId, provider, requestedAt, success,
+                success ? string.Empty : failureReason);
+            ReleaseAdPause();
             onComplete?.Invoke(success);
-        });
+        }
+
+        _interstitialCallbackWatchdogRoutine = StartCoroutine(
+            InterstitialCallbackWatchdog(
+                requestVersion,
+                () => ResolveRequest(false, "callback_timeout")));
+
+        try
+        {
+            provider.ShowInterstitialAd(success =>
+                ResolveRequest(success, success ? string.Empty : "provider_failed"));
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[AdsManager] Interstitial provider threw an exception: {exception.Message}");
+            ResolveRequest(false, "provider_exception");
+        }
 
         return true;
+    }
+
+    private IEnumerator InterstitialCallbackWatchdog(int requestVersion, Action onTimeout)
+    {
+        yield return new WaitForSecondsRealtime(Mathf.Max(3f, interstitialCallbackTimeoutSeconds));
+
+        if (requestVersion != _interstitialRequestVersion || !_interstitialInProgress)
+            yield break;
+
+        _interstitialCallbackWatchdogRoutine = null;
+        Debug.LogWarning("[AdsManager] Interstitial callback timed out; releasing the ad lock.");
+        onTimeout?.Invoke();
+    }
+
+    private void StartStartupInterstitialRoutine()
+    {
+        if (!startupInterstitialEnabled || _startupInterstitialFinished || _startupInterstitialRoutine != null)
+            return;
+
+        _startupInterstitialRoutine = StartCoroutine(StartupInterstitialRoutine());
+    }
+
+    private IEnumerator StartupInterstitialRoutine()
+    {
+        if (startupInterstitialDelaySeconds > 0f)
+            yield return new WaitForSecondsRealtime(startupInterstitialDelaySeconds);
+
+        float startedAt = Time.realtimeSinceStartup;
+        float timeout = Mathf.Max(1f, startupInterstitialReadyTimeoutSeconds);
+        WaitForSecondsRealtime poll = new WaitForSecondsRealtime(
+            Mathf.Max(0.02f, startupInterstitialReadyPollSeconds));
+
+        while (Time.realtimeSinceStartup - startedAt <= timeout)
+        {
+            if (AreInterstitialAdsDisabled)
+            {
+                Debug.Log("[AdsManager] Startup interstitial skipped: interstitial ads are disabled.");
+                _startupInterstitialFinished = true;
+                _startupInterstitialRoutine = null;
+                yield break;
+            }
+
+            if (!_interstitialInProgress && !_rewardedInProgress && FindReadyInterstitialProvider() != null)
+            {
+                bool requestCompleted = false;
+                bool started = TryShowInterstitialAd(
+                    _ => requestCompleted = true,
+                    ignoreTemporarySuppression: true,
+                    placement: "startup");
+                Debug.Log(started
+                    ? "[AdsManager] Startup interstitial requested."
+                    : "[AdsManager] Startup interstitial request was rejected.");
+
+                if (started)
+                {
+                    while (!requestCompleted)
+                        yield return null;
+                }
+
+                _startupInterstitialFinished = true;
+                _startupInterstitialRoutine = null;
+                yield break;
+            }
+
+            yield return poll;
+        }
+
+        Debug.LogWarning($"[AdsManager] Startup interstitial was not ready within {timeout:0.#} seconds.");
+        _startupInterstitialFinished = true;
+        _startupInterstitialRoutine = null;
     }
 
     public void DisableInterstitialAdsForDays(int days)
@@ -264,14 +439,11 @@ public class AdsManager : MonoBehaviour
         if (suppressed)
         {
             _tutorialInterstitialGraceUntilRealtime = 0f;
-            HideCountdown();
         }
         else
         {
             _tutorialInterstitialGraceUntilRealtime = Time.realtimeSinceStartup + Mathf.Max(0f, graceSeconds);
         }
-
-        ResetTimedInterstitialTimer();
     }
 
     public void AddProvider(AdsProvider provider)
@@ -323,14 +495,50 @@ public class AdsManager : MonoBehaviour
     {
         _rewardedInProgress = true;
         ResetTimedInterstitialTimer();
-        provider.ShowRewardedAd(rewardId, success =>
+        bool resolved = false;
+        AcquireAdPause();
+
+        void ResolveRequest(bool success, string failureReason)
         {
+            if (resolved)
+                return;
+
+            resolved = true;
+            if (_rewardedCallbackWatchdogRoutine != null)
+            {
+                StopCoroutine(_rewardedCallbackWatchdogRoutine);
+                _rewardedCallbackWatchdogRoutine = null;
+            }
+
             _rewardedInProgress = false;
             RegisterAdWatched(success);
             TrackAdResult("rewarded", rewardId, requestId, provider, requestedAt, success,
-                success ? string.Empty : "provider_failed");
+                success ? string.Empty : failureReason);
+            ReleaseAdPause();
             onComplete?.Invoke(success);
-        });
+        }
+
+        _rewardedCallbackWatchdogRoutine = StartCoroutine(
+            RewardedCallbackWatchdog(() => ResolveRequest(false, "callback_timeout")));
+
+        try
+        {
+            provider.ShowRewardedAd(rewardId, success =>
+                ResolveRequest(success, success ? string.Empty : "provider_failed"));
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError($"[AdsManager] Rewarded provider threw an exception: {exception.Message}");
+            ResolveRequest(false, "provider_exception");
+        }
+    }
+
+    private IEnumerator RewardedCallbackWatchdog(Action onTimeout)
+    {
+        yield return new WaitForSecondsRealtime(Mathf.Max(10f, interstitialCallbackTimeoutSeconds));
+        _rewardedCallbackWatchdogRoutine = null;
+        Debug.LogWarning("[AdsManager] Rewarded callback timed out; releasing the ad pause.");
+        onTimeout?.Invoke();
     }
 
     private IEnumerator WaitAndShowRewardedAd(
@@ -362,15 +570,7 @@ public class AdsManager : MonoBehaviour
             yield break;
         }
 
-        ResetTimedInterstitialTimer();
-        provider.ShowRewardedAd(rewardId, success =>
-        {
-            _rewardedInProgress = false;
-            RegisterAdWatched(success);
-            TrackAdResult("rewarded", rewardId, requestId, provider, requestedAt, success,
-                success ? string.Empty : "provider_failed");
-            onComplete?.Invoke(success);
-        });
+        ShowRewardedAd(provider, rewardId, requestId, requestedAt, onComplete);
     }
 
     private void StartTimedInterstitialRoutine()
@@ -416,7 +616,7 @@ public class AdsManager : MonoBehaviour
             if (!timedInterstitialEnabled)
                 break;
 
-            yield return ShowTimedInterstitialFlow();
+            yield return ShowTimedRewardFlow();
         }
 
         _timedInterstitialRoutine = null;
@@ -433,60 +633,175 @@ public class AdsManager : MonoBehaviour
         }
     }
 
-    private IEnumerator ShowTimedInterstitialFlow()
+    private IEnumerator ShowTimedRewardFlow()
     {
         if (_timedInterstitialFlowInProgress)
             yield break;
 
         _timedInterstitialFlowInProgress = true;
         ResetTimedInterstitialTimer();
+        AcquireAdPause();
+        bool countdownPauseHeld = true;
+
+        void ReleaseCountdownPause()
+        {
+            if (!countdownPauseHeld)
+                return;
+
+            countdownPauseHeld = false;
+            ReleaseAdPause();
+        }
 
         double baseReward = CalculateTimedInterstitialBaseReward();
-        int countdown = Mathf.Max(1, interstitialCountdownSeconds);
+        bool x2Requested = false;
+        bool rewardedResolved = false;
+        bool rewardedSuccess = false;
+
+        void RequestX2Reward()
+        {
+            if (x2Requested)
+                return;
+
+            x2Requested = true;
+            if (_timedRewardX2Button != null)
+                _timedRewardX2Button.interactable = false;
+
+            HideCountdown();
+            ShowRewardedAd(timedRewardedAdId, success =>
+            {
+                rewardedSuccess = success;
+                rewardedResolved = true;
+            });
+        }
+
+        int countdown = InterstitialWarningSeconds;
         for (int i = countdown; i > 0; i--)
         {
             if (!CanContinueTimedInterstitialFlow())
             {
                 HideCountdown();
+                ReleaseCountdownPause();
                 _timedInterstitialFlowInProgress = false;
                 yield break;
             }
 
-            ShowCountdown(i, baseReward);
-            yield return new WaitForSecondsRealtime(1f);
+            ShowCountdown(i, baseReward, RequestX2Reward);
+            float elapsed = 0f;
+            while (!x2Requested && elapsed < 1f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (x2Requested)
+                break;
         }
 
         HideCountdown();
 
-        bool done = false;
-        bool adSuccess = false;
-        bool adStarted = TryShowInterstitialAd(success =>
+        if (x2Requested)
         {
-            adSuccess = success;
-            done = true;
-        });
+            while (!rewardedResolved)
+                yield return null;
 
-        if (!adStarted)
+            if (rewardedSuccess)
+            {
+                GiveTimedReward(baseReward, "timed_reward_x2", 2d);
+                ReleaseCountdownPause();
+                _timedInterstitialFlowInProgress = false;
+                yield break;
+            }
+
+            // If the rewarded ad was cancelled or failed, keep the original flow:
+            // show the regular interstitial and grant the normal reward.
+        }
+
+        bool interstitialResolved = false;
+        bool interstitialSuccess = false;
+        bool interstitialStarted = TryShowInterstitialAd(success =>
+        {
+            interstitialSuccess = success;
+            interstitialResolved = true;
+        }, ignoreTemporarySuppression: true, placement: "timed_interstitial");
+        // The interstitial request acquires its own pause synchronously, so the
+        // warning can release its scope without a single unpaused frame.
+        ReleaseCountdownPause();
+
+        if (!interstitialStarted)
         {
             _timedInterstitialFlowInProgress = false;
             yield break;
         }
 
-        while (!done)
+        while (!interstitialResolved)
             yield return null;
 
-        if (adSuccess)
-            GiveTimedInterstitialReward(baseReward);
+        if (!interstitialSuccess)
+        {
+            _timedInterstitialFlowInProgress = false;
+            yield break;
+        }
 
+        GiveTimedReward(baseReward, "timed_reward_free", 1d);
         _timedInterstitialFlowInProgress = false;
+    }
+
+    private void AcquireAdPause()
+    {
+        _adPauseDepth++;
+        if (_adPauseDepth != 1)
+            return;
+
+        _wasGloballyPausedBeforeAd = G.IsPaused;
+        G.IsPaused = true;
+        _adPauseManager = PauseManager.Instance;
+        if (_adPauseManager != null && !_adPauseManager.IsInitialize)
+            _adPauseManager = null;
+
+        if (_adPauseManager != null)
+            _adPauseManager.SetPause(true, true);
+        else
+        {
+            _timeScaleBeforeAd = Time.timeScale;
+            _audioPauseBeforeAd = AudioListener.pause;
+            Time.timeScale = 0f;
+            AudioListener.pause = true;
+        }
+
+        EnsureAdOverlay();
+        if (_adOverlayCanvas != null)
+            _adOverlayCanvas.gameObject.SetActive(true);
+        if (_adInputBlocker != null)
+            _adInputBlocker.gameObject.SetActive(true);
+    }
+
+    private void ReleaseAdPause()
+    {
+        if (_adPauseDepth <= 0)
+            return;
+
+        _adPauseDepth--;
+        if (_adPauseDepth != 0)
+            return;
+
+        G.IsPaused = _wasGloballyPausedBeforeAd;
+        if (_adPauseManager != null)
+            _adPauseManager.SetPause(false, true);
+        else
+        {
+            Time.timeScale = _timeScaleBeforeAd;
+            AudioListener.pause = _audioPauseBeforeAd;
+        }
+
+        _adPauseManager = null;
+        if (_adInputBlocker != null)
+            _adInputBlocker.gameObject.SetActive(false);
+        TryHideAdOverlay();
     }
 
     private bool CanCountTimedInterstitialTime()
     {
-        if (AreInterstitialAdsDisabled || IsInterstitialTemporarilySuppressed || _interstitialInProgress || _rewardedInProgress)
-            return false;
-
-        if (G.Control != null && G.Control.CursorActive)
+        if (AreInterstitialAdsDisabled || _interstitialInProgress || _rewardedInProgress)
             return false;
 
         return true;
@@ -511,31 +826,31 @@ public class AdsManager : MonoBehaviour
         return FindReadyInterstitialProvider() != null;
     }
 
-    private void GiveTimedInterstitialReward(double baseReward)
+    private double GiveTimedReward(double baseReward, string source, double multiplier)
     {
         if (baseReward <= 0d)
-            return;
+            return 0d;
 
-        double finalReward = CalculateFinalRewardAmount(baseReward);
+        double finalReward = CalculateFinalRewardAmount(baseReward * Math.Max(0d, multiplier));
         if (G.Currency == null)
         {
-            Debug.LogError("[AdsManager] Cannot give timed interstitial reward: CurrencyManager is not initialized.");
-            return;
+            Debug.LogError("[AdsManager] Cannot give timed reward: CurrencyManager is not initialized.");
+            return 0d;
         }
 
         double balanceBefore = G.Currency.Coins;
         G.Currency.AddCurrency(CurrencyType.Coins, finalReward);
-        Debug.Log($"[AdsManager] Timed interstitial reward granted: +{finalReward} coins ({balanceBefore} -> {G.Currency.Coins}).");
+        Debug.Log($"[AdsManager] Timed reward granted: +{finalReward} coins ({balanceBefore} -> {G.Currency.Coins}), source={source}.");
         GameAnalytics.Track(AnalyticsEventNames.TimedInterstitialRewardGranted, GameAnalytics.Params(
-            "placement", "timed_interstitial",
+            "placement", "timed_reward",
             "currency_type", "coins",
             "reward_amount", finalReward,
             "base_reward_amount", baseReward,
-            "multiplier", interstitialIncomeRewardMultiplier,
-            "source", "timed_interstitial",
+            "multiplier", multiplier,
+            "source", source,
             "result", "success"));
 
-        ShowRewardPopup(finalReward);
+        return finalReward;
     }
 
     private static void TrackAdRequested(string adType, string placement, string requestId)
@@ -646,13 +961,41 @@ public class AdsManager : MonoBehaviour
 
     private void EnsureAdOverlay()
     {
-        if (_adOverlayCanvas != null)
+        if (_adOverlayCanvas == null && !TryCreateAdOverlayFromPrefab())
+            CreateRuntimeAdOverlay();
+
+        EnsureAdInputBlocker();
+    }
+
+    private void EnsureAdInputBlocker()
+    {
+        if (_adOverlayCanvas == null || _adInputBlocker != null)
             return;
 
-        if (TryCreateAdOverlayFromPrefab())
-            return;
+        Transform existing = _adOverlayCanvas.transform.Find("AdInputBlocker");
+        if (existing != null)
+            _adInputBlocker = existing.GetComponent<Image>();
 
-        CreateRuntimeAdOverlay();
+        if (_adInputBlocker == null)
+        {
+            var blockerObject = new GameObject(
+                "AdInputBlocker",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
+            blockerObject.transform.SetParent(_adOverlayCanvas.transform, false);
+            _adInputBlocker = blockerObject.GetComponent<Image>();
+        }
+
+        RectTransform blockerRect = _adInputBlocker.rectTransform;
+        blockerRect.anchorMin = Vector2.zero;
+        blockerRect.anchorMax = Vector2.one;
+        blockerRect.offsetMin = Vector2.zero;
+        blockerRect.offsetMax = Vector2.zero;
+        blockerRect.SetAsFirstSibling();
+        _adInputBlocker.color = Color.clear;
+        _adInputBlocker.raycastTarget = true;
+        _adInputBlocker.gameObject.SetActive(_adPauseDepth > 0);
     }
 
     private bool TryCreateAdOverlayFromPrefab()
@@ -669,6 +1012,8 @@ public class AdsManager : MonoBehaviour
         _countdownPanel = view.CountdownPanel;
         _countdownText = view.CountdownText;
         _countdownRewardText = view.CountdownRewardText;
+        _timedRewardX2Button = view.TimedRewardX2Button;
+        _timedRewardX2ButtonText = view.TimedRewardX2ButtonText;
         _rewardText = view.RewardText;
         _rewardTextRect = view.RewardTextRect;
 
@@ -684,13 +1029,19 @@ public class AdsManager : MonoBehaviour
             _countdownPanel = null;
             _countdownText = null;
             _countdownRewardText = null;
+            _timedRewardX2Button = null;
+            _timedRewardX2ButtonText = null;
             _rewardText = null;
             _rewardTextRect = null;
+            _usesPrefabOverlayLayout = false;
+            _timedRewardX2ButtonInitialized = false;
             return false;
         }
 
+        _usesPrefabOverlayLayout = true;
         _adOverlayCanvas.overrideSorting = true;
         _adOverlayCanvas.sortingOrder = short.MaxValue;
+        EnsureTimedRewardX2Button();
         _countdownPanel.gameObject.SetActive(false);
         _rewardText.gameObject.SetActive(false);
         view.gameObject.SetActive(false);
@@ -699,6 +1050,7 @@ public class AdsManager : MonoBehaviour
 
     private void CreateRuntimeAdOverlay()
     {
+        _usesPrefabOverlayLayout = false;
         GameObject canvasObject = new GameObject("AdsOverlayCanvas");
         DontDestroyOnLoad(canvasObject);
 
@@ -720,21 +1072,21 @@ public class AdsManager : MonoBehaviour
         _countdownPanel.anchorMax = new Vector2(0.5f, 0.5f);
         _countdownPanel.pivot = new Vector2(0.5f, 0.5f);
         _countdownPanel.anchoredPosition = Vector2.zero;
-        _countdownPanel.sizeDelta = new Vector2(640f, 240f);
+        _countdownPanel.sizeDelta = new Vector2(640f, 330f);
 
         Image panelImage = panelObject.AddComponent<Image>();
         panelImage.color = new Color(0f, 0f, 0f, 0.72f);
         panelImage.raycastTarget = false;
 
         _countdownText = CreateOverlayText("CountdownText", _countdownPanel, 54f, Color.white);
-        _countdownText.rectTransform.anchorMin = new Vector2(0f, 0.38f);
-        _countdownText.rectTransform.anchorMax = Vector2.one;
+        _countdownText.rectTransform.anchorMin = new Vector2(0f, 0.68f);
+        _countdownText.rectTransform.anchorMax = new Vector2(1f, 0.97f);
         _countdownText.rectTransform.offsetMin = new Vector2(28f, 0f);
         _countdownText.rectTransform.offsetMax = new Vector2(-28f, -10f);
 
         _countdownRewardText = CreateOverlayText("CountdownRewardText", _countdownPanel, 34f, new Color(1f, 0.92f, 0.24f, 1f));
-        _countdownRewardText.rectTransform.anchorMin = new Vector2(0f, 0.06f);
-        _countdownRewardText.rectTransform.anchorMax = new Vector2(1f, 0.38f);
+        _countdownRewardText.rectTransform.anchorMin = new Vector2(0f, 0.44f);
+        _countdownRewardText.rectTransform.anchorMax = new Vector2(1f, 0.65f);
         _countdownRewardText.rectTransform.offsetMin = new Vector2(28f, 6f);
         _countdownRewardText.rectTransform.offsetMax = new Vector2(-28f, 0f);
 
@@ -746,8 +1098,94 @@ public class AdsManager : MonoBehaviour
         _rewardTextRect.sizeDelta = new Vector2(760f, 110f);
         _rewardText.gameObject.SetActive(false);
 
+        EnsureTimedRewardX2Button();
         _countdownPanel.gameObject.SetActive(false);
         canvasObject.SetActive(false);
+    }
+
+    private void EnsureTimedRewardX2Button()
+    {
+        if (_countdownPanel == null || _timedRewardX2ButtonInitialized)
+            return;
+
+        Transform existing = _countdownPanel.Find("TimedRewardX2Button");
+        if (existing != null)
+            _timedRewardX2Button = existing.GetComponent<Button>();
+
+        bool createdAtRuntime = _timedRewardX2Button == null;
+        if (createdAtRuntime)
+        {
+            var buttonObject = new GameObject(
+                "TimedRewardX2Button",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Button));
+            buttonObject.transform.SetParent(_countdownPanel, false);
+            _timedRewardX2Button = buttonObject.GetComponent<Button>();
+        }
+
+        RectTransform buttonRect = _timedRewardX2Button.transform as RectTransform;
+        if (createdAtRuntime)
+        {
+            buttonRect.anchorMin = new Vector2(0.12f, 0.08f);
+            buttonRect.anchorMax = new Vector2(0.88f, 0.39f);
+            buttonRect.pivot = new Vector2(0.5f, 0.5f);
+            buttonRect.anchoredPosition = Vector2.zero;
+            buttonRect.sizeDelta = Vector2.zero;
+            buttonRect.localScale = Vector3.one;
+            BlockyUITheme.ApplyButton(_timedRewardX2Button, BlockyUITheme.GreenHeader);
+        }
+
+        Transform labelTransform = buttonRect.Find("Label");
+        if (labelTransform == null)
+        {
+            var labelObject = new GameObject(
+                "Label",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            labelObject.transform.SetParent(buttonRect, false);
+            labelTransform = labelObject.transform;
+        }
+
+        _timedRewardX2ButtonText = labelTransform.GetComponent<TextMeshProUGUI>();
+        if (_timedRewardX2ButtonText == null)
+            _timedRewardX2ButtonText = labelTransform.gameObject.AddComponent<TextMeshProUGUI>();
+
+        if (createdAtRuntime)
+            TmpUiTextFactory.ApplyDefaults(_timedRewardX2ButtonText);
+        RectTransform labelRect = _timedRewardX2ButtonText.rectTransform;
+        if (createdAtRuntime)
+        {
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(70f, 4f);
+            labelRect.offsetMax = new Vector2(-70f, -4f);
+        }
+        _timedRewardX2ButtonText.text = timedRewardX2ButtonText;
+        if (createdAtRuntime)
+        {
+            _timedRewardX2ButtonText.alignment = TextAlignmentOptions.Center;
+            _timedRewardX2ButtonText.enableAutoSizing = true;
+            _timedRewardX2ButtonText.fontSizeMin = 24f;
+            _timedRewardX2ButtonText.fontSizeMax = 46f;
+            _timedRewardX2ButtonText.fontStyle = FontStyles.Bold;
+            _timedRewardX2ButtonText.color = Color.white;
+            _timedRewardX2ButtonText.raycastTarget = false;
+            _timedRewardX2ButtonText.textWrappingMode = TextWrappingModes.NoWrap;
+        }
+
+        AdButtonIconDecorator.SetAdIcon(_timedRewardX2Button, true);
+        Transform badge = createdAtRuntime ? buttonRect.Find("AdIconBadge") : null;
+        if (badge is RectTransform badgeRect)
+        {
+            badgeRect.anchoredPosition = new Vector2(-10f, -10f);
+            badgeRect.sizeDelta = new Vector2(44f, 44f);
+        }
+
+        _timedRewardX2Button.gameObject.SetActive(false);
+        _timedRewardX2ButtonInitialized = true;
     }
 
     private TextMeshProUGUI CreateOverlayText(string objectName, Transform parent, float fontSize, Color color)
@@ -769,25 +1207,71 @@ public class AdsManager : MonoBehaviour
         return text;
     }
 
-    private void ShowCountdown(int seconds, double baseReward)
+    private void ShowCountdown(int seconds, double baseReward, Action onX2)
     {
         EnsureAdOverlay();
+        EnsureTimedRewardX2Button();
+
         _adOverlayCanvas.gameObject.SetActive(true);
         _adOverlayCanvas.transform.localScale = Vector3.one;
         _countdownPanel.gameObject.SetActive(true);
-        var countdownFormat = LocalizationUtils.T(timedInterstitialCountdownLocalizationKey, timedInterstitialCountdownText);
+
+        if (!_usesPrefabOverlayLayout)
+        {
+            _countdownPanel.sizeDelta = new Vector2(640f, 330f);
+            RectTransform titleRect = _countdownText.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 0.68f);
+            titleRect.anchorMax = new Vector2(1f, 0.97f);
+            titleRect.offsetMin = new Vector2(28f, 0f);
+            titleRect.offsetMax = new Vector2(-28f, -10f);
+        }
+        var countdownFormat = LocalizationUtils.T(
+            timedInterstitialCountdownLocalizationKey,
+            timedInterstitialCountdownText);
         _countdownText.text = string.Format(CultureInfo.InvariantCulture, countdownFormat, seconds);
+
         if (_countdownRewardText != null)
         {
-            double finalReward = CalculateFinalRewardAmount(baseReward);
-            var rewardFormat = LocalizationUtils.T(timedInterstitialRewardLocalizationKey, timedInterstitialRewardText);
-            _countdownRewardText.text = string.Format(CultureInfo.InvariantCulture, rewardFormat, FormatCoins(finalReward));
+            if (!_usesPrefabOverlayLayout)
+            {
+                RectTransform rewardRect = _countdownRewardText.rectTransform;
+                rewardRect.anchorMin = new Vector2(0f, 0.44f);
+                rewardRect.anchorMax = new Vector2(1f, 0.65f);
+                rewardRect.offsetMin = new Vector2(28f, 6f);
+                rewardRect.offsetMax = new Vector2(-28f, 0f);
+            }
+            UpdateTimedRewardAmount(CalculateFinalRewardAmount(baseReward));
             _countdownRewardText.gameObject.SetActive(true);
         }
+
+        if (_timedRewardX2Button != null)
+        {
+            _timedRewardX2Button.onClick.RemoveAllListeners();
+            if (onX2 != null)
+                _timedRewardX2Button.onClick.AddListener(() => onX2.Invoke());
+            _timedRewardX2Button.interactable = onX2 != null;
+            _timedRewardX2Button.gameObject.SetActive(true);
+            AdButtonIconDecorator.SetAdIcon(_timedRewardX2Button, true);
+        }
+
+        if (_rewardText != null)
+            _rewardText.gameObject.SetActive(false);
+    }
+
+    private void UpdateTimedRewardAmount(double amount)
+    {
+        if (_countdownRewardText == null)
+            return;
+
+        var rewardFormat = LocalizationUtils.T(timedInterstitialRewardLocalizationKey, timedInterstitialRewardText);
+        _countdownRewardText.text = string.Format(
+            CultureInfo.InvariantCulture,
+            rewardFormat,
+            FormatCoins(amount));
     }
 
 #if UNITY_EDITOR
-    [ContextMenu("Ads/Preview 3-2-1 Countdown")]
+    [ContextMenu("Ads/Preview 2-1 With X2 Button")]
     public void PreviewTimedInterstitialCountdownForEditor()
     {
         if (!Application.isPlaying)
@@ -805,10 +1289,10 @@ public class AdsManager : MonoBehaviour
     private IEnumerator EditorCountdownPreviewRoutine()
     {
         double baseReward = CalculateTimedInterstitialBaseReward();
-        int countdown = Mathf.Max(1, interstitialCountdownSeconds);
+        int countdown = InterstitialWarningSeconds;
         for (int i = countdown; i > 0; i--)
         {
-            ShowCountdown(i, baseReward);
+            ShowCountdown(i, baseReward, () => { });
             yield return new WaitForSecondsRealtime(1f);
         }
 
@@ -819,6 +1303,12 @@ public class AdsManager : MonoBehaviour
 
     private void HideCountdown()
     {
+        if (_timedRewardX2Button != null)
+        {
+            _timedRewardX2Button.onClick.RemoveAllListeners();
+            _timedRewardX2Button.gameObject.SetActive(false);
+        }
+
         if (_countdownPanel != null)
             _countdownPanel.gameObject.SetActive(false);
 
@@ -872,6 +1362,12 @@ public class AdsManager : MonoBehaviour
     {
         if (_adOverlayCanvas == null)
             return;
+
+        if (_adPauseDepth > 0)
+        {
+            _adOverlayCanvas.gameObject.SetActive(true);
+            return;
+        }
 
         bool countdownActive = _countdownPanel != null && _countdownPanel.gameObject.activeSelf;
         bool rewardActive = _rewardText != null && _rewardText.gameObject.activeSelf;

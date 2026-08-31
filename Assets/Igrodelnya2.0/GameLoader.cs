@@ -33,12 +33,9 @@ public class GameLoader : MonoBehaviour
 
     public void StartAfterSDK()
     {
-        //_currentSceneName = _gameOptions.LobbySceneName;
-        //SceneManager.LoadScene(_currentSceneName);
-        if (G.Purchases != null && G.Purchases.PurchasesAvailable())
-        {
-            _startLoadingFinished = true;
-        }
+        // The first interstitial must not depend on whether the current platform
+        // supports in-app purchases (for example, anonymous Yandex players).
+        _startLoadingFinished = true;
     }
 
     public void LoadNextScene(string SceneName, bool asyncMode,bool withAds = true)

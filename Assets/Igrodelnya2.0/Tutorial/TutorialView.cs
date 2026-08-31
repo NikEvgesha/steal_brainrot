@@ -315,7 +315,7 @@ public sealed class TutorialView : MonoBehaviour
         {
             _panelContent.sizeDelta = new Vector2(610f, 290f);
             Image panelImage = _panelContent.GetComponent<Image>();
-            ConfigureSurface(panelImage, new Color(0.10f, 0.055f, 0.025f, 0.94f));
+            ConfigureSurface(panelImage, new Color(0.10f, 0.055f, 0.025f, 0.70f));
             EnsureOutline(_panelContent.gameObject, BlockyUITheme.BlackStroke, new Vector2(5f, -5f));
             EnsureShadow(_panelContent.gameObject, new Color(0f, 0f, 0f, 0.42f), new Vector2(0f, -5f));
 
@@ -329,9 +329,9 @@ public sealed class TutorialView : MonoBehaviour
                     new Vector2(0.5f, 1f),
                     Vector2.zero,
                     new Vector2(0f, 64f));
-                ConfigureSurface(header, BlockyUITheme.GreenHeader);
+                ConfigureSurface(header, WithAlpha(BlockyUITheme.GreenHeader, 0.80f));
                 EnsureOutline(header.gameObject, BlockyUITheme.BlackStroke, new Vector2(4f, -4f));
-                EnsureGradient(header.transform);
+                EnsureGradient(header.transform, 0.22f);
                 header.transform.SetSiblingIndex(0);
             }
 
@@ -345,7 +345,7 @@ public sealed class TutorialView : MonoBehaviour
                     new Vector2(0.5f, 0.5f),
                     new Vector2(0f, 4f),
                     new Vector2(-36f, -154f));
-                ConfigureSurface(messagePlate, new Color(0.055f, 0.025f, 0.012f, 0.76f));
+                ConfigureSurface(messagePlate, new Color(0.055f, 0.025f, 0.012f, 0.50f));
                 EnsureOutline(messagePlate.gameObject, new Color(0.02f, 0.01f, 0.005f, 0.95f), new Vector2(3f, -3f));
                 messagePlate.transform.SetSiblingIndex(1);
             }
@@ -397,7 +397,7 @@ public sealed class TutorialView : MonoBehaviour
                     new Vector2(0f, 18f),
                     new Vector2(-36f, 56f));
             }
-            StyleButton(_rewardClaimButton, BlockyUITheme.GreenHeader);
+            StyleButton(_rewardClaimButton, WithAlpha(BlockyUITheme.GreenHeader, 0.72f), 0.20f);
         }
 
         if (_rewardText != null)
@@ -425,7 +425,7 @@ public sealed class TutorialView : MonoBehaviour
         }
 
         if (_doneButton != null)
-            StyleButton(_doneButton, BlockyUITheme.GreenHeader);
+            StyleButton(_doneButton, WithAlpha(BlockyUITheme.GreenHeader, 0.72f), 0.20f);
 
         if (_collapseButton != null)
         {
@@ -439,13 +439,13 @@ public sealed class TutorialView : MonoBehaviour
                     new Vector2(0f, -108f),
                     new Vector2(64f, 64f));
             }
-            StyleButton(_collapseButton, BlockyUITheme.OrangeHeader);
+            StyleButton(_collapseButton, WithAlpha(BlockyUITheme.OrangeHeader, 0.42f), 0.10f);
         }
 
         if (_collapseButtonText != null)
         {
             BlockyUITheme.ApplyText(_collapseButtonText, Color.white, 28);
-            _collapseButtonText.color = Color.white;
+            _collapseButtonText.color = new Color(1f, 1f, 1f, 0.76f);
             _collapseButtonText.fontSize = 30f;
             _collapseButtonText.enableAutoSizing = false;
             _collapseButtonText.alignment = TextAlignmentOptions.Center;
@@ -495,7 +495,13 @@ public sealed class TutorialView : MonoBehaviour
         }
     }
 
-    private void StyleButton(Button button, Color color)
+    private static Color WithAlpha(Color color, float alpha)
+    {
+        color.a = Mathf.Clamp01(alpha);
+        return color;
+    }
+
+    private void StyleButton(Button button, Color color, float gradientAlpha = 0.34f)
     {
         if (button == null)
             return;
@@ -511,7 +517,7 @@ public sealed class TutorialView : MonoBehaviour
         button.targetGraphic = image;
         EnsureOutline(button.gameObject, BlockyUITheme.BlackStroke, new Vector2(3f, -3f));
         EnsureShadow(button.gameObject, new Color(0f, 0f, 0f, 0.36f), new Vector2(0f, -3f));
-        EnsureGradient(button.transform);
+        EnsureGradient(button.transform, gradientAlpha);
 
         ColorBlock colors = button.colors;
         colors.normalColor = Color.white;
@@ -525,7 +531,7 @@ public sealed class TutorialView : MonoBehaviour
         button.navigation = new Navigation { mode = Navigation.Mode.None };
     }
 
-    private void EnsureGradient(Transform parent)
+    private void EnsureGradient(Transform parent, float alpha = 0.34f)
     {
         if (parent == null || _buttonGradient == null)
             return;
@@ -548,7 +554,7 @@ public sealed class TutorialView : MonoBehaviour
         Image gradient = gameObject.GetComponent<Image>();
         gradient.sprite = _buttonGradient;
         gradient.type = Image.Type.Simple;
-        gradient.color = new Color(1f, 1f, 1f, 0.34f);
+        gradient.color = new Color(1f, 1f, 1f, Mathf.Clamp01(alpha));
         gradient.raycastTarget = false;
         gameObject.transform.SetSiblingIndex(0);
     }
@@ -702,7 +708,11 @@ public sealed class TutorialView : MonoBehaviour
         Camera eventCamera = targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay
             ? null
             : targetCanvas.worldCamera;
-        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(eventCamera, uiTarget.position);
+        // RectTransform.position points at the pivot, which is not necessarily the
+        // visual center of a button (the album button uses a top-left pivot).
+        // Aim the tutorial hand at the actual center of the target rectangle.
+        Vector3 targetWorldCenter = uiTarget.TransformPoint(uiTarget.rect.center);
+        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(eventCamera, targetWorldCenter);
         Vector3 viewport = new Vector3(
             Screen.width > 0 ? screenPoint.x / Screen.width : 0.5f,
             Screen.height > 0 ? screenPoint.y / Screen.height : 0.5f,

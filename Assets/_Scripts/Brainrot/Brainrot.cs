@@ -186,6 +186,7 @@ public class Brainrot : InventoryItem
         SetTypeVisual();
         ApplyElementVfx();
         ApplyAnimalsAnimationState();
+        GroundBlobShadow.Ensure(gameObject, GroundBlobShadowPreset.Animal);
         //_floorListener._hitEvent.AddListener(PlayerInPlace);
     }
 
@@ -287,7 +288,7 @@ public class Brainrot : InventoryItem
         CollectIncome();
     }
 
-    public double CollectIncome(bool playAudio = true)
+    public double CollectIncome(bool playAudio = true, bool grantCurrency = true)
     {
         if (!IsCollectibleLocal())
             return 0d;
@@ -298,7 +299,7 @@ public class Brainrot : InventoryItem
 
         bool hadOfflineIncome = _hasOfflineIncomePending;
         bool playOfflineIncome = playAudio && hadOfflineIncome;
-        if (!TryAddCoins(collected, playAudio && !playOfflineIncome))
+        if (grantCurrency && !TryAddCoins(collected, playAudio && !playOfflineIncome))
             return 0d;
         if (playOfflineIncome)
             G.Sound?.Play(GameAudioId.SFX_OFFLINE_INCOME);

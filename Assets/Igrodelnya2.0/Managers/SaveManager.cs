@@ -9,16 +9,24 @@ public class SaveManager : MonoBehaviour
 {
     [SerializeField] private SaveProvider saveProvider; // Назначаем в инспекторе нужный провайдер (YG2SaveProvider, DebugSaveProvider и т.д.)
     [SerializeField] private bool _newPlayer;
+    [Header("Save batching")]
+    [SerializeField, Min(2f)] private float _progressSaveIntervalSeconds = 10f;
     public bool IsNewPlayer => saveProvider == null || !saveProvider.IsInitialized || saveProvider.CheckProgress() == false;
     public bool IsReady => saveProvider != null && saveProvider.IsInitialized;
 
     private bool _pendingSaveFlagSet;
     private bool _pendingSaveFlagValue;
+    private bool _progressExistsMarked;
     private bool _hasCachedBackendProfile;
     private bool _pendingBackendProfilePersist;
     private string _cachedBackendPlayerId;
     private string _cachedBackendFriendCode;
     private string _cachedBackendDisplayName;
+    private bool _hasPendingCoins;
+    private double _pendingCoins;
+    private bool _hasPendingBigPetIncomeTime;
+    private string _pendingBigPetIncomeTime;
+    private readonly Dictionary<string, CellSaveData> _pendingCellData = new();
 
     private void Awake()
     {
@@ -50,9 +58,10 @@ public class SaveManager : MonoBehaviour
 
     private IEnumerator ProgressSavingRoutine()
     {
+        var wait = new WaitForSecondsRealtime(Mathf.Max(2f, _progressSaveIntervalSeconds));
         while (true)
         {
-            yield return new WaitForSeconds(1);
+            yield return wait;
 
             if (saveProvider == null || !saveProvider.IsInitialized)
                 continue;
@@ -69,12 +78,51 @@ public class SaveManager : MonoBehaviour
                 _pendingBackendProfilePersist = false;
             }
 
-            saveProvider.SaveProgress();
+            FlushProgressNow();
         }
+    }
+
+    public void FlushProgressNow()
+    {
+        if (saveProvider == null || !saveProvider.IsInitialized)
+            return;
+
+        if (_hasPendingCoins)
+        {
+            saveProvider.SaveGameCoin(_pendingCoins);
+            _hasPendingCoins = false;
+        }
+
+        if (_hasPendingBigPetIncomeTime)
+        {
+            saveProvider.SaveBigPetIncomeTime(_pendingBigPetIncomeTime);
+            _hasPendingBigPetIncomeTime = false;
+        }
+
+        if (_pendingCellData.Count > 0)
+        {
+            foreach (KeyValuePair<string, CellSaveData> entry in _pendingCellData)
+                saveProvider.SaveCellData(entry.Key, entry.Value);
+            _pendingCellData.Clear();
+        }
+
+        saveProvider.SaveProgress();
+    }
+
+    private void OnApplicationPause(bool paused)
+    {
+        if (paused)
+            FlushProgressNow();
+    }
+
+    private void OnApplicationQuit()
+    {
+        FlushProgressNow();
     }
 
     public void SetSave(bool haveSave)
     {
+        _progressExistsMarked = haveSave;
         if (saveProvider != null && saveProvider.IsInitialized)
         {
             saveProvider.SetSave(haveSave);
@@ -88,6 +136,8 @@ public class SaveManager : MonoBehaviour
 
     private void MarkProgressExists()
     {
+        if (_progressExistsMarked)
+            return;
         SetSave(true);
     }
 
@@ -267,10 +317,13 @@ public class SaveManager : MonoBehaviour
     public void SaveGameCoin(double coin)
     {
         MarkProgressExists();
-        saveProvider.SaveGameCoin(coin);
+        _pendingCoins = coin;
+        _hasPendingCoins = true;
     }
     public double LoadGameCoin()
     {
+        if (_hasPendingCoins)
+            return _pendingCoins;
         return saveProvider.LoadGameCoin();
     }
     public void SavePlayerHealth(float health)
@@ -381,7 +434,8 @@ public class SaveManager : MonoBehaviour
     public void SaveBigPetIncomeTime(string incomeTime)
     {
         MarkProgressExists();
-        saveProvider.SaveBigPetIncomeTime(incomeTime);
+        _pendingBigPetIncomeTime = incomeTime ?? string.Empty;
+        _hasPendingBigPetIncomeTime = true;
     }
     public int LoadBigPetXP()
     {
@@ -397,6 +451,8 @@ public class SaveManager : MonoBehaviour
     }
     public string LoadBigPetIncomeTime()
     {
+        if (_hasPendingBigPetIncomeTime)
+            return _pendingBigPetIncomeTime;
         return saveProvider.LoadBigPetIncomeTime();
     }
 
@@ -437,11 +493,15 @@ public class SaveManager : MonoBehaviour
     public void SaveCellData(string id, CellSaveData data)
     {
         MarkProgressExists();
-        saveProvider.SaveCellData(id, data);
+        if (string.IsNullOrEmpty(id) || data == null)
+            return;
+        _pendingCellData[id] = data;
     }
 
     public CellSaveData LoadCellData(string id)
     {
+        if (!string.IsNullOrEmpty(id) && _pendingCellData.TryGetValue(id, out CellSaveData pending))
+            return pending;
         return saveProvider.LoadCellData(id);
     }
 

@@ -17,6 +17,7 @@ public sealed class AnalyticsManager : MonoBehaviour
     private const float RateBurst = 15f;
     private const float BreakerDurationSeconds = 60f;
     private const float QualitySummaryIntervalSeconds = 300f;
+    private const float IncomeCollectionSummaryIntervalSeconds = 30f;
     private const string MirraSdkVersion = "5.1.20";
     private const string SessionIndexKey = "Analytics.SessionIndex";
     private const string FirstSeenUtcKey = "Analytics.FirstSeenUtc";
@@ -72,6 +73,9 @@ public sealed class AnalyticsManager : MonoBehaviour
     private double _autoClaimCollected;
     private int _autoClaimActions;
     private float _autoClaimWindowStartedAt;
+    private double _manualIncomeCollected;
+    private int _manualIncomeActions;
+    private float _manualIncomeWindowStartedAt;
 
     public static AnalyticsManager Instance
     {
@@ -132,6 +136,12 @@ public sealed class AnalyticsManager : MonoBehaviour
 
         if (_backendFailures.Count > 0 && now >= _nextBackendFailureSummaryAt)
             QueueBackendFailureSummary("periodic");
+
+        if (_manualIncomeActions > 0 &&
+            now - _manualIncomeWindowStartedAt >= IncomeCollectionSummaryIntervalSeconds)
+        {
+            QueueIncomeCollectionSummary("periodic");
+        }
     }
 
     private void OnApplicationPause(bool paused)
@@ -145,6 +155,7 @@ public sealed class AnalyticsManager : MonoBehaviour
 
         if (paused)
         {
+            QueueIncomeCollectionSummary("application_pause");
             _applicationPausedAt = Time.realtimeSinceStartup;
             Track(AnalyticsEventNames.AppPause, GameAnalytics.Params("pause_reason", "application_pause"),
                 AnalyticsPriority.Critical, "application_pause");
@@ -202,6 +213,7 @@ public sealed class AnalyticsManager : MonoBehaviour
             return;
 
         _sessionEnded = true;
+        QueueIncomeCollectionSummary("session_end");
         QueueAutoClaimSummary("session_end");
         QueueBackendFailureSummary("session_end");
         QueueQualitySummary("session_end");
@@ -222,6 +234,13 @@ public sealed class AnalyticsManager : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(eventName))
             return;
+
+        if (eventName == AnalyticsEventNames.IncomeCollected &&
+            (parameters == null || !parameters.ContainsKey("aggregated_action_count")))
+        {
+            RecordIncomeCollection(parameters);
+            return;
+        }
 
         float now = Time.realtimeSinceStartup;
         RegisterTraffic(now);
@@ -301,6 +320,32 @@ public sealed class AnalyticsManager : MonoBehaviour
                 "failure_reason", failureReason ?? string.Empty),
             AnalyticsPriority.Normal,
             (zoneId ?? string.Empty) + ":" + (source ?? string.Empty));
+    }
+
+    private void RecordIncomeCollection(Dictionary<string, object> parameters)
+    {
+        double amount = 0d;
+        if (parameters != null && parameters.TryGetValue("amount", out object rawAmount))
+        {
+            try
+            {
+                amount = Math.Max(0d, Convert.ToDouble(rawAmount, CultureInfo.InvariantCulture));
+            }
+            catch
+            {
+                amount = 0d;
+            }
+        }
+
+        if (_manualIncomeActions == 0)
+            _manualIncomeWindowStartedAt = Time.realtimeSinceStartup;
+        _manualIncomeActions++;
+        _manualIncomeCollected += amount;
+
+        // Keep local session counters exact without sending an SDK event for
+        // every animal interaction.
+        _incomeCollections++;
+        _incomeCollected += amount;
     }
 
     public void RecordBackendFailure(string endpoint, long statusCode, string failureKind)
@@ -719,7 +764,20 @@ public sealed class AnalyticsManager : MonoBehaviour
             _itemsAcquired++;
         else if (eventName == AnalyticsEventNames.IncomeCollected)
         {
-            _incomeCollections++;
+            int actions = 1;
+            if (parameters.TryGetValue("aggregated_action_count", out object rawActions))
+            {
+                try
+                {
+                    actions = Math.Max(1, Convert.ToInt32(rawActions, CultureInfo.InvariantCulture));
+                }
+                catch
+                {
+                    actions = 1;
+                }
+            }
+
+            _incomeCollections += actions;
             if (parameters.TryGetValue("amount", out object amount))
             {
                 try
@@ -787,6 +845,37 @@ public sealed class AnalyticsManager : MonoBehaviour
                 "result", "success"),
             AnalyticsPriority.Normal,
             "auto_claim_window");
+    }
+
+    private void QueueIncomeCollectionSummary(string window)
+    {
+        if (_manualIncomeActions <= 0)
+            return;
+
+        int actions = _manualIncomeActions;
+        double amount = _manualIncomeCollected;
+        _manualIncomeActions = 0;
+        _manualIncomeCollected = 0d;
+        _manualIncomeWindowStartedAt = 0f;
+
+        // Counters were already updated when individual actions were recorded,
+        // so enqueue directly instead of routing through Track/ObserveEvent.
+        Dictionary<string, object> payload = BuildPayload(GameAnalytics.Params(
+            "window", window ?? string.Empty,
+            "source_type", "mixed_animals",
+            "collection_mode", "manual_batched",
+            "amount", amount,
+            "aggregated_action_count", actions,
+            "currency_type", "coins",
+            "result", "success"));
+        Enqueue(new PendingEvent
+        {
+            Name = AnalyticsEventNames.IncomeCollected,
+            Parameters = payload,
+            Priority = AnalyticsPriority.Normal,
+            EnqueuedAt = Time.realtimeSinceStartup,
+            EstimatedBytes = EstimateBytes(AnalyticsEventNames.IncomeCollected, payload)
+        });
     }
 
     private void QueueBackendFailureSummary(string window)

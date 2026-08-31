@@ -230,6 +230,15 @@ public class TPPlayerController : MonoBehaviour
             _externalHorizontalVelocity += velocity;
     }
 
+    public void ResetMotion()
+    {
+        _verticalVel = 0f;
+        _verticalVelocityOverride = 0f;
+        _hasVerticalVelocityOverride = false;
+        _externalHorizontalVelocity = Vector3.zero;
+        _currentSpeed = 0f;
+    }
+
     public void OnFootstepAnimationEvent()
     {
         if (_cc == null || !_cc.isGrounded || _currentSpeed < footstepMinSpeed || Time.time < _nextFootstepAt)

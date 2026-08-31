@@ -156,6 +156,10 @@ public class CurrencyManager : MonoBehaviour
                 G.Save?.SaveGems(_balance[type]);
             else
                 G.Save?.SaveGameCoin(_balance[type]);
+            // Spending is infrequent and must survive an immediate page close.
+            // Income additions stay batched by SaveManager to avoid an SDK call
+            // every time the player collects from an animal.
+            G.Save?.FlushProgressNow();
             return true;
         }
         NotifyInsufficientCurrency(type, amount, source, true);

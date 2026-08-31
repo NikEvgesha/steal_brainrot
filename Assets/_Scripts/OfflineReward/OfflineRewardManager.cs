@@ -352,6 +352,9 @@ public sealed class OfflineRewardManager : MonoBehaviour
 
     private IEnumerator EvaluateAfterResume(long elapsedSeconds, string source)
     {
+        while (G.Ad != null && G.Ad.ShouldDeferStartupModal)
+            yield return null;
+
         yield return null;
         yield return null;
         _pendingEvaluation = null;
@@ -364,6 +367,11 @@ public sealed class OfflineRewardManager : MonoBehaviour
             return;
         if (G.Currency == null || !G.Currency.IsInitialized)
             return;
+        if (G.Ad != null && G.Ad.ShouldDeferStartupModal)
+        {
+            ScheduleEvaluation(elapsedSeconds, source);
+            return;
+        }
 
         RefreshIncomeFromClock();
         OfflineRewardSnapshot snapshot = BuildSnapshot(elapsedSeconds);
@@ -489,9 +497,33 @@ public sealed class OfflineRewardManager : MonoBehaviour
         }
 
         _claimPending = true;
-        double collectedBase = CollectAllLocalIncome(out int sourceCount);
-        if (multiplier > 1 && collectedBase > 0d)
-            AddBonusIncome(collectedBase * (multiplier - 1));
+        _window.SetActionsInteractable(false);
+        _window.SetVisible(false);
+        StartCoroutine(CompleteClaimRoutine(multiplier, gemsPrice, source, claimMode));
+    }
+
+    private IEnumerator CompleteClaimRoutine(
+        int multiplier,
+        int gemsPrice,
+        string source,
+        string claimMode)
+    {
+        // Let the hidden state render before processing scene income sources.
+        yield return null;
+
+        double collectedBase = 0d;
+        int sourceCount = 0;
+        yield return CollectAllLocalIncomeRoutine((total, count) =>
+        {
+            collectedBase = total;
+            sourceCount = count;
+        });
+
+        // Income sources are drained without granting currency individually.
+        // Grant the complete result once so WebGL does one balance save and one
+        // CurrencyChanged notification instead of one per animal.
+        if (collectedBase > 0d)
+            AddBonusIncome(collectedBase * multiplier);
 
         double granted = ApplyIncomeModifiers(collectedBase) * multiplier;
         var resultSnapshot = new OfflineRewardSnapshot(
@@ -517,44 +549,66 @@ public sealed class OfflineRewardManager : MonoBehaviour
         _claimPending = false;
     }
 
-    private double CollectAllLocalIncome(out int sourceCount)
+    private static IEnumerator CollectAllLocalIncomeRoutine(Action<double, int> completed)
     {
         double total = 0d;
-        sourceCount = 0;
-        using (GameAnalytics.BeginIncomeBatch("offline_reward"))
-        {
-            Brainrot[] animals = Object.FindObjectsByType<Brainrot>(
-                FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-            for (int i = 0; i < animals.Length; i++)
-            {
-                if (animals[i] == null || !animals[i].HasCollectibleIncome)
-                    continue;
+        int sourceCount = 0;
+        int inspectedThisFrame = 0;
+        const int SourcesPerFrame = 4;
 
-                double collected = animals[i].CollectIncome(false);
-                if (collected <= 0d)
-                    continue;
-                total += collected;
-                sourceCount++;
+        Brainrot[] animals = Object.FindObjectsByType<Brainrot>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < animals.Length; i++)
+        {
+            Brainrot animal = animals[i];
+            if (animal != null && animal.HasCollectibleIncome)
+            {
+                using (GameAnalytics.BeginIncomeBatch("offline_reward"))
+                {
+                    double collected = animal.CollectIncome(false, false);
+                    if (collected > 0d)
+                    {
+                        total += collected;
+                        sourceCount++;
+                    }
+                }
             }
 
-            BigPetPoint[] bigPets = Object.FindObjectsByType<BigPetPoint>(
-                FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-            for (int i = 0; i < bigPets.Length; i++)
+            if (++inspectedThisFrame >= SourcesPerFrame)
             {
-                if (bigPets[i] == null || !bigPets[i].HasCollectibleIncome)
-                    continue;
-
-                double collected = bigPets[i].CollectIncome(false);
-                if (collected <= 0d)
-                    continue;
-                total += collected;
-                sourceCount++;
+                inspectedThisFrame = 0;
+                yield return null;
             }
         }
 
-        return Math.Max(0d, total);
+        BigPetPoint[] bigPets = Object.FindObjectsByType<BigPetPoint>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < bigPets.Length; i++)
+        {
+            BigPetPoint bigPet = bigPets[i];
+            if (bigPet != null && bigPet.HasCollectibleIncome)
+            {
+                using (GameAnalytics.BeginIncomeBatch("offline_reward"))
+                {
+                    double collected = bigPet.CollectIncome(false, false);
+                    if (collected > 0d)
+                    {
+                        total += collected;
+                        sourceCount++;
+                    }
+                }
+            }
+
+            if (++inspectedThisFrame >= SourcesPerFrame)
+            {
+                inspectedThisFrame = 0;
+                yield return null;
+            }
+        }
+
+        completed?.Invoke(Math.Max(0d, total), sourceCount);
     }
 
     private static void RefreshIncomeFromClock()

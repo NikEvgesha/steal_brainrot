@@ -9,6 +9,13 @@ using UnityEngine.UI;
 
 public class BigPetPoint : MonoBehaviour
 {
+    [Serializable]
+    private struct XpRequirementAnchor
+    {
+        [Min(1)] public int Level;
+        [Min(1)] public int XpRequired;
+    }
+
     public static event Action<int> LocalLevelChanged;
 
     private static readonly HashSet<string> ExcludedBigPetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -41,6 +48,7 @@ public class BigPetPoint : MonoBehaviour
     [SerializeField] private int _xpAddintPerLvl;
     [SerializeField] private int _xpQuadraticPerLvl;
     [SerializeField] private int _xpCubicPerLvl;
+    [SerializeField] private List<XpRequirementAnchor> _xpRequirementAnchors;
     [SerializeField] private Slider _xpProgressBar;
     [SerializeField] private Slider _foodTimeBar;
     [SerializeField] private TMP_Text _xpProgressText;
@@ -286,13 +294,12 @@ public class BigPetPoint : MonoBehaviour
         {
             yield return new WaitForSeconds(1f);
             secondsRemains--;
-            _currentXp += _currentFood.Data.XPPerSecond;
+            AddExperience(_currentFood.Data.XPPerSecond);
             if (secondsRemains % 3 == 0)
             {
                 G.Sound?.PlayAt(GameAudioId.SFX_CHEW_LOOP, transform.position);
                 G.Sound?.Play(GameAudioId.SFX_XP_PULSE);
             }
-            CheckLvl();
             G.Save.SaveBigPetXP(_currentXp);
 
             float t = (float)secondsRemains / _currentFood.Data.SecondsDuration;
@@ -328,11 +335,27 @@ public class BigPetPoint : MonoBehaviour
 
     private void CheckLvl()
     {
+        CheckLvl(_currentXp);
+    }
+
+    private void AddExperience(int xpAmount)
+    {
+        if (_remoteMode || xpAmount <= 0)
+            return;
+
+        // Late-game food can add hundreds of millions of XP per tick. Keep the
+        // transient sum as long so an almost-full int XP bar cannot overflow.
+        CheckLvl((long)_currentXp + xpAmount);
+    }
+
+    private void CheckLvl(long availableXp)
+    {
         if (_remoteMode) return;
 
         _maxLvl = Mathf.Max(1, GetBigPetVariantCount() * Mathf.Max(1, _lvlsPerPet));
         _currentLvl = Mathf.Clamp(_currentLvl, 1, _maxLvl);
         _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
+        availableXp = Math.Max(0L, availableXp);
 
         if (_currentLvl >= _maxLvl)
         {
@@ -342,20 +365,21 @@ public class BigPetPoint : MonoBehaviour
             return;
         }
 
-        if (_currentXp >= _xpForNextLvl)
+        int levelBefore = _currentLvl;
+        int previousMaxAvailablePetIdx = _maxAvailablePetIdx;
+        while (_currentLvl < _maxLvl && availableXp >= _xpForNextLvl)
         {
-            int levelBefore = _currentLvl;
-            int previousMaxAvailablePetIdx = _maxAvailablePetIdx;
-            while (_currentLvl < _maxLvl && _currentXp >= _xpForNextLvl)
-            {
-                _currentLvl++;
-                _currentXp -= _xpForNextLvl;
-                _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
-            }
+            availableXp -= _xpForNextLvl;
+            _currentLvl++;
+            _xpForNextLvl = GetXpRequiredForLevel(_currentLvl);
+        }
 
-            if (_currentLvl >= _maxLvl)
-                _currentXp = 0;
+        _currentXp = _currentLvl >= _maxLvl
+            ? 0
+            : (int)Math.Min(int.MaxValue, availableXp);
 
+        if (_currentLvl != levelBefore)
+        {
             G.Save.SaveBigPetLvl(_currentLvl);
             G.Save.SaveBigPetXP(_currentXp);
             LocalLevelChanged?.Invoke(_currentLvl);
@@ -393,6 +417,9 @@ public class BigPetPoint : MonoBehaviour
 
     private int GetXpRequiredForLevel(int level)
     {
+        if (TryGetAnchoredXpRequirement(level, out int anchoredRequirement))
+            return anchoredRequirement;
+
         long baseXp = Mathf.Max(1, _baseXPperLvl);
         long linear = Mathf.Max(0, _xpAddintPerLvl);
         long quadratic = Mathf.Max(0, _xpQuadraticPerLvl);
@@ -404,6 +431,63 @@ public class BigPetPoint : MonoBehaviour
                       + quadratic * levelSquared
                       + cubic * levelSquared * levelOffset;
         return (int)Math.Min(int.MaxValue, result);
+    }
+
+    private bool TryGetAnchoredXpRequirement(int level, out int requirement)
+    {
+        requirement = 0;
+        if (_xpRequirementAnchors == null || _xpRequirementAnchors.Count == 0)
+            return false;
+
+        int targetLevel = Mathf.Max(1, level);
+        bool hasLower = false;
+        bool hasUpper = false;
+        int lowerLevel = 0;
+        int upperLevel = int.MaxValue;
+        int lowerXp = 0;
+        int upperXp = 0;
+
+        foreach (XpRequirementAnchor anchor in _xpRequirementAnchors)
+        {
+            int anchorLevel = Mathf.Max(1, anchor.Level);
+            int anchorXp = Mathf.Max(1, anchor.XpRequired);
+            if (anchorLevel == targetLevel)
+            {
+                requirement = anchorXp;
+                return true;
+            }
+
+            if (anchorLevel < targetLevel && (!hasLower || anchorLevel > lowerLevel))
+            {
+                hasLower = true;
+                lowerLevel = anchorLevel;
+                lowerXp = anchorXp;
+            }
+            else if (anchorLevel > targetLevel && (!hasUpper || anchorLevel < upperLevel))
+            {
+                hasUpper = true;
+                upperLevel = anchorLevel;
+                upperXp = anchorXp;
+            }
+        }
+
+        if (!hasLower && !hasUpper)
+            return false;
+        if (!hasLower)
+        {
+            requirement = upperXp;
+            return true;
+        }
+        if (!hasUpper)
+        {
+            requirement = lowerXp;
+            return true;
+        }
+
+        double interpolation = (targetLevel - lowerLevel) / (double)(upperLevel - lowerLevel);
+        double interpolatedXp = lowerXp + (upperXp - (double)lowerXp) * interpolation;
+        requirement = (int)Math.Max(1d, Math.Min(int.MaxValue, Math.Round(interpolatedXp)));
+        return true;
     }
 
     private void UpdateXpUI()
@@ -468,6 +552,8 @@ public class BigPetPoint : MonoBehaviour
             _setPetUI.ChangeActivePet(idx);
 
         CheckScale();
+        if (_currentPet != null)
+            GroundBlobShadow.Ensure(_currentPet, GroundBlobShadowPreset.BigPet);
     }
 
     private void ApplyBigPetElementVisual(GameObject petModel, ElementType element)
@@ -565,7 +651,7 @@ public class BigPetPoint : MonoBehaviour
 
     private bool IsPetGeometryRenderer(Renderer renderer)
     {
-        if (renderer == null || !renderer.enabled)
+        if (renderer == null || !renderer.enabled || GroundBlobShadow.IsShadowRenderer(renderer))
             return false;
 
         // Elemental variants add particles, rays and a ground sprite below the model.
@@ -640,7 +726,7 @@ public class BigPetPoint : MonoBehaviour
         CollectIncome();
     }
 
-    public double CollectIncome(bool playAudio = true)
+    public double CollectIncome(bool playAudio = true, bool grantCurrency = true)
     {
         if (_remoteMode) return 0d;
         if (!_purchased) return 0d;
@@ -651,7 +737,7 @@ public class BigPetPoint : MonoBehaviour
 
         bool hadOfflineIncome = _hasOfflineIncomePending;
         bool playOfflineIncome = playAudio && hadOfflineIncome;
-        if (!TryAddCoins(collected, playAudio && !playOfflineIncome))
+        if (grantCurrency && !TryAddCoins(collected, playAudio && !playOfflineIncome))
             return 0d;
         if (playOfflineIncome)
             G.Sound?.Play(GameAudioId.SFX_OFFLINE_INCOME);

@@ -166,6 +166,8 @@ public sealed class TutorialManager : MonoBehaviour
                 SaveState();
         }
 
+        UpdateShopSuppression();
+
         if (!_schedulerReady || _state == null || _processingTransition)
             return;
 
@@ -193,6 +195,16 @@ public sealed class TutorialManager : MonoBehaviour
             RefreshContext();
             EvaluateCurrentStep();
         }
+    }
+
+    private void UpdateShopSuppression()
+    {
+        if (_view == null || !_active)
+            return;
+
+        bool shouldBeVisible = G.SpecialShop == null || !G.SpecialShop.Opened;
+        if (_view.gameObject.activeSelf != shouldBeVisible)
+            _view.gameObject.SetActive(shouldBeVisible);
     }
 
     private bool TryStartNextAvailable()

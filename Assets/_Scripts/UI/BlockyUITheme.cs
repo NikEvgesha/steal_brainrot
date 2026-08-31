@@ -186,11 +186,18 @@ public static class BlockyUITheme
             : PurchaseCoinGreen;
 
         image.color = affordable ? activeColor : PurchaseDisabled;
-        image.type = Image.Type.Sliced;
+        // The soft-stud texture is a repeating surface, not a nine-sliced
+        // frame. Sliced mode stretches its centre and makes the studs look
+        // noticeably wider on long price buttons.
+        image.type = image.sprite != null ? Image.Type.Tiled : Image.Type.Simple;
         image.pixelsPerUnitMultiplier = 1f;
         image.raycastTarget = true;
         button.targetGraphic = image;
-        button.interactable = affordable;
+        // Gem purchases remain clickable when the balance is too low: the
+        // purchase handler raises CurrencyManager.NoGems and opens the shop
+        // directly on its currency section. Keep the gray visual state as the
+        // affordability hint without swallowing that redirect click.
+        button.interactable = affordable || currencyType == CurrencyType.Gems;
 
         // A smaller extrusion makes an unavailable purchase look already pressed.
         EnsureOutline(

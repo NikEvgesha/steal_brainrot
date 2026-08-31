@@ -102,6 +102,8 @@ public class Egg : InventoryItem
         {
             Init();
         }
+
+        GroundBlobShadow.Ensure(gameObject, GroundBlobShadowPreset.Egg);
     }
 
     private void OnEnable()

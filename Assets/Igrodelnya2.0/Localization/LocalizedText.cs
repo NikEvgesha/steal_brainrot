@@ -53,13 +53,32 @@ public class LocalizedText : MonoBehaviour
         if (localizationData == null || string.IsNullOrEmpty(selectedKey))
             return;
 
-        if (string.IsNullOrEmpty(currentLanguage))
+        if (Application.isPlaying)
         {
             var manager = LocalizationManager.Instance;
-            if (manager != null && !string.IsNullOrEmpty(manager.CurrentLanguage))
+            if (manager != null && !manager.IsLanguageReady)
+            {
+                // Do not flash a serialized/default language while Mirra SDK is
+                // still resolving the platform language.
+                if (tmpText != null)
+                    tmpText.text = string.Empty;
+                return;
+            }
+
+            if (manager != null)
+            {
                 currentLanguage = manager.CurrentLanguage;
-            else if (localizationData.Languages.Count > 0)
+            }
+            else if (string.IsNullOrEmpty(currentLanguage) && localizationData.Languages.Count > 0)
+            {
+                // Direct scene Play Mode has no bootstrap localization manager.
+                // Keep prefab previews usable without affecting platform builds.
                 currentLanguage = localizationData.Languages[0];
+            }
+        }
+        else if (string.IsNullOrEmpty(currentLanguage) && localizationData.Languages.Count > 0)
+        {
+            currentLanguage = localizationData.Languages[0];
         }
 
         var translatedText = localizationData.GetTranslation(selectedKey, currentLanguage);

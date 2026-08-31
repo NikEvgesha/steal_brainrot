@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class AdsOverlayView : MonoBehaviour
 {
@@ -7,6 +8,8 @@ public class AdsOverlayView : MonoBehaviour
     [SerializeField] private RectTransform countdownPanel;
     [SerializeField] private TextMeshProUGUI countdownText;
     [SerializeField] private TextMeshProUGUI countdownRewardText;
+    [SerializeField] private Button timedRewardX2Button;
+    [SerializeField] private TextMeshProUGUI timedRewardX2ButtonText;
     [SerializeField] private RectTransform rewardTextRect;
     [SerializeField] private TextMeshProUGUI rewardText;
 
@@ -14,6 +17,8 @@ public class AdsOverlayView : MonoBehaviour
     public RectTransform CountdownPanel => countdownPanel;
     public TextMeshProUGUI CountdownText => countdownText;
     public TextMeshProUGUI CountdownRewardText => countdownRewardText;
+    public Button TimedRewardX2Button => timedRewardX2Button;
+    public TextMeshProUGUI TimedRewardX2ButtonText => timedRewardX2ButtonText;
     public RectTransform RewardTextRect => rewardTextRect != null ? rewardTextRect : rewardText != null ? rewardText.rectTransform : null;
     public TextMeshProUGUI RewardText => rewardText;
 
@@ -42,6 +47,12 @@ public class AdsOverlayView : MonoBehaviour
 
         if (countdownRewardText == null)
             countdownRewardText = FindChildByName(transform, "CountdownRewardText")?.GetComponent<TextMeshProUGUI>();
+
+        if (timedRewardX2Button == null)
+            timedRewardX2Button = FindChildByName(transform, "TimedRewardX2Button")?.GetComponent<Button>();
+
+        if (timedRewardX2ButtonText == null && timedRewardX2Button != null)
+            timedRewardX2ButtonText = FindChildByName(timedRewardX2Button.transform, "Label")?.GetComponent<TextMeshProUGUI>();
 
         if (rewardText == null)
             rewardText = FindChildByName(transform, "InterstitialRewardText")?.GetComponent<TextMeshProUGUI>();

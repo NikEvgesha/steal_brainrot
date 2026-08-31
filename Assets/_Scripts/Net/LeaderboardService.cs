@@ -42,17 +42,28 @@ public sealed class LeaderboardsResponse
 /// </summary>
 public sealed class LeaderboardService : MonoBehaviour
 {
-    public const string DonationsBoardId = "donations_all_time";
-    public const string WeeklyIncomeBoardId = "income_weekly";
-    public const string WeeklyHatchesBoardId = "hatches_weekly";
-    public const string MonthlyBestPetBoardId = "best_pet_monthly";
-    public const string AllTimeHatchesBoardId = "hatches_all_time";
+    // Central feature gate shared by the service, world UI and legacy provider.
+    public static bool RuntimeEnabled => true;
+
+    // Keep the world boards and local score tracking alive, but do not call
+    // Mirra Achievements until all five technical leaderboard IDs are created
+    // and published in the platform dashboard. Mirra currently turns a 404
+    // from these methods into a browser alert before our promise catch runs.
+    public static bool RemoteRequestsEnabled => false;
+
+    public const string DonationsBoardId = "donationsAllTime";
+    public const string WeeklyIncomeBoardId = "incomeWeekly";
+    public const string WeeklyHatchesBoardId = "hatchesWeekly";
+    public const string MonthlyBestPetBoardId = "bestPetMonthly";
+    public const string AllTimeHatchesBoardId = "hatchesAllTime";
 
     private const string CacheKeyPrefix = "mirra.leaderboards.snapshot.v1";
     private const string ScoreKeyPrefix = "mirra.leaderboards.score.v1";
     private const double IncomeLogScale = 7_000_000d;
     private const float ProviderTimeoutSeconds = 20f;
     private const float RequestTimeoutSeconds = 10f;
+    private const float MinimumSyncIntervalSeconds = 60f;
+    private const float LeaderboardRequestSpacingSeconds = 0.25f;
 
     private static readonly string[] BoardIds =
     {
@@ -64,8 +75,7 @@ public sealed class LeaderboardService : MonoBehaviour
     };
 
     [SerializeField, Min(3)] private int topEntries = 10;
-    [SerializeField, Min(2f)] private float flushIntervalSeconds = 10f;
-    [SerializeField, Min(15f)] private float refreshIntervalSeconds = 60f;
+    [SerializeField, Min(MinimumSyncIntervalSeconds)] private float syncIntervalSeconds = MinimumSyncIntervalSeconds;
 
     private readonly Dictionary<string, int> _scores = new();
     private IncomeModifiersHub _subscribedIncome;
@@ -73,7 +83,6 @@ public sealed class LeaderboardService : MonoBehaviour
     private string _displayName = "Player";
     private bool _initialized;
     private bool _flushRequested;
-    private bool _refreshRequested;
     private int _legacyHatchesAtStartup;
     private double _pendingIncome;
     private long _pendingDonations;
@@ -88,6 +97,14 @@ public sealed class LeaderboardService : MonoBehaviour
 
     private void Awake()
     {
+        if (!RuntimeEnabled)
+        {
+            enabled = false;
+            if (G.Leaderboards == this)
+                G.Leaderboards = null;
+            return;
+        }
+
         if (G.Leaderboards != null && G.Leaderboards != this)
         {
             Destroy(this);
@@ -101,6 +118,9 @@ public sealed class LeaderboardService : MonoBehaviour
 
     private IEnumerator Start()
     {
+        if (!RuntimeEnabled)
+            yield break;
+
         EnsureIncomeSubscription();
         bool providersReady = false;
         MirraSDK.WaitForProviders(() => providersReady = true);
@@ -126,28 +146,31 @@ public sealed class LeaderboardService : MonoBehaviour
         EnsureAllTimeHatchesMigration();
         _initialized = true;
         EnsureIncomeSubscription();
-        _refreshRequested = true;
 
-        float flushElapsed = 0f;
-        float refreshElapsed = 0f;
+        // One initial publish/read cycle after login, then a strict cadence.
+        // Pending gameplay progress can accumulate while providers initialize.
+        if (_flushRequested)
+            ApplyPendingScores();
+        yield return RefreshSnapshot();
+
+        float nextSyncAt = Time.unscaledTime + ResolveSyncInterval();
         while (enabled)
         {
             EnsureIncomeSubscription();
-            flushElapsed += Time.unscaledDeltaTime;
-            refreshElapsed += Time.unscaledDeltaTime;
 
-            if (_flushRequested || flushElapsed >= flushIntervalSeconds)
+            if (Time.unscaledTime < nextSyncAt)
             {
+                yield return null;
+                continue;
+            }
+
+            // SetScore and GetLeaderboard are deliberately kept in one
+            // minute-based cycle. Gameplay events only mark data as pending;
+            // they never bypass this throttle.
+            if (_flushRequested)
                 ApplyPendingScores();
-                flushElapsed = 0f;
-            }
-
-            if (_refreshRequested || !HasSnapshot || refreshElapsed >= refreshIntervalSeconds)
-            {
-                _refreshRequested = false;
-                refreshElapsed = 0f;
-                yield return RefreshSnapshot();
-            }
+            yield return RefreshSnapshot();
+            nextSyncAt = Time.unscaledTime + ResolveSyncInterval();
 
             yield return null;
         }
@@ -163,13 +186,22 @@ public sealed class LeaderboardService : MonoBehaviour
 
     private void OnApplicationPause(bool paused)
     {
-        if (paused && _initialized)
+        if (paused && _initialized && _flushRequested)
+            ApplyPendingScores();
+    }
+
+    private void OnApplicationFocus(bool focused)
+    {
+        // On WebGL a tab close/background transition is more reliably exposed
+        // through focus loss than OnApplicationQuit. Do not read leaderboards
+        // here: there may be no time for callbacks, only publish local deltas.
+        if (!focused && _initialized && _flushRequested)
             ApplyPendingScores();
     }
 
     private void OnApplicationQuit()
     {
-        if (_initialized)
+        if (_initialized && _flushRequested)
             ApplyPendingScores();
     }
 
@@ -179,8 +211,7 @@ public sealed class LeaderboardService : MonoBehaviour
             return;
 
         _pendingIncome += amount;
-        if (_pendingIncome >= 1000d)
-            _flushRequested = true;
+        _flushRequested = true;
     }
 
     public void RecordHatch(string petId, ElementType element, double intrinsicIncome)
@@ -201,8 +232,7 @@ public sealed class LeaderboardService : MonoBehaviour
         }
 
         _pendingDonations = Math.Min(int.MaxValue, _pendingDonations + score);
-        ApplyPendingScores();
-        RequestRefresh();
+        _flushRequested = true;
         onAccepted?.Invoke(true);
     }
 
@@ -211,16 +241,6 @@ public sealed class LeaderboardService : MonoBehaviour
         if (Snapshot?.boards == null || string.IsNullOrWhiteSpace(boardId))
             return null;
         return Snapshot.boards.FirstOrDefault(board => board != null && board.boardId == boardId);
-    }
-
-    public void RequestRefresh()
-    {
-        _refreshRequested = true;
-    }
-
-    public void RequestFlush()
-    {
-        _flushRequested = true;
     }
 
     private void EnsureIncomeSubscription()
@@ -256,7 +276,7 @@ public sealed class LeaderboardService : MonoBehaviour
 
     private IEnumerator SynchronizeScores()
     {
-        if (Application.isEditor)
+        if (Application.isEditor || !RemoteRequestsEnabled)
         {
             foreach (string boardId in BoardIds)
                 _scores[boardId] = LoadStoredScore(boardId);
@@ -264,15 +284,21 @@ public sealed class LeaderboardService : MonoBehaviour
         }
 
         var completed = new HashSet<string>();
-        foreach (string id in BoardIds)
+        for (int i = 0; i < BoardIds.Length; i++)
         {
-            string boardId = id;
-            MirraSDK.Achievements.GetScore(boardId, score =>
+            string boardId = BoardIds[i];
+            MirraLeaderboardBridge.GetScore(boardId, (success, score) =>
             {
-                _scores[boardId] = Math.Max(0, score);
-                SaveStoredScore(boardId, _scores[boardId]);
+                if (success)
+                {
+                    _scores[boardId] = Math.Max(0, score);
+                    SaveStoredScore(boardId, _scores[boardId]);
+                }
                 completed.Add(boardId);
             });
+
+            if (i + 1 < BoardIds.Length)
+                yield return WaitUnscaled(LeaderboardRequestSpacingSeconds);
         }
 
         float elapsed = 0f;
@@ -305,14 +331,12 @@ public sealed class LeaderboardService : MonoBehaviour
             return;
 
         _flushRequested = false;
-        bool changed = false;
 
         if (_pendingIncome > 0d)
         {
             double total = DecodeIncome(GetRawScore(WeeklyIncomeBoardId)) + _pendingIncome;
             _pendingIncome = 0d;
             SetRawScore(WeeklyIncomeBoardId, EncodeIncome(total));
-            changed = true;
         }
 
         if (_pendingWeeklyHatches > 0)
@@ -321,7 +345,6 @@ public sealed class LeaderboardService : MonoBehaviour
                 WeeklyHatchesBoardId,
                 SaturatingAdd(GetRawScore(WeeklyHatchesBoardId), _pendingWeeklyHatches));
             _pendingWeeklyHatches = 0;
-            changed = true;
         }
 
         if (_pendingAllTimeHatches > 0)
@@ -330,7 +353,6 @@ public sealed class LeaderboardService : MonoBehaviour
                 AllTimeHatchesBoardId,
                 SaturatingAdd(GetRawScore(AllTimeHatchesBoardId), _pendingAllTimeHatches));
             _pendingAllTimeHatches = 0;
-            changed = true;
         }
 
         if (_pendingBestPetIncome > 0d)
@@ -338,10 +360,7 @@ public sealed class LeaderboardService : MonoBehaviour
             int best = EncodeIncome(_pendingBestPetIncome);
             _pendingBestPetIncome = 0d;
             if (best > GetRawScore(MonthlyBestPetBoardId))
-            {
                 SetRawScore(MonthlyBestPetBoardId, best);
-                changed = true;
-            }
         }
 
         if (_pendingDonations > 0)
@@ -350,11 +369,7 @@ public sealed class LeaderboardService : MonoBehaviour
                 DonationsBoardId,
                 SaturatingAdd(GetRawScore(DonationsBoardId), _pendingDonations));
             _pendingDonations = 0;
-            changed = true;
         }
-
-        if (changed)
-            _refreshRequested = true;
     }
 
     private void SetRawScore(string boardId, int score)
@@ -362,8 +377,8 @@ public sealed class LeaderboardService : MonoBehaviour
         score = Math.Max(0, score);
         _scores[boardId] = score;
         SaveStoredScore(boardId, score);
-        if (!Application.isEditor)
-            MirraSDK.Achievements.SetScore(boardId, score);
+        if (!Application.isEditor && RemoteRequestsEnabled)
+            MirraLeaderboardBridge.SetScore(boardId, score);
     }
 
     private int GetRawScore(string boardId)
@@ -373,7 +388,7 @@ public sealed class LeaderboardService : MonoBehaviour
 
     private IEnumerator RefreshSnapshot()
     {
-        if (Application.isEditor)
+        if (Application.isEditor || !RemoteRequestsEnabled)
         {
             Snapshot = BuildLocalSnapshot();
             IsUsingCachedSnapshot = false;
@@ -384,14 +399,18 @@ public sealed class LeaderboardService : MonoBehaviour
 
         var loaded = new Dictionary<string, MirraGames.SDK.Common.Leaderboard>();
         var completed = new HashSet<string>();
-        foreach (string id in BoardIds)
+        for (int i = 0; i < BoardIds.Length; i++)
         {
-            string boardId = id;
-            MirraSDK.Achievements.GetLeaderboard(boardId, leaderboard =>
+            string boardId = BoardIds[i];
+            MirraLeaderboardBridge.GetLeaderboard(boardId, (success, leaderboard) =>
             {
-                loaded[boardId] = leaderboard;
+                if (success && leaderboard != null)
+                    loaded[boardId] = leaderboard;
                 completed.Add(boardId);
             });
+
+            if (i + 1 < BoardIds.Length)
+                yield return WaitUnscaled(LeaderboardRequestSpacingSeconds);
         }
 
         float elapsed = 0f;
@@ -420,6 +439,18 @@ public sealed class LeaderboardService : MonoBehaviour
         IsUsingCachedSnapshot = usedCache;
         SaveSnapshot();
         SnapshotUpdated?.Invoke(Snapshot);
+    }
+
+    private float ResolveSyncInterval()
+    {
+        return Mathf.Max(MinimumSyncIntervalSeconds, syncIntervalSeconds);
+    }
+
+    private static IEnumerator WaitUnscaled(float seconds)
+    {
+        float end = Time.unscaledTime + Mathf.Max(0f, seconds);
+        while (Time.unscaledTime < end)
+            yield return null;
     }
 
     private LeaderboardsResponse BuildLocalSnapshot()

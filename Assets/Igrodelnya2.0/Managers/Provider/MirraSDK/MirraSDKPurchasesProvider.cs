@@ -101,7 +101,8 @@ public class MirraSDKPurchaseProvider : PurchasesProvider
             data.Tag,
             "",
             "",
-            data.PriceInteger.ToString(),
+            data.PriceFloat.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+            "",
             data.Currency
         );  // :contentReference[oaicite:4]{index=4}
     }
